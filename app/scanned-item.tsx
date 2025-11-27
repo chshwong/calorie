@@ -65,6 +65,11 @@ export default function ScannedItemScreen() {
     setIsLoading(true);
     try {
       const result = await handleScannedBarcode(code);
+      console.log('[ScannedItem] Lookup result status:', result.status);
+      console.log('[ScannedItem] Lookup result source:', result.source);
+      if (result.status === 'found_cache' || result.status === 'found_openfoodfacts') {
+        console.log('[ScannedItem] Cache row source:', (result as any).cacheRow?.source);
+      }
       setLookupResult(result);
     } catch (error: any) {
       console.error('Lookup error:', error);
@@ -100,7 +105,8 @@ export default function ScannedItemScreen() {
   };
 
   // Save external food as custom food (promote to food_master), then auto-select
-  const handleSaveAsCustomFood = async () => {
+  // Save as Custom and Log Food - promotes to food_master and auto-selects for logging
+  const handleSaveAsCustomAndLog = async () => {
     if (!lookupResult || !user) return;
     
     // Only allow saving from cache or OpenFoodFacts results
@@ -116,7 +122,7 @@ export default function ScannedItemScreen() {
       const result = await promoteToFoodMaster(cacheRow, user.id);
       
       if (result.success) {
-        // Navigate back to meal log with auto-select of the new food
+        // Navigate back to meal log with auto-select of the new food (this will open the entry form)
         router.replace({
           pathname: '/mealtype-log',
           params: {
@@ -128,13 +134,59 @@ export default function ScannedItemScreen() {
         });
       } else {
         setSaveError(result.error);
+        setIsSaving(false);
       }
     } catch (error: any) {
       setSaveError(error.message || 'Failed to save food');
-    } finally {
       setIsSaving(false);
     }
   };
+
+  // Log as 1-time (Manual) - opens manual mode with prefilled data
+  const handleLogAsManual = () => {
+    if (!lookupResult) return;
+    
+    if (lookupResult.status !== 'found_cache' && lookupResult.status !== 'found_openfoodfacts') {
+      return;
+    }
+
+    const cacheRow = lookupResult.cacheRow;
+    
+    // Convert cache data (per 100g) to a standard serving for manual entry
+    // Default to 100g serving
+    const servingGrams = 100;
+    const nutrition = calculateNutritionForServing(cacheRow, servingGrams);
+    
+    // Pass manual entry data as JSON - this will trigger manual mode with prefilled form
+    const manualEntryData = JSON.stringify({
+      item_name: cacheRow.product_name || 'Scanned Product',
+      quantity: servingGrams,
+      unit: 'g',
+      calories_kcal: nutrition.calories,
+      protein_g: nutrition.protein,
+      carbs_g: nutrition.carbs,
+      fat_g: nutrition.fat,
+      fiber_g: nutrition.fiber,
+      saturated_fat_g: null, // Not available from cache calculation
+      sugar_g: nutrition.sugar,
+      sodium_mg: nutrition.sodium_mg,
+      brand: cacheRow.brand || null,
+      barcode: cacheRow.barcode,
+    });
+
+    router.replace({
+      pathname: '/mealtype-log',
+      params: {
+        mealType: mealType || 'breakfast',
+        entryDate: entryDate,
+        manualEntryData: manualEntryData,
+        openManualMode: 'true',
+      },
+    });
+  };
+
+  // Keep old handler name for compatibility (now unused, but keeping for now)
+  const handleSaveAsCustomFood = handleSaveAsCustomAndLog;
 
   // Use external food once without saving to food_master
   const handleUseOnce = () => {
@@ -248,17 +300,24 @@ export default function ScannedItemScreen() {
   );
 
   function renderResult(result: BarcodeLookupResult) {
+    // Log the actual status being rendered for debugging
+    console.log('[ScannedItem] Rendering result with status:', result.status);
+    console.log('[ScannedItem] Result source:', result.source);
+    
     switch (result.status) {
       case 'found_food_master':
+        console.log('[ScannedItem] Rendering as food_master result');
         return renderFoodMasterResult(result);
       case 'found_cache':
       case 'found_openfoodfacts':
+        console.log('[ScannedItem] Rendering as external result (cache/OFF)');
         return renderExternalResult(result);
       case 'not_found':
         return renderNotFound(result);
       case 'invalid_barcode':
         return renderInvalidBarcode(result);
       default:
+        console.warn('[ScannedItem] Unknown status, defaulting to not_found:', result.status);
         return renderNotFound(result as any);
     }
   }
@@ -348,10 +407,24 @@ export default function ScannedItemScreen() {
     result: Extract<BarcodeLookupResult, { status: 'found_cache' | 'found_openfoodfacts' }>
   ) {
     const { cacheRow, normalizedBarcode } = result;
-    const isFromOFF = result.status === 'found_openfoodfacts';
     
     // Calculate nutrition for 100g display
     const nutrition = calculateNutritionForServing(cacheRow, 100);
+
+    // Format source name for display (capitalize properly)
+    const formatSourceName = (source: string | null): string => {
+      if (!source) return 'OpenFoodFacts';
+      // Handle common source names with proper capitalization
+      const sourceLower = source.toLowerCase();
+      if (sourceLower === 'openfoodfacts') return 'OpenFoodFacts';
+      // Otherwise capitalize first letter of each word
+      return source
+        .split(/[\s_-]+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    };
+    
+    const sourceName = formatSourceName(cacheRow.source);
 
     return (
       <>
@@ -361,15 +434,12 @@ export default function ScannedItemScreen() {
         </View>
 
         <ThemedText style={styles.successText}>
-          {t('scanned_item.product_found', 'Product Found!')}
+          {t('scanned_item.found_from_source', 'Found from {{source}}', { source: sourceName })}
         </ThemedText>
 
         <View style={[styles.sourceTag, { backgroundColor: colors.tint + '20' }]}>
           <ThemedText style={[styles.sourceTagText, { color: colors.tint }]}>
-            {isFromOFF 
-              ? t('scanned_item.source_openfoodfacts', 'From OpenFoodFacts')
-              : t('scanned_item.source_cached', 'Cached Data')
-            }
+            {sourceName}
           </ThemedText>
         </View>
 
@@ -441,63 +511,57 @@ export default function ScannedItemScreen() {
 
         {/* Actions */}
         <View style={styles.buttonsContainer}>
-          {/* Primary: Use Once - log without saving to food_master */}
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: colors.tint }]}
-            onPress={handleUseOnce}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps(
-              t('scanned_item.use_once', 'Use Once'),
-              t('scanned_item.use_once_hint', 'Log this food without saving it')
-            )}
-          >
-            <ThemedText style={styles.primaryButtonText}>
-              {t('scanned_item.use_once', 'Use Once')}
-            </ThemedText>
-          </TouchableOpacity>
-
-          {/* Secondary: Save as Custom Food */}
+          {/* Primary: Save as Custom and Log Food */}
           <TouchableOpacity
             style={[
-              styles.secondaryButton, 
+              styles.primaryButton, 
               { 
-                borderColor: colors.tint,
-                opacity: isSaving ? 0.7 : 1,
+                backgroundColor: isSaving ? colors.tint + '80' : colors.tint,
               }
             ]}
-            onPress={handleSaveAsCustomFood}
+            onPress={handleSaveAsCustomAndLog}
             disabled={isSaving}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              t('scanned_item.save_as_custom', 'Save as Custom Food'),
-              t('scanned_item.save_as_custom_hint', 'Save this food for easy access in the future')
+              t('scanned_item.save_and_log', 'Save as Custom and Log Food'),
+              t('scanned_item.save_and_log_hint', 'Save this food and log it in your meal')
             )}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={colors.tint} />
+              <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
-                {t('scanned_item.save_as_custom', 'Save as Custom Food')}
+              <ThemedText style={styles.primaryButtonText}>
+                {t('scanned_item.save_and_log', 'Save as Custom and Log Food')}
               </ThemedText>
             )}
           </TouchableOpacity>
 
-          {/* Tertiary: Scan Another */}
+          {/* Secondary: Log as 1-time (Manual) */}
+          <TouchableOpacity
+            style={[styles.secondaryButton, { borderColor: colors.tint }]}
+            onPress={handleLogAsManual}
+            activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              t('scanned_item.log_as_manual', 'Log as 1-time (Manual)'),
+              t('scanned_item.log_as_manual_hint', 'Log this food once without saving it')
+            )}
+          >
+            <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
+              {t('scanned_item.log_as_manual', 'Log as 1-time (Manual)')}
+            </ThemedText>
+          </TouchableOpacity>
+
+          {/* Cancel */}
           <TouchableOpacity
             style={styles.textButton}
-            onPress={handleScanAnother}
+            onPress={handleGoBack}
             activeOpacity={0.7}
           >
             <ThemedText style={[styles.textButtonText, { color: colors.icon }]}>
-              {t('scanned_item.scan_another', 'Scan Another')}
+              {t('common.cancel', 'Cancel')}
             </ThemedText>
           </TouchableOpacity>
         </View>
-
-        {/* Info */}
-        <ThemedText style={[styles.infoText, { color: colors.icon }]}>
-          {t('scanned_item.use_once_info', '"Use Once" logs without saving. "Save as Custom" adds to your foods for future use.')}
-        </ThemedText>
       </>
     );
   }

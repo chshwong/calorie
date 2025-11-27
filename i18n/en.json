@@ -1042,7 +1042,12 @@
     "use_once": "Use Once",
     "use_once_hint": "Log this food without saving it",
     "use_once_info": "\"Use Once\" logs without saving. \"Save as Custom\" adds to your foods for future use.",
-    "save_as_custom_hint": "Save this food for easy access in the future"
+    "save_as_custom_hint": "Save this food for easy access in the future",
+    "found_from_source": "Found from {{source}}",
+    "save_and_log": "Save as Custom and Log Food",
+    "save_and_log_hint": "Save this food and log it in your meal",
+    "log_as_manual": "Log as 1-time (Manual)",
+    "log_as_manual_hint": "Log this food once without saving it"
   }
 }
 

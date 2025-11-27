@@ -602,6 +602,8 @@ export default function LogFoodScreen() {
   // Barcode scan params - for auto-selecting scanned food
   const selectedFoodIdParam = params.selectedFoodId;
   const scannedFoodDataParam = params.scannedFoodData; // JSON string for "Use Once" flow
+  const manualEntryDataParam = params.manualEntryData; // JSON string for manual entry prefilling
+  const openManualModeParam = params.openManualMode; // Flag to open manual mode
   const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual' || activeTabParam === 'favorite')
     ? activeTabParam
     : 'frequent';
@@ -2609,10 +2611,46 @@ export default function LogFoodScreen() {
           console.error('[MealTypeLog] Error parsing scanned food data:', err);
         }
       }
+
+      // Handle manualEntryData - "Log as 1-time (Manual)" flow
+      const manualData = Array.isArray(manualEntryDataParam) ? manualEntryDataParam[0] : manualEntryDataParam;
+      const shouldOpenManual = Array.isArray(openManualModeParam) ? openManualModeParam[0] === 'true' : openManualModeParam === 'true';
+      
+      if (manualData && shouldOpenManual && user?.id) {
+        console.log('[MealTypeLog] Opening manual mode with prefilled data');
+        try {
+          const entryData = JSON.parse(manualData);
+          
+          // Open manual mode
+          setIsManualMode(true);
+          
+          // Prefill form fields
+          setItemName(entryData.item_name || '');
+          setQuantity(entryData.quantity?.toString() || '');
+          setUnit(entryData.unit || 'g');
+          setCalories(entryData.calories_kcal?.toString() || '');
+          setProtein(entryData.protein_g?.toString() || '');
+          setCarbs(entryData.carbs_g?.toString() || '');
+          setFat(entryData.fat_g?.toString() || '');
+          setFiber(entryData.fiber_g?.toString() || '');
+          setSugar(entryData.sugar_g?.toString() || '');
+          setSodium(entryData.sodium_mg?.toString() || '');
+          
+          // Clear any selected food
+          setSelectedFood(null);
+          
+          // Set active tab to manual if not already
+          if (activeTab !== 'manual') {
+            setActiveTab('manual');
+          }
+        } catch (err) {
+          console.error('[MealTypeLog] Error parsing manual entry data:', err);
+        }
+      }
     };
 
     handleScannedFood();
-  }, [selectedFoodIdParam, scannedFoodDataParam, user?.id]);
+  }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab]);
 
   // Real-time validation function
   const validateFields = useCallback(() => {
