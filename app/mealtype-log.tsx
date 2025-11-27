@@ -599,6 +599,9 @@ export default function LogFoodScreen() {
   const newlyAddedFoodIdParam = params.newlyAddedFoodId;
   const newlyEditedFoodIdParam = params.newlyEditedFoodId;
   const newlyAddedBundleIdParam = params.newlyAddedBundleId;
+  // Barcode scan params - for auto-selecting scanned food
+  const selectedFoodIdParam = params.selectedFoodId;
+  const scannedFoodDataParam = params.scannedFoodData; // JSON string for "Use Once" flow
   const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual' || activeTabParam === 'favorite')
     ? activeTabParam
     : 'frequent';
@@ -2551,7 +2554,65 @@ export default function LogFoodScreen() {
     }
   }, [refreshCustomFoodsParam, newlyAddedFoodIdParam, user?.id, activeTab, fetchCustomFoods]);
 
+  // Handle barcode scan results - auto-select food from scan
+  useEffect(() => {
+    const handleScannedFood = async () => {
+      // Handle selectedFoodId - fetch from food_master and auto-select
+      const foodId = Array.isArray(selectedFoodIdParam) ? selectedFoodIdParam[0] : selectedFoodIdParam;
+      if (foodId && user?.id) {
+        console.log('[MealTypeLog] Auto-selecting scanned food:', foodId);
+        try {
+          const { data: food, error } = await supabase
+            .from('food_master')
+            .select('*')
+            .eq('id', foodId)
+            .single();
+          
+          if (food && !error) {
+            // Auto-select the food
+            handleFoodSelect(food as FoodMaster);
+          }
+        } catch (err) {
+          console.error('[MealTypeLog] Error fetching scanned food:', err);
+        }
+      }
+      
+      // Handle scannedFoodData - "Use Once" flow with external data (no food_master entry)
+      const scannedData = Array.isArray(scannedFoodDataParam) ? scannedFoodDataParam[0] : scannedFoodDataParam;
+      if (scannedData && user?.id) {
+        console.log('[MealTypeLog] Using scanned food data for "Use Once"');
+        try {
+          const externalFood = JSON.parse(scannedData);
+          // Create a virtual FoodMaster-like object for the entry form
+          // Note: This food won't be saved to food_master - it's for one-time use
+          const virtualFood: FoodMaster = {
+            id: '', // Empty - indicates this is not a saved food
+            name: externalFood.product_name || 'Scanned Product',
+            brand: externalFood.brand || null,
+            calories_kcal: externalFood.energy_kcal_100g || 0,
+            protein_g: externalFood.protein_100g || 0,
+            carbs_g: externalFood.carbs_100g || 0,
+            fat_g: externalFood.fat_100g || 0,
+            fiber_g: externalFood.fiber_100g || null,
+            saturated_fat_g: externalFood.saturated_fat_100g || null,
+            sugar_g: externalFood.sugars_100g || null,
+            sodium_mg: externalFood.sodium_100g ? Math.round(externalFood.sodium_100g * 1000) : null,
+            serving_size: 100, // External data is per 100g
+            serving_unit: 'g',
+            source: 'openfoodfacts',
+            is_custom: false,
+            barcode: externalFood.barcode || null,
+          };
+          
+          handleFoodSelect(virtualFood);
+        } catch (err) {
+          console.error('[MealTypeLog] Error parsing scanned food data:', err);
+        }
+      }
+    };
 
+    handleScannedFood();
+  }, [selectedFoodIdParam, scannedFoodDataParam, user?.id]);
 
   // Real-time validation function
   const validateFields = useCallback(() => {

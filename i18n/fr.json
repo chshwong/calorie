@@ -1036,7 +1036,13 @@
     "scanned_barcode": "Code-barres scanné",
     "scanned_code": "Code scanné",
     "create_custom": "Créer un aliment personnalisé",
-    "try_again": "Réessayer"
+    "try_again": "Réessayer",
+    "use_this_food": "Utiliser cet aliment",
+    "use_this_food_hint": "Ajouter cet aliment à votre repas",
+    "use_once": "Utiliser une fois",
+    "use_once_hint": "Enregistrer cet aliment sans le sauvegarder",
+    "use_once_info": "\"Utiliser une fois\" enregistre sans sauvegarder. \"Sauvegarder\" l'ajoute à vos aliments pour une utilisation future.",
+    "save_as_custom_hint": "Sauvegarder cet aliment pour un accès facile à l'avenir"
   }
 }
 

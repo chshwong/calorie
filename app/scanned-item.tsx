@@ -87,6 +87,19 @@ export default function ScannedItemScreen() {
     router.back();
   };
 
+  // Use canonical food from food_master - navigate back with auto-select
+  const handleUseCanonicalFood = (foodId: string) => {
+    router.replace({
+      pathname: '/mealtype-log',
+      params: {
+        mealType: mealType || 'breakfast',
+        entryDate: entryDate,
+        selectedFoodId: foodId,
+      },
+    });
+  };
+
+  // Save external food as custom food (promote to food_master), then auto-select
   const handleSaveAsCustomFood = async () => {
     if (!lookupResult || !user) return;
     
@@ -103,14 +116,14 @@ export default function ScannedItemScreen() {
       const result = await promoteToFoodMaster(cacheRow, user.id);
       
       if (result.success) {
-        // Navigate back to meal log - the food is now in food_master
-        // and will appear in search results
+        // Navigate back to meal log with auto-select of the new food
         router.replace({
           pathname: '/mealtype-log',
           params: {
             mealType: mealType || 'breakfast',
             entryDate: entryDate,
             refreshCustomFoods: Date.now().toString(),
+            selectedFoodId: result.foodMasterId,
           },
         });
       } else {
@@ -121,6 +134,42 @@ export default function ScannedItemScreen() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Use external food once without saving to food_master
+  const handleUseOnce = () => {
+    if (!lookupResult) return;
+    
+    if (lookupResult.status !== 'found_cache' && lookupResult.status !== 'found_openfoodfacts') {
+      return;
+    }
+
+    const cacheRow = lookupResult.cacheRow;
+    
+    // Pass external food data as JSON to mealtype-log for one-time use
+    const scannedFoodData = JSON.stringify({
+      barcode: cacheRow.barcode,
+      product_name: cacheRow.product_name,
+      brand: cacheRow.brand,
+      energy_kcal_100g: cacheRow.energy_kcal_100g,
+      protein_100g: cacheRow.protein_100g,
+      carbs_100g: cacheRow.carbs_100g,
+      fat_100g: cacheRow.fat_100g,
+      fiber_100g: cacheRow.fiber_100g,
+      saturated_fat_100g: cacheRow.saturated_fat_100g,
+      sugars_100g: cacheRow.sugars_100g,
+      sodium_100g: cacheRow.sodium_100g,
+      serving_size: cacheRow.serving_size,
+    });
+
+    router.replace({
+      pathname: '/mealtype-log',
+      params: {
+        mealType: mealType || 'breakfast',
+        entryDate: entryDate,
+        scannedFoodData: scannedFoodData,
+      },
+    });
   };
 
   const handleCreateManualFood = () => {
@@ -269,14 +318,15 @@ export default function ScannedItemScreen() {
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: colors.tint }]}
-            onPress={() => {
-              // TODO: Add this food to the meal
-              router.back();
-            }}
+            onPress={() => handleUseCanonicalFood(food.id)}
             activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              t('scanned_item.use_this_food', 'Use This Food'),
+              t('scanned_item.use_this_food_hint', 'Add this food to your meal')
+            )}
           >
             <ThemedText style={styles.primaryButtonText}>
-              {t('scanned_item.add_to_meal', 'Add to Meal')}
+              {t('scanned_item.use_this_food', 'Use This Food')}
             </ThemedText>
           </TouchableOpacity>
 
@@ -391,30 +441,54 @@ export default function ScannedItemScreen() {
 
         {/* Actions */}
         <View style={styles.buttonsContainer}>
+          {/* Primary: Use Once - log without saving to food_master */}
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: colors.tint }]}
+            onPress={handleUseOnce}
+            activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              t('scanned_item.use_once', 'Use Once'),
+              t('scanned_item.use_once_hint', 'Log this food without saving it')
+            )}
+          >
+            <ThemedText style={styles.primaryButtonText}>
+              {t('scanned_item.use_once', 'Use Once')}
+            </ThemedText>
+          </TouchableOpacity>
+
+          {/* Secondary: Save as Custom Food */}
           <TouchableOpacity
             style={[
-              styles.primaryButton, 
-              { backgroundColor: isSaving ? colors.tint + '80' : colors.tint }
+              styles.secondaryButton, 
+              { 
+                borderColor: colors.tint,
+                opacity: isSaving ? 0.7 : 1,
+              }
             ]}
             onPress={handleSaveAsCustomFood}
             disabled={isSaving}
             activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              t('scanned_item.save_as_custom', 'Save as Custom Food'),
+              t('scanned_item.save_as_custom_hint', 'Save this food for easy access in the future')
+            )}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.tint} />
             ) : (
-              <ThemedText style={styles.primaryButtonText}>
+              <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
                 {t('scanned_item.save_as_custom', 'Save as Custom Food')}
               </ThemedText>
             )}
           </TouchableOpacity>
 
+          {/* Tertiary: Scan Another */}
           <TouchableOpacity
-            style={[styles.secondaryButton, { borderColor: colors.tint }]}
+            style={styles.textButton}
             onPress={handleScanAnother}
             activeOpacity={0.7}
           >
-            <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
+            <ThemedText style={[styles.textButtonText, { color: colors.icon }]}>
               {t('scanned_item.scan_another', 'Scan Another')}
             </ThemedText>
           </TouchableOpacity>
@@ -422,7 +496,7 @@ export default function ScannedItemScreen() {
 
         {/* Info */}
         <ThemedText style={[styles.infoText, { color: colors.icon }]}>
-          {t('scanned_item.save_info', 'Saving will add this to your custom foods for easy access in the future.')}
+          {t('scanned_item.use_once_info', '"Use Once" logs without saving. "Save as Custom" adds to your foods for future use.')}
         </ThemedText>
       </>
     );

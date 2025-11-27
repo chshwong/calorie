@@ -1036,7 +1036,13 @@
     "scanned_barcode": "Scanned Barcode",
     "scanned_code": "Scanned Code",
     "create_custom": "Create Custom Food",
-    "try_again": "Try Again"
+    "try_again": "Try Again",
+    "use_this_food": "Use This Food",
+    "use_this_food_hint": "Add this food to your meal",
+    "use_once": "Use Once",
+    "use_once_hint": "Log this food without saving it",
+    "use_once_info": "\"Use Once\" logs without saving. \"Save as Custom\" adds to your foods for future use.",
+    "save_as_custom_hint": "Save this food for easy access in the future"
   }
 }
 
