@@ -273,22 +273,29 @@ export function WebBarcodeScanner({
         </View>
       )}
       
-      {/* This div will be used by html5-qrcode */}
+      {/* This div will be used by html5-qrcode - needs absolute positioning and full size */}
       <div 
         id="web-barcode-scanner" 
         ref={containerRef as any}
         style={{ 
-          width: '100%', 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
           height: '100%',
-          display: isInitializing ? 'none' : 'block'
+          display: isInitializing ? 'none' : 'block',
         }} 
       />
       
       {isScanning && (
         <View style={styles.instructionContainer}>
-          <Text style={styles.instructionText}>
-            {t('mealtype_log.scanner.point_at_barcode', 'Point your camera at a barcode')}
-          </Text>
+          <View style={styles.instructionBubble}>
+            <Text style={styles.instructionText}>
+              {t('mealtype_log.scanner.point_at_barcode', 'Point your camera at a barcode')}
+            </Text>
+          </View>
           
           {onSwitchToFileUpload && (
             <TouchableOpacity
@@ -366,33 +373,36 @@ const styles = StyleSheet.create({
   instructionContainer: {
     position: 'absolute',
     bottom: 40,
-    left: 0,
-    right: 0,
+    left: 16,
+    right: 16,
     alignItems: 'center',
+    zIndex: 20,
+  },
+  instructionBubble: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    maxWidth: '100%',
   },
   instructionText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    textAlign: 'center',
   },
   switchToUploadLink: {
     marginTop: 12,
-    padding: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 8,
   },
   switchToUploadText: {
     color: '#fff',
     fontSize: 14,
     textDecorationLine: 'underline',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textAlign: 'center',
   },
 });
 
