@@ -1017,7 +1017,26 @@
     "scan_another_hint": "Go back to scan a different barcode",
     "adding_to": "Adding to",
     "invalid_barcode_title": "Invalid Barcode",
-    "invalid_barcode_message": "The scanned code \"{{code}}\" is not a valid barcode.\n\n{{error}}\n\nPlease try scanning again with a valid product barcode."
+    "invalid_barcode_message": "The scanned code \"{{code}}\" is not a valid barcode.\n\n{{error}}\n\nPlease try scanning again with a valid product barcode.",
+    "looking_up": "Looking up product...",
+    "found_in_database": "Found in Database!",
+    "product_found": "Product Found!",
+    "source_canonical": "Canonical Food",
+    "source_openfoodfacts": "From OpenFoodFacts",
+    "source_cached": "Cached Data",
+    "unknown_product": "Unknown Product",
+    "per_serving": "Per",
+    "per_100g": "Per 100g/ml",
+    "typical_serving": "Typical serving",
+    "add_to_meal": "Add to Meal",
+    "save_as_custom": "Save as Custom Food",
+    "save_info": "Saving will add this to your custom foods for easy access in the future.",
+    "not_found_title": "Product Not Found",
+    "not_found_description": "This product was not found in our database or OpenFoodFacts. You can create a custom food entry with this barcode.",
+    "scanned_barcode": "Scanned Barcode",
+    "scanned_code": "Scanned Code",
+    "create_custom": "Create Custom Food",
+    "try_again": "Try Again"
   }
 }
 

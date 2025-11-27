@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 // Load html5-qrcode from CDN to avoid Metro bundler issues
 let Html5Qrcode: any = null;
+let Html5QrcodeSupportedFormats: any = null;
 let loadingPromise: Promise<void> | null = null;
 
 function loadHtml5QrcodeFromCDN(): Promise<void> {
@@ -19,6 +20,7 @@ function loadHtml5QrcodeFromCDN(): Promise<void> {
     // Check if already loaded
     if ((window as any).Html5Qrcode) {
       Html5Qrcode = (window as any).Html5Qrcode;
+      Html5QrcodeSupportedFormats = (window as any).Html5QrcodeSupportedFormats;
       resolve();
       return;
     }
@@ -28,7 +30,9 @@ function loadHtml5QrcodeFromCDN(): Promise<void> {
     script.async = true;
     script.onload = () => {
       Html5Qrcode = (window as any).Html5Qrcode;
-      console.log('html5-qrcode loaded from CDN');
+      Html5QrcodeSupportedFormats = (window as any).Html5QrcodeSupportedFormats;
+      console.log('[WebScanner] html5-qrcode loaded from CDN');
+      console.log('[WebScanner] Supported formats:', Html5QrcodeSupportedFormats);
       resolve();
     };
     script.onerror = () => {
@@ -112,13 +116,34 @@ export function WebBarcodeScanner({
           return;
         }
         
-        // Create scanner instance
-        scannerRef.current = new Html5Qrcode(scannerId, {
+        // Get supported formats - prioritize product barcodes (EAN-13, UPC-A)
+        const formatsToSupport = Html5QrcodeSupportedFormats ? [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ].filter(Boolean) : undefined;
+
+        console.log('[WebScanner] Formats to support:', formatsToSupport);
+
+        // Create scanner instance with explicit format configuration
+        const scannerConfig: any = {
           verbose: false,
           experimentalFeatures: {
             useBarCodeDetectorIfSupported: true // Use native BarcodeDetector API if available
           }
-        });
+        };
+        
+        if (formatsToSupport) {
+          scannerConfig.formatsToSupport = formatsToSupport;
+        }
+
+        scannerRef.current = new Html5Qrcode(scannerId, scannerConfig);
         
         // Start scanning with back camera
         await scannerRef.current.start(

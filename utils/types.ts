@@ -147,3 +147,60 @@ export interface UserProfile {
   updated_at: string;
 }
 
+// ============================================================================
+// EXTERNAL FOOD CACHE TYPES
+// ============================================================================
+
+/**
+ * Cached external food data from OpenFoodFacts or other sources.
+ * Maps to the 'external_food_cache' table.
+ * 
+ * IMPORTANT: All nutrition values are per 100g/ml.
+ */
+export interface ExternalFoodCache {
+  id: string;
+  /** Normalized 13-digit EAN-13 barcode */
+  barcode: string;
+  /** Source identifier, e.g., 'openfoodfacts' */
+  source: string;
+  /** Original ID from source (e.g., OFF "code") */
+  source_food_id: string | null;
+  /** Product name */
+  product_name: string | null;
+  /** Brand name */
+  brand: string | null;
+  /** Energy in kcal per 100g/ml */
+  energy_kcal_100g: number | null;
+  /** Protein in grams per 100g/ml */
+  protein_100g: number | null;
+  /** Carbohydrates in grams per 100g/ml */
+  carbs_100g: number | null;
+  /** Fat in grams per 100g/ml */
+  fat_100g: number | null;
+  /** Saturated fat in grams per 100g/ml */
+  saturated_fat_100g: number | null;
+  /** Sugars in grams per 100g/ml */
+  sugars_100g: number | null;
+  /** Fiber in grams per 100g/ml */
+  fiber_100g: number | null;
+  /** Sodium in grams per 100g/ml (OFF uses grams, not mg) */
+  sodium_100g: number | null;
+  /** Raw serving size text from source, e.g., "250 ml" */
+  serving_size: string | null;
+  /** Full original JSON from source API */
+  raw_payload: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+  /** Last time we fetched from the external API */
+  last_fetched_at: string | null;
+  /** Number of times this barcode has been scanned */
+  times_scanned: number;
+  /** If promoted to food_master, the ID of that row */
+  promoted_food_master_id: string | null;
+}
+
+/**
+ * Source types for barcode lookups
+ */
+export type BarcodeLookupSource = 'food_master' | 'external_food_cache' | 'openfoodfacts' | 'none';
+

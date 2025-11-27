@@ -948,21 +948,21 @@ export default function LogFoodScreen() {
       // Map database result to FrequentFood type with default serving info
       const frequentFoodsList: FrequentFood[] = data.map((row: any) => {
         const food: FoodMaster = {
-          id: row.id,
-          name: row.name,
-          brand: row.brand,
-          serving_size: row.serving_size,
-          serving_unit: row.serving_unit,
-          calories_kcal: row.calories_kcal,
-          protein_g: row.protein_g,
-          carbs_g: row.carbs_g,
-          fat_g: row.fat_g,
-          fiber_g: row.fiber_g,
-          saturated_fat_g: row.saturated_fat_g,
-          sugar_g: row.sugar_g,
-          sodium_mg: row.sodium_mg,
-          source: row.source,
-          is_custom: row.is_custom,
+        id: row.id,
+        name: row.name,
+        brand: row.brand,
+        serving_size: row.serving_size,
+        serving_unit: row.serving_unit,
+        calories_kcal: row.calories_kcal,
+        protein_g: row.protein_g,
+        carbs_g: row.carbs_g,
+        fat_g: row.fat_g,
+        fiber_g: row.fiber_g,
+        saturated_fat_g: row.saturated_fat_g,
+        sugar_g: row.sugar_g,
+        sodium_mg: row.sodium_mg,
+        source: row.source,
+        is_custom: row.is_custom,
         };
         
         // Get servings for this food and compute default serving
@@ -971,8 +971,8 @@ export default function LogFoodScreen() {
         
         return {
           ...food,
-          logCount: Number(row.log_count),
-          lastLoggedAt: row.last_logged_at,
+        logCount: Number(row.log_count),
+        lastLoggedAt: row.last_logged_at,
           defaultServingQty: defaultServing.quantity,
           defaultServingUnit: defaultServing.unit,
           defaultServingCalories: Math.round(nutrients.calories_kcal),
@@ -2904,7 +2904,7 @@ export default function LogFoodScreen() {
     try {
       // Step 1: Validate and normalize the barcode (must be 12 or 13 digits)
       const validationResult = validateAndNormalizeBarcode(barcodeData);
-      
+
       if (!validationResult.isValid) {
         // Invalid barcode format - show error with options
         Alert.alert(
@@ -2923,7 +2923,7 @@ export default function LogFoodScreen() {
                 setBarcodeScanning(false);
               }
             },
-            { 
+            {
               text: t('mealtype_log.scanner.try_again', 'Try Again'), 
               onPress: () => {
                 setScanned(false);
@@ -2934,7 +2934,7 @@ export default function LogFoodScreen() {
         );
         return;
       }
-      
+
       // Step 2: Barcode is valid - close scanner and navigate to scanned-item page
       const normalizedCode = validationResult.normalizedCode!;
       
@@ -5445,98 +5445,98 @@ export default function LogFoodScreen() {
             if (!hasPermission) {
               // Native: Need to request permission
               return (
-                <View style={styles.scannerContent}>
-                  <ThemedText style={[styles.scannerText, { color: colors.text }]}>
-                    {t('mealtype_log.scanner.permission_required')}
-                  </ThemedText>
-                  {requestingPermission && (
-                    <ActivityIndicator size="large" color={colors.tint} style={{ marginVertical: 20 }} />
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.scannerButton, 
-                      { 
-                        backgroundColor: requestingPermission ? colors.icon + '40' : colors.tint,
-                        opacity: requestingPermission ? 0.6 : 1
-                      }
-                    ]}
+            <View style={styles.scannerContent}>
+              <ThemedText style={[styles.scannerText, { color: colors.text }]}>
+                {t('mealtype_log.scanner.permission_required')}
+              </ThemedText>
+              {requestingPermission && (
+                <ActivityIndicator size="large" color={colors.tint} style={{ marginVertical: 20 }} />
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.scannerButton, 
+                  { 
+                    backgroundColor: requestingPermission ? colors.icon + '40' : colors.tint,
+                    opacity: requestingPermission ? 0.6 : 1
+                  }
+                ]}
                     onPress={async () => {
                       console.log('=== Grant Permission button pressed ===');
+                  
+                  if (requestingPermission) {
+                    console.log('Already requesting permission, ignoring click');
+                    return;
+                  }
+                  
+                  setRequestingPermission(true);
                       
-                      if (requestingPermission) {
-                        console.log('Already requesting permission, ignoring click');
-                        return;
-                      }
+                    try {
+                      console.log('Current permission state before request:', permission);
+                      const result = await requestPermission();
                       
-                      setRequestingPermission(true);
+                      console.log('Permission request completed. Result:', result);
                       
-                      try {
-                        console.log('Current permission state before request:', permission);
-                        const result = await requestPermission();
-                        
-                        console.log('Permission request completed. Result:', result);
-                        
-                        if (!result) {
-                          console.error('Permission request returned null/undefined');
-                          Alert.alert(
-                            t('alerts.permission_error'),
-                            t('mealtype_log.camera.permission_error'),
-                            [{ text: t('common.ok') }]
-                          );
-                          setRequestingPermission(false);
-                          return;
-                        }
-                        
-                        if (result.granted) {
-                          console.log('✅ Permission granted!');
-                          setForcePermissionCheck(prev => prev + 1);
-                          setRequestingPermission(false);
-                        } else {
-                          console.log('❌ Permission denied');
-                          
-                          let message = t('mealtype_log.camera.permission_required_message');
-                          
-                          if (result.status === 'denied') {
-                            if (result.canAskAgain) {
-                              message += '\n\n' + t('mealtype_log.camera.permission_required_hint_can_ask');
-                            } else {
-                              message += '\n\n' + t('mealtype_log.camera.permission_required_hint_settings');
-                            }
-                          }
-                          
-                          Alert.alert(
-                            t('alerts.camera_permission_required'),
-                            message,
-                            [
-                              { 
-                                text: t('common.cancel'), 
-                                style: 'cancel', 
-                                onPress: () => setShowBarcodeScanner(false) 
-                              },
-                              { 
-                                text: result.canAskAgain ? t('mealtype_log.scanner.try_again') : t('common.ok'),
-                                onPress: () => {
-                                  if (!result.canAskAgain) {
-                                    setShowBarcodeScanner(false);
-                                  }
-                                }
-                              }
-                            ]
-                          );
-                          setRequestingPermission(false);
-                        }
-                      } catch (error: any) {
-                        console.error('❌ Error requesting permission:', error);
+                      if (!result) {
+                        console.error('Permission request returned null/undefined');
                         Alert.alert(
-                          t('alerts.error_title'),
-                          t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
+                          t('alerts.permission_error'),
+                          t('mealtype_log.camera.permission_error'),
                           [{ text: t('common.ok') }]
                         );
                         setRequestingPermission(false);
+                        return;
                       }
-                    }}
-                    activeOpacity={0.7}
-                  >
+                      
+                      if (result.granted) {
+                        console.log('✅ Permission granted!');
+                        setForcePermissionCheck(prev => prev + 1);
+                        setRequestingPermission(false);
+                      } else {
+                        console.log('❌ Permission denied');
+                        
+                        let message = t('mealtype_log.camera.permission_required_message');
+                        
+                        if (result.status === 'denied') {
+                          if (result.canAskAgain) {
+                            message += '\n\n' + t('mealtype_log.camera.permission_required_hint_can_ask');
+                          } else {
+                            message += '\n\n' + t('mealtype_log.camera.permission_required_hint_settings');
+                          }
+                        }
+                        
+                        Alert.alert(
+                          t('alerts.camera_permission_required'),
+                          message,
+                          [
+                            { 
+                              text: t('common.cancel'), 
+                              style: 'cancel', 
+                              onPress: () => setShowBarcodeScanner(false) 
+                            },
+                            { 
+                              text: result.canAskAgain ? t('mealtype_log.scanner.try_again') : t('common.ok'),
+                              onPress: () => {
+                                if (!result.canAskAgain) {
+                                  setShowBarcodeScanner(false);
+                                }
+                              }
+                            }
+                          ]
+                        );
+                        setRequestingPermission(false);
+                      }
+                    } catch (error: any) {
+                      console.error('❌ Error requesting permission:', error);
+                      Alert.alert(
+                        t('alerts.error_title'),
+                        t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
+                        [{ text: t('common.ok') }]
+                      );
+                      setRequestingPermission(false);
+                    }
+                }}
+                activeOpacity={0.7}
+              >
                     <ThemedText style={styles.scannerButtonText}>
                       {requestingPermission ? t('mealtype_log.scanner.requesting') : t('mealtype_log.scanner.grant_permission')}
                     </ThemedText>

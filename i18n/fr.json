@@ -1017,7 +1017,26 @@
     "scan_another_hint": "Retourner pour scanner un autre code-barres",
     "adding_to": "Ajout à",
     "invalid_barcode_title": "Code-barres invalide",
-    "invalid_barcode_message": "Le code scanné \"{{code}}\" n'est pas un code-barres valide.\n\n{{error}}\n\nVeuillez réessayer avec un code-barres de produit valide."
+    "invalid_barcode_message": "Le code scanné \"{{code}}\" n'est pas un code-barres valide.\n\n{{error}}\n\nVeuillez réessayer avec un code-barres de produit valide.",
+    "looking_up": "Recherche du produit...",
+    "found_in_database": "Trouvé dans la base de données!",
+    "product_found": "Produit trouvé!",
+    "source_canonical": "Aliment canonique",
+    "source_openfoodfacts": "Depuis OpenFoodFacts",
+    "source_cached": "Données en cache",
+    "unknown_product": "Produit inconnu",
+    "per_serving": "Par",
+    "per_100g": "Pour 100g/ml",
+    "typical_serving": "Portion typique",
+    "add_to_meal": "Ajouter au repas",
+    "save_as_custom": "Enregistrer comme aliment personnalisé",
+    "save_info": "L'enregistrement ajoutera cet aliment à vos aliments personnalisés pour un accès facile à l'avenir.",
+    "not_found_title": "Produit non trouvé",
+    "not_found_description": "Ce produit n'a pas été trouvé dans notre base de données ni sur OpenFoodFacts. Vous pouvez créer une entrée d'aliment personnalisé avec ce code-barres.",
+    "scanned_barcode": "Code-barres scanné",
+    "scanned_code": "Code scanné",
+    "create_custom": "Créer un aliment personnalisé",
+    "try_again": "Réessayer"
   }
 }
 
