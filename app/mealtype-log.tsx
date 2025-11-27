@@ -16,6 +16,7 @@ import { useFoodSearch } from '@/hooks/use-food-search';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
+import { validateAndNormalizeBarcode } from '@/lib/barcode';
 import { 
   calculateNutrientsSimple, 
   calculateMasterUnitsForDisplay,
@@ -2901,124 +2902,72 @@ export default function LogFoodScreen() {
     setBarcodeScanning(true);
     
     try {
-      // Query food_variant by barcode
-      const { data: variants, error: variantError } = await supabase
-        .from('food_variant')
-        .select(`
-          id,
-          food_master_id,
-          barcode,
-          variant_name,
-          brand,
-          quantity_label,
-          popularity,
-          food_master:food_master_id (
-            id,
-            name,
-            brand,
-            calories_kcal,
-            protein_g,
-            carbs_g,
-            fat_g,
-            fiber_g,
-            saturated_fat_g,
-            sugar_g,
-            sodium_mg,
-            serving_size,
-            serving_unit,
-            is_custom
-          )
-        `)
-        .eq('barcode', barcodeData)
-        .order('popularity', { ascending: false })
-        .limit(5);
-
-      if (variantError) {
-        throw variantError;
-      }
-
-      if (!variants || variants.length === 0) {
-        // No match found
+      // Step 1: Validate and normalize the barcode (must be 12 or 13 digits)
+      const validationResult = validateAndNormalizeBarcode(barcodeData);
+      
+      if (!validationResult.isValid) {
+        // Invalid barcode format - show error with options
         Alert.alert(
-          t('alerts.barcode_not_found'),
-          t('mealtype_log.scanner.barcode_not_found', { barcode: barcodeData }),
+          t('scanned_item.invalid_barcode_title', 'Invalid Barcode'),
+          t('scanned_item.invalid_barcode_message', { 
+            error: validationResult.error,
+            code: barcodeData 
+          }),
           [
-            { text: t('common.cancel'), style: 'cancel', onPress: () => {
-              setShowBarcodeScanner(false);
-              setScanned(false);
-              setBarcodeScanning(false);
-            }},
             { 
-              text: t('mealtype_log.scanner.try_again'), 
-              onPress: () => {
-                setScanned(false);
-                setBarcodeScanning(false);
-              }
-            },
-            {
-              text: t('mealtype_log.scanner.create_custom'),
+              text: t('common.go_back', 'Go Back'), 
+              style: 'cancel', 
               onPress: () => {
                 setShowBarcodeScanner(false);
                 setScanned(false);
                 setBarcodeScanning(false);
-                router.push({
-                  pathname: '/create-custom-food',
-                  params: {
-                    mealType: mealType || 'breakfast',
-                    entryDate: entryDate || getLocalDateString(),
-                    scannedBarcode: barcodeData,
-                  },
-                });
+              }
+            },
+            { 
+              text: t('mealtype_log.scanner.try_again', 'Try Again'), 
+              onPress: () => {
+                setScanned(false);
+                setBarcodeScanning(false);
               }
             }
           ]
         );
         return;
       }
-
-      // Get the first variant (most popular) or let user choose if multiple
-      let selectedVariant = variants[0];
       
-      if (variants.length > 1) {
-        // Multiple variants found - show selection (for now, just use first)
-        // TODO: Could show a selection dialog here
-        selectedVariant = variants[0];
-      }
-
-      // Get the food_master from the variant
-      const foodMaster = selectedVariant.food_master as any;
+      // Step 2: Barcode is valid - close scanner and navigate to scanned-item page
+      const normalizedCode = validationResult.normalizedCode!;
       
-      if (!foodMaster) {
-        throw new Error('Food master data not found');
-      }
-
-      // Close scanner
+      console.log(`Barcode scanned: ${barcodeData} (${validationResult.format}) -> Normalized: ${normalizedCode}`);
+      
+      // Close the scanner modal
       setShowBarcodeScanner(false);
       setScanned(false);
       setBarcodeScanning(false);
       
-      // Select the food (same as if selected from search)
-      await handleFoodSelect(foodMaster);
-      
-      // Show success message
-      Alert.alert(
-        t('alerts.food_found'),
-        t('mealtype_log.scanner.food_found', { name: foodMaster.name, brand: selectedVariant.brand ? ` (${selectedVariant.brand})` : '' }),
-        [{ text: t('common.ok') }]
-      );
+      // Navigate to the scanned-item page with the normalized barcode
+      router.push({
+        pathname: '/scanned-item',
+        params: {
+          barcode: normalizedCode,
+          mealType: mealType || 'breakfast',
+          entryDate: entryDate || getLocalDateString(),
+        },
+      });
       
     } catch (error: any) {
+      console.error('Barcode scan error:', error);
       Alert.alert(
         t('alerts.error_title'),
         t('mealtype_log.scanner.scan_error', { error: error.message || t('common.unexpected_error') }),
         [
-          { text: t('common.cancel'), style: 'cancel', onPress: () => {
+          { text: t('common.go_back', 'Go Back'), style: 'cancel', onPress: () => {
             setShowBarcodeScanner(false);
             setScanned(false);
             setBarcodeScanning(false);
           }},
           { 
-            text: t('mealtype_log.scanner.try_again'), 
+            text: t('mealtype_log.scanner.try_again', 'Try Again'), 
             onPress: () => {
               setScanned(false);
               setBarcodeScanning(false);
@@ -3029,7 +2978,7 @@ export default function LogFoodScreen() {
     } finally {
       setBarcodeScanning(false);
     }
-  }, [scanned, barcodeScanning, handleFoodSelect, mealType, entryDate, router, t]);
+  }, [scanned, barcodeScanning, mealType, entryDate, router, t]);
 
   // Handle serving selection per spec 8.4
   const handleServingSelect = (option: ServingOption) => {

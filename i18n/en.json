@@ -1004,6 +1004,20 @@
       "save_items_failed": "Failed to save bundle items: {{error}}",
       "save_bundle_failed": "Failed to save bundle: {{error}}"
     }
+  },
+
+  "scanned_item": {
+    "title": "Scanned Item",
+    "barcode_detected": "Barcode Detected!",
+    "ean13_code": "EAN-13 Code",
+    "next_step_info": "This barcode will be used to search for product information.",
+    "continue": "Continue",
+    "continue_hint": "Search for product information",
+    "scan_another": "Scan Another",
+    "scan_another_hint": "Go back to scan a different barcode",
+    "adding_to": "Adding to",
+    "invalid_barcode_title": "Invalid Barcode",
+    "invalid_barcode_message": "The scanned code \"{{code}}\" is not a valid barcode.\n\n{{error}}\n\nPlease try scanning again with a valid product barcode."
   }
 }
 

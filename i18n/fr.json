@@ -1004,6 +1004,20 @@
       "save_items_failed": "Échec de la sauvegarde des éléments: {{error}}",
       "save_bundle_failed": "Échec de la sauvegarde de l'ensemble: {{error}}"
     }
+  },
+
+  "scanned_item": {
+    "title": "Article scanné",
+    "barcode_detected": "Code-barres détecté!",
+    "ean13_code": "Code EAN-13",
+    "next_step_info": "Ce code-barres sera utilisé pour rechercher les informations du produit.",
+    "continue": "Continuer",
+    "continue_hint": "Rechercher les informations du produit",
+    "scan_another": "Scanner un autre",
+    "scan_another_hint": "Retourner pour scanner un autre code-barres",
+    "adding_to": "Ajout à",
+    "invalid_barcode_title": "Code-barres invalide",
+    "invalid_barcode_message": "Le code scanné \"{{code}}\" n'est pas un code-barres valide.\n\n{{error}}\n\nVeuillez réessayer avec un code-barres de produit valide."
   }
 }
 
