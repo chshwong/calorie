@@ -1,0 +1,377 @@
+/**
+ * Centralized Theme System for the Calorie Tracker App
+ * 
+ * This file contains all design tokens used throughout the app:
+ * - Colors (light/dark mode)
+ * - Spacing scale
+ * - Border radii
+ * - Typography (font sizes, weights, line heights)
+ * - Shadows
+ * - Semantic colors (success, error, warning, info)
+ * 
+ * IMPORTANT: Always import values from this file instead of hardcoding.
+ */
+
+import { Platform } from 'react-native';
+
+// ============================================================================
+// COLORS
+// ============================================================================
+
+const tintColorLight = '#0a7ea4';
+const tintColorDark = '#5BB8FF';
+
+// Semantic colors (same for both themes)
+export const SemanticColors = {
+  success: '#10B981',
+  successLight: '#10B98120',
+  error: '#EF4444',
+  errorLight: '#EF444420',
+  warning: '#F59E0B',
+  warningLight: '#F59E0B20',
+  info: '#3B82F6',
+  infoLight: '#3B82F620',
+};
+
+// Tab/category colors
+export const CategoryColors = {
+  frequent: '#3B82F6',
+  recent: '#10B981',
+  custom: '#8B5CF6',
+  bundle: '#F59E0B',
+  manual: '#6B7280',
+  favorite: '#FBBF24',
+};
+
+export const Colors = {
+  light: {
+    // Text
+    text: '#11181C',
+    textSecondary: '#687076',
+    textTertiary: '#9BA1A6',
+    textInverse: '#FFFFFF',
+    
+    // Backgrounds
+    background: '#FFFFFF',
+    backgroundSecondary: '#F9F9F9',
+    backgroundTertiary: '#F2F2F2',
+    
+    // Accent
+    tint: tintColorLight,
+    tintLight: tintColorLight + '20',
+    
+    // UI Elements
+    icon: '#687076',
+    tabIconDefault: '#687076',
+    tabIconSelected: tintColorLight,
+    border: '#E5E5E5',
+    borderSecondary: '#D1D1D1',
+    separator: '#E5E5E5',
+    overlay: 'rgba(0, 0, 0, 0.5)',
+    card: '#FFFFFF',
+    shadow: 'rgba(0, 0, 0, 0.1)',
+    
+    // Input
+    inputBackground: '#FFFFFF',
+    inputBorder: '#E5E5E5',
+    inputPlaceholder: '#9BA1A6',
+    
+    // Semantic (spread from SemanticColors)
+    ...SemanticColors,
+  },
+  dark: {
+    // Text
+    text: '#FFFFFF',
+    textSecondary: '#AEAEB2',
+    textTertiary: '#8E8E93',
+    textInverse: '#11181C',
+    
+    // Backgrounds
+    background: '#121212',
+    backgroundSecondary: '#1C1C1E',
+    backgroundTertiary: '#2C2C2E',
+    
+    // Accent
+    tint: tintColorDark,
+    tintLight: tintColorDark + '20',
+    
+    // UI Elements
+    icon: '#AEAEB2',
+    tabIconDefault: '#8E8E93',
+    tabIconSelected: tintColorDark,
+    border: '#38383A',
+    borderSecondary: '#48484A',
+    separator: '#38383A',
+    overlay: 'rgba(0, 0, 0, 0.7)',
+    card: '#1C1C1E',
+    shadow: 'rgba(0, 0, 0, 0.4)',
+    
+    // Input
+    inputBackground: '#1C1C1E',
+    inputBorder: '#38383A',
+    inputPlaceholder: '#8E8E93',
+    
+    // Semantic (spread from SemanticColors)
+    ...SemanticColors,
+  },
+};
+
+// Type for theme colors
+export type ThemeColors = typeof Colors.light;
+
+// ============================================================================
+// SPACING
+// ============================================================================
+
+/**
+ * Spacing scale based on 4px base unit
+ * Use these values instead of arbitrary numbers
+ */
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 32,
+  '4xl': 40,
+  '5xl': 48,
+  '6xl': 64,
+} as const;
+
+// ============================================================================
+// BORDER RADIUS
+// ============================================================================
+
+export const BorderRadius = {
+  none: 0,
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  '2xl': 20,
+  '3xl': 24,
+  full: 9999,
+} as const;
+
+// ============================================================================
+// TYPOGRAPHY
+// ============================================================================
+
+/**
+ * Font sizes following a type scale
+ */
+export const FontSize = {
+  xs: 10,
+  sm: 12,
+  base: 14,
+  md: 16,
+  lg: 18,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 30,
+  '4xl': 36,
+} as const;
+
+/**
+ * Font weights
+ */
+export const FontWeight = {
+  regular: '400' as const,
+  medium: '500' as const,
+  semibold: '600' as const,
+  bold: '700' as const,
+};
+
+/**
+ * Line heights
+ */
+export const LineHeight = {
+  tight: 1.2,
+  normal: 1.5,
+  relaxed: 1.75,
+} as const;
+
+/**
+ * Typography presets for consistent text styling
+ * Use these with the ThemedText component
+ */
+export const Typography = {
+  // Headings
+  h1: {
+    fontSize: FontSize['3xl'],
+    fontWeight: FontWeight.bold,
+    lineHeight: FontSize['3xl'] * LineHeight.tight,
+  },
+  h2: {
+    fontSize: FontSize['2xl'],
+    fontWeight: FontWeight.bold,
+    lineHeight: FontSize['2xl'] * LineHeight.tight,
+  },
+  h3: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.semibold,
+    lineHeight: FontSize.xl * LineHeight.tight,
+  },
+  h4: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    lineHeight: FontSize.lg * LineHeight.normal,
+  },
+  
+  // Body text
+  body: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.regular,
+    lineHeight: FontSize.base * LineHeight.normal,
+  },
+  bodyLarge: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.regular,
+    lineHeight: FontSize.md * LineHeight.normal,
+  },
+  bodySmall: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.regular,
+    lineHeight: FontSize.sm * LineHeight.normal,
+  },
+  
+  // Labels
+  label: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    lineHeight: FontSize.sm * LineHeight.normal,
+  },
+  labelLarge: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.medium,
+    lineHeight: FontSize.base * LineHeight.normal,
+  },
+  
+  // Caption/Helper text
+  caption: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.regular,
+    lineHeight: FontSize.xs * LineHeight.normal,
+  },
+  
+  // Button text
+  button: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    lineHeight: FontSize.base * LineHeight.normal,
+  },
+  buttonSmall: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    lineHeight: FontSize.sm * LineHeight.normal,
+  },
+} as const;
+
+// ============================================================================
+// SHADOWS
+// ============================================================================
+
+export const Shadows = {
+  sm: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+    },
+    android: {
+      elevation: 1,
+    },
+    web: {
+      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+    },
+    default: {},
+  }),
+  md: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 3,
+    },
+    web: {
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    },
+    default: {},
+  }),
+  lg: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+    },
+    android: {
+      elevation: 5,
+    },
+    web: {
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    },
+    default: {},
+  }),
+};
+
+// ============================================================================
+// LAYOUT
+// ============================================================================
+
+export const Layout = {
+  /** Minimum touch target size for accessibility (44x44) */
+  minTouchTarget: 44,
+  
+  /** Maximum content width for centered layouts */
+  maxContentWidth: 600,
+  
+  /** Standard screen padding */
+  screenPadding: Spacing.lg,
+  
+  /** Standard card padding */
+  cardPadding: Spacing.md,
+  
+  /** Standard gap between list items */
+  listGap: Spacing.sm,
+};
+
+// ============================================================================
+// FONTS (Legacy - kept for backwards compatibility)
+// ============================================================================
+
+/**
+ * @deprecated Use Inter font from useFonts hook instead
+ */
+export const Fonts = Platform.select({
+  ios: {
+    sans: 'Inter',
+    serif: 'ui-serif',
+    rounded: 'ui-rounded',
+    mono: 'ui-monospace',
+  },
+  android: {
+    sans: 'Inter',
+    serif: 'serif',
+    rounded: 'Inter',
+    mono: 'monospace',
+  },
+  web: {
+    sans: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+    rounded: "Inter, system-ui, sans-serif",
+    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  },
+  default: {
+    sans: 'Inter',
+    serif: 'serif',
+    rounded: 'Inter',
+    mono: 'monospace',
+  },
+});

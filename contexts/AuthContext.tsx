@@ -1,0 +1,379 @@
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { Platform } from 'react-native';
+import { setLanguage, isLanguageSupported } from '@/i18n';
+
+type AuthContextType = {
+  session: Session | null;
+  user: User | null;
+  profile: any | null;
+  loading: boolean;
+  retrying: boolean;
+  isAdmin: boolean;
+  onboardingComplete: boolean;
+  isPasswordRecovery: () => boolean;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextType>({
+  session: null,
+  user: null,
+  profile: null,
+  loading: true,
+  retrying: false,
+  isAdmin: false,
+  onboardingComplete: false,
+  isPasswordRecovery: () => false,
+  signOut: async () => {},
+  refreshProfile: async () => {},
+});
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
+  const profileFetchRetryCount = useRef(0);
+  const profileRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const profileRef = useRef<any | null>(null); // Ref to track profile for closures
+  const userRef = useRef<User | null>(null); // Ref to track user for closures
+  const isPasswordRecoveryRef = useRef(false); // Track if we're in password recovery mode
+  const mountedRef = useRef(true);
+
+  // Update refs whenever state changes
+  useEffect(() => {
+    profileRef.current = profile;
+    userRef.current = user;
+  }, [profile, user]);
+
+  const fetchProfile = async (userId: string, isInitialLoad = false) => {
+    try {
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000); // 10 second timeout
+      });
+
+      const fetchPromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+      if (error) {
+        // If profile doesn't exist (404/406), that's okay - user might need to register
+        if (error.code === 'PGRST116' || error.message.includes('No rows')) {
+          setProfile(null);
+          setRetrying(false);
+          setLoading(false);
+        } else {
+          // Don't clear profile immediately on error - keep last known profile if user is still logged in
+          // Only clear if this is the initial load
+          if (isInitialLoad && profileFetchRetryCount.current === 0) {
+            setProfile(null);
+          }
+          // Retry with exponential backoff (max 3 retries)
+          if (profileFetchRetryCount.current < 3 && userRef.current) {
+            profileFetchRetryCount.current += 1;
+            // Only show retrying state if we had a profile before (reconnecting scenario)
+            // On initial load, keep loading state instead
+            if (profileRef.current) {
+              setRetrying(true);
+            }
+            const retryDelay = Math.min(500 * Math.pow(2, profileFetchRetryCount.current - 1), 2000);
+            profileRetryTimeoutRef.current = setTimeout(() => {
+              fetchProfile(userId, false);
+            }, retryDelay);
+          } else {
+            setRetrying(false);
+            setLoading(false);
+          }
+        }
+      } else {
+        // Check if user is active (treat null as inactive for safety)
+        if (data && (data.is_active === false || data.is_active === null)) {
+          // User account is inactive, sign them out
+          setProfile(null);
+          setRetrying(false);
+          setLoading(false);
+          // Clear state and sign out from Supabase
+          setSession(null);
+          setUser(null);
+          await supabase.auth.signOut();
+          return;
+        }
+        
+        setProfile(data);
+        profileFetchRetryCount.current = 0; // Reset retry count on success
+        setRetrying(false);
+        setLoading(false);
+        
+        // Apply user's language preference from profile
+        if (data?.language_preference && isLanguageSupported(data.language_preference)) {
+          setLanguage(data.language_preference);
+        }
+      }
+    } catch (error: any) {
+      if (error.message === 'Profile fetch timeout') {
+        // Profile fetch timed out
+      }
+      // Don't clear profile on timeout - keep last known profile if user is still logged in
+      // Only clear if this is the initial load
+      if (isInitialLoad && profileFetchRetryCount.current === 0) {
+        setProfile(null);
+      }
+      // Retry with exponential backoff (max 3 retries)
+      if (profileFetchRetryCount.current < 3 && userRef.current) {
+        profileFetchRetryCount.current += 1;
+        // Only show retrying state if we had a profile before (reconnecting scenario)
+        // On initial load, keep loading state instead
+        if (profileRef.current) {
+          setRetrying(true);
+        }
+            const retryDelay = Math.min(500 * Math.pow(2, profileFetchRetryCount.current - 1), 2000);
+            profileRetryTimeoutRef.current = setTimeout(() => {
+          fetchProfile(userId, false);
+        }, retryDelay);
+      } else {
+        setRetrying(false);
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    // Log when AuthProvider mounts (should only happen once)
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      console.log('[AuthProvider] Mounted - AuthProvider initialized');
+    }
+    
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mountedRef.current) return;
+      
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        console.log('[AuthProvider] Initial session loaded:', session ? 'has session' : 'no session');
+      }
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id, true);
+      } else {
+        setProfile(null);
+        setLoading(false);
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          console.log('[AuthProvider] No session, loading set to false');
+        }
+      }
+    }).catch((error) => {
+      console.error('[AuthProvider] Error getting initial session:', error);
+      if (mountedRef.current) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mountedRef.current) return;
+      
+      // Handle password recovery event
+      if (event === 'PASSWORD_RECOVERY') {
+        isPasswordRecoveryRef.current = true;
+        // Set session storage flag for web
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          sessionStorage.setItem('password_recovery_mode', 'true');
+        }
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id, true);
+        } else {
+          setLoading(false);
+        }
+        return;
+      }
+      
+      // Clear password recovery flag on sign out or password update
+      if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        // Check if password was updated by checking if recovery mode should be cleared
+        const stillInRecovery = Platform.OS === 'web' && typeof window !== 'undefined' && 
+          sessionStorage.getItem('password_recovery_mode') === 'true';
+        if (!stillInRecovery) {
+          isPasswordRecoveryRef.current = false;
+        }
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          sessionStorage.removeItem('password_recovery_mode');
+        }
+      }
+      
+      // Don't refetch profile on token refresh if we already have one
+      // Only refetch on actual sign in/out events
+      if (event === 'TOKEN_REFRESHED' && profileRef.current && session?.user) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        return;
+      }
+      
+      // Handle INITIAL_SESSION - this fires after getSession() completes
+      // The session should already be set by getSession(), but we'll set it again to be safe
+      // and ensure loading state is correct
+      if (event === 'INITIAL_SESSION') {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (!session?.user) {
+          setProfile(null);
+          setLoading(false);
+        }
+        // If we have a user, fetchProfile was already called in getSession() handler
+        // Don't call it again here to avoid duplicate calls
+        return;
+      }
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        // Reset retry count on new session
+        profileFetchRetryCount.current = 0;
+        await fetchProfile(session.user.id, true);
+      } else {
+        setProfile(null);
+        setRetrying(false);
+        setLoading(false);
+        // Clear any pending retries
+        if (profileRetryTimeoutRef.current) {
+          clearTimeout(profileRetryTimeoutRef.current);
+          profileRetryTimeoutRef.current = null;
+        }
+      }
+    });
+
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+      if (profileRetryTimeoutRef.current) {
+        clearTimeout(profileRetryTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Expose password recovery state via context
+  const isPasswordRecovery = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return sessionStorage.getItem('password_recovery_mode') === 'true' || isPasswordRecoveryRef.current;
+    }
+    return isPasswordRecoveryRef.current;
+  };
+
+  // Periodically check if profile is missing but user is logged in, and retry fetching
+  // Only run this check if profile is truly missing (not just loading)
+  useEffect(() => {
+    if (!user || profile || loading) return;
+
+    // If user is logged in but profile is null, wait a bit then retry
+    // Use a longer interval to avoid excessive checks
+    const checkInterval = setInterval(() => {
+      // Use refs to get current values
+      const currentUser = userRef.current;
+      const currentProfile = profileRef.current;
+      // Only retry if profile is still missing and we haven't exceeded retry limit
+      // Also check that we're not already in a retry cycle
+      if (currentUser && !currentProfile && !loading && profileFetchRetryCount.current === 0) {
+        // Only show retrying if we previously had a profile (reconnection scenario)
+        if (profileRef.current) {
+          setRetrying(true);
+        } else {
+          setLoading(true);
+        }
+        fetchProfile(currentUser.id, false);
+      }
+    }, 60000); // Check every 60 seconds (reduced frequency)
+
+    return () => clearInterval(checkInterval);
+  }, [user, profile, loading]);
+
+  const signOut = async () => {
+    try {
+      // Clear state first to prevent UI flicker
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRetrying(false);
+      setLoading(true); // Set loading while signing out
+      
+      // Sign out from Supabase - this should clear the session
+      const { error } = await supabase.auth.signOut();
+      
+      // Verify session is actually cleared
+      const { data: { session: verifySession } } = await supabase.auth.getSession();
+      if (verifySession) {
+        // Session still exists, force clear it
+        console.warn('Session not cleared after signOut, forcing clear');
+        // Try signing out again
+        await supabase.auth.signOut();
+        // Clear any stored session data manually
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          // Clear Supabase session storage
+          const keys = Object.keys(localStorage);
+          keys.forEach(key => {
+            if (key.includes('supabase') || key.includes('sb-')) {
+              localStorage.removeItem(key);
+            }
+          });
+        }
+      }
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        // Even if there's an error, we've already cleared local state
+      }
+
+      // Ensure state is cleared
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+    } catch (error) {
+      console.error('Sign out exception:', error);
+      // Even if there's an error, clear local state
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRetrying(false);
+      setLoading(false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      profileFetchRetryCount.current = 0;
+      await fetchProfile(user.id, false);
+    }
+  };
+
+  // Calculate isAdmin from profile
+  const isAdmin = profile?.is_admin === true;
+  
+  // Calculate onboardingComplete from profile
+  const onboardingComplete = profile?.onboarding_complete === true;
+
+  return (
+    <AuthContext.Provider value={{ session, user, profile, loading, retrying, isAdmin, onboardingComplete, isPasswordRecovery, signOut, refreshProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
+

@@ -1,0 +1,985 @@
+{
+  "common": {
+    "back": "Retour",
+    "next": "Suivant",
+    "done": "Terminé",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "ok": "OK",
+    "yes": "Oui",
+    "no": "Non",
+    "or": "ou",
+    "email": "Courriel",
+    "password": "Mot de passe",
+    "year": "Année",
+    "month": "Mois",
+    "day": "Jour",
+    "unexpected_error": "Une erreur inattendue s'est produite. Veuillez réessayer.",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier"
+  },
+
+  "home": {
+    "greeting": {
+      "morning": "Bonjour",
+      "afternoon": "Bon après-midi",
+      "evening": "Bonsoir"
+    },
+    "profile_not_found": {
+      "title": "Profil introuvable",
+      "message": "Votre compte existe mais nous n'avons pas trouvé votre profil. Cela peut se produire si l'inscription n'a pas été complétée correctement.",
+      "logout_button": "Déconnexion et réinscription"
+    },
+    "stats": {
+      "age": "Âge",
+      "years": "ans",
+      "height": "Taille",
+      "weight": "Poids",
+      "bmi": "IMC",
+      "bmi_underweight": "Insuffisance pondérale",
+      "bmi_normal": "Poids normal",
+      "bmi_overweight": "Surpoids/Musculaire",
+      "bmi_obese": "Obésité"
+    },
+    "summary": {
+      "title_today": "Résumé d'aujourd'hui",
+      "title_other": "Résumé",
+      "entry_one": "{{count}} entrée",
+      "entry_other": "{{count}} entrées",
+      "total_calories": "Calories totales",
+      "more_details": "Plus de détails",
+      "protein": "Protéines",
+      "carbs": "Glucides",
+      "fat": "Lipides",
+      "fiber": "Fibres",
+      "saturated_fat": "Gras saturés",
+      "sugar": "Sucre",
+      "sodium": "Sodium",
+      "loading_entries": "Chargement des entrées..."
+    },
+    "date_picker": {
+      "title": "SÉLECTIONNER DATE",
+      "previous_month": "Mois précédent",
+      "next_month": "Mois suivant",
+      "previous_day": "Jour précédent",
+      "next_day": "Jour suivant",
+      "select_date": "Sélectionner date",
+      "today_button": "Aujourd'hui",
+      "weekdays": ["D", "L", "M", "M", "J", "V", "S"]
+    },
+    "meal_types": {
+      "breakfast": "Petit-déjeuner",
+      "lunch": "Déjeuner",
+      "dinner": "Dîner",
+      "afternoon_snack": "Collation",
+      "late_night": "Collation tardive"
+    },
+    "food_log": {
+      "log_food_prompt": "← Ajouter aliment",
+      "kcal": "kcal"
+    },
+    "accessibility": {
+      "refresh_entries": "Actualiser les entrées",
+      "refresh_hint": "Appuyez deux fois pour actualiser les entrées",
+      "profile_settings": "Paramètres du profil",
+      "profile_hint": "Appuyez deux fois pour ouvrir les paramètres",
+      "log_food_hint": "Appuyez deux fois pour ajouter ou modifier des aliments pour {{mealType}}",
+      "expand_details": "Afficher plus de détails",
+      "collapse_details": "Masquer les détails",
+      "details_hint": "Appuyez deux fois pour afficher ou masquer les détails nutritionnels",
+      "calendar_select_day": "Sélectionner {{day}}"
+    },
+    "admin_button": "ADMIN"
+  },
+
+  "auth": {
+    "login": {
+      "title": "Bon retour",
+      "subtitle": "Connectez-vous pour continuer à suivre vos calories",
+      "email_label": "Courriel",
+      "email_placeholder": "Entrez votre adresse courriel",
+      "password_label": "Mot de passe",
+      "password_placeholder": "Entrez votre mot de passe",
+      "remember_email": "Se souvenir du courriel",
+      "forgot_password": "Mot de passe oublié?",
+      "sign_in_button": "Se connecter",
+      "logging_in": "Connexion en cours...",
+      "no_account": "Vous n'avez pas de compte?",
+      "sign_up": "S'inscrire",
+      "google_sign_in": "Continuer avec Google",
+      "signing_in_google": "Connexion en cours...",
+      "error_fill_all_fields": "Veuillez remplir tous les champs",
+      "error_invalid_email": "Veuillez entrer une adresse courriel valide",
+      "error_invalid_credentials": "Courriel ou mot de passe invalide. Veuillez vérifier vos identifiants et réessayer.",
+      "error_email_not_confirmed": "Veuillez confirmer votre adresse courriel avant de vous connecter. Vérifiez votre boîte de réception (y compris le dossier spam).",
+      "error_too_many_requests": "Trop de tentatives de connexion. Veuillez attendre quelques minutes et réessayer.",
+      "error_user_not_found": "Aucun compte trouvé avec cette adresse courriel. Veuillez d'abord vous inscrire.",
+      "error_account_removed": "Désolé, votre compte a été supprimé.",
+      "error_supabase_not_configured": "Supabase n'est pas configuré. Veuillez vérifier votre fichier .env.",
+      "error_google_sign_in_failed": "La connexion Google a échoué. Veuillez réessayer.",
+      "accessibility_show_password": "Afficher le mot de passe",
+      "accessibility_hide_password": "Masquer le mot de passe"
+    },
+
+    "register": {
+      "title": "Créer un compte",
+      "step1_title": "Créez votre compte",
+      "step1_subtitle": "Commençons par votre courriel et un mot de passe sécurisé",
+      "step2_title": "Informations personnelles",
+      "step2_subtitle": "Parlez-nous un peu de vous",
+      "step3_title": "Informations physiques",
+      "step3_subtitle": "Aidez-nous à calculer vos besoins caloriques",
+      "email_label": "Courriel",
+      "email_placeholder": "Entrez votre adresse courriel",
+      "password_label": "Mot de passe",
+      "password_placeholder": "Créez un mot de passe sécurisé",
+      "confirm_password_label": "Confirmer le mot de passe",
+      "confirm_password_placeholder": "Confirmez votre mot de passe",
+      "passwords_match": "Les mots de passe correspondent",
+      "preferred_name_label": "Nom préféré",
+      "preferred_name_placeholder": "Entrez votre nom préféré",
+      "date_of_birth_label": "Date de naissance",
+      "date_of_birth_placeholder": "Sélectionnez votre date de naissance",
+      "age_label": "Âge: {{age}} ans",
+      "gender_label": "Sexe à la naissance",
+      "gender_description": "Pour la précision des calculs caloriques",
+      "gender_male": "Homme",
+      "gender_female": "Femme",
+      "gender_not_telling": "Ne pas dire",
+      "gender_not_telling_description": "Pas de problème. Pour les calculs caloriques, nous utiliserons des valeurs basées sur la physiologie typique XX.",
+      "height_label": "Taille",
+      "weight_label": "Poids",
+      "create_account_button": "Créer un compte",
+      "creating_account": "Création en cours...",
+      "error_email_required": "Le courriel est requis",
+      "error_invalid_email": "Veuillez entrer une adresse courriel valide",
+      "error_password_required": "Le mot de passe est requis",
+      "error_password_requirements": "Le mot de passe ne répond pas à toutes les exigences",
+      "error_confirm_password": "Veuillez confirmer votre mot de passe",
+      "error_passwords_not_match": "Les mots de passe ne correspondent pas",
+      "error_name_required": "Le nom préféré est requis",
+      "error_name_too_long": "Le nom préféré doit contenir 40 caractères ou moins",
+      "error_dob_required": "La date de naissance est requise",
+      "error_dob_format": "La date de naissance doit être au format AAAA-MM-JJ",
+      "error_dob_future": "La date de naissance ne peut pas être dans le futur",
+      "error_age_minimum": "Vous devez avoir au moins 13 ans",
+      "error_age_maximum": "La date de naissance ne peut pas être il y a plus de 150 ans",
+      "error_height_required": "La taille est requise",
+      "error_weight_required": "Le poids est requis",
+      "error_height_range": "La taille doit être entre 50 cm et 304,8 cm",
+      "error_weight_range": "Le poids doit être entre 45 et 1200 lbs",
+      "error_height_weight_required": "La taille et le poids sont requis",
+      "error_rate_limit": "Trop de tentatives d'inscription. Veuillez attendre quelques minutes.",
+      "error_email_exists": "Ce courriel est déjà enregistré. Veuillez vous connecter.",
+      "error_failed_create_account": "Échec de la création du compte. Veuillez réessayer."
+    },
+
+    "register_confirmation": {
+      "title": "Inscription réussie!",
+      "message": "Votre compte a été créé avec succès. Veuillez vérifier votre courriel (y compris le dossier spam) pour confirmer votre compte avant de vous connecter.",
+      "go_to_login": "Aller à la connexion"
+    },
+
+    "forgot_password": {
+      "title": "Réinitialiser le mot de passe",
+      "description": "Entrez votre adresse courriel et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
+      "email_label": "Courriel",
+      "email_placeholder": "Entrez votre adresse courriel",
+      "send_button": "Envoyer le lien",
+      "sending": "Envoi en cours...",
+      "success_message": "Courriel de réinitialisation envoyé! Veuillez vérifier votre boîte de réception.",
+      "success_alert_title": "Courriel envoyé",
+      "success_alert_message": "Si un compte existe avec ce courriel, vous recevrez un lien de réinitialisation sous peu.",
+      "error_email_required": "Veuillez entrer votre adresse courriel",
+      "error_invalid_email": "Veuillez entrer une adresse courriel valide",
+      "error_rate_limit": "Trop de demandes. Veuillez attendre un moment.",
+      "accessibility_back": "Retour à la connexion"
+    },
+
+    "reset_password": {
+      "title": "Réinitialiser le mot de passe",
+      "subtitle": "Veuillez entrer votre nouveau mot de passe ci-dessous.",
+      "new_password_label": "Nouveau mot de passe",
+      "new_password_placeholder": "Entrez le nouveau mot de passe",
+      "confirm_password_label": "Confirmer le mot de passe",
+      "confirm_password_placeholder": "Confirmez le nouveau mot de passe",
+      "update_button": "Mettre à jour le mot de passe",
+      "back_to_login": "Retour à la connexion",
+      "verifying": "Vérification du lien...",
+      "error_fill_all_fields": "Veuillez remplir tous les champs",
+      "error_passwords_not_match": "Les mots de passe ne correspondent pas",
+      "error_password_requirements": "Le mot de passe ne répond pas à toutes les exigences.",
+      "error_same_password": "Le nouveau mot de passe doit être différent de l'ancien.",
+      "error_weak_password": "Le mot de passe est trop faible.",
+      "error_timeout": "Délai de connexion dépassé. Vérifiez votre connexion internet.",
+      "error_invalid_link": "Ce lien de réinitialisation est invalide ou expiré.",
+      "error_auth_required": "Vous devez cliquer sur le lien de réinitialisation dans votre courriel."
+    },
+
+    "password_requirements": {
+      "min_length": "Minimum 10 caractères",
+      "has_letter": "Au moins une lettre",
+      "has_uppercase": "Au moins une lettre majuscule",
+      "has_lowercase": "Au moins une lettre minuscule",
+      "has_number": "Au moins un chiffre",
+      "has_special": "Au moins un caractère spécial",
+      "no_spaces": "Pas d'espaces au début ou à la fin",
+      "not_email": "Ne correspond pas à votre courriel",
+      "not_common": "Pas un mot de passe courant"
+    }
+  },
+
+  "onboarding": {
+    "title": "Terminer la configuration",
+    "step1_title": "Informations personnelles",
+    "step1_subtitle": "Parlez-nous un peu de vous",
+    "step2_title": "Informations physiques",
+    "step2_subtitle": "Aidez-nous à calculer vos besoins caloriques",
+    "complete_button": "Terminer la configuration",
+    "saving": "Enregistrement...",
+    "error_no_session": "Aucune session utilisateur trouvée. Veuillez vous reconnecter."
+  },
+
+  "settings": {
+    "title": "Paramètres",
+    "profile_section": {
+      "user_fallback": "Utilisateur"
+    },
+    "my_journey": {
+      "title": "Mon parcours",
+      "goals": "Mes objectifs",
+      "goals_subtitle": "Définir et suivre vos objectifs"
+    },
+    "account": {
+      "title": "Compte",
+      "edit_profile": "Modifier le profil",
+      "edit_profile_subtitle": "Mettre à jour vos informations personnelles",
+      "change_password": "Changer le mot de passe",
+      "email_settings": "Paramètres de courriel"
+    },
+    "preferences": {
+      "title": "Préférences",
+      "language": "Langue",
+      "language_english": "English",
+      "language_french": "Français",
+      "units": "Unités",
+      "units_metric": "Métrique (kg, cm)",
+      "units_imperial": "Impérial (lbs, in)",
+      "dark_mode": "Mode sombre",
+      "dark_mode_system": "Système",
+      "dark_mode_on": "Activé",
+      "dark_mode_off": "Désactivé",
+      "notifications": "Notifications",
+      "notifications_subtitle": "Activer les notifications push"
+    },
+    "privacy": {
+      "title": "Confidentialité et sécurité",
+      "export_data": "Exporter les données",
+      "export_data_subtitle": "Télécharger vos données",
+      "privacy_policy": "Politique de confidentialité"
+    },
+    "about": {
+      "title": "À propos",
+      "app_version": "Version de l'application",
+      "terms_of_service": "Conditions d'utilisation",
+      "help_support": "Aide et support"
+    },
+    "danger_zone": {
+      "title": "Zone dangereuse",
+      "delete_account": "Supprimer le compte",
+      "delete_account_subtitle": "Supprimer définitivement votre compte et vos données",
+      "deleting_account": "Suppression du compte..."
+    },
+    "logout": {
+      "button": "Déconnexion",
+      "confirm_title": "Déconnexion",
+      "confirm_message": "Êtes-vous sûr de vouloir vous déconnecter?"
+    },
+    "delete_confirm": {
+      "title": "⚠️ Supprimer le compte",
+      "message": "ATTENTION: Cette action est PERMANENTE et ne peut PAS être annulée!\n\nCela supprimera définitivement:\n• Votre profil et informations personnelles\n• Tous vos journaux, ensembles, aliments personnalisés, objectifs et préférences\n\nÊtes-vous absolument sûr de vouloir supprimer votre compte?",
+      "confirm_button": "Supprimer mon compte",
+      "cancel_button": "NON, ne pas supprimer"
+    },
+    "delete_second_confirm": {
+      "title": "⚠️ Confirmation finale",
+      "message": "Êtes-vous vraiment sûr de vouloir supprimer votre compte définitivement?",
+      "confirm_button": "Veuillez supprimer mon compte",
+      "cancel_button": "NON, ne pas supprimer"
+    },
+    "delete_third_confirm": {
+      "message": "Triste de vous voir partir. Nous nous améliorerons chaque jour, et nous espérons vous revoir à l'avenir!",
+      "confirm_button": "À bientôt",
+      "cancel_button": "En fait, ne supprimez pas mon compte"
+    },
+    "coming_soon": "Bientôt disponible",
+    "feature_coming_soon": "La fonctionnalité {{feature}} sera bientôt disponible."
+  },
+
+  "edit_profile": {
+    "title": "Modifier le profil",
+    "subtitle": "Mettre à jour vos informations personnelles",
+    "preferred_name_label": "Nom préféré",
+    "preferred_name_placeholder": "Nom préféré",
+    "date_of_birth_label": "Date de naissance",
+    "date_of_birth_placeholder": "Sélectionnez la date de naissance",
+    "gender_label": "Sexe à la naissance",
+    "gender_description": "Pour la précision des calculs caloriques",
+    "height_label": "Taille",
+    "weight_label": "Poids",
+    "save_button": "Enregistrer les modifications",
+    "loading_profile": "Chargement du profil...",
+    "profile_not_found_title": "Profil non trouvé",
+    "profile_not_found_message": "Votre profil n'a pas pu être chargé. Veuillez réessayer plus tard.",
+    "go_back": "Retour",
+    "select_date_title": "Sélectionnez la date de naissance",
+    "error_user_not_authenticated": "Utilisateur non authentifié",
+    "error_name_dob_required": "Le nom préféré et la date de naissance sont requis",
+    "error_update_failed": "Échec de la mise à jour du profil: {{message}}"
+  },
+
+  "my_goals": {
+    "title": "Mes objectifs",
+    "subtitle": "Définissez vos objectifs nutritionnels quotidiens",
+    "loading": "Chargement des objectifs...",
+    "save_button": "Enregistrer les objectifs",
+    "success_message": "Objectifs mis à jour avec succès",
+    "calories": {
+      "title": "Objectif calorique quotidien",
+      "description": "Définissez une plage inférieure et/ou supérieure optionnelle",
+      "set_maximum": "Définir le maximum (kcal)",
+      "set_minimum": "Définir le minimum (kcal)",
+      "placeholder_max": "ex: 2200",
+      "placeholder_min": "ex: 1800"
+    },
+    "nutrients": {
+      "title": "Objectif nutritionnel quotidien",
+      "description": "Apport en protéines cible par jour",
+      "protein": "Définir l'objectif protéines (g)",
+      "protein_placeholder": "ex: 150",
+      "sodium": "Définir le sodium max (mg)",
+      "sodium_placeholder": "ex: 2300"
+    },
+    "carbs": {
+      "total": "Définir glucides totaux max (g)",
+      "total_placeholder": "ex: 200",
+      "net": "Définir glucides nets max (g)",
+      "net_placeholder": "ex: 150"
+    },
+    "fibre": {
+      "label": "Définir l'objectif fibres (g)",
+      "placeholder": "ex: 30"
+    },
+    "fats": {
+      "total": "Définir lipides totaux max (g)",
+      "total_placeholder": "ex: 65",
+      "saturated": "Définir gras saturés max (g)",
+      "saturated_placeholder": "ex: 20"
+    },
+    "water": {
+      "label": "Définir l'objectif eau (L)",
+      "placeholder": "ex: 2"
+    },
+    "target_weight": {
+      "title": "Poids cible",
+      "set_target": "Définir le poids cible ({{unit}})",
+      "placeholder_lbs": "50 à 800",
+      "placeholder_kg": "23 à 363",
+      "set_date": "Définir la date cible",
+      "select_date": "Sélectionner la date cible",
+      "select_date_title": "Sélectionner la date cible"
+    },
+    "validation": {
+      "lower_range_minimum": "La plage inférieure doit être 0 ou plus",
+      "upper_range_maximum": "La plage supérieure doit être 20000 ou moins",
+      "lower_less_than_upper": "La plage inférieure doit être plus petite que la plage supérieure",
+      "protein_range": "Les protéines doivent être entre 20 et 500 grammes",
+      "protein_length": "Les protéines doivent avoir 3 caractères ou moins",
+      "total_carbs_range": "Les glucides totaux doivent être entre 0 et 450 grammes",
+      "net_carbs_range": "Les glucides nets doivent être entre 0 et 450 grammes",
+      "fibre_range": "L'objectif fibres doit être entre 10 et 240 grammes",
+      "total_fat_range": "Les lipides totaux doivent être entre 0 et 150 grammes",
+      "saturated_fat_range": "Les gras saturés doivent être entre 0 et 100 grammes",
+      "sodium_range": "Le sodium max doit être entre 0 et 6000 mg",
+      "water_range": "L'objectif eau doit être entre 1 et 10 litres",
+      "target_weight_range": "Le poids cible doit être entre 50 et 800 lbs",
+      "target_date_format": "La date cible doit être au format AAAA-MM-JJ",
+      "target_date_future": "La date cible doit être dans le futur",
+      "target_date_max": "La date cible doit être dans les 10 prochaines années"
+    }
+  },
+
+  "date_picker": {
+    "select_date_of_birth": "Sélectionnez la date de naissance",
+    "select_year_month": "Sélectionnez l'année et le mois",
+    "previous_month": "Mois précédent",
+    "next_month": "Mois suivant",
+    "weekdays": {
+      "sun": "Dim",
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mer",
+      "thu": "Jeu",
+      "fri": "Ven",
+      "sat": "Sam"
+    }
+  },
+
+  "units": {
+    "cm": "cm",
+    "ft_in": "pi/po",
+    "ft": "pi",
+    "in": "po",
+    "lbs": "lbs",
+    "kg": "kg",
+    "kcal": "kcal",
+    "g": "g",
+    "mg": "mg",
+    "ml": "ml",
+    "L": "L"
+  },
+
+  "accessibility": {
+    "email_address": "Adresse courriel",
+    "password": "Mot de passe",
+    "show_password": "Afficher le mot de passe",
+    "hide_password": "Masquer le mot de passe",
+    "toggle_password_visibility": "Appuyez deux fois pour basculer la visibilité du mot de passe",
+    "back": "Retour",
+    "close": "Fermer",
+    "next_step": "Appuyez deux fois pour passer à l'étape suivante",
+    "previous_step": "Appuyez deux fois pour revenir à l'étape précédente",
+    "select_date": "Appuyez deux fois pour sélectionner votre date de naissance",
+    "checkbox_checked": "coché",
+    "checkbox_unchecked": "non coché"
+  },
+
+  "validation": {
+    "required": "Ce champ est requis",
+    "invalid_email": "Veuillez entrer une adresse courriel valide",
+    "password_too_short": "Le mot de passe doit contenir au moins 10 caractères",
+    "passwords_must_match": "Les mots de passe doivent correspondre"
+  },
+
+  "alerts": {
+    "configuration_error": "Erreur de configuration",
+    "validation_error": "Erreur de validation",
+    "login_failed": "Échec de connexion",
+    "registration_failed": "Échec d'inscription",
+    "update_failed": "Échec de mise à jour",
+    "error_title": "Erreur",
+    "timeout_error": "Erreur de délai",
+    "success": "Succès",
+    "save_failed": "Échec de sauvegarde",
+    "limit_reached": "Limite atteinte",
+    "calories_limit_exceeded": "Limite de calories dépassée",
+    "security_required": "Sécurité requise",
+    "camera_not_supported": "Caméra non prise en charge",
+    "permission_denied": "Permission refusée",
+    "permission_error": "Erreur de permission",
+    "camera_permission_required": "Permission caméra requise",
+    "barcode_not_found": "Code-barres non trouvé",
+    "food_found": "Aliment trouvé!"
+  },
+
+  "mealtype_log": {
+    "title": "Journal",
+    "back": "Retour",
+    "search_placeholder": "Rechercher un aliment à ajouter",
+    "quick_add": "Ajout rapide",
+    "quick_add_success": "{{foodName}} ajouté à {{mealType}}",
+    "no_entries": "Aucune entrée",
+    "add_first_entry": "Appuyez sur + pour ajouter votre première entrée",
+    
+    "tabs": {
+      "frequent": "Fréquent",
+      "recent": "Récent",
+      "custom": "Personnalisé",
+      "bundles": "Ensembles",
+      "search": "Recherche",
+      "manual": "Manuel",
+      "favorites": "⭐ Favoris"
+    },
+    
+    "manual_entry": {
+      "title": "Ajout rapide",
+      "hint": "Utilisé plus d'une fois? Créez-le comme Personnalisé!"
+    },
+    
+    "favorites": {
+      "title": "⭐ Favoris",
+      "empty": "Vos aliments favoris apparaîtront ici"
+    },
+    
+    "food_log": {
+      "title": "Journal alimentaire",
+      "title_with_count": "Journal alimentaire ({{count}})",
+      "details": "Détails",
+      "edit": "Modifier",
+      "done": "Terminé",
+      "no_entries": "Aucune entrée. Ajoutez-en une ci-dessus!",
+      "unknown_food": "Inconnu",
+      "select_all": "Tout sélectionner"
+    },
+    
+    "form": {
+      "food_item": "Aliment(s) consommé(s)",
+      "food_item_required": "Aliment(s) consommé(s) *",
+      "food_item_placeholder": "ex: Grand buffet avec nouilles, glaces, soupes, etc",
+      "quantity": "Quantité",
+      "quantity_required": "Quantité *",
+      "quantity_placeholder": "1",
+      "unit": "Unité",
+      "unit_placeholder": "g",
+      "calories": "Calories (kcal)",
+      "calories_required": "Calories (kcal) *",
+      "calories_placeholder": "625",
+      "protein": "Protéines (g)",
+      "protein_placeholder": "0",
+      "carbs": "Glucides (g)",
+      "carbs_placeholder": "0",
+      "fat": "Lipides (g)",
+      "fat_placeholder": "0",
+      "fiber": "Fibres (g)",
+      "fiber_placeholder": "0",
+      "saturated_fat": "Gras saturés (g)",
+      "saturated_fat_placeholder": "0",
+      "sugar": "Sucre (g)",
+      "sugar_placeholder": "0",
+      "sodium": "Sodium (mg)",
+      "sodium_placeholder": "0"
+    },
+    
+    "macros": {
+      "protein_short": "Pro",
+      "carbs_short": "Gluc",
+      "fat_short": "Lip",
+      "fiber_short": "Fib",
+      "saturated_fat_short": "Gras sat",
+      "sugar_short": "Sucre",
+      "sodium_short": "Sodium"
+    },
+    
+    "buttons": {
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "delete": "Supprimer",
+      "edit": "Modifier",
+      "add": "Ajouter",
+      "scan_barcode": "Scanner code-barres",
+      "create_custom": "Créer personnalisé",
+      "create_bundle": "Créer ensemble",
+      "add_bundle": "Ajouter ensemble",
+      "delete_bundle": "Supprimer ensemble",
+      "saving": "Enregistrement...",
+      "show_macros": "Afficher macros",
+      "hide_macros": "Masquer macros",
+      "show_details": "Afficher détails",
+      "hide_details": "Masquer détails",
+      "log_food": "Enregistrer l'aliment",
+      "logging": "Enregistrement...",
+      "update_log": "Mettre à jour",
+      "updating": "Mise à jour..."
+    },
+    
+    "bundles": {
+      "title": "Ensembles",
+      "empty": "Créez des ensembles pour des entrées multiples rapides",
+      "create_hint": "Créez des ensembles pour enregistrer plusieurs aliments rapidement",
+      "example_hint": "ex: Déjeuner protéiné du lundi",
+      "example_desc": "4 œufs entiers, 20g Whey, 2 tasses lait écrémé, 1 c.s. huile olive, 150g jambon",
+      "limit_reached": "Vous pouvez créer jusqu'à 20 ensembles. Veuillez supprimer un ensemble existant.",
+      "added_success": "\"{{name}}\" ajouté à {{mealType}}!",
+      "delete_failed": "Échec de suppression de l'ensemble: {{error}}",
+      "add_failed": "Échec d'ajout de l'ensemble: {{error}}",
+      "empty_invalid": "L'ensemble est vide ou invalide.",
+      "create_new": "+ Créer un nouvel ensemble",
+      "bundles_count": "({{count}}/20 ensembles)",
+      "loading": "Chargement des ensembles..."
+    },
+    
+    "custom_foods": {
+      "title": "Aliments personnalisés",
+      "empty": "Créez votre propre collection d'aliments personnalisés",
+      "create_hint": "Créez des aliments personnalisés pour vos aliments réguliers",
+      "create_new": "+ Créer un nouvel aliment",
+      "custom_foods_count": "aliments personnalisés",
+      "loading": "Chargement des aliments personnalisés..."
+    },
+    
+    "frequent_foods": {
+      "title": "Aliments fréquents",
+      "empty": "Aucun aliment fréquent",
+      "hint": "Les aliments que vous enregistrez souvent apparaîtront ici",
+      "loading": "Chargement des aliments fréquents..."
+    },
+    
+    "recent_foods": {
+      "title": "Aliments récents",
+      "empty": "Aucun aliment récent trouvé",
+      "hint": "Les aliments que vous enregistrez apparaîtront ici",
+      "loading": "Chargement des aliments récents..."
+    },
+    
+    "search": {
+      "title": "Rechercher des aliments",
+      "no_results": "Aucun aliment trouvé",
+      "try_different": "Essayez un autre terme de recherche"
+    },
+    
+    "scanner": {
+      "title": "Scanner le code-barres",
+      "scanning": "Numérisation...",
+      "point_camera": "Pointez la caméra vers le code-barres",
+      "try_again": "Réessayer",
+      "create_custom": "Créer personnalisé",
+      "barcode_not_found": "Aucun aliment trouvé pour le code-barres: {{barcode}}\n\nVoulez-vous réessayer ou créer un aliment personnalisé?",
+      "food_found": "Trouvé: {{name}}{{brand}}",
+      "scan_error": "Échec du traitement du code-barres: {{error}}\n\nVoulez-vous réessayer?",
+      "open_failed": "Échec d'ouverture du scanner: {{error}}",
+      "requesting_permission": "Demande d'autorisation de la caméra...",
+      "permission_required": "L'autorisation de la caméra est requise pour scanner les codes-barres.",
+      "grant_permission": "Accorder l'autorisation",
+      "requesting": "Demande en cours...",
+      "loading_camera": "Chargement de la caméra...",
+      "processing": "Traitement du code-barres...",
+      "instructions": "Positionnez le code-barres dans le cadre"
+    },
+    
+    "camera": {
+      "security_required": "L'accès à la caméra nécessite une connexion sécurisée (HTTPS). Veuillez utiliser HTTPS ou localhost.",
+      "not_supported": "Votre navigateur ne prend pas en charge l'accès à la caméra. Veuillez utiliser un navigateur moderne comme Chrome, Firefox ou Safari.",
+      "permission_denied": "La permission de la caméra a été refusée précédemment.\n\nVeuillez:\n1. Cliquer sur l'icône de cadenas dans la barre d'adresse\n2. Autoriser l'accès à la caméra\n3. Actualiser la page et réessayer",
+      "permission_error": "Impossible de demander la permission de la caméra. Veuillez vérifier les paramètres de votre appareil.",
+      "permission_required_title": "Permission caméra requise",
+      "permission_required_message": "L'autorisation de la caméra est requise pour scanner les codes-barres.",
+      "permission_required_hint_can_ask": "Vous pouvez réessayer.",
+      "permission_required_hint_settings": "Veuillez activer l'autorisation de la caméra dans les paramètres de votre appareil:\n\nParamètres > Applications > [Cette application] > Autorisations > Caméra",
+      "permission_required_ios": "Pour scanner les codes-barres, veuillez activer l'accès à la caméra:\n\n1. Ouvrir Réglages\n2. Défiler et appuyer sur cette application\n3. Activer l'accès Caméra",
+      "permission_required_android": "Pour scanner les codes-barres, cette application a besoin de la permission caméra.\n\nVeuillez appuyer sur \"Autoriser\" lorsque demandé.",
+      "permission_request_failed": "Échec de demande de permission caméra.\n\n{{error}}",
+      "camera_error_title": "Erreur de caméra",
+      "camera_error_message": "Échec de l'accès à la caméra.\n\nErreur: {{errorName}}\nMessage: {{errorMessage}}\n\nVeuillez vérifier les paramètres de votre navigateur et vous assurer que l'accès à la caméra est autorisé.",
+      "request_timeout_title": "Délai d'attente de la demande",
+      "request_timeout_message": "La demande d'autorisation de la caméra a expiré.\n\nCela signifie généralement:\n1. La boîte de dialogue d'autorisation n'est pas apparue\n2. Votre navigateur a bloqué la demande\n3. La caméra est déjà utilisée\n\nVeuillez vérifier les paramètres de votre navigateur et réessayer.",
+      "no_camera_found_title": "Aucune caméra trouvée",
+      "no_camera_found_message": "Aucune caméra trouvée sur cet appareil.",
+      "camera_in_use_title": "Caméra en cours d'utilisation",
+      "camera_in_use_message": "La caméra est déjà utilisée par une autre application. Veuillez fermer les autres applications utilisant la caméra et réessayer."
+    },
+    
+    "delete_entry": {
+      "title": "Supprimer l'entrée",
+      "message": "Êtes-vous sûr de vouloir supprimer {{name}}?",
+      "message_generic": "Êtes-vous sûr de vouloir supprimer cette entrée?",
+      "confirm": "Supprimer",
+      "cancel": "Annuler",
+      "success": "Entrée supprimée avec succès",
+      "success_multiple": "{{count}} {{entries}} supprimée(s) avec succès!",
+      "entry_singular": "entrée",
+      "entry_plural": "entrées",
+      "failed": "Échec de suppression de l'entrée: {{error}}",
+      "failed_multiple": "Échec de suppression des entrées: {{error}}"
+    },
+    
+    "delete_custom_food": {
+      "title": "Supprimer l'aliment personnalisé",
+      "message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\"? Cette action est irréversible.",
+      "message_generic": "Êtes-vous sûr de vouloir supprimer cet aliment personnalisé? Cette action est irréversible.",
+      "confirm": "Supprimer",
+      "cancel": "Annuler"
+    },
+    
+    "delete_bundle": {
+      "title": "Supprimer l'ensemble",
+      "message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\"? Cette action est irréversible.",
+      "message_generic": "Êtes-vous sûr de vouloir supprimer cet ensemble? Cette action est irréversible."
+    },
+    
+    "add_bundle": {
+      "title": "Ajouter l'ensemble au repas",
+      "message": "Êtes-vous sûr de vouloir ajouter les {{count}} entrées de \"{{name}}\" à votre journal?",
+      "message_generic": "Êtes-vous sûr de vouloir ajouter toutes les entrées à votre journal?",
+      "confirm": "Ajouter"
+    },
+    
+    "mass_delete": {
+      "title": "Supprimer les entrées",
+      "message": "Êtes-vous sûr de vouloir supprimer les {{count}} {{items}} sélectionnés?",
+      "item_singular": "élément",
+      "item_plural": "éléments",
+      "cancel_no": "Non"
+    },
+    
+    "errors": {
+      "user_not_authenticated": "Utilisateur non authentifié.",
+      "user_not_found": "Utilisateur non trouvé",
+      "fetch_failed": "Échec de récupération des données: {{error}}",
+      "no_valid_entries": "Aucune entrée valide à ajouter.",
+      "no_entries_added": "Aucune entrée ajoutée. Veuillez réessayer.",
+      "unexpected_error": "Une erreur inattendue s'est produite.",
+      "entry_not_exists": "L'entrée en cours de modification n'existe plus. Veuillez actualiser et réessayer.",
+      "quantity_invalid": "La quantité doit être un nombre valide.",
+      "calories_invalid": "Les calories doivent être un nombre valide.",
+      "serving_too_large": "La portion est trop grande ({{value}}). Maximum autorisé: {{max}}. Veuillez réduire la quantité ou diviser en plusieurs entrées.",
+      "protein_invalid": "La valeur de protéines est invalide.",
+      "carbs_invalid": "La valeur de glucides est invalide.",
+      "fat_invalid": "La valeur de lipides est invalide.",
+      "fiber_invalid": "La valeur de fibres est invalide.",
+      "protein_too_large": "La valeur de protéines est trop grande. Maximum autorisé: {{max}}g.",
+      "carbs_too_large": "La valeur de glucides est trop grande. Maximum autorisé: {{max}}g.",
+      "fat_too_large": "La valeur de lipides est trop grande. Maximum autorisé: {{max}}g.",
+      "calories_limit_exceeded": "Cette entrée ajouterait {{calories}} kcal, portant votre total {{mealType}} à {{total}} kcal.\n\nCela dépasse la limite de sécurité de {{limit}} kcal par repas.\n\nSi c'est intentionnel, veuillez diviser en plusieurs entrées.",
+      "fix_errors": "Veuillez corriger les erreurs affichées en rouge avant d'enregistrer.",
+      "save_failed_checklist": "Impossible d'enregistrer l'entrée. Veuillez vérifier:\n\n• Le nom de l'aliment n'est pas vide\n• La quantité est un nombre valide\n• Les calories sont un nombre valide\n\nSi le problème persiste, essayez d'actualiser la page.",
+      "save_unexpected": "Une erreur inattendue s'est produite lors de l'enregistrement: {{error}}",
+      "delete_custom_failed": "Échec de suppression de l'aliment personnalisé: {{error}}",
+      "item_name_required": "Veuillez entrer un nom d'aliment",
+      "quantity_required": "Veuillez entrer une quantité valide",
+      "calories_required": "Veuillez entrer les calories",
+      "quick_add_failed": "Échec de l'ajout rapide: {{error}}"
+    },
+    
+    "success": {
+      "entry_saved": "Entrée alimentaire {{action}} avec succès!",
+      "action_saved": "enregistrée",
+      "action_updated": "mise à jour"
+    },
+    
+    "calendar": {
+      "previous_month": "Mois précédent",
+      "next_month": "Mois suivant",
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "months": {
+        "jan": "Jan",
+        "feb": "Fév",
+        "mar": "Mar",
+        "apr": "Avr",
+        "may": "Mai",
+        "jun": "Juin",
+        "jul": "Juil",
+        "aug": "Août",
+        "sep": "Sep",
+        "oct": "Oct",
+        "nov": "Nov",
+        "dec": "Déc"
+      }
+    },
+    
+    "meal_types": {
+      "breakfast": "Petit-déjeuner",
+      "lunch": "Déjeuner",
+      "dinner": "Dîner",
+      "snack": "Collation",
+      "late_night": "Souper tardif"
+    },
+    
+    "multi_select": {
+      "items_selected": "{{count}} sélectionné(s)",
+      "delete_selected": "Supprimer la sélection"
+    },
+    
+    "accessibility": {
+      "searching": "Recherche d'aliments",
+      "scan_barcode": "Scanner code-barres",
+      "frequent_tab": "Onglet aliments fréquents",
+      "recent_tab": "Onglet aliments récents",
+      "custom_tab": "Onglet aliments personnalisés",
+      "bundles_tab": "Onglet ensembles",
+      "manual_tab": "Onglet saisie manuelle",
+      "favorite_tab": "Onglet aliments favoris",
+      "quick_add_hint": "Appuyer deux fois pour ajouter avec la portion par défaut"
+    }
+  },
+  
+  "create_custom_food": {
+    "title_create": "Créer un aliment personnalisé",
+    "title_edit": "Modifier l'aliment personnalisé",
+    "title_clone": "Cloner l'aliment personnalisé",
+    "loading": "Chargement des données...",
+    "back": "← Retour",
+    
+    "required_section": {
+      "food_name_label": "Nom de l'aliment *",
+      "food_name_placeholder": "ex: Barre protéinée maison de papa"
+    },
+    
+    "weight_serving": {
+      "title": "Portion basée sur le poids *",
+      "description": "Entrez les informations nutritionnelles basées sur le poids. Requis pour des calculs précis.",
+      "quantity_label": "Quantité *",
+      "quantity_placeholder": "100",
+      "unit_label": "Unité *",
+      "calories_label": "Calories (kcal) *",
+      "calories_placeholder": "0"
+    },
+    
+    "volume_serving": {
+      "checkbox_label": "Ajouter une portion basée sur le volume",
+      "title": "Portion basée sur le volume",
+      "description": "Entrez le volume équivalent à la portion basée sur le poids ci-dessus",
+      "quantity_label": "Quantité *",
+      "quantity_placeholder": "1",
+      "unit_label": "Unité *"
+    },
+    
+    "macronutrients": {
+      "title": "Macronutriments (g)",
+      "protein": "Protéines",
+      "carbs": "Glucides",
+      "fat": "Lipides",
+      "fiber": "Fibres"
+    },
+    
+    "other_nutrients": {
+      "title": "Autres nutriments",
+      "saturated_fat": "Gras sat (g)",
+      "sugar": "Sucre (g)",
+      "sodium": "Sodium (mg)",
+      "placeholder": "0"
+    },
+    
+    "optional_section": {
+      "title": "Informations optionnelles",
+      "subtitle": "Ces champs sont optionnels et peuvent être ajoutés plus tard",
+      "brand_label": "Marque",
+      "brand_placeholder": "ex: Ma cuisine"
+    },
+    
+    "buttons": {
+      "cancel": "Annuler",
+      "create": "Créer l'aliment",
+      "update": "Mettre à jour",
+      "clone": "Cloner l'aliment",
+      "creating": "Création...",
+      "updating": "Mise à jour...",
+      "cloning": "Clonage..."
+    },
+    
+    "validation": {
+      "name_required": "Entrez un nom significatif :)",
+      "name_too_long": "Le nom ne peut pas dépasser {{max}} caractères. Actuel: {{current}} caractères.",
+      "brand_too_long": "La marque ne peut pas dépasser {{max}} caractères. Actuel: {{current}} caractères.",
+      "duplicate_name": "Un aliment personnalisé avec le même nom existe déjà",
+      "duplicate_name_brand": "Un aliment personnalisé avec le même nom et marque \"{{brand}}\" existe déjà",
+      "quantity_required": "La quantité doit être un nombre valide supérieur à 0",
+      "quantity_exceeds_limit": "La quantité ne peut pas dépasser {{max}}. Veuillez réduire.",
+      "calories_required": "Les calories doivent être un nombre valide",
+      "calories_exceeds_limit": "Les calories ne peuvent pas dépasser {{max}} kcal. Actuel: {{current}} kcal.",
+      "volume_quantity_required": "La quantité de volume doit être un nombre valide supérieur à 0",
+      "volume_quantity_exceeds_limit": "La quantité de volume ne peut pas dépasser {{max}}. Veuillez réduire.",
+      "protein_invalid": "Les protéines doivent être un nombre valide",
+      "protein_exceeds_limit": "Les protéines ne peuvent pas dépasser {{max}}g",
+      "carbs_invalid": "Les glucides doivent être un nombre valide",
+      "carbs_exceeds_limit": "Les glucides ne peuvent pas dépasser {{max}}g",
+      "fat_invalid": "Les lipides doivent être un nombre valide",
+      "fat_exceeds_limit": "Les lipides ne peuvent pas dépasser {{max}}g",
+      "fiber_invalid": "Les fibres doivent être un nombre valide",
+      "fiber_exceeds_limit": "Les fibres ne peuvent pas dépasser {{max}}g",
+      "saturated_fat_invalid": "Les gras saturés doivent être un nombre valide",
+      "saturated_fat_exceeds_limit": "Les gras saturés ne peuvent pas dépasser {{max}}g",
+      "sugar_invalid": "Le sucre doit être un nombre valide",
+      "sugar_exceeds_limit": "Le sucre ne peut pas dépasser {{max}}g",
+      "sodium_invalid": "Le sodium doit être un nombre valide",
+      "sodium_exceeds_limit": "Le sodium ne peut pas dépasser {{max}} mg",
+      "invalid_serving_quantity": "Quantité de portion invalide: {{value}}",
+      "invalid_calories": "Calories invalides: {{value}}",
+      "fix_errors": "Veuillez corriger les erreurs avant de sauvegarder."
+    },
+    
+    "errors": {
+      "load_failed": "Échec du chargement des données pour modification",
+      "load_error": "Échec du chargement: {{error}}",
+      "clone_load_failed": "Échec du chargement des données pour clonage",
+      "not_logged_in": "Vous devez être connecté pour créer ou modifier des aliments personnalisés",
+      "limit_reached_title": "Limite d'aliments personnalisés atteinte",
+      "limit_reached_message": "Vous avez atteint la limite maximale de 50 aliments personnalisés.\n\nPour en créer un nouveau:\n• Supprimez un aliment existant de l'onglet Personnalisé\n• Ou clonez un aliment existant au lieu d'en créer un nouveau",
+      "update_failed": "Échec de la mise à jour: {{error}}",
+      "update_no_data": "Échec de la mise à jour - aucune donnée retournée",
+      "create_failed": "Échec de la création: {{error}}",
+      "create_no_data": "Échec de la création - aucune donnée retournée",
+      "save_failed": "Échec de la création. Veuillez réessayer."
+    }
+  },
+
+  "create_bundle": {
+    "title_create": "Créer un ensemble",
+    "title_edit": "Modifier l'ensemble",
+    "loading": "Chargement de l'ensemble...",
+    
+    "step1_title": "Étape 1: Nommer l'ensemble",
+    "bundle_name_label": "Nom de l'ensemble",
+    "bundle_name_placeholder": "ex: Shake protéiné du matin",
+    "characters_count": "{{count}}/40 caractères",
+    
+    "step2_title": "Étape 2: Rechercher et ajouter des aliments (au moins 2 requis)",
+    "search_placeholder": "Rechercher un aliment à ajouter",
+    
+    "quantity_label": "Quantité",
+    "serving_label": "Portion",
+    "select_serving": "Sélectionner la portion",
+    "total_kcal": "Total kcal",
+    "add_to_bundle": "Ajouter à l'ensemble",
+    
+    "bundle_items_title": "Éléments de l'ensemble ({{count}})",
+    "details_toggle": "Détails",
+    "unknown_item": "Inconnu",
+    
+    "bundle_summary_title": "Résumé de l'ensemble",
+    
+    "cancel_button": "Annuler",
+    "create_button": "Créer l'ensemble",
+    "update_button": "Mettre à jour l'ensemble",
+    
+    "remove_item_title": "Supprimer l'élément",
+    "remove_item_message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" de l'ensemble?",
+    "remove_item_message_generic": "Êtes-vous sûr de vouloir supprimer cet élément de l'ensemble?",
+    "remove_button": "Supprimer",
+    
+    "source_custom": "Personnalisé",
+    "source_database": "Base de données",
+    "source_manual": "Manuel",
+    
+    "macros": {
+      "protein_short": "Pro",
+      "carbs_short": "Gluc",
+      "fat_short": "Lip",
+      "fiber_short": "Fib",
+      "saturated_fat_short": "Gras Sat",
+      "sugar_short": "Sucre",
+      "sodium_short": "Sodium",
+      "protein": "Protéines",
+      "carbs": "Glucides",
+      "fat": "Lipides",
+      "fiber": "Fibres"
+    },
+    
+    "errors": {
+      "load_bundle_failed": "Échec du chargement de l'ensemble",
+      "load_items_failed": "Échec du chargement des éléments",
+      "load_bundle_error": "Échec du chargement de l'ensemble: {{error}}",
+      "load_food_failed": "Échec du chargement de l'aliment",
+      "select_food_and_serving": "Veuillez sélectionner un aliment et une portion",
+      "enter_valid_quantity": "Veuillez entrer une quantité valide",
+      "quantity_greater_than_zero": "La quantité doit être supérieure à 0",
+      "quantity_exceeds_limit": "La quantité ne peut pas dépasser {{max}}. Veuillez réduire ou diviser en plusieurs entrées.",
+      "calories_exceed_limit": "Les calories ({{calories}} kcal) dépassent la limite de {{max}} kcal par entrée. Réduisez la quantité ou divisez en {{entries}} entrées.",
+      "enter_bundle_name": "Veuillez entrer un nom d'ensemble",
+      "bundle_name_too_long": "Le nom de l'ensemble doit contenir 40 caractères ou moins",
+      "add_at_least_one_food": "Veuillez ajouter au moins un aliment à l'ensemble",
+      "add_at_least_two_foods": "Veuillez ajouter au moins 2 aliments pour créer un ensemble",
+      "bundle_limit_reached_title": "Limite d'ensembles atteinte",
+      "bundle_limit_reached_message": "Vous avez atteint la limite maximale de 20 ensembles.\n\nPour créer un nouvel ensemble:\n• Supprimez un ensemble existant dans l'onglet Ensembles\n• Ou modifiez un ensemble existant au lieu d'en créer un nouveau",
+      "update_bundle_failed": "Échec de la mise à jour de l'ensemble: {{error}}",
+      "create_bundle_failed": "Échec de la création de l'ensemble: {{error}}",
+      "save_items_failed": "Échec de la sauvegarde des éléments: {{error}}",
+      "save_bundle_failed": "Échec de la sauvegarde de l'ensemble: {{error}}"
+    }
+  }
+}
+
