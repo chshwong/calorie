@@ -263,7 +263,15 @@ export function WebBarcodeScanner({
   }
 
   return (
-    <View style={styles.container}>
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      minHeight: '400px',
+      backgroundColor: '#000',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
       {isInitializing && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={colors.tint} />
@@ -273,21 +281,30 @@ export function WebBarcodeScanner({
         </View>
       )}
       
-      {/* This div will be used by html5-qrcode - needs absolute positioning and full size */}
+      {/* This div will be used by html5-qrcode */}
       <div 
         id="web-barcode-scanner" 
         ref={containerRef as any}
         style={{ 
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          flex: 1,
           width: '100%',
-          height: '100%',
+          minHeight: '300px',
           display: isInitializing ? 'none' : 'block',
         }} 
       />
+      
+      {/* CSS to ensure html5-qrcode video fills container */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        #web-barcode-scanner video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+        }
+        #web-barcode-scanner > div {
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `}} />
       
       {isScanning && (
         <div style={{
@@ -338,7 +355,7 @@ export function WebBarcodeScanner({
           )}
         </div>
       )}
-    </View>
+    </div>
   );
 }
 
