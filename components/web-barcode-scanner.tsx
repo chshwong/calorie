@@ -290,24 +290,53 @@ export function WebBarcodeScanner({
       />
       
       {isScanning && (
-        <View style={styles.instructionContainer}>
-          <View style={styles.instructionBubble}>
-            <Text style={styles.instructionText}>
+        <div style={{
+          position: 'absolute',
+          bottom: 40,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          zIndex: 100,
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            padding: '12px 20px',
+            borderRadius: 12,
+          }}>
+            <span style={{
+              color: '#fff',
+              fontSize: 16,
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+            }}>
               {t('mealtype_log.scanner.point_at_barcode', 'Point your camera at a barcode')}
-            </Text>
-          </View>
+            </span>
+          </div>
           
           {onSwitchToFileUpload && (
-            <TouchableOpacity
-              style={styles.switchToUploadLink}
-              onPress={onSwitchToFileUpload}
+            <button
+              onClick={onSwitchToFileUpload}
+              style={{
+                marginTop: 12,
+                padding: '8px 16px',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
             >
-              <Text style={styles.switchToUploadText}>
+              <span style={{
+                color: '#fff',
+                fontSize: 14,
+                textDecoration: 'underline',
+              }}>
                 {t('mealtype_log.scanner.or_upload_photo', 'or upload a photo')}
-              </Text>
-            </TouchableOpacity>
+              </span>
+            </button>
           )}
-        </View>
+        </div>
       )}
     </View>
   );
@@ -369,40 +398,6 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  instructionContainer: {
-    position: 'absolute',
-    bottom: 40,
-    left: 16,
-    right: 16,
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  instructionBubble: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    maxWidth: '100%',
-  },
-  instructionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  switchToUploadLink: {
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 8,
-  },
-  switchToUploadText: {
-    color: '#fff',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-    textAlign: 'center',
   },
 });
 
