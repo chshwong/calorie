@@ -244,13 +244,14 @@ export default function CreateCustomFoodScreen() {
           setWeightQuantity(servingMatch[1]);
           setWeightUnit(servingMatch[2].trim());
         } else {
-          // Fallback: use grams from serving
-          setWeightQuantity(servingsData.grams.toString());
+          // Fallback: use weight_g or volume_ml from serving
+          const servingValue = servingsData.weight_g ?? servingsData.volume_ml ?? 0;
+          setWeightQuantity(servingValue.toString());
           setWeightUnit('g');
         }
 
         // Calculate values for the serving size
-        const servingGrams = servingsData.grams;
+        const servingGrams = servingsData.weight_g ?? servingsData.volume_ml ?? 0;
         const caloriesForServing = (foodData.calories_kcal / 100) * servingGrams;
         setWeightCalories(caloriesForServing.toFixed(1));
 

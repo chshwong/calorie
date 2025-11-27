@@ -54,8 +54,10 @@ type FoodServingRow = {
   id: string;
   food_id: string;
   serving_name: string | null;
-  grams: number | null;
+  weight_g: number | null;
+  volume_ml: number | null;
   is_default: boolean | null;
+  sort_order: number | null;
   // Computed field: name of associated master food
   food_master_name?: string | null;
 };
@@ -167,8 +169,10 @@ const SERVING_COLUMN_KEYS = [
   'id',
   'food_id',
   'serving_name',
-  'grams',
+  'weight_g',
+  'volume_ml',
   'is_default',
+  'sort_order',
 ];
 
 const ACTION_COLUMNS = ['remove', 'master', 'variant'];
@@ -230,8 +234,10 @@ const DEFAULT_COLUMN_WIDTHS: { [key: string]: number } = {
   serving_id: 80,
   serving_food_id: 80,
   serving_serving_name: 150,
-  serving_grams: 100,
+  serving_weight_g: 100,
+  serving_volume_ml: 100,
   serving_is_default: 100,
+  serving_sort_order: 80,
   // Variant columns
   variant_food_master_name: 200,
   variant_id: 80,
@@ -295,6 +301,9 @@ const FOOD_ROW_COLORS = [
   '#FFF9C4', // Light yellow
 ];
 
+// Text color to use on colored rows (always dark for contrast with light pastel backgrounds)
+const COLORED_ROW_TEXT = '#1a1a1a';
+
 const loadColumnWidths = async (): Promise<{ [key: string]: number }> => {
   try {
     if (Platform.OS === 'web') {
@@ -332,35 +341,7 @@ export default function MergeFoodScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { isAdmin, loading: authLoading } = useAuth();
 
-  // Check admin access on focus
-  useFocusEffect(
-    useCallback(() => {
-      if (!authLoading && !isAdmin) {
-        Alert.alert('Access Denied', 'You do not have permission to access this page.');
-        router.back();
-      }
-    }, [isAdmin, authLoading, router])
-  );
-
-  // Don't render content if not admin
-  if (authLoading) {
-    return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </ThemedView>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ThemedText style={{ fontSize: 18, fontWeight: 'bold', color: '#ff0000' }}>
-          Access Denied
-        </ThemedText>
-      </ThemedView>
-    );
-  }
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodMasterRow[]>([]);
   const [selectedFoods, setSelectedFoods] = useState<FoodMasterRow[]>([]);
@@ -411,6 +392,16 @@ export default function MergeFoodScreen() {
     startX: number;
     startWidth: number;
   }>({ columnKey: null, startX: 0, startWidth: 0 });
+
+  // Check admin access on focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!authLoading && !isAdmin) {
+        Alert.alert('Access Denied', 'You do not have permission to access this page.');
+        router.back();
+      }
+    }, [isAdmin, authLoading, router])
+  );
 
   // Update ref when columnWidths change
   useEffect(() => {
@@ -492,22 +483,27 @@ export default function MergeFoodScreen() {
           return words.every(word => searchText.includes(word));
         });
         
-        // Sort filtered results to maintain ranking:
-        // 1. is_base_food DESC (true first)
-        // 2. is_quality_data DESC (true first)
-        // 3. name ASC (alphabetical)
+        // Sort filtered results to maintain ranking (same as useFoodSearch hook):
+        // 1. is_base_food = true first (highest priority)
+        // 2. is_quality_data = true second
+        // 3. order_index ascending (smaller first, null treated as 0)
+        // 4. Fallback to name for consistent ordering
         filteredResults.sort((a, b) => {
           const aBase = (a.is_base_food === true) ? 1 : 0;
           const bBase = (b.is_base_food === true) ? 1 : 0;
-          if (aBase !== bBase) return bBase - aBase; // DESC
+          if (bBase !== aBase) return bBase - aBase;
           
           const aQuality = (a.is_quality_data === true) ? 1 : 0;
           const bQuality = (b.is_quality_data === true) ? 1 : 0;
-          if (aQuality !== bQuality) return bQuality - aQuality; // DESC
+          if (bQuality !== aQuality) return bQuality - aQuality;
           
-          const aName = (a.name || '').toLowerCase();
-          const bName = (b.name || '').toLowerCase();
-          return aName.localeCompare(bName); // ASC
+          // order_index ascending (smaller first, null treated as 0)
+          const aOrder = a.order_index ?? 0;
+          const bOrder = b.order_index ?? 0;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          
+          // Fallback to name for consistent ordering
+          return (a.name || '').localeCompare(b.name || '');
         });
         
         const results = filteredResults.slice(0, 20); // Limit to 20 for display
@@ -543,7 +539,7 @@ export default function MergeFoodScreen() {
       // Fetch servings for the given food IDs
       const { data: servingsData, error } = await supabase
         .from('food_servings')
-        .select('id, food_id, serving_name, grams, is_default')
+        .select('id, food_id, serving_name, weight_g, volume_ml, is_default, sort_order')
         .in('food_id', foodIds);
 
       if (error) {
@@ -1283,6 +1279,9 @@ export default function MergeFoodScreen() {
     if (key === 'serving_make_default') return 'Make Default';
     if (key === 'is_base_food') return 'Is Base Food';
     if (key === 'is_quality_data') return 'Is Quality Data';
+    if (key === 'weight_g') return 'Weight (g)';
+    if (key === 'volume_ml') return 'Volume (ml)';
+    if (key === 'sort_order') return 'Sort Order';
     return key
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -1648,7 +1647,7 @@ export default function MergeFoodScreen() {
               if (key === 'food_master_name') continue; // Skip computed field
               if (value === null || value === undefined || value === '') {
                 updates[key] = null;
-              } else if (['grams', 'is_default'].includes(key)) {
+              } else if (['weight_g', 'volume_ml', 'sort_order', 'is_default'].includes(key)) {
                 if (key === 'is_default') {
                   updates[key] = value === true || value === 'true' || value === 1 || value === '1';
                 } else {
@@ -2082,7 +2081,7 @@ export default function MergeFoodScreen() {
               if (key === 'food_master_name') continue;
               if (value === null || value === undefined || value === '') {
                 updates[key] = null;
-              } else if (['grams', 'is_default'].includes(key)) {
+              } else if (['weight_g', 'volume_ml', 'sort_order', 'is_default'].includes(key)) {
                 if (key === 'is_default') {
                   updates[key] = value === true || value === 'true' || value === 1 || value === '1';
                 } else {
@@ -2839,6 +2838,25 @@ export default function MergeFoodScreen() {
     return getRowColorByFoodId(bundleItem.food_id);
   }, [associatedBundleItems, getRowColorByFoodId]);
 
+  // Handle loading and access denied states - EARLY RETURNS AFTER ALL HOOKS
+  if (authLoading) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </ThemedView>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText style={{ fontSize: 18, fontWeight: 'bold', color: '#ff0000' }}>
+          Access Denied
+        </ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
@@ -3233,7 +3251,7 @@ export default function MergeFoodScreen() {
                                   styles.editableCell,
                                   {
                                     width: columnWidths[key] || DEFAULT_COLUMN_WIDTHS[key],
-                                    color: colors.text,
+                                    color: COLORED_ROW_TEXT,
                                   }
                                 ]}
                                 value={displayValue}
@@ -3245,7 +3263,7 @@ export default function MergeFoodScreen() {
                                 }}
                                 keyboardType={isNumeric ? 'numeric' : 'default'}
                                 placeholder="-"
-                                placeholderTextColor={colors.textSecondary}
+                                placeholderTextColor="#666"
                                 multiline={false}
                                 {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
                                 {...getInputAccessibilityProps(
@@ -3392,7 +3410,7 @@ export default function MergeFoodScreen() {
                                 : serving[key as keyof FoodServingRow];
                               const editedValue = getEditedValue(serving.id, key, originalValue, 'serving');
                               const displayValue = editedValue === null || editedValue === undefined ? '' : String(editedValue);
-                              const isNumeric = ['grams'].includes(key);
+                              const isNumeric = ['weight_g', 'volume_ml', 'sort_order'].includes(key);
                               const isBoolean = key === 'is_default';
                               return (
                                 <TextInput

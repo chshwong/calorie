@@ -281,12 +281,12 @@ export function computeNutrientsForFoodServing(
   let servingInput: ServingInput;
   
   if (isVolumeUnit(baseUnit)) {
-    // Volume-based food: use volume_ml, fallback to grams for backwards compatibility
-    const volumeValue = (serving.volume_ml ?? serving.grams ?? 0) * quantity;
+    // Volume-based food: use volume_ml
+    const volumeValue = (serving.volume_ml ?? 0) * quantity;
     servingInput = { volume_ml: volumeValue };
   } else {
-    // Weight-based food: use weight_g, fallback to grams for backwards compatibility
-    const weightValue = (serving.weight_g ?? serving.grams ?? 0) * quantity;
+    // Weight-based food: use weight_g
+    const weightValue = (serving.weight_g ?? 0) * quantity;
     servingInput = { weight_g: weightValue };
   }
   
@@ -496,11 +496,11 @@ export function getServingNormalizedValue(serving: FoodServing, food: FoodMaster
   const baseUnit = food.serving_unit.toLowerCase();
   
   if (isVolumeUnit(baseUnit)) {
-    // Volume-based: use volume_ml, fallback to grams for backwards compatibility
-    return serving.volume_ml ?? serving.grams ?? 0;
+    // Volume-based: use volume_ml
+    return serving.volume_ml ?? 0;
   } else {
-    // Weight-based: use weight_g, fallback to grams for backwards compatibility
-    return serving.weight_g ?? serving.grams ?? 0;
+    // Weight-based: use weight_g
+    return serving.weight_g ?? 0;
   }
 }
 

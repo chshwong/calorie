@@ -6,6 +6,9 @@ import * as SecureStore from 'expo-secure-store';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { WebBarcodeScanner } from '@/components/web-barcode-scanner';
+import { BarcodeFileUpload } from '@/components/barcode-file-upload';
+import { useBarcodeScannerMode } from '@/hooks/use-barcode-scanner-mode';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -35,9 +38,11 @@ import {
 } from '@/utils/nutritionMath';
 import {
   getServingsForFood,
+  getServingsForFoods,
   getDefaultServingForFood,
   computeNutrientsForFoodServing,
   computeNutrientsForRawQuantity,
+  getDefaultServingWithNutrients,
   FOOD_SERVING_COLUMNS,
 } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -552,10 +557,29 @@ export default function LogFoodScreen() {
   const [requestingPermission, setRequestingPermission] = useState(false);
   // Web-specific: track browser permission separately since expo-camera hook doesn't sync properly on mobile web
   const [webCameraPermissionGranted, setWebCameraPermissionGranted] = useState(false);
+  // Web-specific: track if user manually switched to file upload mode
+  const [webForceFileUpload, setWebForceFileUpload] = useState(false);
+  
+  // Use the barcode scanner mode hook for web platform detection
+  const { 
+    mode: barcodeScannerMode, 
+    isChecking: isScannerModeChecking,
+    cameraAvailable: webCameraAvailable,
+    switchToFileUpload: switchToFileUploadMode,
+    recheckCamera,
+  } = useBarcodeScannerMode();
   
   // Debug: Log when showBarcodeScanner changes
   useEffect(() => {
     console.log('showBarcodeScanner state changed to:', showBarcodeScanner);
+    console.log('Barcode scanner mode:', barcodeScannerMode);
+  }, [showBarcodeScanner, barcodeScannerMode]);
+  
+  // Reset file upload mode when modal closes
+  useEffect(() => {
+    if (!showBarcodeScanner) {
+      setWebForceFileUpload(false);
+    }
   }, [showBarcodeScanner]);
   
   // Auto-open camera when permission is granted while modal is open
@@ -586,19 +610,27 @@ export default function LogFoodScreen() {
   const tabsContentWidthRef = useRef<number>(0);
   const tabsScrollViewWidthRef = useRef<number>(0);
   
-  // Custom foods state
-  const [customFoods, setCustomFoods] = useState<FoodMaster[]>([]);
+  // Custom foods state (with default serving info)
+  type CustomFood = FoodMaster & DefaultServingInfo;
+  const [customFoods, setCustomFoods] = useState<CustomFood[]>([]);
   const [customFoodsLoading, setCustomFoodsLoading] = useState(false);
   const customFoodsFetched = useRef(false); // Track if we've fetched custom foods
   const lastRefreshParam = useRef<string | undefined>(undefined);
   const newlyAddedFoodId = useRef<string | undefined>(undefined); // Track which food was just added
   const newlyEditedFoodId = useRef<string | undefined>(undefined); // Track which food was just edited
   
+  // Default serving info for display
+  type DefaultServingInfo = {
+    defaultServingQty: number;
+    defaultServingUnit: string;
+    defaultServingCalories: number;
+  };
+  
   // Frequent foods state (foods logged in last 14 months)
   type FrequentFood = FoodMaster & {
     logCount: number;
     lastLoggedAt: string;
-  };
+  } & DefaultServingInfo;
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [frequentFoodsLoading, setFrequentFoodsLoading] = useState(false);
   const frequentFoodsFetched = useRef(false); // Track if we've fetched frequent foods
@@ -606,7 +638,7 @@ export default function LogFoodScreen() {
   // Recent foods state (last 50 most recent foods used from food_master)
   type RecentFood = FoodMaster & {
     lastUsedAt: string;
-  };
+  } & DefaultServingInfo;
   const [recentFoods, setRecentFoods] = useState<RecentFood[]>([]);
   const [recentFoodsLoading, setRecentFoodsLoading] = useState(false);
   const recentFoodsFetched = useRef(false); // Track if we've fetched recent foods
@@ -637,7 +669,7 @@ export default function LogFoodScreen() {
     totalFat?: number;
     totalFiber?: number;
     foodsMap?: Map<string, { id: string; name: string; calories_kcal: number; protein_g: number | null; carbs_g: number | null; fat_g: number | null; fiber_g: number | null; serving_size: number; serving_unit: string }>;
-    servingsMap?: Map<string, { id: string; serving_name: string; grams: number }>;
+    servingsMap?: Map<string, { id: string; serving_name: string; weight_g: number | null; volume_ml: number | null }>;
   };
 
   const [bundles, setBundles] = useState<Bundle[]>([]);
@@ -845,9 +877,32 @@ export default function LogFoodScreen() {
 
       if (error) {
         setCustomFoods([]);
-      } else {
-        setCustomFoods(data || []);
+        return;
       }
+      
+      if (!data || data.length === 0) {
+        setCustomFoods([]);
+        return;
+      }
+
+      // Batch fetch servings for all foods using centralized data access
+      const foodIds = data.map((food: any) => food.id);
+      const servingsMap = await getServingsForFoods(foodIds);
+
+      // Enrich foods with default serving info
+      const customFoodsList: CustomFood[] = data.map((food: any) => {
+        const foodServings = servingsMap.get(food.id) || [];
+        const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
+        
+        return {
+          ...food,
+          defaultServingQty: defaultServing.quantity,
+          defaultServingUnit: defaultServing.unit,
+          defaultServingCalories: Math.round(nutrients.calories_kcal),
+        };
+      });
+
+      setCustomFoods(customFoodsList);
     } catch (error) {
       setCustomFoods([]);
     } finally {
@@ -883,26 +938,45 @@ export default function LogFoodScreen() {
         return;
       }
 
-      // Map database result to FrequentFood type
-      const frequentFoodsList: FrequentFood[] = data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        brand: row.brand,
-        serving_size: row.serving_size,
-        serving_unit: row.serving_unit,
-        calories_kcal: row.calories_kcal,
-        protein_g: row.protein_g,
-        carbs_g: row.carbs_g,
-        fat_g: row.fat_g,
-        fiber_g: row.fiber_g,
-        saturated_fat_g: row.saturated_fat_g,
-        sugar_g: row.sugar_g,
-        sodium_mg: row.sodium_mg,
-        source: row.source,
-        is_custom: row.is_custom,
-        logCount: Number(row.log_count),
-        lastLoggedAt: row.last_logged_at,
-      }));
+      // Get food IDs for batch fetching servings
+      const foodIds = data.map((row: any) => row.id);
+      
+      // Batch fetch servings for all foods using centralized data access
+      const servingsMap = await getServingsForFoods(foodIds);
+
+      // Map database result to FrequentFood type with default serving info
+      const frequentFoodsList: FrequentFood[] = data.map((row: any) => {
+        const food: FoodMaster = {
+          id: row.id,
+          name: row.name,
+          brand: row.brand,
+          serving_size: row.serving_size,
+          serving_unit: row.serving_unit,
+          calories_kcal: row.calories_kcal,
+          protein_g: row.protein_g,
+          carbs_g: row.carbs_g,
+          fat_g: row.fat_g,
+          fiber_g: row.fiber_g,
+          saturated_fat_g: row.saturated_fat_g,
+          sugar_g: row.sugar_g,
+          sodium_mg: row.sodium_mg,
+          source: row.source,
+          is_custom: row.is_custom,
+        };
+        
+        // Get servings for this food and compute default serving
+        const foodServings = servingsMap.get(row.id) || [];
+        const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
+        
+        return {
+          ...food,
+          logCount: Number(row.log_count),
+          lastLoggedAt: row.last_logged_at,
+          defaultServingQty: defaultServing.quantity,
+          defaultServingUnit: defaultServing.unit,
+          defaultServingCalories: Math.round(nutrients.calories_kcal),
+        };
+      });
 
       setFrequentFoods(frequentFoodsList);
     } catch (error) {
@@ -974,12 +1048,19 @@ export default function LogFoodScreen() {
         return;
       }
 
-      // Combine food details with lastUsedAt
+      // Batch fetch servings for all foods using centralized data access
+      const servingsMap = await getServingsForFoods(foodIds);
+
+      // Combine food details with lastUsedAt and default serving info
       const foodsMap = new Map((foodsData || []).map(food => [food.id, food]));
       const recentFoodsList: RecentFood[] = uniqueFoods
         .map(({ foodId, lastUsedAt }) => {
           const food = foodsMap.get(foodId);
           if (!food) return null;
+          
+          // Get servings for this food and compute default serving
+          const foodServings = servingsMap.get(foodId) || [];
+          const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
           
           return {
             id: food.id,
@@ -998,6 +1079,9 @@ export default function LogFoodScreen() {
             source: food.source,
             is_custom: food.is_custom,
             lastUsedAt,
+            defaultServingQty: defaultServing.quantity,
+            defaultServingUnit: defaultServing.unit,
+            defaultServingCalories: Math.round(nutrients.calories_kcal),
           };
         })
         .filter((food): food is RecentFood => food !== null);
@@ -1094,7 +1178,7 @@ export default function LogFoodScreen() {
       const { data: allServingsData } = allServingIds.length > 0
         ? await supabase
             .from('food_servings')
-            .select('id, serving_name, grams')
+            .select('id, serving_name, weight_g, volume_ml')
             .in('id', allServingIds)
         : { data: [] };
       
@@ -1118,8 +1202,9 @@ export default function LogFoodScreen() {
               let multiplier = 1;
               if (item.serving_id && servingsMap.has(item.serving_id)) {
                 const servingData = servingsMap.get(item.serving_id)!;
-                // Calculate multiplier: (quantity * serving_grams) / 100
-                multiplier = (item.quantity * servingData.grams) / 100;
+                // Calculate multiplier: (quantity * serving_weight_or_volume) / 100
+                const servingValue = servingData.weight_g ?? servingData.volume_ml ?? 0;
+                multiplier = (item.quantity * servingValue) / 100;
               } else {
                 // Unit-based serving (1g or 1ml)
                 if (item.unit === 'g' || item.unit === 'ml') {
@@ -1206,7 +1291,7 @@ export default function LogFoodScreen() {
             if (item.serving_id) {
               const { data: servingData, error: servingError } = await supabase
                 .from('food_servings')
-                .select('grams')
+                .select('weight_g, volume_ml')
                 .eq('id', item.serving_id)
                 .single();
 
@@ -1218,7 +1303,9 @@ export default function LogFoodScreen() {
                   multiplier = (item.quantity * food.serving_size) / 100;
                 }
               } else {
-                multiplier = (item.quantity * servingData.grams) / 100;
+                // Use weight_g or volume_ml from the serving
+                const servingValue = servingData.weight_g ?? servingData.volume_ml ?? 0;
+                multiplier = (item.quantity * servingValue) / 100;
               }
             } else {
               // Unit-based serving (1g or 1ml) or other units
@@ -2606,8 +2693,13 @@ export default function LogFoodScreen() {
         masterUnits = qty;
       }
     } else {
-      // For saved servings: grams = quantity_in_master_unit (how many master units per 1 serving)
-      masterUnits = option.serving.grams * qty;
+      // For saved servings: use the correct field based on food's base unit type
+      // - Weight-based foods (g, kg, oz, lb): use weight_g only
+      // - Volume-based foods (ml, L, cup, tbsp, tsp, floz): use volume_ml only
+      const servingValue = isVolumeUnit(food.serving_unit)
+        ? (option.serving.volume_ml ?? 0)
+        : (option.serving.weight_g ?? 0);
+      masterUnits = servingValue * qty;
     }
     
     // Use the centralized calculation from nutritionMath
@@ -2981,8 +3073,11 @@ export default function LogFoodScreen() {
             return qty.toFixed(1);
           }
         } else {
-          // For saved servings: multiply grams (quantity_in_master_unit) by quantity
-          return (selectedServing.serving.grams * qty).toFixed(1);
+          // For saved servings: use volume_ml for volume-based foods, weight_g for weight-based
+          const servingValue = isVolumeUnit(selectedFood.serving_unit)
+            ? (selectedServing.serving.volume_ml ?? 0)
+            : (selectedServing.serving.weight_g ?? 0);
+          return (servingValue * qty).toFixed(1);
         }
       })()
     : '';
@@ -3359,7 +3454,7 @@ export default function LogFoodScreen() {
                             </ThemedText>
                           )}
                           <ThemedText style={[styles.searchResultNutrition, { color: colors.icon }]}>
-                            {food.serving_size} {food.serving_unit} • {food.calories_kcal} kcal
+                            {food.defaultServingQty} {food.defaultServingUnit} • {food.defaultServingCalories} kcal
                           </ThemedText>
                         </View>
                       </TouchableOpacity>
@@ -3653,7 +3748,7 @@ export default function LogFoodScreen() {
                     >
                       {frequentFoods.map((food) => {
                         const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                        const nutritionInfo = `${food.serving_size} ${food.serving_unit} • ${food.calories_kcal} kcal`;
+                        const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
                         const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                         const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                         const rightSideText = `${brandText}${nutritionInfo}`;
@@ -3732,7 +3827,7 @@ export default function LogFoodScreen() {
                     >
                       {recentFoods.map((food) => {
                         const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                        const nutritionInfo = `${food.serving_size} ${food.serving_unit} • ${food.calories_kcal} kcal`;
+                        const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
                         const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                         const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                         const rightSideText = `${brandText}${nutritionInfo}`;
@@ -3894,9 +3989,8 @@ export default function LogFoodScreen() {
           const isNewlyAdded = newlyAddedFoodId.current === food.id;
           const isNewlyEdited = newlyEditedFoodId.current === food.id;
                           const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                          // Calculate calories for the serving size (calories_kcal is per 100g)
-                          const caloriesForServing = (food.calories_kcal / 100) * food.serving_size;
-                          const nutritionInfo = `${food.serving_size} ${food.serving_unit} • ${caloriesForServing.toFixed(0)} kcal`;
+                          // Use pre-computed default serving info from centralized logic
+                          const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
                           const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                           const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                           const rightSideText = `${brandText}${nutritionInfo}`;
@@ -4176,26 +4270,26 @@ export default function LogFoodScreen() {
                                   <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 8 }]}>
                                     •
                                   </ThemedText>
-                                  {bundle.totalProtein && (
+                                  {bundle.totalProtein ? (
                                     <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
                                       P: {bundle.totalProtein}g
                                     </ThemedText>
-                                  )}
-                                  {bundle.totalCarbs && (
+                                  ) : null}
+                                  {bundle.totalCarbs ? (
                                     <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
                                       C: {bundle.totalCarbs}g
                                     </ThemedText>
-                                  )}
-                                  {bundle.totalFat && (
+                                  ) : null}
+                                  {bundle.totalFat ? (
                                     <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
                                       Fat: {bundle.totalFat}g
                                     </ThemedText>
-                                  )}
-                                  {bundle.totalFiber && (
+                                  ) : null}
+                                  {bundle.totalFiber ? (
                                     <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
                                       Fib: {bundle.totalFiber}g
                                     </ThemedText>
-                                  )}
+                                  ) : null}
                                 </>
                               )}
                             </View>
@@ -4370,9 +4464,9 @@ export default function LogFoodScreen() {
                       );
                     })()}
                   </View>
-                  {/* Base serving info from Food_master table */}
+                  {/* Default serving info - uses centralized default serving logic */}
                   <ThemedText style={{ fontSize: 11, color: colors.icon, marginTop: -2 }}>
-                    {selectedFood.serving_size} {selectedFood.serving_unit} = {selectedFood.calories_kcal} kcal
+                    {quantity} × {selectedServing?.label || `${selectedFood.serving_size} ${selectedFood.serving_unit}`} = {calories || selectedFood.calories_kcal} kcal
                   </ThemedText>
                 </View>
               ) : editingEntryId ? (
@@ -4558,13 +4652,13 @@ export default function LogFoodScreen() {
               </View>
             )}
 
-            {/* Serving Size and Serving on the same line - inline - Only show when food is selected */}
+            {/* Qty and Serving on the same line - inline - Only show when food is selected */}
             {selectedFood && (
               <View style={styles.field}>
-              <View style={[styles.inlineRow, { alignItems: 'center', gap: 12 }]}>
+              <View style={[styles.inlineRow, { alignItems: 'center', gap: 6 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
-                    {editingEntryId ? 'Qty *' : 'Serving Size *:'}
+                    Qty *
                   </ThemedText>
                   <TextInput
                     ref={quantityInputRef}
@@ -4593,7 +4687,7 @@ export default function LogFoodScreen() {
                 
                 {/* Multiplier symbol between qty and serving */}
                 {selectedFood && availableServings.length > 0 && (
-                  <ThemedText style={{ color: colors.icon, fontSize: 14, marginHorizontal: 4 }}>×</ThemedText>
+                  <ThemedText style={{ color: colors.icon, fontSize: 14 }}>×</ThemedText>
                 )}
                 
                 {/* Serving Selection (if food from food_master is selected) */}
@@ -4640,12 +4734,12 @@ export default function LogFoodScreen() {
             </View>
             )}
 
-            {/* Weight and Calories on the same line - inline display */}
+            {/* Weight/Volume and Calories on the same line - inline display */}
             {selectedFood && selectedServing && (
               <View style={styles.field}>
                 <View style={styles.inlineRow}>
                   <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
-                    Weight (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{calculatedWeight || '0.0'}</ThemedText>
+                    {isVolumeUnit(selectedFood.serving_unit) ? 'Volume (ml)' : 'Weight (g)'}: <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{calculatedWeight || '0.0'}</ThemedText>
                   </ThemedText>
                   <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
                     Calories (kcal): <ThemedText style={[styles.inlineValue, { color: caloriesError ? '#EF4444' : colors.text }]}>{calories || '0'}</ThemedText>
@@ -5296,13 +5390,98 @@ export default function LogFoodScreen() {
             console.log('[Modal Render] Web camera permission granted:', webCameraPermissionGranted);
             return null;
           })()}
-          {/* For web, use webCameraPermissionGranted since expo-camera hook doesn't sync properly */}
+          {/* For web, use mode detection to show camera or file upload */}
+          {/* For native, use expo-camera hook permission state */}
           {(() => {
-            const hasPermission = Platform.OS === 'web' 
-              ? webCameraPermissionGranted 
-              : permission?.granted;
+            // On web, use the barcode scanner mode hook to determine what to show
+            if (Platform.OS === 'web') {
+              // Determine effective mode: check if user manually switched to file upload
+              const effectiveMode = webForceFileUpload ? 'file-upload' : barcodeScannerMode;
+              
+              // Still checking camera availability
+              if (isScannerModeChecking && !webForceFileUpload) {
+                return (
+                  <View style={styles.scannerContent}>
+                    <ActivityIndicator size="large" color={colors.tint} />
+                    <ThemedText style={[styles.scannerText, { color: colors.text }]}>
+                      {t('mealtype_log.scanner.checking_camera', 'Checking camera availability...')}
+                    </ThemedText>
+                  </View>
+                );
+              }
+              
+              // File upload mode (no camera available or user chose file upload)
+              if (effectiveMode === 'file-upload') {
+                return (
+                  <View style={styles.scannerContent}>
+                    <BarcodeFileUpload
+                      onBarcodeScanned={scanned ? () => {} : handleBarcodeScanned}
+                      onError={(error) => {
+                        console.error('File upload barcode scanner error:', error);
+                      }}
+                      onSwitchToCamera={webCameraAvailable ? () => {
+                        setWebForceFileUpload(false);
+                        recheckCamera();
+                      } : undefined}
+                      cameraAvailable={webCameraAvailable}
+                      colors={{
+                        tint: colors.tint,
+                        text: colors.text,
+                        background: colors.background,
+                        textSecondary: colors.icon,
+                      }}
+                    />
+                    {barcodeScanning && (
+                      <View style={styles.scannerOverlay}>
+                        <ActivityIndicator size="large" color={colors.tint} />
+                        <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
+                          {t('mealtype_log.scanner.processing', 'Processing barcode...')}
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
+                );
+              }
+              
+              // Camera mode
+              return (
+                <View style={styles.scannerContent}>
+                  <WebBarcodeScanner
+                    onBarcodeScanned={scanned ? () => {} : handleBarcodeScanned}
+                    onPermissionGranted={() => setWebCameraPermissionGranted(true)}
+                    onError={(error) => {
+                      console.error('Web barcode scanner error:', error);
+                    }}
+                    onCameraFailed={(error) => {
+                      console.log('Camera failed, switching to file upload:', error);
+                      setWebForceFileUpload(true);
+                    }}
+                    onSwitchToFileUpload={() => {
+                      console.log('User requested file upload mode');
+                      setWebForceFileUpload(true);
+                    }}
+                    colors={{
+                      tint: colors.tint,
+                      text: colors.text,
+                      background: colors.background,
+                      textSecondary: colors.icon,
+                    }}
+                  />
+                  {barcodeScanning && (
+                    <View style={styles.scannerOverlay}>
+                      <ActivityIndicator size="large" color={colors.tint} />
+                      <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
+                        {t('mealtype_log.scanner.processing', 'Processing barcode...')}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              );
+            }
             
-            if (!permission && Platform.OS !== 'web') {
+            const hasPermission = permission?.granted;
+            
+            if (!permission) {
               // Native: waiting for permission hook to initialize
               return (
                 <View style={styles.scannerContent}>
@@ -5315,189 +5494,100 @@ export default function LogFoodScreen() {
             }
             
             if (!hasPermission) {
-              // Need to request permission
+              // Native: Need to request permission
               return (
-            <View style={styles.scannerContent}>
-              <ThemedText style={[styles.scannerText, { color: colors.text }]}>
-                {t('mealtype_log.scanner.permission_required')}
-              </ThemedText>
-              {requestingPermission && (
-                <ActivityIndicator size="large" color={colors.tint} style={{ marginVertical: 20 }} />
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.scannerButton, 
-                  { 
-                    backgroundColor: requestingPermission ? colors.icon + '40' : colors.tint,
-                    opacity: requestingPermission ? 0.6 : 1
-                  }
-                ]}
-                onPress={() => {
-                  console.log('=== Grant Permission button pressed (SYNC START) ===');
-                  
-                  if (requestingPermission) {
-                    console.log('Already requesting permission, ignoring click');
-                    return;
-                  }
-                  
-                  // Set loading state immediately - synchronous
-                  setRequestingPermission(true);
-                  console.log('Set requestingPermission to true');
-                  
-                  // Use setTimeout to make the async work happen after state update
-                  setTimeout(async () => {
-                    console.log('=== Grant Permission async handler started ===');
-                    console.log('Platform:', Platform.OS);
-                  
-                  if (Platform.OS === 'web') {
-                    // For web, use browser's native getUserMedia directly
-                    try {
-                      console.log('Web platform - checking for getUserMedia support...');
+                <View style={styles.scannerContent}>
+                  <ThemedText style={[styles.scannerText, { color: colors.text }]}>
+                    {t('mealtype_log.scanner.permission_required')}
+                  </ThemedText>
+                  {requestingPermission && (
+                    <ActivityIndicator size="large" color={colors.tint} style={{ marginVertical: 20 }} />
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.scannerButton, 
+                      { 
+                        backgroundColor: requestingPermission ? colors.icon + '40' : colors.tint,
+                        opacity: requestingPermission ? 0.6 : 1
+                      }
+                    ]}
+                    onPress={async () => {
+                      console.log('=== Grant Permission button pressed ===');
                       
-                      // Check if we're in a secure context (HTTPS or localhost)
-                      // Note: Local network IPs like 10.0.0.x over HTTP won't work for camera
-                      if (typeof window !== 'undefined' && window.isSecureContext === false) {
-                        console.error('Not a secure context - camera requires HTTPS');
-                        setRequestingPermission(false);
-                        // Use window.alert for web since Alert.alert may not work properly
-                        window.alert('Camera requires a secure connection (HTTPS). Please access this site via HTTPS or localhost.');
+                      if (requestingPermission) {
+                        console.log('Already requesting permission, ignoring click');
                         return;
                       }
                       
-                      if (!navigator || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        console.error('getUserMedia not available');
-                        setRequestingPermission(false);
-                        window.alert('Camera is not supported in this browser. Please use a modern browser like Chrome or Safari.');
-                        return;
-                      }
+                      setRequestingPermission(true);
                       
-                      console.log('Requesting camera access via getUserMedia...');
-                      
-                      // Directly call getUserMedia - this triggers the browser's native permission dialog
-                      // Skip navigator.permissions.query as it's unreliable on mobile browsers
-                      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                      
-                      console.log('✅ Browser camera access granted! Stream:', stream);
-                      
-                      // Stop the stream immediately - we just needed to get permission
-                      if (stream && stream.getTracks) {
-                        stream.getTracks().forEach(track => {
-                          track.stop();
-                          console.log('Stopped track:', track.kind);
-                        });
-                      }
-                      
-                      // Set web permission state - this is the source of truth for web
-                      console.log('Setting webCameraPermissionGranted to true');
-                      setWebCameraPermissionGranted(true);
-                      setRequestingPermission(false);
-                      
-                      console.log('Permission granted, camera should now appear');
-                      
-                    } catch (mediaError: any) {
-                      console.error('Browser getUserMedia error:', mediaError);
-                      console.error('Error name:', mediaError?.name);
-                      console.error('Error message:', mediaError?.message);
-                      
-                      setRequestingPermission(false);
-                      
-                      // Use window.alert for reliable error display on mobile web
-                      let errorMsg = 'Camera access was denied.';
-                      
-                      if (mediaError?.name === 'NotAllowedError' || mediaError?.name === 'PermissionDeniedError') {
-                        errorMsg = 'Camera permission was denied. Please allow camera access in your browser settings and try again.';
-                      } else if (mediaError?.name === 'NotFoundError' || mediaError?.name === 'DevicesNotFoundError') {
-                        errorMsg = 'No camera found on this device.';
-                      } else if (mediaError?.name === 'NotReadableError' || mediaError?.name === 'TrackStartError') {
-                        errorMsg = 'Camera is in use by another app. Please close other apps using the camera.';
-                      } else if (mediaError?.name === 'AbortError') {
-                        errorMsg = 'Camera request was cancelled. Please try again.';
-                      } else if (mediaError?.name === 'SecurityError') {
-                        errorMsg = 'Camera requires HTTPS. Please access this site via a secure connection.';
-                      } else {
-                        errorMsg = `Camera error: ${mediaError?.name || 'Unknown'} - ${mediaError?.message || 'Please try again.'}`;
-                      }
-                      
-                      window.alert(errorMsg);
-                    }
-                  } else {
-                    // Native platform handling
-                    try {
-                      console.log('Current permission state before request:', permission);
-                      console.log('Platform:', Platform.OS);
-                      
-                      console.log('Calling requestPermission() from hook...');
-                      const result = await requestPermission();
-                      
-                      console.log('Permission request completed. Result:', result);
-                      console.log('Result granted:', result?.granted);
-                      console.log('Result status:', result?.status);
-                      
-                      if (!result) {
-                        console.error('Permission request returned null/undefined');
+                      try {
+                        console.log('Current permission state before request:', permission);
+                        const result = await requestPermission();
+                        
+                        console.log('Permission request completed. Result:', result);
+                        
+                        if (!result) {
+                          console.error('Permission request returned null/undefined');
+                          Alert.alert(
+                            t('alerts.permission_error'),
+                            t('mealtype_log.camera.permission_error'),
+                            [{ text: t('common.ok') }]
+                          );
+                          setRequestingPermission(false);
+                          return;
+                        }
+                        
+                        if (result.granted) {
+                          console.log('✅ Permission granted!');
+                          setForcePermissionCheck(prev => prev + 1);
+                          setRequestingPermission(false);
+                        } else {
+                          console.log('❌ Permission denied');
+                          
+                          let message = t('mealtype_log.camera.permission_required_message');
+                          
+                          if (result.status === 'denied') {
+                            if (result.canAskAgain) {
+                              message += '\n\n' + t('mealtype_log.camera.permission_required_hint_can_ask');
+                            } else {
+                              message += '\n\n' + t('mealtype_log.camera.permission_required_hint_settings');
+                            }
+                          }
+                          
+                          Alert.alert(
+                            t('alerts.camera_permission_required'),
+                            message,
+                            [
+                              { 
+                                text: t('common.cancel'), 
+                                style: 'cancel', 
+                                onPress: () => setShowBarcodeScanner(false) 
+                              },
+                              { 
+                                text: result.canAskAgain ? t('mealtype_log.scanner.try_again') : t('common.ok'),
+                                onPress: () => {
+                                  if (!result.canAskAgain) {
+                                    setShowBarcodeScanner(false);
+                                  }
+                                }
+                              }
+                            ]
+                          );
+                          setRequestingPermission(false);
+                        }
+                      } catch (error: any) {
+                        console.error('❌ Error requesting permission:', error);
                         Alert.alert(
-                          t('alerts.permission_error'),
-                          t('mealtype_log.camera.permission_error'),
+                          t('alerts.error_title'),
+                          t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
                           [{ text: t('common.ok') }]
                         );
                         setRequestingPermission(false);
-                        return;
                       }
-                      
-                      if (result.granted) {
-                        console.log('✅ Permission granted!');
-                        setForcePermissionCheck(prev => prev + 1);
-                        setRequestingPermission(false);
-                      } else {
-                        console.log('❌ Permission denied');
-                        console.log('Status:', result.status);
-                        console.log('Can ask again:', result.canAskAgain);
-                        
-                        let message = t('mealtype_log.camera.permission_required_message');
-                        
-                        if (result.status === 'denied') {
-                          if (result.canAskAgain) {
-                            message += '\n\n' + t('mealtype_log.camera.permission_required_hint_can_ask');
-                          } else {
-                            message += '\n\n' + t('mealtype_log.camera.permission_required_hint_settings');
-                          }
-                        }
-                        
-                        Alert.alert(
-                          t('alerts.camera_permission_required'),
-                          message,
-                          [
-                            { 
-                              text: t('common.cancel'), 
-                              style: 'cancel', 
-                              onPress: () => setShowBarcodeScanner(false) 
-                            },
-                            { 
-                              text: result.canAskAgain ? t('mealtype_log.scanner.try_again') : t('common.ok'),
-                              onPress: () => {
-                                if (!result.canAskAgain) {
-                                  setShowBarcodeScanner(false);
-                                }
-                              }
-                            }
-                          ]
-                        );
-                        setRequestingPermission(false);
-                      }
-                    } catch (error: any) {
-                      console.error('❌ Error requesting permission:', error);
-                      Alert.alert(
-                        t('alerts.error_title'),
-                        t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
-                        [{ text: t('common.ok') }]
-                      );
-                      setRequestingPermission(false);
-                    }
-                  }
-                }, 0); // Execute async code after state update
-                }}
-                activeOpacity={0.7}
-              >
+                    }}
+                    activeOpacity={0.7}
+                  >
                     <ThemedText style={styles.scannerButtonText}>
                       {requestingPermission ? t('mealtype_log.scanner.requesting') : t('mealtype_log.scanner.grant_permission')}
                     </ThemedText>
@@ -5506,7 +5596,7 @@ export default function LogFoodScreen() {
               );
             }
             
-            // Permission is granted - show camera
+            // Native: Permission is granted - show CameraView
             return (
               <View style={styles.scannerContent}>
                 <CameraView
@@ -5543,98 +5633,6 @@ export default function LogFoodScreen() {
           })()}
         </ThemedView>
       </Modal>
-
-      {/* Native platform permission handler - separate button */}
-      {Platform.OS !== 'web' && !permission?.granted && showBarcodeScanner && (
-        <View style={styles.scannerContent}>
-          <TouchableOpacity
-            style={[styles.scannerButton, { backgroundColor: colors.tint }]}
-            onPress={async () => {
-              if (requestingPermission) return;
-              
-              setRequestingPermission(true);
-              try {
-                    console.log('Current permission state before request:', permission);
-                    console.log('Platform:', Platform.OS);
-                    
-                    // Use the hook's requestPermission method
-                    console.log('Calling requestPermission() from hook...');
-                    const result = await requestPermission();
-                    
-                    console.log('Permission request completed. Result:', result);
-                    console.log('Result granted:', result?.granted);
-                    console.log('Result status:', result?.status);
-                    
-                    if (!result) {
-                      console.error('Permission request returned null/undefined');
-                      Alert.alert(
-                        t('alerts.permission_error'),
-                        t('mealtype_log.camera.permission_error'),
-                        [{ text: t('common.ok') }]
-                      );
-                      return;
-                    }
-                    
-                    if (result.granted) {
-                      console.log('✅ Permission granted!');
-                      // Force a re-render to ensure state updates
-                      setForcePermissionCheck(prev => prev + 1);
-                      setRequestingPermission(false);
-                    } else {
-                      setRequestingPermission(false);
-                      console.log('❌ Permission denied');
-                      console.log('Status:', result.status);
-                      console.log('Can ask again:', result.canAskAgain);
-                      
-                      let message = t('mealtype_log.camera.permission_required_message');
-                      
-                      if (result.status === 'denied') {
-                        if (result.canAskAgain) {
-                          message += '\n\n' + t('mealtype_log.camera.permission_required_hint_can_ask');
-                        } else {
-                          message += '\n\n' + t('mealtype_log.camera.permission_required_hint_settings');
-                        }
-                      }
-                      
-                      Alert.alert(
-                        t('alerts.camera_permission_required'),
-                        message,
-                        [
-                          { 
-                            text: t('common.cancel'), 
-                            style: 'cancel', 
-                            onPress: () => setShowBarcodeScanner(false) 
-                          },
-                          { 
-                            text: result.canAskAgain ? t('mealtype_log.scanner.try_again') : t('common.ok'),
-                            onPress: () => {
-                              if (!result.canAskAgain) {
-                                setShowBarcodeScanner(false);
-                              }
-                            }
-                          }
-                        ]
-                      );
-                    }
-                  } catch (error: any) {
-                    setRequestingPermission(false);
-                    console.error('❌ Error requesting permission:', error);
-                    Alert.alert(
-                      t('alerts.error_title'),
-                      t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
-                      [{ text: t('common.ok') }]
-                    );
-                  }
-                }}
-                disabled={requestingPermission}
-                activeOpacity={0.7}
-              >
-                <ThemedText style={styles.scannerButtonText}>
-                  {t('mealtype_log.scanner.grant_permission')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          )}
 
       {/* Serving Dropdown - Rendered at root level for proper z-index */}
       {showServingDropdown && servingDropdownLayout && (

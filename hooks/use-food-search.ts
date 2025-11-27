@@ -10,6 +10,17 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type FoodMaster } from '@/utils/nutritionMath';
+import { getServingsForFoods, getDefaultServingWithNutrients } from '@/lib/servings';
+
+/**
+ * Search result with pre-computed default serving info
+ * Uses centralized default serving logic from lib/servings.ts
+ */
+export interface FoodSearchResult extends FoodMaster {
+  defaultServingQty: number;
+  defaultServingUnit: string;
+  defaultServingCalories: number;
+}
 
 export interface UseFoodSearchOptions {
   /** Include user's custom foods in search results */
@@ -27,8 +38,8 @@ export interface UseFoodSearchResult {
   searchQuery: string;
   /** Set search query */
   setSearchQuery: (query: string) => void;
-  /** Search results */
-  searchResults: FoodMaster[];
+  /** Search results with default serving info */
+  searchResults: FoodSearchResult[];
   /** Whether search is loading */
   searchLoading: boolean;
   /** Whether to show search results dropdown */
@@ -66,7 +77,7 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
   } = options;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<FoodMaster[]>([]);
+  const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
@@ -183,7 +194,24 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
         })
         .slice(0, maxResults);
       
-      setSearchResults(sortedResults);
+      // Batch fetch servings for all results using centralized data access
+      const foodIds = sortedResults.map(food => food.id);
+      const servingsMap = await getServingsForFoods(foodIds);
+      
+      // Enrich results with default serving info using centralized logic
+      const resultsWithServings: FoodSearchResult[] = sortedResults.map(food => {
+        const foodServings = servingsMap.get(food.id) || [];
+        const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
+        
+        return {
+          ...food,
+          defaultServingQty: defaultServing.quantity,
+          defaultServingUnit: defaultServing.unit,
+          defaultServingCalories: Math.round(nutrients.calories_kcal),
+        };
+      });
+      
+      setSearchResults(resultsWithServings);
       setShowSearchResults(true);
     } catch (error) {
       setSearchResults([]);

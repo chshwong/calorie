@@ -53,9 +53,6 @@ export interface FoodMaster {
  * For volume-based foods (serving_unit = 'ml'):
  *   - volume_ml stores the serving volume in milliliters
  *   - weight_g should be null
- * 
- * The old 'grams' field is deprecated and will be removed after migration.
- * New code should use weight_g/volume_ml exclusively.
  */
 export interface FoodServing {
   id: string;
@@ -65,9 +62,6 @@ export interface FoodServing {
   volume_ml?: number | null;     // serving volume in ml (for liquid foods)
   sort_order?: number;           // UI ordering (lower = higher priority)
   is_default: boolean;
-  // DEPRECATED: 'grams' field - kept for backwards compatibility during migration
-  // This will be removed after migration is complete
-  grams?: number;
 }
 
 export interface Nutrients {
@@ -212,22 +206,10 @@ export function formatUnitLabel(unit: string): string {
 
 /**
  * Format a saved serving label for display
- * Shows the serving name with equivalent weight or volume
- * e.g., "1 cup (240 ml)" or "1 slice (30 g)"
+ * Shows just the serving name as stored in the database
  */
 export function formatServingLabel(serving: FoodServing, food: FoodMaster): string {
-  // Use weight_g or volume_ml based on the food's canonical unit
-  const normalizedUnit = food.serving_unit.toLowerCase();
-  
-  if (isVolumeUnit(normalizedUnit)) {
-    // Volume-based food: show volume_ml
-    const volumeValue = serving.volume_ml ?? serving.grams ?? 0;
-    return `${serving.serving_name} (${volumeValue} ml)`;
-  } else {
-    // Weight-based food (or unknown): show weight_g
-    const weightValue = serving.weight_g ?? serving.grams ?? 0;
-    return `${serving.serving_name} (${weightValue} g)`;
-  }
+  return serving.serving_name;
 }
 
 /**
@@ -260,8 +242,8 @@ export function buildServingOptions(
     id: s.id,
   }));
 
-  // 3) Final list: raw units first, then saved servings
-  return [...rawOptions, ...savedOptions];
+  // 3) Final list: saved servings first (more relevant), then raw units
+  return [...savedOptions, ...rawOptions];
 }
 
 /**
@@ -319,11 +301,11 @@ export function getServingNormalizedValue(serving: FoodServing, food: FoodMaster
   const normalizedUnit = food.serving_unit.toLowerCase();
   
   if (isVolumeUnit(normalizedUnit)) {
-    // Volume-based food: use volume_ml, fallback to grams for backwards compatibility
-    return serving.volume_ml ?? serving.grams ?? 0;
+    // Volume-based food: use volume_ml
+    return serving.volume_ml ?? 0;
   } else {
-    // Weight-based food: use weight_g, fallback to grams for backwards compatibility
-    return serving.weight_g ?? serving.grams ?? 0;
+    // Weight-based food: use weight_g
+    return serving.weight_g ?? 0;
   }
 }
 
@@ -472,12 +454,18 @@ export function getMasterUnitsFromRaw(
 
 /**
  * Get master units from a saved serving selection
- * quantity_in_master_unit (stored as 'grams' in DB) is how many food_master.serving_unit 
- * are in ONE of this serving row
+ * 
+ * @deprecated Use getMasterUnitsFromServingOption instead, which correctly handles
+ * weight vs volume based on the food's serving_unit.
+ * 
+ * Note: This function requires the food parameter to determine which field to use.
  */
-export function getMasterUnitsFromSaved(selection: SavedServingSelection): number {
-  // grams field represents quantity_in_master_unit
-  return selection.quantity * selection.serving.grams;
+export function getMasterUnitsFromSaved(selection: SavedServingSelection, food: FoodMaster): number {
+  // Use the correct field based on food's base unit type
+  const servingValue = isVolumeUnit(food.serving_unit)
+    ? (selection.serving.volume_ml ?? 0)
+    : (selection.serving.weight_g ?? 0);
+  return selection.quantity * servingValue;
 }
 
 /**
@@ -553,12 +541,10 @@ export function calculateNutrientsForEntry(
 
 /**
  * Simplified calculation for direct quantity/serving inputs
- * Used when we have a food, a serving option (from food_servings), and a quantity
+ * Used when we have a food and a quantity in master units
  * 
  * @param food - The food master record
- * @param serving - The selected serving option (with grams = quantity_in_master_unit)
- * @param quantity - How many of that serving
- * @param isRawUnit - If true, treat serving.grams as 1 (user entered raw units)
+ * @param quantityInMasterUnits - The quantity in master units (g or ml)
  */
 export function calculateNutrientsSimple(
   food: FoodMaster,
@@ -581,20 +567,27 @@ export function calculateNutrientsSimple(
 /**
  * Calculate weight/volume in master units for display
  * 
+ * @deprecated Use getMasterUnitsFromServingOption instead, which correctly handles
+ * weight vs volume based on the food's serving_unit.
+ * 
  * @param serving - The serving option
  * @param quantity - How many of that serving
- * @param isRawUnit - If true, quantity is already in master units
+ * @param food - The food master record (needed to determine weight vs volume)
  */
 export function calculateMasterUnitsForDisplay(
   serving: FoodServing & { isUnitBased?: boolean },
-  quantity: number
+  quantity: number,
+  food: FoodMaster
 ): number {
   if ('isUnitBased' in serving && serving.isUnitBased) {
     // For raw unit serving (1g or 1ml), quantity IS the master units
     return quantity;
   }
-  // For saved servings, grams = quantity_in_master_unit
-  return serving.grams * quantity;
+  // For saved servings, use the correct field based on food's base unit type
+  const servingValue = isVolumeUnit(food.serving_unit)
+    ? (serving.volume_ml ?? 0)
+    : (serving.weight_g ?? 0);
+  return servingValue * quantity;
 }
 
 // ============================================================================
