@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -75,7 +76,11 @@ export default function CreateCustomFoodScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingFood, setLoadingFood] = useState(false);
 
-  // Mandatory weight-based serving
+  // Serving type toggle (default: weight-based)
+  const [servingType, setServingType] = useState<'weight' | 'volume'>('weight');
+  const isWeightBased = servingType === 'weight';
+
+  // Weight-based serving fields
   const [weightQuantity, setWeightQuantity] = useState('100'); // Default to 100g
   const [weightUnit, setWeightUnit] = useState('g');
   const [weightCalories, setWeightCalories] = useState('0');
@@ -87,11 +92,10 @@ export default function CreateCustomFoodScreen() {
   const [weightSugar, setWeightSugar] = useState('');
   const [weightSodium, setWeightSodium] = useState('');
 
-  // Optional volume-based serving
-  const [hasVolumeServing, setHasVolumeServing] = useState(false);
+  // Volume-based serving fields
   const [volumeQuantity, setVolumeQuantity] = useState('1');
   const [volumeUnit, setVolumeUnit] = useState('ml');
-  const [volumeCalories, setVolumeCalories] = useState('');
+  const [volumeCalories, setVolumeCalories] = useState('0');
 
   // Dropdown states
   const [showWeightUnitDropdown, setShowWeightUnitDropdown] = useState(false);
@@ -150,18 +154,21 @@ export default function CreateCustomFoodScreen() {
       const servingSize = foodData.serving_size;
       const servingUnit = foodData.serving_unit || 'g';
       
-      setWeightQuantity(servingSize.toString());
-      setWeightUnit(servingUnit);
-
-      // Calculate values for the serving size
-      // Nutrients in food_master are stored per serving_size (not per 100g for custom foods created with new logic)
-      // But for backwards compatibility with old custom foods, we check if it's per 100g
-      const servingGrams = servingSize;
-      
-      // Calculate nutrient values for the serving
-      // Note: food_master stores values per serving_size for custom foods
-      const caloriesForServing = foodData.calories_kcal;
-      setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+        // Determine if this is weight-based or volume-based
+        const isWeightUnit = WEIGHT_UNITS.some(u => u.value === servingUnit);
+        setServingType(isWeightUnit ? 'weight' : 'volume');
+        
+        if (isWeightUnit) {
+          setWeightQuantity(servingSize.toString());
+          setWeightUnit(servingUnit);
+          const caloriesForServing = foodData.calories_kcal;
+          setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+        } else {
+          setVolumeQuantity(servingSize.toString());
+          setVolumeUnit(servingUnit);
+          const caloriesForServing = foodData.calories_kcal;
+          setVolumeCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+        }
 
       const proteinForServing = foodData.protein_g || 0;
       setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
@@ -255,6 +262,7 @@ export default function CreateCustomFoodScreen() {
         const caloriesForServing = (foodData.calories_kcal / 100) * servingGrams;
         setWeightCalories(caloriesForServing.toFixed(1));
 
+        // Set macronutrients (same for both weight and volume)
         const proteinForServing = foodData.protein_g ? (foodData.protein_g / 100) * servingGrams : 0;
         setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
 
@@ -282,12 +290,21 @@ export default function CreateCustomFoodScreen() {
         const servingSize = foodData.serving_size;
         const servingUnit = foodData.serving_unit || 'g';
         
-        setWeightQuantity(servingSize.toString());
-        setWeightUnit(servingUnit);
-
-        // Nutrients in food_master are stored per serving_size for custom foods
-        const caloriesForServing = foodData.calories_kcal;
-        setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+        // Determine if this is weight-based or volume-based
+        const isWeightUnit = WEIGHT_UNITS.some(u => u.value === servingUnit);
+        setServingType(isWeightUnit ? 'weight' : 'volume');
+        
+        if (isWeightUnit) {
+          setWeightQuantity(servingSize.toString());
+          setWeightUnit(servingUnit);
+          const caloriesForServing = foodData.calories_kcal;
+          setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+        } else {
+          setVolumeQuantity(servingSize.toString());
+          setVolumeUnit(servingUnit);
+          const caloriesForServing = foodData.calories_kcal;
+          setVolumeCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+        }
 
         const proteinForServing = foodData.protein_g || 0;
         setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
@@ -311,25 +328,6 @@ export default function CreateCustomFoodScreen() {
         setWeightSodium(sodiumForServing > 0 ? sodiumForServing.toFixed(1) : '');
       }
 
-      // Check for volume serving (only relevant for foods with food_servings)
-      const { data: volumeServingData } = await supabase
-        .from('food_servings')
-        .select('*')
-        .eq('food_id', cloneFoodId)
-        .eq('is_default', false)
-        .limit(1)
-        .single();
-
-      if (volumeServingData) {
-        setHasVolumeServing(true);
-        const volumeMatch = volumeServingData.serving_name.match(/^([\d.]+)\s*(.+)$/);
-        if (volumeMatch) {
-          setVolumeQuantity(volumeMatch[1]);
-          setVolumeUnit(volumeMatch[2].trim());
-        }
-        // Volume serving uses the same grams as weight-based serving (they're equivalent)
-        // No need to set volumeCalories separately since it uses weight-based calories
-      }
     } catch (error: any) {
       Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.load_error', { error: error.message || t('common.unexpected_error') }));
       router.back();
@@ -376,29 +374,38 @@ export default function CreateCustomFoodScreen() {
       newErrors.brand = t('create_custom_food.validation.brand_too_long', { max: MAX_BRAND_LENGTH, current: brand.length });
     }
     
-    // Validate weight quantity
-    const parsedWeightQuantity = parseFloat(weightQuantity);
-    if (!weightQuantity || isNaN(parsedWeightQuantity) || !isFinite(parsedWeightQuantity) || parsedWeightQuantity <= 0) {
-      newErrors.weightQuantity = t('create_custom_food.validation.quantity_required');
-    } else if (parsedWeightQuantity > MAX_QUANTITY) {
-      newErrors.weightQuantity = t('create_custom_food.validation.quantity_exceeds_limit', { max: MAX_QUANTITY.toLocaleString() });
-    }
-    
-    // Validate weight calories
-    const parsedWeightCalories = parseFloat(weightCalories);
-    if (!weightCalories || weightCalories.trim() === '' || isNaN(parsedWeightCalories) || !isFinite(parsedWeightCalories) || parsedWeightCalories < 0) {
-      newErrors.weightCalories = t('create_custom_food.validation.calories_required');
-    } else if (parsedWeightCalories > MAX_CALORIES) {
-      newErrors.weightCalories = t('create_custom_food.validation.calories_exceeds_limit', { max: MAX_CALORIES.toLocaleString(), current: parsedWeightCalories.toLocaleString() });
-    }
-    
-    // Validate volume quantity (if enabled)
-    if (hasVolumeServing) {
+    // Validate based on serving type
+    if (isWeightBased) {
+      // Validate weight quantity
+      const parsedWeightQuantity = parseFloat(weightQuantity);
+      if (!weightQuantity || isNaN(parsedWeightQuantity) || !isFinite(parsedWeightQuantity) || parsedWeightQuantity <= 0) {
+        newErrors.weightQuantity = t('create_custom_food.validation.quantity_required');
+      } else if (parsedWeightQuantity > MAX_QUANTITY) {
+        newErrors.weightQuantity = t('create_custom_food.validation.quantity_exceeds_limit', { max: MAX_QUANTITY.toLocaleString() });
+      }
+      
+      // Validate weight calories
+      const parsedWeightCalories = parseFloat(weightCalories);
+      if (!weightCalories || weightCalories.trim() === '' || isNaN(parsedWeightCalories) || !isFinite(parsedWeightCalories) || parsedWeightCalories < 0) {
+        newErrors.weightCalories = t('create_custom_food.validation.calories_required');
+      } else if (parsedWeightCalories > MAX_CALORIES) {
+        newErrors.weightCalories = t('create_custom_food.validation.calories_exceeds_limit', { max: MAX_CALORIES.toLocaleString(), current: parsedWeightCalories.toLocaleString() });
+      }
+    } else {
+      // Validate volume quantity
       const parsedVolumeQuantity = parseFloat(volumeQuantity);
       if (!volumeQuantity || isNaN(parsedVolumeQuantity) || !isFinite(parsedVolumeQuantity) || parsedVolumeQuantity <= 0) {
         newErrors.volumeQuantity = t('create_custom_food.validation.volume_quantity_required');
       } else if (parsedVolumeQuantity > MAX_QUANTITY) {
         newErrors.volumeQuantity = t('create_custom_food.validation.volume_quantity_exceeds_limit', { max: MAX_QUANTITY.toLocaleString() });
+      }
+      
+      // Validate volume calories
+      const parsedVolumeCalories = parseFloat(volumeCalories);
+      if (!volumeCalories || volumeCalories.trim() === '' || isNaN(parsedVolumeCalories) || !isFinite(parsedVolumeCalories) || parsedVolumeCalories < 0) {
+        newErrors.volumeCalories = t('create_custom_food.validation.volume_calories_required');
+      } else if (parsedVolumeCalories > MAX_CALORIES) {
+        newErrors.volumeCalories = t('create_custom_food.validation.volume_calories_exceeds_limit', { max: MAX_CALORIES.toLocaleString(), current: parsedVolumeCalories.toLocaleString() });
       }
     }
     
@@ -474,7 +481,7 @@ export default function CreateCustomFoodScreen() {
   // Run validation whenever values change
   useEffect(() => {
     validateFields();
-  }, [foodName, brand, weightQuantity, weightCalories, volumeQuantity, weightProtein, weightCarbs, weightFat, weightFiber, weightSaturatedFat, weightSugar, weightSodium, hasVolumeServing]);
+  }, [foodName, brand, weightQuantity, weightCalories, volumeQuantity, volumeCalories, weightProtein, weightCarbs, weightFat, weightFiber, weightSaturatedFat, weightSugar, weightSodium, isWeightBased]);
   
   // Check if form is valid (for Save button) - don't call validateFields to avoid infinite loop
   const isFormValid = () => {
@@ -482,18 +489,22 @@ export default function CreateCustomFoodScreen() {
     if (foodName.length > MAX_NAME_LENGTH) return false;
     if (brand && brand.length > MAX_BRAND_LENGTH) return false;
     
-    const parsedWeightQuantity = parseFloat(weightQuantity);
-    if (!weightQuantity || isNaN(parsedWeightQuantity) || !isFinite(parsedWeightQuantity) || parsedWeightQuantity <= 0) return false;
-    if (parsedWeightQuantity > MAX_QUANTITY) return false;
-    
-    const parsedWeightCalories = parseFloat(weightCalories);
-    if (!weightCalories || weightCalories.trim() === '' || isNaN(parsedWeightCalories) || !isFinite(parsedWeightCalories) || parsedWeightCalories < 0) return false;
-    if (parsedWeightCalories > MAX_CALORIES) return false;
-    
-    if (hasVolumeServing) {
+    if (isWeightBased) {
+      const parsedWeightQuantity = parseFloat(weightQuantity);
+      if (!weightQuantity || isNaN(parsedWeightQuantity) || !isFinite(parsedWeightQuantity) || parsedWeightQuantity <= 0) return false;
+      if (parsedWeightQuantity > MAX_QUANTITY) return false;
+      
+      const parsedWeightCalories = parseFloat(weightCalories);
+      if (!weightCalories || weightCalories.trim() === '' || isNaN(parsedWeightCalories) || !isFinite(parsedWeightCalories) || parsedWeightCalories < 0) return false;
+      if (parsedWeightCalories > MAX_CALORIES) return false;
+    } else {
       const parsedVolumeQuantity = parseFloat(volumeQuantity);
       if (!volumeQuantity || isNaN(parsedVolumeQuantity) || !isFinite(parsedVolumeQuantity) || parsedVolumeQuantity <= 0) return false;
       if (parsedVolumeQuantity > MAX_QUANTITY) return false;
+      
+      const parsedVolumeCalories = parseFloat(volumeCalories);
+      if (!volumeCalories || volumeCalories.trim() === '' || isNaN(parsedVolumeCalories) || !isFinite(parsedVolumeCalories) || parsedVolumeCalories < 0) return false;
+      if (parsedVolumeCalories > MAX_CALORIES) return false;
     }
     
     // Check macros
@@ -566,23 +577,30 @@ export default function CreateCustomFoodScreen() {
       }
     }
 
-    if (!weightQuantity || isNaN(parseFloat(weightQuantity)) || parseFloat(weightQuantity) <= 0) {
-      newErrors.weightQuantity = t('create_custom_food.validation.quantity_required');
-    } else if (parseFloat(weightQuantity) > MAX_QUANTITY) {
-      newErrors.weightQuantity = t('create_custom_food.validation.quantity_exceeds_limit', { max: MAX_QUANTITY.toLocaleString() });
-    }
+    // Validate based on serving type
+    if (isWeightBased) {
+      if (!weightQuantity || isNaN(parseFloat(weightQuantity)) || parseFloat(weightQuantity) <= 0) {
+        newErrors.weightQuantity = t('create_custom_food.validation.quantity_required');
+      } else if (parseFloat(weightQuantity) > MAX_QUANTITY) {
+        newErrors.weightQuantity = t('create_custom_food.validation.quantity_exceeds_limit', { max: MAX_QUANTITY.toLocaleString() });
+      }
 
-    if (!weightCalories || isNaN(parseFloat(weightCalories)) || parseFloat(weightCalories) < 0) {
-      newErrors.weightCalories = t('create_custom_food.validation.calories_required');
-    } else if (parseFloat(weightCalories) > MAX_CALORIES) {
-      newErrors.weightCalories = t('create_custom_food.validation.calories_exceeds_limit', { max: MAX_CALORIES.toLocaleString(), current: parseFloat(weightCalories).toLocaleString() });
-    }
-
-    if (hasVolumeServing) {
+      if (!weightCalories || isNaN(parseFloat(weightCalories)) || parseFloat(weightCalories) < 0) {
+        newErrors.weightCalories = t('create_custom_food.validation.calories_required');
+      } else if (parseFloat(weightCalories) > MAX_CALORIES) {
+        newErrors.weightCalories = t('create_custom_food.validation.calories_exceeds_limit', { max: MAX_CALORIES.toLocaleString(), current: parseFloat(weightCalories).toLocaleString() });
+      }
+    } else {
       if (!volumeQuantity || isNaN(parseFloat(volumeQuantity)) || parseFloat(volumeQuantity) <= 0) {
         newErrors.volumeQuantity = t('create_custom_food.validation.volume_quantity_required');
       } else if (parseFloat(volumeQuantity) > MAX_QUANTITY) {
         newErrors.volumeQuantity = t('create_custom_food.validation.volume_quantity_exceeds_limit', { max: MAX_QUANTITY.toLocaleString() });
+      }
+
+      if (!volumeCalories || isNaN(parseFloat(volumeCalories)) || parseFloat(volumeCalories) < 0) {
+        newErrors.volumeCalories = t('create_custom_food.validation.volume_calories_required');
+      } else if (parseFloat(volumeCalories) > MAX_CALORIES) {
+        newErrors.volumeCalories = t('create_custom_food.validation.volume_calories_exceeds_limit', { max: MAX_CALORIES.toLocaleString(), current: parseFloat(volumeCalories).toLocaleString() });
       }
     }
 
@@ -636,16 +654,18 @@ export default function CreateCustomFoodScreen() {
 
     setLoading(true);
     try {
-      const weightQty = parseFloat(weightQuantity);
-      const weightCal = parseFloat(weightCalories);
+      // Get values based on serving type
+      const quantity = isWeightBased ? parseFloat(weightQuantity) : parseFloat(volumeQuantity);
+      const unit = isWeightBased ? weightUnit : volumeUnit;
+      const calories = isWeightBased ? parseFloat(weightCalories) : parseFloat(volumeCalories);
 
       // Validate
-      if (isNaN(weightQty) || weightQty <= 0) {
-        throw new Error(t('create_custom_food.validation.invalid_serving_quantity', { value: weightQty }));
+      if (isNaN(quantity) || quantity <= 0) {
+        throw new Error(t('create_custom_food.validation.invalid_serving_quantity', { value: quantity }));
       }
 
-      if (isNaN(weightCal) || weightCal < 0) {
-        throw new Error(t('create_custom_food.validation.invalid_calories', { value: weightCal }));
+      if (isNaN(calories) || calories < 0) {
+        throw new Error(t('create_custom_food.validation.invalid_calories', { value: calories }));
       }
 
       // For custom foods, store values directly for the serving_size
@@ -654,9 +674,9 @@ export default function CreateCustomFoodScreen() {
       const foodUpdateData = {
         name: foodName.trim(),
         brand: brand.trim() || null,
-        serving_size: weightQty,   // Store the user's quantity directly
-        serving_unit: weightUnit,  // Store the user's unit directly
-        calories_kcal: weightCal,  // Store directly for serving_size
+        serving_size: quantity,   // Store the user's quantity directly
+        serving_unit: unit,      // Store the user's unit directly
+        calories_kcal: calories, // Store directly for serving_size
         protein_g: weightProtein ? parseFloat(weightProtein) : null,
         carbs_g: weightCarbs ? parseFloat(weightCarbs) : null,
         fat_g: weightFat ? parseFloat(weightFat) : null,
@@ -812,9 +832,13 @@ export default function CreateCustomFoodScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Required Information Section */}
+        {/* Step 1: Your Food's Name */}
         <View style={[styles.requiredSection, { backgroundColor: colors.background, borderColor: colors.tint + '30' }]}>
           <View style={styles.sectionContent}>
+            <ThemedText style={[styles.stepTitle, { color: colors.text }]}>
+              {t('create_custom_food.step1_title')}
+            </ThemedText>
+            
             {/* Food Name */}
             <View style={styles.field}>
               <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.required_section.food_name_label')}</ThemedText>
@@ -835,164 +859,155 @@ export default function CreateCustomFoodScreen() {
               {errors.foodName && <Text style={styles.errorText}>{errors.foodName}</Text>}
             </View>
 
-            {/* Mandatory Weight-Based Serving */}
-            <View style={[styles.subSection, { borderColor: colors.tint + '20', backgroundColor: colors.tint + '05' }]}>
-              <ThemedText style={[styles.subSectionTitle, { color: colors.tint }]}>
-                {t('create_custom_food.weight_serving.title')}
-              </ThemedText>
-              <ThemedText style={[styles.subSectionDescription, { color: colors.icon }]}>
-                {t('create_custom_food.weight_serving.description')}
-              </ThemedText>
-
-            {/* Quantity, Unit, and Calories */}
+            {/* Serving Type Toggle */}
             <View style={styles.field}>
-              <View style={styles.inlineRow}>
-                <View style={{ flex: 1, marginRight: 4 }}>
-                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.quantity_label')}</ThemedText>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      { borderColor: errors.weightQuantity ? '#EF4444' : colors.icon + '30', color: colors.text }
-                    ]}
-                    placeholder={t('create_custom_food.weight_serving.quantity_placeholder')}
-                    placeholderTextColor={colors.icon}
-                    value={weightQuantity}
-                    onChangeText={(text) => {
-                      setWeightQuantity(validateNumericInput(text));
-                    }}
-                    keyboardType="decimal-pad"
-                  />
-                  {errors.weightQuantity && <Text style={styles.errorText}>{errors.weightQuantity}</Text>}
-                </View>
-                <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.unit_label')}</ThemedText>
-                  <View
-                    ref={weightUnitButtonRef}
-                    onLayout={() => {
-                      weightUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                        setWeightUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
-                      });
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={[styles.input, styles.dropdownButton, { borderColor: colors.icon + '30' }]}
-                      onPress={() => {
+              <SegmentedToggle
+                options={[
+                  { key: 'weight', label: t('create_custom_food.serving_type_toggle.weight_based') },
+                  { key: 'volume', label: t('create_custom_food.serving_type_toggle.volume_based') },
+                ]}
+                value={servingType}
+                onChange={setServingType}
+              />
+            </View>
+
+            {/* Weight-Based Serving Fields */}
+            {isWeightBased && (
+              <View style={styles.field}>
+                <View style={styles.inlineRow}>
+                  <View style={{ flex: 1, marginRight: 4 }}>
+                    <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.quantity_label')}</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { borderColor: errors.weightQuantity ? '#EF4444' : colors.icon + '30', color: colors.text }
+                      ]}
+                      placeholder={t('create_custom_food.weight_serving.quantity_placeholder')}
+                      placeholderTextColor={colors.icon}
+                      value={weightQuantity}
+                      onChangeText={(text) => {
+                        setWeightQuantity(validateNumericInput(text));
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.weightQuantity && <Text style={styles.errorText}>{errors.weightQuantity}</Text>}
+                  </View>
+                  <View style={{ flex: 1, marginHorizontal: 4 }}>
+                    <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.unit_label')}</ThemedText>
+                    <View
+                      ref={weightUnitButtonRef}
+                      onLayout={() => {
                         weightUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
                           setWeightUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
-                          setShowWeightUnitDropdown(!showWeightUnitDropdown);
                         });
                       }}
-                      activeOpacity={0.7}
                     >
-                      <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
-                        {WEIGHT_UNITS.find(u => u.value === weightUnit)?.label || weightUnit}
-                      </ThemedText>
-                      <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <View style={{ flex: 1, marginLeft: 4 }}>
-                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.calories_label')}</ThemedText>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      { borderColor: errors.weightCalories ? '#EF4444' : colors.icon + '30', color: colors.text }
-                    ]}
-                    placeholder={t('create_custom_food.weight_serving.calories_placeholder')}
-                    placeholderTextColor={colors.icon}
-                    value={weightCalories}
-                    onChangeText={(text) => {
-                      setWeightCalories(validateNumericInput(text));
-                    }}
-                    keyboardType="decimal-pad"
-                  />
-                  {errors.weightCalories && <Text style={styles.errorText}>{errors.weightCalories}</Text>}
-                </View>
-              </View>
-            </View>
-
-            {/* Optional Volume-Based Serving */}
-            <View style={[styles.subSection, { borderWidth: 1, borderColor: colors.icon + '20', backgroundColor: colors.tint + '08' }]}>
-              <TouchableOpacity
-                style={[styles.checkboxRow, { borderWidth: 0, paddingBottom: hasVolumeServing ? 6 : 0, marginBottom: hasVolumeServing ? 6 : 0 }]}
-                onPress={() => setHasVolumeServing(!hasVolumeServing)}
-                activeOpacity={0.7}
-              >
-                <ThemedText style={[styles.checkboxLabel, { color: colors.text }]}>
-                  {t('create_custom_food.volume_serving.checkbox_label')}
-                </ThemedText>
-                <View style={[
-                  styles.checkbox,
-                  { 
-                    backgroundColor: hasVolumeServing ? colors.tint : 'transparent',
-                    borderColor: hasVolumeServing ? colors.tint : colors.icon + '40'
-                  }
-                ]}>
-                  {hasVolumeServing && <Text style={styles.checkboxCheck}>✓</Text>}
-                </View>
-              </TouchableOpacity>
-
-              {hasVolumeServing && (
-                <>
-                  <ThemedText style={[styles.subSectionTitle, { color: colors.text }]}>
-                    {t('create_custom_food.volume_serving.title')}
-                  </ThemedText>
-                  <ThemedText style={[styles.subSectionDescription, { color: colors.icon }]}>
-                    {t('create_custom_food.volume_serving.description')}
-                  </ThemedText>
-
-                  {/* Quantity and Unit */}
-                  <View style={styles.field}>
-                    <View style={styles.inlineRow}>
-                      <View style={{ flex: 1, marginRight: 8 }}>
-                        <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.quantity_label')}</ThemedText>
-                        <TextInput
-                          style={[
-                            styles.input,
-                            { borderColor: errors.volumeQuantity ? '#EF4444' : colors.icon + '30', color: colors.text }
-                          ]}
-                          placeholder={t('create_custom_food.volume_serving.quantity_placeholder')}
-                          placeholderTextColor={colors.icon}
-                          value={volumeQuantity}
-                          onChangeText={(text) => {
-                            setVolumeQuantity(validateNumericInput(text));
-                          }}
-                          keyboardType="decimal-pad"
-                        />
-                        {errors.volumeQuantity && <Text style={styles.errorText}>{errors.volumeQuantity}</Text>}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.unit_label')}</ThemedText>
-                        <View
-                          ref={volumeUnitButtonRef}
-                          onLayout={() => {
-                            volumeUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                              setVolumeUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
-                            });
-                          }}
-                        >
-                          <TouchableOpacity
-                            style={[styles.input, styles.dropdownButton, { borderColor: colors.icon + '30' }]}
-                            onPress={() => {
-                              volumeUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                                setVolumeUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
-                                setShowVolumeUnitDropdown(!showVolumeUnitDropdown);
-                              });
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
-                              {VOLUME_UNITS.find(u => u.value === volumeUnit)?.label || volumeUnit}
-                            </ThemedText>
-                            <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                      <TouchableOpacity
+                        style={[styles.input, styles.dropdownButton, { borderColor: colors.icon + '30' }]}
+                        onPress={() => {
+                          weightUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                            setWeightUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
+                            setShowWeightUnitDropdown(!showWeightUnitDropdown);
+                          });
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
+                          {WEIGHT_UNITS.find(u => u.value === weightUnit)?.label || weightUnit}
+                        </ThemedText>
+                        <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </>
-              )}
-            </View>
+                  <View style={{ flex: 1, marginLeft: 4 }}>
+                    <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.calories_label')}</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { borderColor: errors.weightCalories ? '#EF4444' : colors.icon + '30', color: colors.text }
+                      ]}
+                      placeholder={t('create_custom_food.weight_serving.calories_placeholder')}
+                      placeholderTextColor={colors.icon}
+                      value={weightCalories}
+                      onChangeText={(text) => {
+                        setWeightCalories(validateNumericInput(text));
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.weightCalories && <Text style={styles.errorText}>{errors.weightCalories}</Text>}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Volume-Based Serving Fields */}
+            {!isWeightBased && (
+              <View style={styles.field}>
+                <View style={styles.inlineRow}>
+                  <View style={{ flex: 1, marginRight: 4 }}>
+                    <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.quantity_label')}</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { borderColor: errors.volumeQuantity ? '#EF4444' : colors.icon + '30', color: colors.text }
+                      ]}
+                      placeholder={t('create_custom_food.volume_serving.quantity_placeholder')}
+                      placeholderTextColor={colors.icon}
+                      value={volumeQuantity}
+                      onChangeText={(text) => {
+                        setVolumeQuantity(validateNumericInput(text));
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.volumeQuantity && <Text style={styles.errorText}>{errors.volumeQuantity}</Text>}
+                  </View>
+                  <View style={{ flex: 1, marginHorizontal: 4 }}>
+                    <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.unit_label')}</ThemedText>
+                    <View
+                      ref={volumeUnitButtonRef}
+                      onLayout={() => {
+                        volumeUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                          setVolumeUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
+                        });
+                      }}
+                    >
+                      <TouchableOpacity
+                        style={[styles.input, styles.dropdownButton, { borderColor: colors.icon + '30' }]}
+                        onPress={() => {
+                          volumeUnitButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                            setVolumeUnitDropdownLayout({ x: pageX, y: pageY + height, width, height });
+                            setShowVolumeUnitDropdown(!showVolumeUnitDropdown);
+                          });
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
+                          {VOLUME_UNITS.find(u => u.value === volumeUnit)?.label || volumeUnit}
+                        </ThemedText>
+                        <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 4 }}>
+                    <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.calories_label')}</ThemedText>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { borderColor: errors.volumeCalories ? '#EF4444' : colors.icon + '30', color: colors.text }
+                      ]}
+                      placeholder={t('create_custom_food.volume_serving.calories_placeholder')}
+                      placeholderTextColor={colors.icon}
+                      value={volumeCalories}
+                      onChangeText={(text) => {
+                        setVolumeCalories(validateNumericInput(text));
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.volumeCalories && <Text style={styles.errorText}>{errors.volumeCalories}</Text>}
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Macronutrients */}
             <View style={styles.field}>
@@ -1091,22 +1106,7 @@ export default function CreateCustomFoodScreen() {
                 </View>
               </View>
             </View>
-            </View>
-          </View>
-        </View>
 
-        {/* Optional Information Section */}
-        <View style={[styles.optionalSection, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
-          <View style={[styles.sectionHeader, { borderBottomColor: colors.icon + '15' }]}>
-            <ThemedText style={[styles.sectionHeaderTitle, { color: colors.icon }]}>
-              {t('create_custom_food.optional_section.title')}
-            </ThemedText>
-            <ThemedText style={[styles.sectionHeaderSubtitle, { color: colors.icon }]}>
-              {t('create_custom_food.optional_section.subtitle')}
-            </ThemedText>
-          </View>
-
-          <View style={styles.sectionContent}>
             {/* Brand (Optional) */}
             <View style={styles.field}>
               <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.optional_section.brand_label')}</ThemedText>
@@ -1525,6 +1525,11 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
+  },
+  stepTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
   },
 });
 

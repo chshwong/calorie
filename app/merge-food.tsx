@@ -4581,7 +4581,8 @@ const styles = StyleSheet.create({
     minHeight: 32,
     ...Platform.select({
       web: {
-        outline: 'none',
+        outlineWidth: 0,
+        outlineStyle: 'none',
       },
     }),
   },

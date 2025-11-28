@@ -65,11 +65,6 @@ export default function ScannedItemScreen() {
     setIsLoading(true);
     try {
       const result = await handleScannedBarcode(code);
-      console.log('[ScannedItem] Lookup result status:', result.status);
-      console.log('[ScannedItem] Lookup result source:', result.source);
-      if (result.status === 'found_cache' || result.status === 'found_openfoodfacts') {
-        console.log('[ScannedItem] Cache row source:', (result as any).cacheRow?.source);
-      }
       setLookupResult(result);
     } catch (error: any) {
       console.error('Lookup error:', error);
@@ -272,24 +267,17 @@ export default function ScannedItemScreen() {
   );
 
   function renderResult(result: BarcodeLookupResult) {
-    // Log the actual status being rendered for debugging
-    console.log('[ScannedItem] Rendering result with status:', result.status);
-    console.log('[ScannedItem] Result source:', result.source);
-    
     switch (result.status) {
       case 'found_food_master':
-        console.log('[ScannedItem] Rendering as food_master result');
         return renderFoodMasterResult(result);
       case 'found_cache':
       case 'found_openfoodfacts':
-        console.log('[ScannedItem] Rendering as external result (cache/OFF)');
         return renderExternalResult(result);
       case 'not_found':
         return renderNotFound(result);
       case 'invalid_barcode':
         return renderInvalidBarcode(result);
       default:
-        console.warn('[ScannedItem] Unknown status, defaulting to not_found:', (result as any).status);
         return renderNotFound(result as any);
     }
   }

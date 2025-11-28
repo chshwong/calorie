@@ -57,3 +57,6 @@ export function useAuthGuard(options?: {
   }, [session, loading, isPasswordRecovery, requireAuth, redirectTo, allowInRecovery, router, segments]);
 }
 
+
+
+

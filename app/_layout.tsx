@@ -6,12 +6,25 @@ import { useEffect, useRef } from 'react';
 import 'react-native-reanimated';
 import { I18nextProvider } from 'react-i18next';
 import i18n, { loadStoredLanguage } from '@/i18n';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider as AppThemeProvider } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/theme';
+
+// Create QueryClient with sensible defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 60 seconds
+      gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Keep the splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
@@ -63,22 +76,16 @@ export default function RootLayout() {
     if (!mountRef.current) {
       mountRef.current = true;
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        console.log('[RootLayout] Mounted - Root app shell initialized');
-        
         // Monitor for navigation that causes full page reloads
         const handleBeforeUnload = () => {
-          console.warn('[RootLayout] beforeunload event - Full page navigation detected');
+          // Track navigation events if needed
         };
         
         window.addEventListener('beforeunload', handleBeforeUnload);
         
         // Monitor for page visibility changes (which might indicate reloads)
         const handleVisibilityChange = () => {
-          if (document.hidden) {
-            console.log('[RootLayout] Page hidden');
-          } else {
-            console.log('[RootLayout] Page visible');
-          }
+          // Track visibility changes if needed
         };
         
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -86,15 +93,12 @@ export default function RootLayout() {
         return () => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener('visibilitychange', handleVisibilityChange);
-          console.warn('[RootLayout] UNMOUNTED - This should not happen! Root layout should never unmount.');
         };
       }
     }
     
     return () => {
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && mountRef.current) {
-        console.warn('[RootLayout] UNMOUNTED - This should not happen! Root layout should never unmount.');
-      }
+      // Cleanup
     };
   }, []);
 
@@ -109,9 +113,11 @@ export default function RootLayout() {
 
   return (
     <I18nextProvider i18n={i18n}>
-      <AppThemeProvider>
-        <ThemeProviderWrapper />
-      </AppThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppThemeProvider>
+          <ThemeProviderWrapper />
+        </AppThemeProvider>
+      </QueryClientProvider>
     </I18nextProvider>
   );
 }
@@ -123,15 +129,10 @@ function ThemeProviderWrapper() {
   useEffect(() => {
     if (!navigationMountRef.current) {
       navigationMountRef.current = true;
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        console.log('[Navigation] Stack navigator mounted - Navigation container initialized');
-      }
     }
     
     return () => {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        console.warn('[Navigation] Stack navigator UNMOUNTED - This should not happen! Navigation container should never unmount.');
-      }
+      // Cleanup
     };
   }, []);
 

@@ -53,9 +53,6 @@ export default function Index() {
           if (inRecoveryMode) {
             // SECURITY: If in recovery mode, redirect to reset-password
             // Recovery sessions should NOT grant access to the app
-            if (Platform.OS === 'web' && typeof window !== 'undefined') {
-              console.log('[Index] Redirecting to /reset-password (recovery mode)');
-            }
             router.replace('/reset-password');
           } else if (session) {
             // If we have a session but profile is still loading, wait
@@ -69,18 +66,12 @@ export default function Index() {
             // If profile exists and is_active is false/null, don't navigate (user should be signed out by AuthContext)
             if (profile && (profile.is_active === false || profile.is_active === null)) {
               // User is inactive - don't navigate, AuthContext should handle sign out
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                console.log('[Index] User is inactive, not navigating');
-              }
               return;
             }
             
             // Check if onboarding is complete
             // If no profile OR onboarding_complete is false, redirect to onboarding
             if (!profile || !onboardingComplete) {
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                console.log('[Index] Redirecting to /onboarding (onboarding not complete)');
-              }
               router.replace('/onboarding');
               return;
             }
@@ -88,13 +79,9 @@ export default function Index() {
             // Normal login - clear any recovery mode flag that might be lingering
             if (Platform.OS === 'web' && typeof window !== 'undefined') {
               sessionStorage.removeItem('password_recovery_mode');
-              console.log('[Index] Redirecting to /(tabs) (authenticated)');
             }
             router.replace('/(tabs)');
           } else {
-            if (Platform.OS === 'web' && typeof window !== 'undefined') {
-              console.log('[Index] Redirecting to /login (not authenticated)');
-            }
             router.replace('/login');
           }
         } catch (error) {

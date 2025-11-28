@@ -315,8 +315,6 @@ export default function EditProfileScreen() {
         weight_unit: weightUnit,
       };
 
-      console.log('Attempting to update profile:', { user_id: user.id, ...updateData });
-
       const updatePromise = supabase
         .from('profiles')
         .update(updateData)
@@ -328,8 +326,6 @@ export default function EditProfileScreen() {
 
       const result = await Promise.race([updatePromise, timeoutPromise]) as any;
       const { error: updateError } = result;
-
-      console.log('Update result:', { error: updateError, hasError: !!updateError });
 
       if (updateError) {
         console.error('Profile update error:', updateError);

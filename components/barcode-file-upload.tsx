@@ -31,8 +31,6 @@ function loadHtml5QrcodeFromCDN(): Promise<void> {
     script.onload = () => {
       Html5Qrcode = (window as any).Html5Qrcode;
       Html5QrcodeSupportedFormats = (window as any).Html5QrcodeSupportedFormats;
-      console.log('[BarcodeUpload] html5-qrcode loaded from CDN');
-      console.log('[BarcodeUpload] Supported formats:', Html5QrcodeSupportedFormats);
       resolve();
     };
     script.onerror = () => {
@@ -58,7 +56,6 @@ async function resizeImageIfNeeded(file: File, maxDimension: number = 1500): Pro
       
       // Check if resize is needed
       if (img.width <= maxDimension && img.height <= maxDimension) {
-        console.log(`[BarcodeUpload] Image size OK: ${img.width}x${img.height}`);
         resolve(file);
         return;
       }
@@ -74,8 +71,6 @@ async function resizeImageIfNeeded(file: File, maxDimension: number = 1500): Pro
         newHeight = maxDimension;
         newWidth = (img.width / img.height) * maxDimension;
       }
-      
-      console.log(`[BarcodeUpload] Resizing image from ${img.width}x${img.height} to ${Math.round(newWidth)}x${Math.round(newHeight)}`);
       
       // Create canvas and resize
       const canvas = document.createElement('canvas');
@@ -148,8 +143,6 @@ export function BarcodeFileUpload({
     setError(null);
     setSelectedFileName(file.name);
 
-    console.log(`[BarcodeUpload] Processing file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
-
     try {
       // Load the library if needed
       await loadHtml5QrcodeFromCDN();
@@ -160,7 +153,6 @@ export function BarcodeFileUpload({
 
       // Resize image if too large
       const processedFile = await resizeImageIfNeeded(file, 1500);
-      console.log(`[BarcodeUpload] File after processing: ${processedFile.size} bytes`);
 
       // Get supported formats - prioritize product barcodes
       const formatsToSupport = Html5QrcodeSupportedFormats ? [
@@ -175,19 +167,13 @@ export function BarcodeFileUpload({
         Html5QrcodeSupportedFormats.QR_CODE,
       ].filter(Boolean) : undefined;
 
-      console.log('[BarcodeUpload] Formats to support:', formatsToSupport);
-
       // Create a temporary scanner instance with explicit format config
       const config = formatsToSupport ? { formatsToSupport } : undefined;
       const html5QrCode = new Html5Qrcode('barcode-file-scanner-temp', config);
       
-      console.log('[BarcodeUpload] Starting file scan...');
-      
       // Decode the barcode from the image file
       // The scanFile method signature: scanFile(file, showImage, config)
       const decodedResult = await html5QrCode.scanFile(processedFile, /* showImage */ false);
-      
-      console.log('[BarcodeUpload] Barcode decoded successfully:', decodedResult);
       
       // Clean up
       try {
@@ -218,9 +204,6 @@ export function BarcodeFileUpload({
           errorStr.includes('notfoundexception')) {
         errorMessage = t('mealtype_log.scanner.no_barcode_found',
           'No barcode found in the image. Please try another photo.');
-        console.log('[BarcodeUpload] Detection result: No barcode detected in image');
-      } else {
-        console.log('[BarcodeUpload] Detection result: Exception thrown -', err?.message);
       }
       
       setError(errorMessage);

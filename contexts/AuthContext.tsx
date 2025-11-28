@@ -148,18 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     
-    // Log when AuthProvider mounts (should only happen once)
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      console.log('[AuthProvider] Mounted - AuthProvider initialized');
-    }
-    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mountedRef.current) return;
-      
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        console.log('[AuthProvider] Initial session loaded:', session ? 'has session' : 'no session');
-      }
       
       setSession(session);
       setUser(session?.user ?? null);
@@ -168,9 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(null);
         setLoading(false);
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          console.log('[AuthProvider] No session, loading set to false');
-        }
       }
     }).catch((error) => {
       console.error('[AuthProvider] Error getting initial session:', error);
@@ -319,7 +307,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session: verifySession } } = await supabase.auth.getSession();
       if (verifySession) {
         // Session still exists, force clear it
-        console.warn('Session not cleared after signOut, forcing clear');
         // Try signing out again
         await supabase.auth.signOut();
         // Clear any stored session data manually

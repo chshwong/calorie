@@ -150,14 +150,9 @@ export async function handleScannedBarcode(
     };
   }
   
-  console.log(`[BarcodeLookup] Normalized barcode: ${normalizedBarcode}`);
-  
   // Step 2: Check food_master for canonical match
-  console.log(`[BarcodeLookup] Checking food_master...`);
   const foodMasterResult = await lookupFoodMaster(normalizedBarcode);
   if (foodMasterResult) {
-    console.log(`[BarcodeLookup] ✓ Found in food_master: ${foodMasterResult.name}`);
-    console.log(`[BarcodeLookup] Final status: FOUND_CANONICAL (found_food_master)`);
     return {
       status: 'found_food_master',
       source: 'food_master',
@@ -165,20 +160,15 @@ export async function handleScannedBarcode(
       normalizedBarcode,
     };
   }
-  console.log(`[BarcodeLookup] ✗ Not found in food_master`);
   
   // Step 3: Check external_food_cache
-  console.log(`[BarcodeLookup] Checking external_food_cache...`);
   const cacheResult = await lookupExternalCache(normalizedBarcode);
   if (cacheResult) {
-    console.log(`[BarcodeLookup] ✓ Found in cache: ${cacheResult.product_name || 'Unknown Product'}`);
     const isStale = isCacheStale(cacheResult.last_fetched_at);
     
     if (isStale) {
-      console.log(`[BarcodeLookup] ⚠ Cache is stale (${Math.round((Date.now() - new Date(cacheResult.last_fetched_at || cacheResult.created_at).getTime()) / (1000 * 60 * 60 * 24))} days old), but using it`);
       // Even if stale, return the cached data - user can refresh later if needed
       await incrementCacheScanCount(cacheResult.id);
-      console.log(`[BarcodeLookup] Final status: FOUND_CACHE (stale but usable)`);
       return {
         status: 'found_cache',
         source: 'external_food_cache',
@@ -189,9 +179,7 @@ export async function handleScannedBarcode(
     }
     
     // Fresh cache - return it
-    console.log(`[BarcodeLookup] ✓ Cache is fresh`);
     await incrementCacheScanCount(cacheResult.id);
-    console.log(`[BarcodeLookup] Final status: FOUND_CACHE (fresh)`);
     return {
       status: 'found_cache',
       source: 'external_food_cache',
@@ -200,15 +188,11 @@ export async function handleScannedBarcode(
       isStale: false,
     };
   }
-  console.log(`[BarcodeLookup] ✗ Not found in external_food_cache`);
   
   // Step 4: Fetch from OpenFoodFacts (only if no cache exists)
-  console.log(`[BarcodeLookup] Fetching from OpenFoodFacts...`);
   const offResult = await fetchProductByBarcode(normalizedBarcode);
   
   if (!offResult.found) {
-    console.log(`[BarcodeLookup] ✗ Not found in OpenFoodFacts: ${offResult.error}`);
-    console.log(`[BarcodeLookup] Final status: NOT_FOUND`);
     return {
       status: 'not_found',
       source: 'none',
@@ -218,10 +202,7 @@ export async function handleScannedBarcode(
   }
   
   // Step 5: Upsert into cache
-  console.log(`[BarcodeLookup] ✓ Found in OpenFoodFacts: ${offResult.product.productName || 'Unknown Product'}`);
-  console.log(`[BarcodeLookup] Caching OpenFoodFacts result...`);
   const cachedRow = await upsertExternalCache(normalizedBarcode, offResult.product, null);
-  console.log(`[BarcodeLookup] Final status: FOUND_OFF`);
   
   return {
     status: 'found_openfoodfacts',
@@ -244,9 +225,6 @@ async function lookupFoodMaster(
 ): Promise<FoodMasterMatch | null> {
   // Ensure barcode is trimmed and normalized for strict matching
   const cleanBarcode = normalizedBarcode.trim();
-  
-  console.log(`[BarcodeLookup] Querying food_master with barcode: "${cleanBarcode}"`);
-  console.log(`[BarcodeLookup] Barcode type: ${typeof cleanBarcode}, length: ${cleanBarcode.length}`);
   
   const { data, error } = await supabase
     .from('food_master')
@@ -274,20 +252,10 @@ async function lookupFoodMaster(
     .limit(1)
     .maybeSingle(); // Use maybeSingle() to avoid errors when no row exists
   
-  console.log(`[BarcodeLookup] food_master query result:`, {
-    hasData: !!data,
-    hasError: !!error,
-    errorCode: error?.code,
-    dataId: data?.id,
-    dataBarcode: data?.barcode,
-    dataName: data?.name,
-  });
-  
   // Handle errors (database errors, not "no row found")
   if (error) {
     // If it's a "not found" error, that's expected - return null
     if (error.code === 'PGRST116' || error.message?.includes('JSON object requested, multiple (or no) rows returned')) {
-      console.log(`[BarcodeLookup] No food_master row found (expected)`);
       return null;
     }
     console.error('[BarcodeLookup] Error querying food_master:', error);
@@ -296,17 +264,14 @@ async function lookupFoodMaster(
   
   // No data found
   if (!data) {
-    console.log(`[BarcodeLookup] No food_master row found (data is null)`);
     return null;
   }
   
   // Verify the barcode actually matches (defensive check)
   if (data.barcode !== cleanBarcode) {
-    console.warn(`[BarcodeLookup] Barcode mismatch! Query: "${cleanBarcode}", Found: "${data.barcode}"`);
     return null;
   }
   
-  console.log(`[BarcodeLookup] ✓ Found in food_master: ${data.name}`);
   return data as FoodMasterMatch;
 }
 
@@ -320,9 +285,6 @@ async function lookupExternalCache(
   // Ensure barcode is trimmed for comparison
   const cleanBarcode = normalizedBarcode.trim();
   
-  console.log(`[BarcodeLookup] Querying external_food_cache with barcode: "${cleanBarcode}"`);
-  console.log(`[BarcodeLookup] Barcode type: ${typeof cleanBarcode}, length: ${cleanBarcode.length}`);
-  
   // Use array-based query (more reliable than maybeSingle)
   const { data: rows, error } = await supabase
     .from('external_food_cache')
@@ -330,14 +292,6 @@ async function lookupExternalCache(
     .eq('barcode', cleanBarcode)
     .eq('source', 'openfoodfacts')
     .limit(1);
-  
-  // Log the full response for debugging
-  console.log(`[BarcodeLookup] Cache query result:`, {
-    rowCount: rows?.length || 0,
-    hasError: !!error,
-    errorCode: error?.code,
-    errorMessage: error?.message,
-  });
   
   // Handle errors
   if (error) {
@@ -349,7 +303,6 @@ async function lookupExternalCache(
     });
     
     // Try fallback query without source filter (in case source wasn't saved correctly)
-    console.log(`[BarcodeLookup] Trying fallback query (barcode only)...`);
     const fallbackResult = await supabase
       .from('external_food_cache')
       .select('*')
@@ -363,12 +316,6 @@ async function lookupExternalCache(
     
     if (fallbackResult.data && fallbackResult.data.length > 0) {
       const row = fallbackResult.data[0] as ExternalFoodCacheRow;
-      console.log(`[BarcodeLookup] ✓ Cache row found (fallback query):`, {
-        id: row.id,
-        product_name: row.product_name,
-        barcode: row.barcode,
-        source: row.source,
-      });
       return row;
     }
     
@@ -377,10 +324,7 @@ async function lookupExternalCache(
   
   // Check if we got any rows
   if (!rows || rows.length === 0) {
-    console.log(`[BarcodeLookup] ✗ No cache row found (empty result array)`);
-    
     // Try fallback query without source filter
-    console.log(`[BarcodeLookup] Trying fallback query (barcode only)...`);
     const fallbackResult = await supabase
       .from('external_food_cache')
       .select('*')
@@ -389,12 +333,6 @@ async function lookupExternalCache(
     
     if (!fallbackResult.error && fallbackResult.data && fallbackResult.data.length > 0) {
       const row = fallbackResult.data[0] as ExternalFoodCacheRow;
-      console.log(`[BarcodeLookup] ✓ Cache row found (fallback query, no source filter):`, {
-        id: row.id,
-        product_name: row.product_name,
-        barcode: row.barcode,
-        source: row.source,
-      });
       return row;
     }
     
@@ -403,14 +341,6 @@ async function lookupExternalCache(
   
   // Found a row
   const row = rows[0] as ExternalFoodCacheRow;
-  console.log(`[BarcodeLookup] ✓ Cache row found:`, {
-    id: row.id,
-    product_name: row.product_name,
-    barcode: row.barcode,
-    source: row.source,
-    last_fetched_at: row.last_fetched_at,
-  });
-  
   return row;
 }
 
@@ -460,9 +390,6 @@ async function upsertExternalCache(
   existingRow: ExternalFoodCacheRow | null
 ): Promise<ExternalFoodCacheRow> {
   const now = new Date().toISOString();
-  
-  console.log(`[BarcodeLookup] Upserting cache with barcode: "${normalizedBarcode}"`);
-  console.log(`[BarcodeLookup] Upsert barcode type: ${typeof normalizedBarcode}, length: ${normalizedBarcode.length}`);
   
   const upsertData = {
     barcode: normalizedBarcode.trim(), // Ensure no whitespace

@@ -18,4 +18,7 @@ export { Text, Heading1, Heading2, Heading3, Heading4, Body, Caption, Label } fr
 export { Collapsible } from './collapsible';
 export { ConfirmModal } from './confirm-modal';
 export { IconSymbol, type IconSymbolName } from './icon-symbol';
+export { TabButton } from './tab-button';
+export { TabBar } from './tab-bar';
+export { SegmentedToggle, type SegmentedOption, type SegmentedToggleProps } from './segmented-toggle';
 

@@ -21,6 +21,13 @@ import { Platform } from 'react-native';
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#5BB8FF';
 
+// Standardized grey color used across the entire app
+// This is the primary grey for secondary text, icons, and UI elements
+export const StandardGrey = {
+  light: '#1F2937',  // Darker grey for light mode
+  dark: '#4B5563',   // Darker grey for dark mode
+} as const;
+
 // Semantic colors (same for both themes)
 export const SemanticColors = {
   success: '#10B981',
@@ -47,7 +54,7 @@ export const Colors = {
   light: {
     // Text
     text: '#11181C',
-    textSecondary: '#687076',
+    textSecondary: StandardGrey.light,
     textTertiary: '#9BA1A6',
     textInverse: '#FFFFFF',
     
@@ -61,8 +68,8 @@ export const Colors = {
     tintLight: tintColorLight + '20',
     
     // UI Elements
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: StandardGrey.light,
+    tabIconDefault: StandardGrey.light,
     tabIconSelected: tintColorLight,
     border: '#E5E5E5',
     borderSecondary: '#D1D1D1',
@@ -74,7 +81,7 @@ export const Colors = {
     // Input
     inputBackground: '#FFFFFF',
     inputBorder: '#E5E5E5',
-    inputPlaceholder: '#9BA1A6',
+    inputPlaceholder: StandardGrey.light,
     
     // Semantic (spread from SemanticColors)
     ...SemanticColors,
@@ -82,7 +89,7 @@ export const Colors = {
   dark: {
     // Text
     text: '#FFFFFF',
-    textSecondary: '#AEAEB2',
+    textSecondary: StandardGrey.dark,
     textTertiary: '#8E8E93',
     textInverse: '#11181C',
     
@@ -96,8 +103,8 @@ export const Colors = {
     tintLight: tintColorDark + '20',
     
     // UI Elements
-    icon: '#AEAEB2',
-    tabIconDefault: '#8E8E93',
+    icon: StandardGrey.dark,
+    tabIconDefault: StandardGrey.dark,
     tabIconSelected: tintColorDark,
     border: '#38383A',
     borderSecondary: '#48484A',
@@ -109,7 +116,7 @@ export const Colors = {
     // Input
     inputBackground: '#1C1C1E',
     inputBorder: '#38383A',
-    inputPlaceholder: '#8E8E93',
+    inputPlaceholder: StandardGrey.dark,
     
     // Semantic (spread from SemanticColors)
     ...SemanticColors,

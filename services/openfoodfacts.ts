@@ -77,8 +77,6 @@ export async function fetchProductByBarcode(
 ): Promise<OpenFoodFactsResult> {
   const url = `${OFF_API_BASE}/product/${barcode}.json`;
   
-  console.log(`[OpenFoodFacts] Fetching product: ${barcode}`);
-  
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -100,7 +98,6 @@ export async function fetchProductByBarcode(
     
     // Check if product was found
     if (data.status !== 1 || !data.product) {
-      console.log(`[OpenFoodFacts] Product not found: ${barcode}`);
       return {
         found: false,
         error: 'Product not found in OpenFoodFacts database',
@@ -130,8 +127,6 @@ export async function fetchProductByBarcode(
       servingSize: product.serving_size || null,
       rawPayload: data,
     };
-    
-    console.log(`[OpenFoodFacts] Found product: ${parsedProduct.productName}`);
     
     return {
       found: true,

@@ -86,7 +86,6 @@ export default function ForgotPasswordScreen() {
       const { data: { session: afterResetSession } } = await supabase.auth.getSession();
       if (afterResetSession) {
         // Session appeared - this shouldn't happen, clear it immediately
-        console.warn('SECURITY: Session detected after resetPasswordForEmail, clearing it');
         await supabase.auth.signOut();
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           const keys = Object.keys(localStorage);

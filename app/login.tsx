@@ -142,13 +142,6 @@ export default function LoginScreen() {
       if (loginError) {
         let errorMsg = t('alerts.login_failed');
         
-        // Log the actual error for debugging (remove in production)
-        console.log('Login error details:', {
-          message: loginError.message,
-          status: loginError.status,
-          code: loginError.code,
-        });
-        
         // Provide user-friendly error messages
         if (loginError.message.includes('Invalid login credentials') || 
             loginError.message.includes('Invalid credentials') ||
@@ -184,7 +177,6 @@ export default function LoginScreen() {
 
         if (profileError) {
           // If profile doesn't exist, allow login (user might be registering)
-          console.log('Profile fetch error during login:', profileError);
         } else if (profileData && (profileData.is_active === false || profileData.is_active === null)) {
           // User account is inactive - sign out immediately and prevent navigation
           // Sign out synchronously to prevent any navigation

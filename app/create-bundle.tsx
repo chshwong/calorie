@@ -464,15 +464,14 @@ export default function CreateBundleScreen() {
       // Navigate back after successful save
       // If creating a new bundle, pass the bundle ID so it can be highlighted
       if (!isEditing && finalBundleId) {
-        router.replace({
-          pathname: '/mealtype-log',
-          params: {
-            mealType: params.mealType || 'breakfast',
-            entryDate: params.entryDate || new Date().toISOString().split('T')[0],
-            activeTab: 'bundle',
-            newlyAddedBundleId: finalBundleId,
-          },
-        });
+        // Store the newly added bundle ID in sessionStorage (web) or AsyncStorage (native)
+        // This avoids param-based navigation issues that can cause infinite loops
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          sessionStorage.setItem('newlyAddedBundleId', finalBundleId);
+        }
+        
+        // Navigate back - the focus effect will handle refreshing and highlighting
+        router.back();
       } else {
         router.back();
       }

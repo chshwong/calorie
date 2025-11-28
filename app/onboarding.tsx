@@ -354,7 +354,6 @@ export default function OnboardingScreen() {
       let profileSuccess = false;
       
       try {
-        console.log('Attempting to call create_user_profile function for onboarding...');
         const { data: functionData, error: functionError } = await supabase.rpc('create_user_profile', {
           p_user_id: user.id,
           p_first_name: firstName.trim(),
@@ -371,7 +370,6 @@ export default function OnboardingScreen() {
           console.error('Function error:', functionError);
           profileError = functionError;
         } else {
-          console.log('Profile created/updated successfully via function');
           profileSuccess = true;
         }
       } catch (e: any) {
@@ -381,7 +379,6 @@ export default function OnboardingScreen() {
       
       // If function failed, try direct upsert
       if (!profileSuccess) {
-        console.log('Attempting direct upsert...');
         const profileData = {
           user_id: user.id,
           first_name: firstName.trim(),
@@ -403,7 +400,6 @@ export default function OnboardingScreen() {
           console.error('Direct upsert error:', upsertError);
           throw new Error(upsertError.message || 'Failed to save profile');
         } else {
-          console.log('Profile saved successfully via direct upsert');
           profileSuccess = true;
         }
       }

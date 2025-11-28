@@ -210,11 +210,7 @@ export default function ResetPasswordScreen() {
     setLoading(true);
     setError(null);
 
-    console.log('Starting password update...');
-
     try {
-      console.log('Calling supabase.auth.updateUser...');
-      
       // Create a timeout that can be cleared
       let timeoutId: NodeJS.Timeout | null = null;
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -241,7 +237,6 @@ export default function ResetPasswordScreen() {
         });
         
         result = await Promise.race([updateWithCleanup, timeoutPromise]);
-        console.log('Password update promise resolved:', result);
       } catch (timeoutError: any) {
         // Clear timeout
         if (timeoutId) {
@@ -263,7 +258,6 @@ export default function ResetPasswordScreen() {
       }
 
       const { error: updateError, data } = result;
-      console.log('Update result - error:', updateError, 'data:', data);
 
       if (updateError) {
         let errorMsg = 'Failed to update password';
@@ -286,7 +280,6 @@ export default function ResetPasswordScreen() {
         return; // Exit early on error
       } else {
         // Password updated successfully - clear password recovery flag and redirect to login
-        console.log('Password updated successfully');
         
         // Clear the recovery mode flag from sessionStorage FIRST
         // This must happen before navigation to prevent redirect loops

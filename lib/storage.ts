@@ -51,16 +51,15 @@ const webStorage: StorageAdapter = {
 const mobileStorage: StorageAdapter = {
   getItem(_key: string): string | null {
     // For now, return null - implement with AsyncStorage for React Native
-    console.warn('Mobile storage not implemented, using null');
     return null;
   },
   
   setItem(_key: string, _value: string): void {
-    console.warn('Mobile storage not implemented');
+    // TODO: Implement with AsyncStorage for React Native
   },
   
   removeItem(_key: string): void {
-    console.warn('Mobile storage not implemented');
+    // TODO: Implement with AsyncStorage for React Native
   },
 };
 

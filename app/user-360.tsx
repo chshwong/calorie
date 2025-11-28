@@ -217,7 +217,6 @@ export default function User360Screen() {
       
       // If RPC fails and this is the current user, fallback to direct query (RLS allows own data)
       if (error && (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('not found'))) {
-        console.warn('RPC function not found, trying direct query for current user...');
         if (isCurrentUser) {
           const directResult = await supabase
             .from('calorie_entries')
@@ -238,7 +237,6 @@ export default function User360Screen() {
         console.error('Error fetching food log entries for user', userId, ':', error);
         setFoodLogEntries([]);
       } else {
-        console.log('Fetched', data?.length || 0, 'food log entries for user', userId);
         setFoodLogEntries((data || []) as FoodLogEntryRow[]);
       }
     } catch (error) {
@@ -272,7 +270,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
     
     // If RPC fails and this is the current user, fallback to direct query (RLS allows own data)
     if (error && (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('not found'))) {
-      console.warn('RPC function not found, trying direct query for current user...');
       if (isCurrentUser) {
         const directResult = await supabase
           .from('food_master')
@@ -293,7 +290,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
       console.error('Error fetching custom foods for user', userId, ':', error);
       setCustomFoods([]);
     } else {
-      console.log('Fetched', data?.length || 0, 'custom foods for user', userId);
       setCustomFoods((data || []) as CustomFoodRow[]);
     }
   } catch (error) {
@@ -329,7 +325,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
         // Check if all bundles belong to current user (RLS allows own data)
         const isCurrentUserBundles = bundlesData && bundlesData.length > 0 && bundlesData.every(b => b.user_id === currentUser?.id);
         if (isCurrentUserBundles) {
-          console.warn('RPC function failed, trying direct query fallback for current user bundles...', error);
           const directResult = await supabase
             .from('bundle_items')
             .select('*')
@@ -350,7 +345,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
         console.error('Error fetching bundle items for bundles', bundleIds, ':', error);
         setBundleItems([]);
       } else {
-        console.log('Fetched', data?.length || 0, 'bundle items');
         // Create a map of bundle_id to user_id
         const bundleUserMap = new Map<string, string>();
         if (bundlesData) {
@@ -399,7 +393,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
       
       // If RPC fails and this is the current user, fallback to direct query (RLS allows own data)
       if (error && isCurrentUser) {
-        console.warn('RPC function failed for current user, trying direct query fallback...', error);
         const directResult = await supabase
           .from('bundles')
           .select('*')
@@ -421,7 +414,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
         setBundleItems([]);
         setLoadingBundleItems(false);
       } else {
-        console.log('Fetched', data?.length || 0, 'bundles for user', userId);
         setBundles((data || []) as BundleRow[]);
         
         // Fetch bundle items for these bundles
@@ -544,7 +536,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
 
   // Load a user's profile by user_id
   const loadUserProfile = useCallback(async (userId: string) => {
-    console.log('Loading profile for user:', userId, 'isAdmin:', isAdmin);
     // Clear all existing data immediately when selecting a new user
     setProfileLoading(true);
     setShowSearchResults(false);
@@ -587,8 +578,6 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
         if (!rpcError && rpcData && rpcData.length > 0) {
           profileData = rpcData[0];
           // RPC function doesn't return email, so leave it null
-        } else if (rpcError) {
-          console.warn('RPC function admin_get_user_profile failed:', rpcError);
         }
       }
       
@@ -628,12 +617,9 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
         
         // Fetch associated data for the selected user
         if (isAdmin) {
-          console.log('Fetching data for user:', userId);
           fetchFoodLogEntries(userId);
           fetchCustomFoods(userId);
           fetchBundles(userId);
-        } else {
-          console.warn('User is not admin, skipping data fetch');
         }
       } else {
         setSelectedProfile(null);

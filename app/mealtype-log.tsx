@@ -16,6 +16,12 @@ import { useFoodSearch } from '@/hooks/use-food-search';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
+import { useFrequentFoods } from '@/hooks/use-frequent-foods';
+import { useRecentFoods } from '@/hooks/use-recent-foods';
+import { useCustomFoods } from '@/hooks/use-custom-foods';
+import { useBundles } from '@/hooks/use-bundles';
+import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useQueryClient } from '@tanstack/react-query';
 import { validateAndNormalizeBarcode } from '@/lib/barcode';
 import { 
   calculateNutrientsSimple, 
@@ -48,6 +54,9 @@ import {
 } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { TabButton } from '@/components/ui/tab-button';
+import { TabBar } from '@/components/ui/tab-bar';
+import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
 import { HighlightableItem } from '@/components/highlightable-item';
 import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
 import { MultiSelectItem } from '@/components/multi-select-item';
@@ -108,7 +117,6 @@ export default function LogFoodScreen() {
       custom: '#8B5CF6', // Purple
       bundle: '#F59E0B', // Orange
       manual: '#6B7280', // Dark Grey
-      favorite: '#FBBF24', // Yellow/Gold
     };
     
     const baseColor = shades[tab as keyof typeof shades] || colors.tint;
@@ -143,7 +151,6 @@ export default function LogFoodScreen() {
       custom: '#8B5CF6', // Purple
       bundle: '#F59E0B', // Orange (fallback)
       manual: '#6B7280', // Dark Grey
-      favorite: '#FBBF24', // Yellow/Gold
     };
     
     const baseColor = shades[tab as keyof typeof shades] || colors.tint;
@@ -453,6 +460,8 @@ export default function LogFoodScreen() {
   // Custom food delete confirmation modal state
   const [customFoodDeleteConfirmVisible, setCustomFoodDeleteConfirmVisible] = useState(false);
   const [customFoodToDelete, setCustomFoodToDelete] = useState<FoodMaster | null>(null);
+  const [bundleWarningVisible, setBundleWarningVisible] = useState(false);
+  const [bundleWarningData, setBundleWarningData] = useState<{ food: FoodMaster; bundleNames: string; bundleCount: number } | null>(null);
   
   // Manual entry mode (when Manual tab is active)
   const [isManualMode, setIsManualMode] = useState(false);
@@ -524,9 +533,13 @@ export default function LogFoodScreen() {
     }
   }, [showEntryDetails, toggleAnimation, loadingDetailsPreference]);
 
-  // Existing entries state
-  const [entries, setEntries] = useState<CalorieEntry[]>([]);
-  const [entriesLoading, setEntriesLoading] = useState(true);
+  // Use React Query hook for entries (shared cache with Home screen)
+  const { data: allEntriesForDay = [], isLoading: entriesLoading, isError: entriesError, refetch: refetchEntries } = useDailyEntries(entryDate);
+  
+  // Filter entries by current meal type (client-side filtering)
+  const entries = (allEntriesForDay ?? []).filter(
+    (entry) => entry.meal_type === mealType
+  );
   
   // Use reusable highlight hook for newly added entries
   const {
@@ -571,11 +584,7 @@ export default function LogFoodScreen() {
     recheckCamera,
   } = useBarcodeScannerMode();
   
-  // Debug: Log when showBarcodeScanner changes
-  useEffect(() => {
-    console.log('showBarcodeScanner state changed to:', showBarcodeScanner);
-    console.log('Barcode scanner mode:', barcodeScannerMode);
-  }, [showBarcodeScanner, barcodeScannerMode]);
+  // Reset file upload mode when modal closes
   
   // Reset file upload mode when modal closes
   useEffect(() => {
@@ -587,7 +596,6 @@ export default function LogFoodScreen() {
   // Auto-open camera when permission is granted while modal is open
   useEffect(() => {
     if (showBarcodeScanner && permission && permission.granted) {
-      console.log('Permission granted while modal is open - camera should be visible');
       setScanned(false);
       setBarcodeScanning(false);
     }
@@ -606,10 +614,28 @@ export default function LogFoodScreen() {
   const manualEntryDataParam = params.manualEntryData; // JSON string for manual entry prefilling
   const openManualModeParam = params.openManualMode; // Flag to open manual mode
   const openBarcodeScannerParam = params.openBarcodeScanner; // Flag to open barcode scanner
-  const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual' || activeTabParam === 'favorite')
+  const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual')
     ? activeTabParam
     : 'frequent';
-  const [activeTab, setActiveTab] = useState<'frequent' | 'recent' | 'custom' | 'bundle' | 'manual' | 'favorite'>(initialTab);
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const [previousTabKey, setPreviousTabKey] = useState<TabKey>(initialTab);
+  const [tabContentCollapsed, setTabContentCollapsed] = useState(false);
+  
+  // Helper function to handle tab press - toggles content collapse if already active
+  const handleTabPress = (tab: TabKey, additionalActions?: () => void) => {
+    if (activeTab === tab) {
+      // Tab is already active - toggle content collapse
+      setTabContentCollapsed(!tabContentCollapsed);
+    } else {
+      // Different tab selected - set previous key, then set new active tab and expand content
+      setPreviousTabKey(activeTab);
+      setActiveTab(tab);
+      setTabContentCollapsed(false);
+      if (additionalActions) {
+        additionalActions();
+      }
+    }
+  };
   
   // Scroll tracking for tabs
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -618,37 +644,19 @@ export default function LogFoodScreen() {
   const tabsContentWidthRef = useRef<number>(0);
   const tabsScrollViewWidthRef = useRef<number>(0);
   
-  // Custom foods state (with default serving info)
-  type CustomFood = FoodMaster & DefaultServingInfo;
-  const [customFoods, setCustomFoods] = useState<CustomFood[]>([]);
-  const [customFoodsLoading, setCustomFoodsLoading] = useState(false);
+  // Use React Query hooks for tab data
+  const queryClient = useQueryClient();
+  const { data: customFoods = [], isLoading: customFoodsLoading, refetch: refetchCustomFoods } = useCustomFoods();
+  const { data: frequentFoods = [], isLoading: frequentFoodsLoading, refetch: refetchFrequentFoods } = useFrequentFoods(mealType);
+  const { data: recentFoods = [], isLoading: recentFoodsLoading, refetch: refetchRecentFoods } = useRecentFoods(mealType);
+  const { data: bundles = [], isLoading: bundlesLoading, refetch: refetchBundles } = useBundles();
+  
+  // Refs for tracking UI state (kept for compatibility with existing code)
   const customFoodsFetched = useRef(false); // Track if we've fetched custom foods
   const lastRefreshParam = useRef<string | undefined>(undefined);
   const newlyAddedFoodId = useRef<string | undefined>(undefined); // Track which food was just added
   const newlyEditedFoodId = useRef<string | undefined>(undefined); // Track which food was just edited
-  
-  // Default serving info for display
-  type DefaultServingInfo = {
-    defaultServingQty: number;
-    defaultServingUnit: string;
-    defaultServingCalories: number;
-  };
-  
-  // Frequent foods state (foods logged in last 14 months)
-  type FrequentFood = FoodMaster & {
-    logCount: number;
-    lastLoggedAt: string;
-  } & DefaultServingInfo;
-  const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
-  const [frequentFoodsLoading, setFrequentFoodsLoading] = useState(false);
   const frequentFoodsFetched = useRef(false); // Track if we've fetched frequent foods
-  
-  // Recent foods state (last 50 most recent foods used from food_master)
-  type RecentFood = FoodMaster & {
-    lastUsedAt: string;
-  } & DefaultServingInfo;
-  const [recentFoods, setRecentFoods] = useState<RecentFood[]>([]);
-  const [recentFoodsLoading, setRecentFoodsLoading] = useState(false);
   const recentFoodsFetched = useRef(false); // Track if we've fetched recent foods
 
   // Bundle types and state
@@ -680,9 +688,9 @@ export default function LogFoodScreen() {
     servingsMap?: Map<string, { id: string; serving_name: string; weight_g: number | null; volume_ml: number | null }>;
   };
 
-  const [bundles, setBundles] = useState<Bundle[]>([]);
-  const [bundlesLoading, setBundlesLoading] = useState(false);
   const bundlesFetched = useRef(false);
+  const bundlesFetching = useRef(false);
+  const processedNewBundleIds = useRef<Set<string>>(new Set());
   const [bundleEditMode, setBundleEditMode] = useState(false);
   
   // Use reusable highlight hook for newly added bundles
@@ -803,41 +811,27 @@ export default function LogFoodScreen() {
     }
   };
 
-  // Fetch existing entries
-  const fetchEntries = useCallback(async () => {
-    if (!user?.id) {
-      setEntriesLoading(false);
+  // Fetch food source types and brand for entries with food_id
+  // This runs whenever entries change
+  useEffect(() => {
+    if (!entries.length) {
+      setFoodSourceMap({});
+      setFoodBrandMap({});
       return;
     }
 
-    setEntriesLoading(true);
-    try {
-      const dateString = entryDate;
-      const normalizedMealType = mealType.toLowerCase();
-      
-      const { data, error } = await supabase
-        .from('calorie_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('entry_date', dateString)
-        .eq('meal_type', normalizedMealType)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        setEntries([]);
-        setFoodSourceMap({});
-        setFoodBrandMap({});
-      } else {
-        setEntries(data ? [...data] : []);
-        
-        // Fetch food source types and brand for entries with food_id
-        const foodIds = [...new Set((data || []).filter(e => e.food_id).map(e => e.food_id))] as string[];
-        if (foodIds.length > 0) {
-          const { data: foodsData } = await supabase
-            .from('food_master')
-            .select('id, is_custom, brand')
-            .in('id', foodIds);
-          
+    const foodIds = [...new Set(entries.filter(e => e.food_id).map(e => e.food_id))] as string[];
+    if (foodIds.length > 0) {
+      supabase
+        .from('food_master')
+        .select('id, is_custom, brand')
+        .in('id', foodIds)
+        .then(({ data: foodsData, error }) => {
+          if (error) {
+            setFoodSourceMap({});
+            setFoodBrandMap({});
+            return;
+          }
           if (foodsData) {
             const sourceMap: { [foodId: string]: boolean } = {};
             const brandMap: { [foodId: string]: string | null } = {};
@@ -852,255 +846,18 @@ export default function LogFoodScreen() {
             setFoodSourceMap({});
             setFoodBrandMap({});
           }
-        } else {
+        })
+        .catch(() => {
           setFoodSourceMap({});
           setFoodBrandMap({});
-        }
-      }
-    } catch (error) {
-      setEntries([]);
+        });
+    } else {
       setFoodSourceMap({});
-    } finally {
-      setEntriesLoading(false);
+      setFoodBrandMap({});
     }
-  }, [user?.id, entryDate, mealType]);
+  }, [entries]);
 
-  // Fetch custom foods for the current user
-  const fetchCustomFoods = useCallback(async () => {
-    if (!user?.id) {
-      setCustomFoods([]);
-      return;
-    }
-
-    setCustomFoodsLoading(true);
-    try {
-      // Fetch custom foods - order by order_index if available, otherwise by name
-      const { data, error } = await supabase
-        .from('food_master')
-        .select('*')
-        .eq('is_custom', true)
-        .eq('owner_user_id', user.id)
-        .order('order_index', { ascending: true, nullsFirst: false })
-        .order('name', { ascending: true }); // Fallback if order_index is null
-
-      if (error) {
-        setCustomFoods([]);
-        return;
-      }
-      
-      if (!data || data.length === 0) {
-        setCustomFoods([]);
-        return;
-      }
-
-      // Batch fetch servings for all foods using centralized data access
-      const foodIds = data.map((food: any) => food.id);
-      const servingsMap = await getServingsForFoods(foodIds);
-
-      // Enrich foods with default serving info
-      const customFoodsList: CustomFood[] = data.map((food: any) => {
-        const foodServings = servingsMap.get(food.id) || [];
-        const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
-        
-        return {
-          ...food,
-          defaultServingQty: defaultServing.quantity,
-          defaultServingUnit: defaultServing.unit,
-          defaultServingCalories: Math.round(nutrients.calories_kcal),
-        };
-      });
-
-      setCustomFoods(customFoodsList);
-    } catch (error) {
-      setCustomFoods([]);
-    } finally {
-      setCustomFoodsLoading(false);
-    }
-  }, [user?.id]);
-
-  // Fetch frequent foods (foods logged in last 14 months)
-  // Optimized: Uses a single database function call instead of multiple queries
-  const fetchFrequentFoods = useCallback(async () => {
-    if (!user?.id) {
-      setFrequentFoods([]);
-      return;
-    }
-
-    setFrequentFoodsLoading(true);
-    try {
-      // Use database function for efficient single-query aggregation
-      const { data, error } = await supabase.rpc('get_frequent_foods', {
-        p_user_id: user.id,
-        p_months_back: 14,
-        p_limit_count: 30,
-      });
-
-      if (error) {
-        // Fallback to empty array if function doesn't exist yet
-        setFrequentFoods([]);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        setFrequentFoods([]);
-        return;
-      }
-
-      // Get food IDs for batch fetching servings
-      const foodIds = data.map((row: any) => row.id);
-      
-      // Batch fetch servings for all foods using centralized data access
-      const servingsMap = await getServingsForFoods(foodIds);
-
-      // Map database result to FrequentFood type with default serving info
-      const frequentFoodsList: FrequentFood[] = data.map((row: any) => {
-        const food: FoodMaster = {
-        id: row.id,
-        name: row.name,
-        brand: row.brand,
-        serving_size: row.serving_size,
-        serving_unit: row.serving_unit,
-        calories_kcal: row.calories_kcal,
-        protein_g: row.protein_g,
-        carbs_g: row.carbs_g,
-        fat_g: row.fat_g,
-        fiber_g: row.fiber_g,
-        saturated_fat_g: row.saturated_fat_g,
-        sugar_g: row.sugar_g,
-        sodium_mg: row.sodium_mg,
-        source: row.source,
-        is_custom: row.is_custom,
-        };
-        
-        // Get servings for this food and compute default serving
-        const foodServings = servingsMap.get(row.id) || [];
-        const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
-        
-        return {
-          ...food,
-        logCount: Number(row.log_count),
-        lastLoggedAt: row.last_logged_at,
-          defaultServingQty: defaultServing.quantity,
-          defaultServingUnit: defaultServing.unit,
-          defaultServingCalories: Math.round(nutrients.calories_kcal),
-        };
-      });
-
-      setFrequentFoods(frequentFoodsList);
-    } catch (error) {
-      setFrequentFoods([]);
-    } finally {
-      setFrequentFoodsLoading(false);
-    }
-  }, [user?.id]);
-
-  // Fetch recent foods (last 50 most recent foods used from food_master)
-  const fetchRecentFoods = useCallback(async () => {
-    if (!user?.id) {
-      setRecentFoods([]);
-      return;
-    }
-
-    setRecentFoodsLoading(true);
-    try {
-      // First, get recent entries with food_id to find unique foods
-      const { data: entriesData, error: entriesError } = await supabase
-        .from('calorie_entries')
-        .select('food_id, created_at')
-        .eq('user_id', user.id)
-        .not('food_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1000); // Get enough entries to find 50 unique foods
-
-      if (entriesError) {
-        setRecentFoods([]);
-        return;
-      }
-
-      if (!entriesData || entriesData.length === 0) {
-        setRecentFoods([]);
-        return;
-      }
-
-      // Process entries to get unique food_ids with their most recent created_at
-      const foodMap = new Map<string, { foodId: string; lastUsedAt: string }>();
-      
-      for (const entry of entriesData) {
-        if (entry.food_id && !foodMap.has(entry.food_id)) {
-          foodMap.set(entry.food_id, {
-            foodId: entry.food_id,
-            lastUsedAt: entry.created_at,
-          });
-          
-          // Stop once we have 50 unique foods
-          if (foodMap.size >= 50) {
-            break;
-          }
-        }
-      }
-
-      // Convert to array and sort by lastUsedAt (most recent first)
-      const uniqueFoods = Array.from(foodMap.values())
-        .sort((a, b) => new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime())
-        .slice(0, 50);
-
-      // Fetch food details for all unique food_ids
-      const foodIds = uniqueFoods.map(f => f.foodId);
-      const { data: foodsData, error: foodsError } = await supabase
-        .from('food_master')
-        .select('*')
-        .in('id', foodIds);
-
-      if (foodsError) {
-        setRecentFoods([]);
-        return;
-      }
-
-      // Batch fetch servings for all foods using centralized data access
-      const servingsMap = await getServingsForFoods(foodIds);
-
-      // Combine food details with lastUsedAt and default serving info
-      const foodsMap = new Map((foodsData || []).map(food => [food.id, food]));
-      const recentFoodsList: RecentFood[] = uniqueFoods
-        .map(({ foodId, lastUsedAt }) => {
-          const food = foodsMap.get(foodId);
-          if (!food) return null;
-          
-          // Get servings for this food and compute default serving
-          const foodServings = servingsMap.get(foodId) || [];
-          const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
-          
-          return {
-            id: food.id,
-            name: food.name,
-            brand: food.brand,
-            serving_size: food.serving_size,
-            serving_unit: food.serving_unit,
-            calories_kcal: food.calories_kcal,
-            protein_g: food.protein_g,
-            carbs_g: food.carbs_g,
-            fat_g: food.fat_g,
-            fiber_g: food.fiber_g,
-            saturated_fat_g: food.saturated_fat_g,
-            sugar_g: food.sugar_g,
-            sodium_mg: food.sodium_mg,
-            source: food.source,
-            is_custom: food.is_custom,
-            lastUsedAt,
-            defaultServingQty: defaultServing.quantity,
-            defaultServingUnit: defaultServing.unit,
-            defaultServingCalories: Math.round(nutrients.calories_kcal),
-          };
-        })
-        .filter((food): food is RecentFood => food !== null);
-
-      setRecentFoods(recentFoodsList);
-    } catch (error) {
-      setRecentFoods([]);
-    } finally {
-      setRecentFoodsLoading(false);
-    }
-  }, [user?.id]);
+  // Fetch functions removed - now using React Query hooks above
 
   // Helper function to format bundle items as a concatenated string (just food names)
   const formatBundleItemsList = useCallback((bundle: Bundle): string => {
@@ -1122,137 +879,7 @@ export default function LogFoodScreen() {
       .join(', ');
   }, []);
 
-  // Fetch bundles with items and calculate totals
-  const fetchBundles = useCallback(async () => {
-    if (!user?.id) {
-      setBundles([]);
-      return;
-    }
-
-    setBundlesLoading(true);
-    try {
-      // Fetch bundles
-      // Use created_at ordering for now (order_index will be used after migration is run)
-      const { data: bundlesData, error: bundlesError } = await supabase
-        .from('bundles')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (bundlesError) {
-        setBundles([]);
-        return;
-      }
-
-      if (!bundlesData || bundlesData.length === 0) {
-        setBundles([]);
-        return;
-      }
-
-      // Fetch bundle items for all bundles
-      const bundleIds = bundlesData.map(b => b.id);
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('bundle_items')
-        .select('*')
-        .in('bundle_id', bundleIds)
-        .order('order_index', { ascending: true });
-
-      if (itemsError) {
-        setBundles(bundlesData.map(b => ({ ...b, items: [] })));
-        return;
-      }
-
-      // Group items by bundle_id
-      const itemsByBundle = new Map<string, BundleItem[]>();
-      (itemsData || []).forEach(item => {
-        if (!itemsByBundle.has(item.bundle_id)) {
-          itemsByBundle.set(item.bundle_id, []);
-        }
-        itemsByBundle.get(item.bundle_id)!.push(item);
-      });
-
-      // Fetch all food names and serving names needed for display
-      const allFoodIds = [...new Set((itemsData || []).filter(item => item.food_id).map(item => item.food_id!))];
-      const { data: allFoodsData } = allFoodIds.length > 0
-        ? await supabase
-            .from('food_master')
-            .select('id, name, calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, serving_size, serving_unit')
-            .in('id', allFoodIds)
-        : { data: [] };
-      
-      const foodsMap = new Map((allFoodsData || []).map(food => [food.id, food]));
-
-      const allServingIds = [...new Set((itemsData || []).filter(item => item.serving_id).map(item => item.serving_id!))];
-      const { data: allServingsData } = allServingIds.length > 0
-        ? await supabase
-            .from('food_servings')
-            .select('id, serving_name, weight_g, volume_ml')
-            .in('id', allServingIds)
-        : { data: [] };
-      
-      const servingsMap = new Map((allServingsData || []).map(serving => [serving.id, serving]));
-
-      // Calculate totals for each bundle
-      const bundlesWithItems: Bundle[] = await Promise.all(
-        bundlesData.map(async (bundle) => {
-          const items = itemsByBundle.get(bundle.id) || [];
-          let totalCalories = 0;
-          let totalProtein = 0;
-          let totalCarbs = 0;
-          let totalFat = 0;
-          let totalFiber = 0;
-
-          // Calculate totals by fetching food details for items with food_id
-          for (const item of items) {
-            if (item.food_id && foodsMap.has(item.food_id)) {
-              const foodData = foodsMap.get(item.food_id)!;
-              // Calculate nutrition based on quantity and serving
-              let multiplier = 1;
-              if (item.serving_id && servingsMap.has(item.serving_id)) {
-                const servingData = servingsMap.get(item.serving_id)!;
-                // Calculate multiplier: (quantity * serving_weight_or_volume) / 100
-                const servingValue = servingData.weight_g ?? servingData.volume_ml ?? 0;
-                multiplier = (item.quantity * servingValue) / 100;
-              } else {
-                // Unit-based serving (1g or 1ml)
-                if (item.unit === 'g' || item.unit === 'ml') {
-                  multiplier = item.quantity / 100;
-                } else {
-                  // For other units, use serving_size as reference
-                  multiplier = (item.quantity * foodData.serving_size) / 100;
-                }
-              }
-
-              totalCalories += (foodData.calories_kcal || 0) * multiplier;
-              totalProtein += (foodData.protein_g || 0) * multiplier;
-              totalCarbs += (foodData.carbs_g || 0) * multiplier;
-              totalFat += (foodData.fat_g || 0) * multiplier;
-              totalFiber += (foodData.fiber_g || 0) * multiplier;
-            }
-            // Note: Manual entries (item_name without food_id) don't contribute to totals
-          }
-
-          return {
-            ...bundle,
-            items,
-            totalCalories: Math.round(totalCalories),
-            totalProtein: Math.round(totalProtein * 10) / 10,
-            totalCarbs: Math.round(totalCarbs * 10) / 10,
-            totalFat: Math.round(totalFat * 10) / 10,
-            totalFiber: Math.round(totalFiber * 10) / 10,
-            foodsMap, // Store for formatting items list
-            servingsMap, // Store for formatting items list
-          };
-        })
-      );
-
-      setBundles(bundlesWithItems);
-    } catch (error) {
-      setBundles([]);
-    } finally {
-      setBundlesLoading(false);
-    }
-  }, [user?.id]);
+  // Fetch bundles function removed - now using React Query hook above
 
   // Helper function to actually add bundle entries (extracted for reuse)
   const addBundleEntries = useCallback(async (bundle: Bundle) => {
@@ -1437,11 +1064,11 @@ export default function LogFoodScreen() {
 
       // Refresh entries - ensure we wait for it to complete
       // Force a fresh fetch to ensure we get the latest data
-      await fetchEntries();
+      await refetchEntries();
       
       // Double-check: fetch again after a brief moment to ensure consistency
       await new Promise(resolve => setTimeout(resolve, 200));
-      await fetchEntries();
+      await refetchEntries();
       
       // Show success message after entries are refreshed
       Alert.alert(t('alerts.success'), t('mealtype_log.bundles.added_success', { name: bundle.name, mealType: mealTypeLabel }));
@@ -1450,7 +1077,7 @@ export default function LogFoodScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, entryDate, mealType, mealTypeLabel, fetchEntries, markAsNewlyAdded]);
+  }, [user?.id, entryDate, mealType, mealTypeLabel, refetchEntries, markAsNewlyAdded]);
 
   // Add bundle to meal (create all entries at once) - with confirmation prompt
   const handleAddBundleToMeal = useCallback((bundle: Bundle) => {
@@ -1499,39 +1126,27 @@ export default function LogFoodScreen() {
       if (error) {
         Alert.alert(t('alerts.error_title'), t('mealtype_log.bundles.delete_failed', { error: error.message }));
       } else {
-        await fetchBundles();
+        // Invalidate bundles query to refetch
+        queryClient.invalidateQueries({ queryKey: ['bundles', user?.id] });
       }
       setBundleToDelete(null);
     }
-  }, [bundleToDelete, fetchBundles]);
+  }, [bundleToDelete, queryClient, user?.id]);
 
   const handleBundleDeleteCancel = useCallback(() => {
     setBundleDeleteConfirmVisible(false);
     setBundleToDelete(null);
   }, []);
 
-  // Move bundle up in order
+  // Move bundle up in order - removed (bundles are now read-only from React Query)
+  // If reordering is needed, it should be done via mutations that update the database
   const handleMoveBundleUp = useCallback((bundleId: string) => {
-    setBundles(prevBundles => {
-      const index = prevBundles.findIndex(b => b.id === bundleId);
-      if (index <= 0) return prevBundles; // Already at top
-      
-      const newBundles = [...prevBundles];
-      [newBundles[index - 1], newBundles[index]] = [newBundles[index], newBundles[index - 1]];
-      return newBundles;
-    });
+    // Reordering removed - bundles are managed by React Query
   }, []);
 
-  // Move bundle down in order
+  // Move bundle down in order - removed (bundles are now read-only from React Query)
   const handleMoveBundleDown = useCallback((bundleId: string) => {
-    setBundles(prevBundles => {
-      const index = prevBundles.findIndex(b => b.id === bundleId);
-      if (index < 0 || index >= prevBundles.length - 1) return prevBundles; // Already at bottom
-      
-      const newBundles = [...prevBundles];
-      [newBundles[index], newBundles[index + 1]] = [newBundles[index + 1], newBundles[index]];
-      return newBundles;
-    });
+    // Reordering removed - bundles are managed by React Query
   }, []);
 
   // Save bundle order to database
@@ -1559,28 +1174,15 @@ export default function LogFoodScreen() {
     setBundleEditMode(false);
   }, [saveBundleOrder]);
 
-  // Move custom food up in order
+  // Move custom food up in order - removed (custom foods are now read-only from React Query)
+  // If reordering is needed, it should be done via mutations that update the database
   const handleMoveCustomFoodUp = useCallback((foodId: string) => {
-    setCustomFoods(prevFoods => {
-      const index = prevFoods.findIndex(f => f.id === foodId);
-      if (index <= 0) return prevFoods; // Already at top
-      
-      const newFoods = [...prevFoods];
-      [newFoods[index - 1], newFoods[index]] = [newFoods[index], newFoods[index - 1]];
-      return newFoods;
-    });
+    // Reordering removed - custom foods are managed by React Query
   }, []);
 
-  // Move custom food down in order
+  // Move custom food down in order - removed (custom foods are now read-only from React Query)
   const handleMoveCustomFoodDown = useCallback((foodId: string) => {
-    setCustomFoods(prevFoods => {
-      const index = prevFoods.findIndex(f => f.id === foodId);
-      if (index < 0 || index >= prevFoods.length - 1) return prevFoods; // Already at bottom
-      
-      const newFoods = [...prevFoods];
-      [newFoods[index], newFoods[index + 1]] = [newFoods[index + 1], newFoods[index]];
-      return newFoods;
-    });
+    // Reordering removed - custom foods are managed by React Query
   }, []);
 
   // Save custom food order to database
@@ -1624,23 +1226,11 @@ export default function LogFoodScreen() {
     }
   }, [activeTab, customFoodEditMode, bundleEditMode, saveCustomFoodOrder, saveBundleOrder]);
 
-  // Track if we've used preloaded entries to avoid using them on refocus
-  const hasUsedPreloadedEntries = useRef(false);
-
-  // Use preloaded entries if available on initial mount, otherwise fetch from database
-  useEffect(() => {
-    if (preloadedEntries !== null && !hasUsedPreloadedEntries.current) {
-      // Use preloaded entries on initial mount - no database call needed
-      setEntries(preloadedEntries);
-      setEntriesLoading(false);
-      hasUsedPreloadedEntries.current = true;
-    } else if (user?.id && !hasUsedPreloadedEntries.current) {
-      // No preloaded entries, fetch from database
-      fetchEntries();
-    }
-  }, [preloadedEntries, user?.id, fetchEntries]);
+  // Preloaded entries are no longer needed - React Query handles caching
+  // Entries now come from useDailyEntries hook which shares cache with Home screen
 
   // Refresh entries when page comes into focus (only when navigating from another screen)
+  // React Query will use cached data if available, or refetch if stale
   const isInitialMount = useRef(true);
   useFocusEffect(
     useCallback(() => {
@@ -1649,13 +1239,14 @@ export default function LogFoodScreen() {
         return;
       }
       // Only refresh when coming back to the page from another screen (not when switching tabs)
+      // React Query will check if data is stale and refetch if needed
       if (user?.id) {
         const timer = setTimeout(() => {
-          fetchEntries();
+          refetchEntries();
         }, 600);
         return () => clearTimeout(timer);
       }
-    }, [user?.id, fetchEntries])
+    }, [user?.id, refetchEntries])
   );
 
 
@@ -1674,24 +1265,19 @@ export default function LogFoodScreen() {
       // If we have a new refresh param and custom tab is active, refresh immediately
       if (currentRefreshParam && currentRefreshParam !== lastRefreshParam.current && activeTab === 'custom' && user?.id && customFoodsFetched.current) {
         // Refresh immediately when coming into focus with refresh param
-        fetchCustomFoods();
+        refetchCustomFoods();
         lastRefreshParam.current = currentRefreshParam;
       }
-    }, [refreshCustomFoodsParam, activeTab, user?.id, fetchCustomFoods])
+    }, [refreshCustomFoodsParam, activeTab, user?.id, refetchCustomFoods])
   );
 
-  // Fetch frequent foods only once when frequent tab is first selected
-  // Will be refreshed when page comes into focus (with minimal delay)
+  // Track when frequent foods tab is first accessed (for UI state tracking)
   useEffect(() => {
     if (activeTab === 'frequent' && user?.id && !frequentFoodsFetched.current) {
-      // Fetch if never fetched before (handles both initial mount and first-time tab selection)
-      fetchFrequentFoods();
       frequentFoodsFetched.current = true;
     }
-    
-    // Update previous tab
     previousActiveTab.current = activeTab;
-  }, [activeTab, user?.id, fetchFrequentFoods]);
+  }, [activeTab, user?.id]);
 
   // Refresh frequent foods when page comes into focus and frequent tab is active
   // Only refresh if data was already fetched (to avoid double-fetch on initial load)
@@ -1700,62 +1286,84 @@ export default function LogFoodScreen() {
       if (activeTab === 'frequent' && user?.id && frequentFoodsFetched.current) {
         // Minimal delay to ensure database writes are committed
         const timer = setTimeout(() => {
-          fetchFrequentFoods();
+          refetchFrequentFoods();
         }, 100);
         return () => clearTimeout(timer);
       }
-    }, [activeTab, user?.id, fetchFrequentFoods])
+    }, [activeTab, user?.id, refetchFrequentFoods])
   );
 
-  // Fetch recent foods only once when recent tab is first selected
-  // Will be refreshed when page comes into focus (with minimal delay)
+  // Track when recent foods tab is first accessed (for UI state tracking)
   useEffect(() => {
     if (activeTab === 'recent' && user?.id && !recentFoodsFetched.current) {
-      // Fetch if never fetched before (handles both initial mount and first-time tab selection)
-      fetchRecentFoods();
       recentFoodsFetched.current = true;
     }
-    
-    // Update previous tab
     previousActiveTab.current = activeTab;
-  }, [activeTab, user?.id, fetchRecentFoods]);
+  }, [activeTab, user?.id]);
 
-  // Fetch bundles only once when bundle tab is first selected
+  // Track when bundles tab is first accessed (for UI state tracking)
   useEffect(() => {
-    if (activeTab === 'bundle' && user?.id && !bundlesFetched.current) {
-      fetchBundles();
+    if (activeTab === 'bundle' && user?.id && !bundlesFetched.current && !newlyAddedBundleIdParam) {
       bundlesFetched.current = true;
     }
-    
-    // Update previous tab
     previousActiveTab.current = activeTab;
-  }, [activeTab, user?.id, fetchBundles]);
+  }, [activeTab, user?.id, newlyAddedBundleIdParam]);
 
   // Handle newly added bundle ID from create-bundle page
+  // Check both URL params and sessionStorage (for web)
   useEffect(() => {
-    const bundleId = Array.isArray(newlyAddedBundleIdParam) 
+    let bundleId: string | undefined;
+    
+    // First check URL params
+    const paramBundleId = Array.isArray(newlyAddedBundleIdParam) 
       ? newlyAddedBundleIdParam[0] 
       : newlyAddedBundleIdParam;
     
-    if (bundleId && activeTab === 'bundle') {
+    if (paramBundleId && typeof paramBundleId === 'string') {
+      bundleId = paramBundleId;
+    } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // Check sessionStorage as fallback
+      const storedId = sessionStorage.getItem('newlyAddedBundleId');
+      if (storedId) {
+        bundleId = storedId;
+        // Clear it immediately to prevent re-processing
+        sessionStorage.removeItem('newlyAddedBundleId');
+      }
+    }
+    
+    // Only process if we have a bundle ID, are on bundle tab, and haven't processed this ID yet
+    if (bundleId && activeTab === 'bundle' && !processedNewBundleIds.current.has(bundleId)) {
+      // Mark this bundle ID as processed to prevent re-processing
+      processedNewBundleIds.current.add(bundleId);
+      
       // Mark the bundle as newly added for highlight animation
       markBundleAsNewlyAdded(bundleId);
       
+      // Ensure bundlesFetched is set so useFocusEffect doesn't also trigger
+      bundlesFetched.current = true;
+      
       // Refresh bundles to show the new one
-      fetchBundles();
+      queryClient.invalidateQueries({ queryKey: ['bundles', user?.id] });
     }
-  }, [newlyAddedBundleIdParam, activeTab, markBundleAsNewlyAdded, fetchBundles]);
+  }, [newlyAddedBundleIdParam, activeTab, markBundleAsNewlyAdded, queryClient, user?.id]);
 
   // Refresh bundles when page comes into focus and bundle tab is active
+  // Skip if we just handled a newlyAddedBundleIdParam (to avoid double fetch)
+  // Also skip if we're currently fetching to prevent loops
   useFocusEffect(
     useCallback(() => {
-      if (activeTab === 'bundle' && user?.id && bundlesFetched.current) {
+      const bundleId = Array.isArray(newlyAddedBundleIdParam) 
+        ? newlyAddedBundleIdParam[0] 
+        : newlyAddedBundleIdParam;
+      const hasNewBundleParam = bundleId && typeof bundleId === 'string';
+      
+      if (activeTab === 'bundle' && user?.id && bundlesFetched.current && !hasNewBundleParam) {
         const timer = setTimeout(() => {
-          fetchBundles();
-        }, 100);
+          refetchBundles();
+        }, 200);
         return () => clearTimeout(timer);
       }
-    }, [activeTab, user?.id, fetchBundles])
+    }, [activeTab, user?.id, refetchBundles, newlyAddedBundleIdParam])
   );
 
   // Refresh recent foods when page comes into focus and recent tab is active
@@ -1765,11 +1373,11 @@ export default function LogFoodScreen() {
       if (activeTab === 'recent' && user?.id && recentFoodsFetched.current) {
         // Minimal delay to ensure database writes are committed
         const timer = setTimeout(() => {
-          fetchRecentFoods();
+          refetchRecentFoods();
         }, 100);
         return () => clearTimeout(timer);
       }
-    }, [activeTab, user?.id, fetchRecentFoods])
+    }, [activeTab, user?.id, refetchRecentFoods])
   );
 
   // Handle edit entry - load entry data into form
@@ -1914,14 +1522,14 @@ export default function LogFoodScreen() {
 
       // Clear selection and refresh entries
       clearEntrySelection();
-      await fetchEntries();
+      await refetchEntries();
       Alert.alert(t('alerts.success'), t('mealtype_log.delete_entry.success_multiple', { count: selectedEntryCount, entries: selectedEntryCount === 1 ? t('mealtype_log.delete_entry.entry_singular') : t('mealtype_log.delete_entry.entry_plural') }));
     } catch (error: any) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.delete_entry.failed_multiple', { error: error?.message || t('common.unexpected_error') }));
     } finally {
       setLoading(false);
     }
-  }, [selectedEntryIds, selectedEntryCount, clearEntrySelection, fetchEntries]);
+  }, [selectedEntryIds, selectedEntryCount, clearEntrySelection, refetchEntries]);
 
   const handleMassDeleteCancel = useCallback(() => {
     setMassDeleteConfirmVisible(false);
@@ -1941,7 +1549,7 @@ export default function LogFoodScreen() {
         if (editingEntryId === entryId) {
           handleCancel();
         }
-        await fetchEntries();
+        await refetchEntries();
       }
     } catch (error) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.unexpected_error'));
@@ -2221,22 +1829,6 @@ export default function LogFoodScreen() {
         }
       }
 
-      // Log entry data for debugging
-      console.log('=== SAVE ENTRY DEBUG ===');
-      console.log('Original Entry Data:', JSON.stringify(entryData, null, 2));
-      console.log('Cleaned Entry Data:', JSON.stringify(cleanedEntryData, null, 2));
-      console.log('Selected Food:', selectedFood ? {
-        id: selectedFood.id,
-        name: selectedFood.name,
-        sugar_g: selectedFood.sugar_g,
-        sodium_mg: selectedFood.sodium_mg,
-      } : 'null');
-      console.log('Selected Serving:', selectedServing);
-      console.log('State values:', {
-        sugar: sugar,
-        sodium: sodium,
-        saturatedFat: saturatedFat
-      });
 
       let error;
       let result;
@@ -2265,13 +1857,6 @@ export default function LogFoodScreen() {
       }
 
       if (error) {
-        console.log('=== DATABASE ERROR ===');
-        console.log('Error Code:', error.code);
-        console.log('Error Message:', error.message);
-        console.log('Error Details:', error.details);
-        console.log('Error Hint:', error.hint);
-        console.log('Full Error:', JSON.stringify(error, null, 2));
-        
         // Parse error message to provide user-friendly feedback
         let errorMessage = `Failed to ${editingEntryId ? 'update' : 'save'} food entry.`;
         const errorMsg = error.message || '';
@@ -2332,7 +1917,7 @@ export default function LogFoodScreen() {
         return false;
       } else {
         // Refresh entries to show the updated/newly saved entry
-        await fetchEntries();
+        await refetchEntries();
         
         // Clear highlight state if we were editing (not adding)
         if (editingEntryId) {
@@ -2405,10 +1990,48 @@ export default function LogFoodScreen() {
   };
 
 
-  // Delete custom food
-  const handleDeleteCustomFood = (food: FoodMaster) => {
-    setCustomFoodToDelete(food);
-    setCustomFoodDeleteConfirmVisible(true);
+  // Delete custom food - check for bundle references first
+  const handleDeleteCustomFood = async (food: FoodMaster) => {
+    if (!user?.id) return;
+
+    // Check if food is referenced in any bundle items
+    const { getBundleItemReferencesForFood } = await import('@/lib/services/bundleItems');
+    const bundleReferences = await getBundleItemReferencesForFood(user.id, food.id);
+
+    if (bundleReferences.length > 0) {
+      // Food is referenced in bundles - format bundle names (truncate to 10 chars each)
+      const truncatedBundleNames = bundleReferences.map(ref => {
+        const name = ref.bundle_name;
+        return name.length > 10 ? `${name.substring(0, 10)}...` : name;
+      }).join(', ');
+      
+      setBundleWarningData({ 
+        food, 
+        bundleNames: truncatedBundleNames,
+        bundleCount: bundleReferences.length 
+      });
+      setBundleWarningVisible(true);
+    } else {
+      // No bundle references - proceed with normal confirmation
+      setCustomFoodToDelete(food);
+      setCustomFoodDeleteConfirmVisible(true);
+    }
+  };
+
+  // Handle bundle warning confirmation - proceed to delete confirmation
+  const handleBundleWarningConfirm = () => {
+    if (bundleWarningData) {
+      setBundleWarningVisible(false);
+      setCustomFoodToDelete(bundleWarningData.food);
+      setCustomFoodDeleteConfirmVisible(true);
+      setBundleWarningData(null);
+    }
+  };
+
+  // Handle bundle warning cancellation
+  const handleBundleWarningCancel = () => {
+    setBundleWarningVisible(false);
+    setBundleWarningData(null);
   };
 
   const handleCustomFoodDeleteConfirm = async () => {
@@ -2438,6 +2061,16 @@ export default function LogFoodScreen() {
         throw entriesError;
       }
 
+      // Delete bundle_items that reference this food (as warned to user)
+      const { error: bundleItemsError } = await supabase
+        .from('bundle_items')
+        .delete()
+        .eq('food_id', food.id);
+
+      if (bundleItemsError) {
+        throw bundleItemsError;
+      }
+
       // Delete from food_servings (foreign key constraint)
       const { error: servingsError } = await supabase
         .from('food_servings')
@@ -2460,7 +2093,7 @@ export default function LogFoodScreen() {
       }
 
       // Refresh the custom foods list
-      fetchCustomFoods();
+      queryClient.invalidateQueries({ queryKey: ['customFoods', user?.id] });
       // Keep fetched flag true since we just refreshed
       shouldRefreshCustomFoods.current = false;
     } catch (error: any) {
@@ -2494,29 +2127,27 @@ export default function LogFoodScreen() {
       // Check if we have a refresh param (coming from create page)
       const shouldRefreshFromCreate = currentRefreshParam && currentRefreshParam !== lastRefreshParam.current;
       
-      // Fetch if: switching to custom tab OR never fetched before (handles initial mount)
+      // Track when custom tab is first accessed
       if (!customFoodsFetched.current) {
-        // First time selecting custom tab or initial mount - fetch
-        fetchCustomFoods();
         customFoodsFetched.current = true;
         if (currentRefreshParam) {
           lastRefreshParam.current = currentRefreshParam;
         }
       } else if (shouldRefreshCustomFoods.current) {
         // Refresh if explicitly needed (after delete)
-        fetchCustomFoods();
+        queryClient.invalidateQueries({ queryKey: ['customFoods', user?.id] });
         shouldRefreshCustomFoods.current = false;
       } else if (shouldRefreshFromCreate && customFoodsFetched.current) {
         // Refresh when coming back from create page (detected by refreshCustomFoods param)
         // Refresh immediately without delay
-        fetchCustomFoods();
+        refetchCustomFoods();
         lastRefreshParam.current = currentRefreshParam;
       }
     }
     
     // Update previous tab
     previousActiveTab.current = activeTab;
-  }, [activeTab, user?.id, fetchCustomFoods, refreshCustomFoodsParam]);
+  }, [activeTab, user?.id, refetchCustomFoods, refreshCustomFoodsParam, queryClient]);
   
   // Also check refresh param separately to catch it even if activeTab hasn't changed
   // This is the primary mechanism for detecting when we come back from create page
@@ -2543,12 +2174,11 @@ export default function LogFoodScreen() {
           newlyAddedFoodId.current = undefined; // Clear added if editing
         }
         
-        // Refresh immediately if we've fetched before, or fetch for first time
+        // Refresh immediately if we've fetched before, or mark as fetched for first time
         if (customFoodsFetched.current) {
-          fetchCustomFoods();
+          refetchCustomFoods();
         } else {
-          // First time - fetch and mark as fetched
-          fetchCustomFoods();
+          // First time - mark as fetched (React Query will fetch automatically)
           customFoodsFetched.current = true;
         }
         
@@ -2556,7 +2186,7 @@ export default function LogFoodScreen() {
         lastRefreshParam.current = currentRefreshParam;
       }
     }
-  }, [refreshCustomFoodsParam, newlyAddedFoodIdParam, user?.id, activeTab, fetchCustomFoods]);
+  }, [refreshCustomFoodsParam, newlyAddedFoodIdParam, user?.id, activeTab, refetchCustomFoods]);
 
   // Handle barcode scan results - auto-select food from scan
   useEffect(() => {
@@ -2564,7 +2194,6 @@ export default function LogFoodScreen() {
       // Handle selectedFoodId - fetch from food_master and auto-select
       const foodId = Array.isArray(selectedFoodIdParam) ? selectedFoodIdParam[0] : selectedFoodIdParam;
       if (foodId && user?.id) {
-        console.log('[MealTypeLog] Auto-selecting scanned food:', foodId);
         try {
           const { data: food, error } = await supabase
             .from('food_master')
@@ -2584,7 +2213,6 @@ export default function LogFoodScreen() {
       // Handle scannedFoodData - "Use Once" flow with external data (no food_master entry)
       const scannedData = Array.isArray(scannedFoodDataParam) ? scannedFoodDataParam[0] : scannedFoodDataParam;
       if (scannedData && user?.id) {
-        console.log('[MealTypeLog] Using scanned food data for "Use Once"');
         try {
           const externalFood = JSON.parse(scannedData);
           // Create a virtual FoodMaster-like object for the entry form
@@ -2619,7 +2247,6 @@ export default function LogFoodScreen() {
       const shouldOpenManual = Array.isArray(openManualModeParam) ? openManualModeParam[0] === 'true' : openManualModeParam === 'true';
       
       if (manualData && shouldOpenManual && user?.id) {
-        console.log('[MealTypeLog] Opening manual mode with prefilled data');
         try {
           const entryData = JSON.parse(manualData);
           
@@ -2661,7 +2288,6 @@ export default function LogFoodScreen() {
       : openBarcodeScannerParam === 'true';
     
     if (shouldOpenScanner && !showBarcodeScanner) {
-      console.log('[MealTypeLog] Opening barcode scanner from param');
       setScanned(false); // Reset scanned state
       setBarcodeScanning(false); // Reset scanning state
       setShowBarcodeScanner(true);
@@ -2962,7 +2588,7 @@ export default function LogFoodScreen() {
 
       // 6. Success! Clear search and refresh entries
       clearSearch();
-      await fetchEntries();
+      await refetchEntries();
 
       // Show brief success feedback - meal type label for display
       const mealTypeLabel = t(`mealtype_log.meal_types.${mealType.toLowerCase()}`);
@@ -2982,25 +2608,18 @@ export default function LogFoodScreen() {
 
   // Handle barcode scan button press
   const handleBarcodeScanPress = useCallback(async () => {
-    console.log('=== Barcode button pressed ===');
-    console.log('Platform.OS:', Platform.OS);
-    
     try {
       // Open the scanner modal first - it will handle permission requests
-      console.log('Opening scanner modal');
       setScanned(false);
       setBarcodeScanning(false);
       setShowBarcodeScanner(true);
       setBarcodeScannerKey(prev => prev + 1); // Force remount
-      console.log('Scanner modal opened');
       
       // If permission is already granted, the camera will show immediately
       // If not, the modal will show the permission request screen
       
     } catch (error: any) {
-      console.error('Error in handleBarcodeScanPress:', error);
       const errorMessage = error?.message || 'Unknown error';
-      console.error('Full error:', error);
       
       Alert.alert(
         t('alerts.error_title'),
@@ -3054,8 +2673,6 @@ export default function LogFoodScreen() {
 
       // Step 2: Barcode is valid - close scanner and navigate to scanned-item page
       const normalizedCode = validationResult.normalizedCode!;
-      
-      console.log(`Barcode scanned: ${barcodeData} (${validationResult.format}) -> Normalized: ${normalizedCode}`);
       
       // Close the scanner modal
       setShowBarcodeScanner(false);
@@ -3460,8 +3077,8 @@ export default function LogFoodScreen() {
                 borderColor: colors.tint + '40',
               }]}
               onPress={handleBarcodeScanPress}
-              onPressIn={() => console.log('Barcode button pressed in')}
-              onPressOut={() => console.log('Barcode button pressed out')}
+              onPressIn={() => {}}
+              onPressOut={() => {}}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               {...getButtonAccessibilityProps(
@@ -3576,204 +3193,96 @@ export default function LogFoodScreen() {
                 onContentSizeChange={handleTabsContentSizeChange}
                 scrollEventThrottle={16}
               >
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    getMinTouchTargetStyle(),
-                    activeTab === 'frequent' && { 
-                      borderBottomColor: getTabColor('frequent', true), 
-                      borderBottomWidth: 3,
-                      backgroundColor: getTabColor('frequent', true) + '15',
+                <TabBar
+                  tabs={[
+                    {
+                      key: 'frequent',
+                      label: t('mealtype_log.tabs.frequent'),
+                      activeColor: getTabColor('frequent', true),
+                      inactiveColor: getTabColor('frequent', false),
+                      accessibilityLabel: t('mealtype_log.accessibility.frequent_tab'),
                     },
-                    { ...(Platform.OS === 'web' ? getFocusStyle(getTabColor('frequent', activeTab === 'frequent')) : {}) }
-                  ]}
-                  onPress={() => {
-                    setActiveTab('frequent');
-                    setIsManualMode(false);
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === 'frequent' }}
-                  accessibilityLabel={t('mealtype_log.accessibility.frequent_tab')}
-                >
-                  <ThemedText style={[
-                    styles.tabText,
-                    { color: getTabColor('frequent', activeTab === 'frequent') }
-                  ]}>
-                    {t('mealtype_log.tabs.frequent')}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    getMinTouchTargetStyle(),
-                    activeTab === 'recent' && { 
-                      borderBottomColor: getTabColor('recent', true), 
-                      borderBottomWidth: 3,
-                      backgroundColor: getTabColor('recent', true) + '15',
+                    {
+                      key: 'recent',
+                      label: t('mealtype_log.tabs.recent'),
+                      activeColor: getTabColor('recent', true),
+                      inactiveColor: getTabColor('recent', false),
+                      accessibilityLabel: t('mealtype_log.accessibility.recent_tab'),
                     },
-                    { ...(Platform.OS === 'web' ? getFocusStyle(getTabColor('recent', activeTab === 'recent')) : {}) }
-                  ]}
-                  onPress={() => {
-                    setActiveTab('recent');
-                    setIsManualMode(false);
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === 'recent' }}
-                  accessibilityLabel={t('mealtype_log.accessibility.recent_tab')}
-                >
-                  <ThemedText style={[
-                    styles.tabText,
-                    { color: getTabColor('recent', activeTab === 'recent') }
-                  ]}>
-                    {t('mealtype_log.tabs.recent')}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    getMinTouchTargetStyle(),
-                    activeTab === 'custom' && { 
-                      borderBottomColor: getTabColor('custom', true), 
-                      borderBottomWidth: 3,
-                      backgroundColor: getTabColor('custom', true) + '15',
+                    {
+                      key: 'custom',
+                      label: t('mealtype_log.tabs.custom'),
+                      activeColor: getTabColor('custom', true),
+                      inactiveColor: getTabColor('custom', false),
+                      accessibilityLabel: t('mealtype_log.accessibility.custom_tab'),
                     },
-                    { ...(Platform.OS === 'web' ? getFocusStyle(getTabColor('custom', activeTab === 'custom')) : {}) }
-                  ]}
-                  onPress={() => {
-                    setActiveTab('custom');
-                    setIsManualMode(false);
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === 'custom' }}
-                  accessibilityLabel={t('mealtype_log.accessibility.custom_tab')}
-                >
-                  <ThemedText style={[
-                    styles.tabText,
-                    { color: getTabColor('custom', activeTab === 'custom') }
-                  ]}>
-                    {t('mealtype_log.tabs.custom')}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    getMinTouchTargetStyle(),
-                    activeTab === 'bundle' && { 
-                      borderBottomColor: getTabColor('bundle', true), 
-                      borderBottomWidth: 3,
-                      backgroundColor: getTabColor('bundle', true) + '15',
+                    {
+                      key: 'bundle',
+                      label: t('mealtype_log.tabs.bundles'),
+                      activeColor: getTabColor('bundle', true),
+                      inactiveColor: getTabColor('bundle', false),
+                      accessibilityLabel: t('mealtype_log.accessibility.bundles_tab'),
                     },
-                    { ...(Platform.OS === 'web' ? getFocusStyle(getTabColor('bundle', activeTab === 'bundle')) : {}) }
-                  ]}
-                  onPress={() => {
-                    setActiveTab('bundle');
-                    setIsManualMode(false);
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === 'bundle' }}
-                  accessibilityLabel={t('mealtype_log.accessibility.bundles_tab')}
-                >
-                  <ThemedText style={[
-                    styles.tabText,
-                    { color: getTabColor('bundle', activeTab === 'bundle') }
-                  ]}>
-                    {t('mealtype_log.tabs.bundles')}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    getMinTouchTargetStyle(),
-                    activeTab === 'manual' && { 
-                      borderBottomColor: getTabColor('manual', true), 
-                      borderBottomWidth: 3,
-                      backgroundColor: getTabColor('manual', true) + '15',
+                    {
+                      key: 'manual',
+                      label: t('mealtype_log.tabs.manual'),
+                      activeColor: getTabColor('manual', true),
+                      inactiveColor: getTabColor('manual', false),
+                      accessibilityLabel: t('mealtype_log.accessibility.manual_tab'),
+                      renderLabel: () => (
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <ThemedText style={[
+                            styles.tabText,
+                            { color: getTabColor('manual', activeTab === 'manual') }
+                          ]}>
+                            {t('mealtype_log.tabs.manual')}
+                          </ThemedText>
+                          <ThemedText style={[
+                            styles.tabText,
+                            { 
+                              color: getTabColor('manual', activeTab === 'manual'),
+                              fontSize: 20,
+                              fontWeight: 'bold',
+                              lineHeight: 20,
+                              marginLeft: 4
+                            }
+                          ]}>
+                            +
+                          </ThemedText>
+                        </View>
+                      ),
                     },
-                    { ...(Platform.OS === 'web' ? getFocusStyle(getTabColor('manual', activeTab === 'manual')) : {}) }
                   ]}
-                  onPress={() => {
-                    setActiveTab('manual');
-                    setIsManualMode(true);
-                    setSelectedFood(null);
-                    setEditingEntryId(null);
-                    // Clear form fields without resetting isManualMode
-                    setItemName('');
-                    setQuantity('1');
-                    setUnit('plate');
-                    setCalories('');
-                    setProtein('');
-                    setCarbs('');
-                    setFat('');
-                    setFiber('');
-                    setSaturatedFat('');
-                    setSugar('');
-                    setSodium('');
-                    setSelectedServing(null);
-                    setAvailableServings([]);
-                    setItemNameError('');
-                    setQuantityError('');
-                    setCaloriesError('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === 'manual' }}
-                  accessibilityLabel={t('mealtype_log.accessibility.manual_tab')}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <ThemedText style={[
-                      styles.tabText,
-                      { color: getTabColor('manual', activeTab === 'manual') }
-                    ]}>
-                      {t('mealtype_log.tabs.manual')}
-                    </ThemedText>
-                    <ThemedText style={[
-                      styles.tabText,
-                      { 
-                        color: getTabColor('manual', activeTab === 'manual'),
-                        fontSize: 20,
-                        fontWeight: 'bold',
-                        lineHeight: 20,
-                        marginLeft: 4
-                      }
-                    ]}>
-                      +
-                    </ThemedText>
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    getMinTouchTargetStyle(),
-                    activeTab === 'favorite' && { 
-                      borderBottomColor: getTabColor('favorite', true), 
-                      borderBottomWidth: 3,
-                      backgroundColor: getTabColor('favorite', true) + '15',
-                    },
-                    { ...(Platform.OS === 'web' ? getFocusStyle(getTabColor('favorite', activeTab === 'favorite')) : {}) }
-                  ]}
-                  onPress={() => {
-                    setActiveTab('favorite');
-                    setIsManualMode(false);
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === 'favorite' }}
-                  accessibilityLabel={t('mealtype_log.accessibility.favorite_tab')}
-                >
-                  <ThemedText style={[
-                    styles.tabText,
-                    { 
-                      color: getTabColor('favorite', activeTab === 'favorite'),
-                      fontSize: activeTab === 'favorite' ? 20 : 16,
+                  activeKey={activeTab}
+                  onTabPress={(key) => {
+                    if (key === 'manual') {
+                      handleTabPress('manual', () => {
+                        setIsManualMode(true);
+                        setSelectedFood(null);
+                        setEditingEntryId(null);
+                        // Clear form fields without resetting isManualMode
+                        setItemName('');
+                        setQuantity('1');
+                        setUnit('plate');
+                        setCalories('');
+                        setProtein('');
+                        setCarbs('');
+                        setFat('');
+                        setFiber('');
+                        setSaturatedFat('');
+                        setSugar('');
+                        setSodium('');
+                        setSelectedServing(null);
+                        setAvailableServings([]);
+                        setItemNameError('');
+                        setQuantityError('');
+                        setCaloriesError('');
+                      });
+                    } else {
+                      handleTabPress(key as 'frequent' | 'recent' | 'custom' | 'bundle', () => setIsManualMode(false));
                     }
-                  ]}>
-                    ⭐
-                  </ThemedText>
-                </TouchableOpacity>
+                  }}
+                />
               </ScrollView>
               
               {/* Right arrow */}
@@ -3792,92 +3301,748 @@ export default function LogFoodScreen() {
               )}
             </View>
 
-            {/* Tab Content */}
-            {activeTab === 'frequent' && (
-          <View style={styles.tabContent}>
-            {/* Frequent Foods List - only show when not searching */}
-            {!searchQuery && (
-              <>
-                {frequentFoodsLoading ? (
-                  <View style={styles.emptyTabState}>
-                    <ActivityIndicator size="small" color={colors.tint} />
-                    <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 8 }]}>
-                      {t('mealtype_log.frequent_foods.loading')}
-                    </ThemedText>
-                  </View>
-                ) : frequentFoods.length > 0 ? (
-                  <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('frequent'), borderColor: colors.icon + '20' }]}>
-                    <ScrollView 
-                      style={styles.searchResultsList}
-                      nestedScrollEnabled
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      {frequentFoods.map((food) => {
-                        const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                        const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
-                        const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
-                        const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
-                        const rightSideText = `${brandText}${nutritionInfo}`;
+            {/* Collapsed Content Hint - Show when content is collapsed */}
+            {tabContentCollapsed && (
+              <TouchableOpacity
+                onPress={() => setTabContentCollapsed(false)}
+                activeOpacity={0.7}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 0.5,
+                }}
+                accessibilityLabel={t('mealtype_log.expand_content')}
+                accessibilityHint={t('mealtype_log.expand_content_hint')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <ThemedText style={[styles.collapsedHintText, { color: colors.icon, fontSize: 11, marginRight: 6 }]}>
+                    {t('mealtype_log.tap_to_expand')}
+                  </ThemedText>
+                  <IconSymbol
+                    name="chevron.down"
+                    size={14}
+                    color={colors.icon}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
 
-                        // Determine if food is custom - simple check: is_custom === true
-                        const isCustom = food.is_custom === true;
-
-                        return (
-                          <View
-                            key={food.id}
-                            style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
-                          >
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-                              <TouchableOpacity
-                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
-                                onPress={() => handleFoodSelect(food)}
-                                activeOpacity={0.7}
-                              >
-                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-                                  <ThemedText 
-                                    style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
-                                    numberOfLines={1}
-                                    ellipsizeMode="tail"
-                                  >
-                                    {truncatedName}
-                                  </ThemedText>
-                                </View>
-                                <ThemedText 
-                                  style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
-                                  numberOfLines={1}
-                                >
-                                  {rightSideText}
-                                </ThemedText>
-                              </TouchableOpacity>
-                              <View style={[styles.sourceBadge, { 
-                                backgroundColor: isCustom ? colors.tint + '20' : '#3B82F6' + '20',
-                                borderColor: isCustom ? colors.tint + '40' : '#3B82F6' + '40',
-                                marginLeft: 6
-                              }]}>
-                                <ThemedText style={[styles.sourceBadgeText, { 
-                                  color: isCustom ? colors.tint : '#3B82F6'
-                                }]}>
-                                  {isCustom ? 'Custom' : 'Database'}
+            {/* Tab Content - Animated */}
+            <AnimatedTabContent
+              activeKey={activeTab}
+              previousKey={previousTabKey}
+              isExpanded={!tabContentCollapsed}
+              renderContent={(key: TabKey) => {
+                // Render content for each tab using cached data only
+                switch (key) {
+                  case 'frequent':
+                    return (
+                      <View style={styles.tabContent}>
+                        {!searchQuery && (
+                          <>
+                            {frequentFoodsLoading ? (
+                              <View style={styles.emptyTabState}>
+                                <ActivityIndicator size="small" color={colors.tint} />
+                                <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 8 }]}>
+                                  {t('mealtype_log.frequent_foods.loading')}
                                 </ThemedText>
                               </View>
+                            ) : frequentFoods.length > 0 ? (
+                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('frequent'), borderColor: colors.icon + '20' }]}>
+                                <ScrollView 
+                                  style={styles.searchResultsList}
+                                  nestedScrollEnabled
+                                  keyboardShouldPersistTaps="handled"
+                                >
+                                  {frequentFoods.map((food) => {
+                                    const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                    const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                    const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                    const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                    const rightSideText = `${brandText}${nutritionInfo}`;
+                                    const isCustom = food.is_custom === true;
+
+                                    return (
+                                      <View
+                                        key={food.id}
+                                        style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                      >
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                          <TouchableOpacity
+                                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
+                                            onPress={() => handleFoodSelect(food)}
+                                            activeOpacity={0.7}
+                                          >
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                              <ThemedText 
+                                                style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                              >
+                                                {truncatedName}
+                                              </ThemedText>
+                                            </View>
+                                            <ThemedText 
+                                              style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                              numberOfLines={1}
+                                            >
+                                              {rightSideText}
+                                            </ThemedText>
+                                          </TouchableOpacity>
+                                          <View style={[styles.sourceBadge, { 
+                                            backgroundColor: isCustom ? colors.tint + '20' : '#3B82F6' + '20',
+                                            borderColor: isCustom ? colors.tint + '40' : '#3B82F6' + '40',
+                                            marginLeft: 6
+                                          }]}>
+                                            <ThemedText style={[styles.sourceBadgeText, { 
+                                              color: isCustom ? colors.tint : '#3B82F6'
+                                            }]}>
+                                              {isCustom ? 'Custom' : 'Database'}
+                                            </ThemedText>
+                                          </View>
+                                          <TouchableOpacity
+                                            style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                            onPress={() => handleQuickAdd(food)}
+                                            activeOpacity={0.7}
+                                            accessibilityLabel={t('mealtype_log.quick_add')}
+                                            accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                          >
+                                            <IconSymbol
+                                              name="plus.circle.fill"
+                                              size={22}
+                                              color={colors.tint}
+                                            />
+                                          </TouchableOpacity>
+                                        </View>
+                                      </View>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+                            ) : null}
+                          </>
+                        )}
+                      </View>
+                    );
+                  
+                  case 'recent':
+                    return (
+                      <View style={styles.tabContent}>
+                        {!searchQuery && (
+                          <>
+                            {recentFoodsLoading ? (
+                              <View style={styles.emptyTabState}>
+                                <ActivityIndicator size="small" color={colors.tint} />
+                                <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 8 }]}>
+                                  {t('mealtype_log.recent_foods.loading')}
+                                </ThemedText>
+                              </View>
+                            ) : recentFoods.length > 0 ? (
+                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('recent'), borderColor: colors.icon + '20' }]}>
+                                <ScrollView 
+                                  style={styles.searchResultsList}
+                                  nestedScrollEnabled
+                                  keyboardShouldPersistTaps="handled"
+                                >
+                                  {recentFoods.map((food) => {
+                                    const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                    const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                    const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                    const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                    const rightSideText = `${brandText}${nutritionInfo}`;
+                                    const isCustom = food.is_custom === true;
+
+                                    return (
+                                      <View
+                                        key={food.id}
+                                        style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                      >
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                          <TouchableOpacity
+                                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
+                                            onPress={() => handleFoodSelect(food)}
+                                            activeOpacity={0.7}
+                                          >
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                              <ThemedText 
+                                                style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                              >
+                                                {truncatedName}
+                                              </ThemedText>
+                                            </View>
+                                            <ThemedText 
+                                              style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                              numberOfLines={1}
+                                            >
+                                              {rightSideText}
+                                            </ThemedText>
+                                          </TouchableOpacity>
+                                          <View style={[styles.sourceBadge, { 
+                                            backgroundColor: isCustom ? colors.tint + '20' : '#3B82F6' + '20',
+                                            borderColor: isCustom ? colors.tint + '40' : '#3B82F6' + '40',
+                                            marginLeft: 6
+                                          }]}>
+                                            <ThemedText style={[styles.sourceBadgeText, { 
+                                              color: isCustom ? colors.tint : '#3B82F6'
+                                            }]}>
+                                              {isCustom ? 'Custom' : 'Database'}
+                                            </ThemedText>
+                                          </View>
+                                          <TouchableOpacity
+                                            style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                            onPress={() => handleQuickAdd(food)}
+                                            activeOpacity={0.7}
+                                            accessibilityLabel={t('mealtype_log.quick_add')}
+                                            accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                          >
+                                            <IconSymbol
+                                              name="plus.circle.fill"
+                                              size={22}
+                                              color={colors.tint}
+                                            />
+                                          </TouchableOpacity>
+                                        </View>
+                                      </View>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+                            ) : (
+                              <View style={styles.emptyTabState}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
+                                  {t('mealtype_log.recent_foods.empty')}
+                                </ThemedText>
+                                <ThemedText style={[styles.emptyTabSubtext, { color: colors.icon }]}>
+                                  {t('mealtype_log.recent_foods.hint')}
+                                </ThemedText>
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    );
+                  
+                  case 'custom':
+                    return (
+                      <View style={styles.tabContent}>
+                        {!searchQuery && (
+                          <>
+                            {/* Create New Custom Food Button */}
+                            <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('custom'), borderColor: colors.icon + '20', marginBottom: customFoodsLoading || customFoods.length === 0 ? 0 : 0 }]}>
+                              <TouchableOpacity
+                                style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15', backgroundColor: colors.tint + '10' }]}
+                                onPress={() => {
+                                  router.push({
+                                    pathname: '/create-custom-food',
+                                    params: {
+                                      mealType: mealType || 'breakfast',
+                                      entryDate: entryDate || getLocalDateString(),
+                                    },
+                                  });
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
+                                  <ThemedText style={[styles.searchResultName, { color: colors.tint, fontWeight: '700', flex: 1 }]}>
+                                    {t('mealtype_log.custom_foods.create_new')}
+                                  </ThemedText>
+                                  {customFoods.length > 0 && (
+                                    <TouchableOpacity
+                                      onPress={() => {
+                                        if (customFoodEditMode) {
+                                          handleExitCustomFoodEditMode();
+                                        } else {
+                                          setCustomFoodEditMode(true);
+                                        }
+                                      }}
+                                      style={[styles.editButton, { 
+                                        backgroundColor: customFoodEditMode ? '#10B981' + '20' : colors.tint + '20', 
+                                        borderColor: customFoodEditMode ? '#10B981' + '40' : colors.tint + '40' 
+                                      }]}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Text style={[styles.editButtonText, { 
+                                        color: customFoodEditMode ? '#10B981' : colors.tint 
+                                      }]}>
+                                        {customFoodEditMode ? '✓' : '✏️'}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                              </TouchableOpacity>
                             </View>
+
+                            {customFoodsLoading ? (
+                              <View style={styles.emptyTabState}>
+                                <ActivityIndicator size="large" color={colors.tint} />
+                                <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 12 }]}>
+                                  {t('mealtype_log.custom_foods.loading')}
+                                </ThemedText>
+                              </View>
+                            ) : customFoods.length > 0 ? (
+                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('custom'), borderColor: colors.icon + '20' }]}>
+                                <ScrollView 
+                                  style={styles.searchResultsList}
+                                  nestedScrollEnabled
+                                  keyboardShouldPersistTaps="handled"
+                                >
+                                  {(() => {
+                                    let sortedFoods;
+                                    if (customFoodEditMode) {
+                                      sortedFoods = [...customFoods];
+                                      const newlyAddedIndex = sortedFoods.findIndex(f => f.id === newlyAddedFoodId.current || f.id === newlyEditedFoodId.current);
+                                      if (newlyAddedIndex > 0) {
+                                        const newlyAdded = sortedFoods.splice(newlyAddedIndex, 1)[0];
+                                        sortedFoods.unshift(newlyAdded);
+                                      }
+                                    } else {
+                                      sortedFoods = [...customFoods].sort((a, b) => {
+                                        if (newlyAddedFoodId.current === a.id || newlyEditedFoodId.current === a.id) return -1;
+                                        if (newlyAddedFoodId.current === b.id || newlyEditedFoodId.current === b.id) return 1;
+                                        const indexA = customFoods.findIndex(f => f.id === a.id);
+                                        const indexB = customFoods.findIndex(f => f.id === b.id);
+                                        return indexA - indexB;
+                                      });
+                                    }
+                                    
+                                    return sortedFoods.map((food) => {
+                                      const isNewlyAdded = newlyAddedFoodId.current === food.id;
+                                      const isNewlyEdited = newlyEditedFoodId.current === food.id;
+                                      const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                      const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                      const rightSideText = `${brandText}${nutritionInfo}`;
+                                      
+                                      return (
+                                        <View
+                                          key={food.id}
+                                          style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                        >
+                                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <TouchableOpacity
+                                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, opacity: customFoodEditMode ? 0.6 : 1 }}
+                                              onPress={() => {
+                                                if (!customFoodEditMode) {
+                                                  handleFoodSelect(food);
+                                                }
+                                              }}
+                                              disabled={customFoodEditMode}
+                                              activeOpacity={0.7}
+                                            >
+                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                                <ThemedText 
+                                                  style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                                  numberOfLines={1}
+                                                  ellipsizeMode="tail"
+                                                >
+                                                  {truncatedName}
+                                                </ThemedText>
+                                                {isNewlyAdded && (
+                                                  <View style={[styles.justAddedBadge, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
+                                                    <ThemedText style={[styles.justAddedText, { color: colors.tint }]}>
+                                                      just added
+                                                    </ThemedText>
+                                                  </View>
+                                                )}
+                                                {isNewlyEdited && (
+                                                  <View style={[styles.justAddedBadge, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
+                                                    <ThemedText style={[styles.justAddedText, { color: colors.tint }]}>
+                                                      just edited
+                                                    </ThemedText>
+                                                  </View>
+                                                )}
+                                              </View>
+                                              {!customFoodEditMode && (
+                                                <ThemedText 
+                                                  style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                                  numberOfLines={1}
+                                                >
+                                                  {rightSideText}
+                                                </ThemedText>
+                                              )}
+                                            </TouchableOpacity>
+                                          </View>
+                                          {customFoodEditMode && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
+                                              <TouchableOpacity
+                                                style={[
+                                                  styles.editButton, 
+                                                  { 
+                                                    backgroundColor: colors.icon + '20', 
+                                                    borderColor: colors.icon + '40', 
+                                                    marginRight: 4, 
+                                                    paddingHorizontal: 8, 
+                                                    paddingVertical: 4,
+                                                    opacity: sortedFoods.findIndex(f => f.id === food.id) === 0 ? 0.5 : 1,
+                                                  }
+                                                ]}
+                                                onPress={() => handleMoveCustomFoodUp(food.id)}
+                                                disabled={sortedFoods.findIndex(f => f.id === food.id) === 0}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[
+                                                  styles.editButton, 
+                                                  { 
+                                                    backgroundColor: colors.icon + '20', 
+                                                    borderColor: colors.icon + '40', 
+                                                    marginRight: 6, 
+                                                    paddingHorizontal: 8, 
+                                                    paddingVertical: 4,
+                                                    opacity: sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1 ? 0.5 : 1,
+                                                  }
+                                                ]}
+                                                onPress={() => handleMoveCustomFoodDown(food.id)}
+                                                disabled={sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                                                onPress={() => handleDeleteCustomFood(food)}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}
+                                                onPress={() => {
+                                                  router.push({
+                                                    pathname: '/create-custom-food',
+                                                    params: {
+                                                      mealType: mealType || 'breakfast',
+                                                      entryDate: entryDate || getLocalDateString(),
+                                                      foodId: food.id,
+                                                    },
+                                                  });
+                                                }}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.tint }]}>✏️</Text>
+                                              </TouchableOpacity>
+                                            </View>
+                                          )}
+                                          {!customFoodEditMode && (
+                                            <>
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginLeft: 6 }]}
+                                                onPress={() => {
+                                                  router.push({
+                                                    pathname: '/create-custom-food',
+                                                    params: {
+                                                      mealType: mealType || 'breakfast',
+                                                      entryDate: entryDate || getLocalDateString(),
+                                                      cloneFoodId: food.id,
+                                                    },
+                                                  });
+                                                }}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.tint }]}>⧉</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                                onPress={() => handleQuickAdd(food)}
+                                                activeOpacity={0.7}
+                                                accessibilityLabel={t('mealtype_log.quick_add')}
+                                                accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                              >
+                                                <IconSymbol
+                                                  name="plus.circle.fill"
+                                                  size={22}
+                                                  color={colors.tint}
+                                                />
+                                              </TouchableOpacity>
+                                            </>
+                                          )}
+                                        </View>
+                                      );
+                                    });
+                                  })()}
+                                </ScrollView>
+                              </View>
+                            ) : (
+                              <View style={styles.emptyTabState}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
+                                  {t('mealtype_log.custom_foods.empty')}
+                                </ThemedText>
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    );
+                  
+                  case 'bundle':
+                    return (
+                      <View style={styles.tabContent}>
+                        {/* Create New Bundle Button */}
+                        <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20', marginBottom: bundlesLoading || bundles.length === 0 ? 0 : 0 }]}>
+                          <TouchableOpacity
+                            style={[
+                              styles.searchResultItem, 
+                              { 
+                                borderBottomColor: colors.icon + '15', 
+                                backgroundColor: bundles.length >= 20 ? colors.icon + '20' : colors.tint + '10',
+                                opacity: bundles.length >= 20 ? 0.6 : 1,
+                              }
+                            ]}
+                            onPress={() => {
+                              if (bundles.length >= 20) {
+                                Alert.alert(t('alerts.limit_reached'), t('mealtype_log.bundles.limit_reached'));
+                                return;
+                              }
+                              router.push({
+                                pathname: '/create-bundle',
+                                params: {
+                                  mealType: mealType || 'breakfast',
+                                  entryDate: entryDate || new Date().toISOString().split('T')[0],
+                                },
+                              });
+                            }}
+                            disabled={bundles.length >= 20}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
+                              <ThemedText style={[
+                                styles.searchResultName, 
+                                { 
+                                  color: bundles.length >= 20 ? colors.icon : colors.tint, 
+                                  fontWeight: '700',
+                                  flex: 1,
+                                }
+                              ]}>
+                                {t('mealtype_log.bundles.create_new')}{' '}
+                                <ThemedText style={{
+                                  fontWeight: '400',
+                                  fontSize: 13,
+                                  color: bundles.length >= 20 ? colors.icon + '80' : colors.tint + 'CC',
+                                }}>
+                                  {t('mealtype_log.bundles.bundles_count', { count: bundles.length })}
+                                </ThemedText>
+                              </ThemedText>
+                              {bundles.length > 0 && (
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    if (bundleEditMode) {
+                                      handleExitBundleEditMode();
+                                    } else {
+                                      setBundleEditMode(true);
+                                    }
+                                  }}
+                                  style={[styles.editButton, { 
+                                    backgroundColor: bundleEditMode ? '#10B981' + '20' : colors.tint + '20', 
+                                    borderColor: bundleEditMode ? '#10B981' + '40' : colors.tint + '40' 
+                                  }]}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={[styles.editButtonText, { 
+                                    color: bundleEditMode ? '#10B981' : colors.tint 
+                                  }]}>
+                                    {bundleEditMode ? '✓' : '✏️'}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+
+                        {bundlesLoading ? (
+                          <View style={styles.emptyTabState}>
+                            <ActivityIndicator size="large" color={colors.tint} />
+                            <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 12 }]}>
+                              {t('mealtype_log.bundles.loading')}
+                            </ThemedText>
                           </View>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                ) : null}
-              </>
-            )}
-          </View>
+                        ) : bundles.length > 0 ? (
+                          <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20' }]}>
+                            <ScrollView 
+                              style={styles.searchResultsList}
+                              nestedScrollEnabled
+                              keyboardShouldPersistTaps="handled"
+                            >
+                              {bundles.map((bundle) => (
+                                <HighlightableItem
+                                  key={bundle.id}
+                                  isHighlighted={isBundleNewlyAdded(bundle.id)}
+                                  animationValue={getBundleAnimationValue(bundle.id)}
+                                  style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                >
+                                  <View style={{ flex: 1, minWidth: 0 }}>
+                                    <ThemedText 
+                                      style={[styles.searchResultName, { color: colors.text, flexShrink: 1, marginBottom: bundleEditMode ? 0 : 4 }]}
+                                      numberOfLines={1}
+                                      ellipsizeMode="tail"
+                                    >
+                                      {bundle.name}{' '}
+                                      <ThemedText style={{ color: colors.icon, fontSize: 11 }}>
+                                        ({bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'})
+                                      </ThemedText>
+                                    </ThemedText>
+                                    {!bundleEditMode && (
+                                      <>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                                          {bundle.totalCalories !== undefined && (
+                                            <ThemedText style={[styles.searchResultNutrition, { color: colors.tint, fontSize: 12, fontWeight: '600' }]}>
+                                              {bundle.totalCalories} kcal
+                                            </ThemedText>
+                                          )}
+                                          {(bundle.totalProtein || bundle.totalCarbs || bundle.totalFat || bundle.totalFiber) && (
+                                            <>
+                                              <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 8 }]}>
+                                                •
+                                              </ThemedText>
+                                              {bundle.totalProtein ? (
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                  P: {bundle.totalProtein}g
+                                                </ThemedText>
+                                              ) : null}
+                                              {bundle.totalCarbs ? (
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                  C: {bundle.totalCarbs}g
+                                                </ThemedText>
+                                              ) : null}
+                                              {bundle.totalFat ? (
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                  Fat: {bundle.totalFat}g
+                                                </ThemedText>
+                                              ) : null}
+                                              {bundle.totalFiber ? (
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                  Fib: {bundle.totalFiber}g
+                                                </ThemedText>
+                                              ) : null}
+                                            </>
+                                          )}
+                                        </View>
+                                        <ThemedText 
+                                          style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginTop: 2 }]}
+                                          numberOfLines={3}
+                                          ellipsizeMode="tail"
+                                        >
+                                          {formatBundleItemsList(bundle)}
+                                        </ThemedText>
+                                      </>
+                                    )}
+                                  </View>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                                    {bundleEditMode ? (
+                                      <>
+                                        <TouchableOpacity
+                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                          onPress={() => handleMoveBundleUp(bundle.id)}
+                                          disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                          onPress={() => handleMoveBundleDown(bundle.id)}
+                                          disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                          style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                                          onPress={() => handleDeleteBundle(bundle)}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                          style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginRight: 6 }]}
+                                          onPress={() => {
+                                            router.push({
+                                              pathname: '/create-bundle',
+                                              params: {
+                                                mealType: mealType || 'breakfast',
+                                                entryDate: entryDate || getLocalDateString(),
+                                                bundleId: bundle.id,
+                                              },
+                                            });
+                                          }}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Text style={[styles.editButtonText, { color: colors.tint }]}>✏️</Text>
+                                        </TouchableOpacity>
+                                      </>
+                                    ) : (
+                                      <TouchableOpacity
+                                        style={{ 
+                                          backgroundColor: loading ? colors.icon + '60' : colors.tint, 
+                                          paddingHorizontal: 14, 
+                                          paddingVertical: 8, 
+                                          borderRadius: 8,
+                                          opacity: loading ? 0.7 : (colorScheme === 'dark' ? 0.75 : 1),
+                                          ...Platform.select({
+                                            web: {
+                                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                                              transition: 'all 0.2s ease',
+                                              cursor: loading ? 'not-allowed' : 'pointer',
+                                            },
+                                            default: {
+                                              shadowOffset: { width: 0, height: 4 },
+                                              shadowOpacity: colorScheme === 'dark' ? 0.4 : 0.25,
+                                              shadowRadius: 8,
+                                              elevation: 5,
+                                            },
+                                          }),
+                                        }}
+                                        onPress={() => {
+                                          if (!loading) {
+                                            handleAddBundleToMeal(bundle);
+                                          }
+                                        }}
+                                        disabled={loading}
+                                        activeOpacity={0.7}
+                                        accessibilityLabel={t('mealtype_log.add_bundle.label')}
+                                        accessibilityHint={t('mealtype_log.add_bundle.hint')}
+                                      >
+                                        <ThemedText style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
+                                          {t('mealtype_log.add_bundle.button')}
+                                        </ThemedText>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                </HighlightableItem>
+                              ))}
+                            </ScrollView>
+                          </View>
+                        ) : (
+                          <View style={styles.emptyTabState}>
+                            <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
+                              {t('mealtype_log.bundles.empty')}
+                            </ThemedText>
+                            <ThemedText style={[styles.emptyTabSubtext, { color: colors.icon }]}>
+                              {t('mealtype_log.bundles.hint')}
+                            </ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  
+                  case 'manual':
+                    return null; // Manual mode is handled separately
+                  
+                  default:
+                    return null;
+                }
+              }}
+            />
+          </>
         )}
 
-        {activeTab === 'recent' && (
-          <View style={styles.tabContent}>
-            {/* Recent Foods List - only show when not searching */}
-            {!searchQuery && (
-              <>
-                {recentFoodsLoading ? (
+        {/* Add/Edit Form - Show when a food is selected, when editing, or in manual mode */}
                   <View style={styles.emptyTabState}>
                     <ActivityIndicator size="small" color={colors.tint} />
                     <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 8 }]}>
@@ -3939,6 +4104,20 @@ export default function LogFoodScreen() {
                                   {isCustom ? 'Custom' : 'Database'}
                                 </ThemedText>
                               </View>
+                              {/* Quick Add Button */}
+                              <TouchableOpacity
+                                style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                onPress={() => handleQuickAdd(food)}
+                                activeOpacity={0.7}
+                                accessibilityLabel={t('mealtype_log.quick_add')}
+                                accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                              >
+                                <IconSymbol
+                                  name="plus.circle.fill"
+                                  size={22}
+                                  color={colors.tint}
+                                />
+                              </TouchableOpacity>
                             </View>
                           </View>
                         );
@@ -3960,7 +4139,7 @@ export default function LogFoodScreen() {
           </View>
         )}
 
-        {activeTab === 'custom' && (
+        {activeTab === 'custom' && !tabContentCollapsed && (
           <View style={styles.tabContent}>
             {/* Custom Foods Content - only show when not searching */}
             {!searchQuery && (
@@ -4185,23 +4364,39 @@ export default function LogFoodScreen() {
                             )}
                             {/* Clone button - shown in non-edit mode */}
                             {!customFoodEditMode && (
-                              <TouchableOpacity
-                                style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginLeft: 6 }]}
-                                onPress={() => {
-                                  // Navigate to create-custom-food page for cloning
-                                  router.push({
-                                    pathname: '/create-custom-food',
-                                    params: {
-                                      mealType: mealType || 'breakfast',
-                                      entryDate: entryDate || getLocalDateString(),
-                                      cloneFoodId: food.id, // Pass food ID for cloning
-                                    },
-                                  });
-                                }}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={[styles.editButtonText, { color: colors.tint }]}>⧉</Text>
-                              </TouchableOpacity>
+                              <>
+                                <TouchableOpacity
+                                  style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginLeft: 6 }]}
+                                  onPress={() => {
+                                    // Navigate to create-custom-food page for cloning
+                                    router.push({
+                                      pathname: '/create-custom-food',
+                                      params: {
+                                        mealType: mealType || 'breakfast',
+                                        entryDate: entryDate || getLocalDateString(),
+                                        cloneFoodId: food.id, // Pass food ID for cloning
+                                      },
+                                    });
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={[styles.editButtonText, { color: colors.tint }]}>⧉</Text>
+                                </TouchableOpacity>
+                                {/* Quick Add Button */}
+                                <TouchableOpacity
+                                  style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                  onPress={() => handleQuickAdd(food)}
+                                  activeOpacity={0.7}
+                                  accessibilityLabel={t('mealtype_log.quick_add')}
+                                  accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                >
+                                  <IconSymbol
+                                    name="plus.circle.fill"
+                                    size={22}
+                                    color={colors.tint}
+                                  />
+                                </TouchableOpacity>
+                              </>
                             )}
                           </View>
                           );
@@ -4220,7 +4415,7 @@ export default function LogFoodScreen() {
             )}
           </View>
         )}
-        {activeTab === 'bundle' && (
+        {activeTab === 'bundle' && !tabContentCollapsed && (
           <View style={styles.tabContent}>
             {/* Create New Bundle Button - Always visible */}
             <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20', marginBottom: bundlesLoading || bundles.length === 0 ? 0 : 0 }]}>
@@ -4321,7 +4516,10 @@ export default function LogFoodScreen() {
                           numberOfLines={1}
                           ellipsizeMode="tail"
                         >
-                          {bundle.name}
+                          {bundle.name}{' '}
+                          <ThemedText style={{ color: colors.icon, fontSize: 11 }}>
+                            ({bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'})
+                          </ThemedText>
                         </ThemedText>
                         {!bundleEditMode && (
                           <>
@@ -4364,7 +4562,7 @@ export default function LogFoodScreen() {
                               numberOfLines={3}
                               ellipsizeMode="tail"
                             >
-                              {bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'}: {formatBundleItemsList(bundle)}
+                              {formatBundleItemsList(bundle)}
                             </ThemedText>
                           </>
                         )}
@@ -4474,7 +4672,7 @@ export default function LogFoodScreen() {
             )}
           </View>
         )}
-        {activeTab === 'manual' && !isManualMode && (
+        {activeTab === 'manual' && !isManualMode && !tabContentCollapsed && (
           <View style={styles.tabContent}>
             <View style={styles.emptyTabState}>
               <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
@@ -4482,18 +4680,6 @@ export default function LogFoodScreen() {
               </ThemedText>
               <ThemedText style={[styles.emptyTabSubtext, { color: colors.icon }]}>
                 {t('mealtype_log.manual_entry.hint')}
-              </ThemedText>
-            </View>
-          </View>
-        )}
-        {activeTab === 'favorite' && (
-          <View style={styles.tabContent}>
-            <View style={styles.emptyTabState}>
-              <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
-                {t('mealtype_log.favorites.title')}
-              </ThemedText>
-              <ThemedText style={[styles.emptyTabSubtext, { color: colors.icon }]}>
-                {t('mealtype_log.favorites.empty')}
               </ThemedText>
             </View>
           </View>
@@ -5416,19 +5602,14 @@ export default function LogFoodScreen() {
       )}
       
       {/* Barcode Scanner Modal */}
-      {console.log('Rendering modal, showBarcodeScanner:', showBarcodeScanner)}
       <Modal
         visible={showBarcodeScanner}
         animationType="slide"
         transparent={false}
         onRequestClose={() => {
-          console.log('Modal onRequestClose called');
           setShowBarcodeScanner(false);
           setScanned(false);
           setBarcodeScanning(false);
-        }}
-        onShow={() => {
-          console.log('Modal onShow called - modal is now visible');
         }}
       >
         <ThemedView style={styles.scannerContainer}>
@@ -5450,12 +5631,6 @@ export default function LogFoodScreen() {
             <View style={styles.scannerCloseButton} />
           </View>
           
-          {(() => {
-            console.log('[Modal Render] Permission state:', permission);
-            console.log('[Modal Render] Permission granted:', permission?.granted);
-            console.log('[Modal Render] Web camera permission granted:', webCameraPermissionGranted);
-            return null;
-          })()}
           {/* For web, use mode detection to show camera or file upload */}
           {/* For native, use expo-camera hook permission state */}
           {(() => {
@@ -5519,12 +5694,10 @@ export default function LogFoodScreen() {
                     onError={(error) => {
                       console.error('Web barcode scanner error:', error);
                     }}
-                    onCameraFailed={(error) => {
-                      console.log('Camera failed, switching to file upload:', error);
+                    onCameraFailed={() => {
                       setWebForceFileUpload(true);
                     }}
                     onSwitchToFileUpload={() => {
-                      console.log('User requested file upload mode');
                       setWebForceFileUpload(true);
                     }}
                     colors={{
@@ -5579,23 +5752,16 @@ export default function LogFoodScreen() {
                   }
                 ]}
                     onPress={async () => {
-                      console.log('=== Grant Permission button pressed ===');
-                  
                   if (requestingPermission) {
-                    console.log('Already requesting permission, ignoring click');
                     return;
                   }
                   
                   setRequestingPermission(true);
                       
                     try {
-                      console.log('Current permission state before request:', permission);
                       const result = await requestPermission();
                       
-                      console.log('Permission request completed. Result:', result);
-                      
                       if (!result) {
-                        console.error('Permission request returned null/undefined');
                         Alert.alert(
                           t('alerts.permission_error'),
                           t('mealtype_log.camera.permission_error'),
@@ -5606,12 +5772,9 @@ export default function LogFoodScreen() {
                       }
                       
                       if (result.granted) {
-                        console.log('✅ Permission granted!');
                         setForcePermissionCheck(prev => prev + 1);
                         setRequestingPermission(false);
                       } else {
-                        console.log('❌ Permission denied');
-                        
                         let message = t('mealtype_log.camera.permission_required_message');
                         
                         if (result.status === 'denied') {
@@ -5644,7 +5807,6 @@ export default function LogFoodScreen() {
                         setRequestingPermission(false);
                       }
                     } catch (error: any) {
-                      console.error('❌ Error requesting permission:', error);
                       Alert.alert(
                         t('alerts.error_title'),
                         t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
@@ -5779,6 +5941,21 @@ export default function LogFoodScreen() {
         cancelText={t('mealtype_log.delete_entry.cancel')}
         onConfirm={handleBundleDeleteConfirm}
         onCancel={handleBundleDeleteCancel}
+        confirmButtonStyle={{ backgroundColor: '#EF4444' }}
+      />
+
+      {/* Bundle Warning Modal - shown before delete confirmation if food is in bundles */}
+      <ConfirmModal
+        visible={bundleWarningVisible}
+        title={t('mealtype_log.delete_custom_food.bundle_warning_title')}
+        message={bundleWarningData ? t('mealtype_log.delete_custom_food.message_with_bundles', {
+          bundleCount: bundleWarningData.bundleCount,
+          bundleNames: bundleWarningData.bundleNames,
+        }) : ''}
+        confirmText={t('mealtype_log.delete_custom_food.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={handleBundleWarningConfirm}
+        onCancel={handleBundleWarningCancel}
         confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
 
@@ -6623,6 +6800,10 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     minHeight: 200,
+  },
+  collapsedHintText: {
+    fontSize: 11,
+    fontStyle: 'italic',
   },
   emptyTabState: {
     padding: 40,

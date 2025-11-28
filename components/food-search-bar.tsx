@@ -142,11 +142,26 @@ export function FoodSearchBar({
                   activeOpacity={0.7}
                 >
                   <View style={styles.searchResultContent}>
-                    <ThemedText
-                      style={[styles.searchResultName, { color: colors.text }]}
-                    >
-                      {food.name}
-                    </ThemedText>
+                    <View style={styles.searchResultNameRow}>
+                      <ThemedText
+                        style={[styles.searchResultName, { color: colors.text }]}
+                      >
+                        {food.name}
+                      </ThemedText>
+                      {/* CUSTOM badge - only show for custom foods */}
+                      {food.is_custom === true && (
+                        <View style={[styles.customBadge, { 
+                          backgroundColor: colors.tint + '20',
+                          borderColor: colors.tint + '40',
+                        }]}>
+                          <ThemedText style={[styles.customBadgeText, { 
+                            color: colors.tint
+                          }]}>
+                            CUSTOM
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
                     {food.brand && (
                       <ThemedText
                         style={[styles.searchResultBrand, { color: colors.icon }]}
@@ -258,6 +273,11 @@ const styles = StyleSheet.create({
   searchResultContent: {
     flex: 1,
   },
+  searchResultNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
   quickAddButton: {
     padding: 8,
     borderRadius: 8,
@@ -266,6 +286,18 @@ const styles = StyleSheet.create({
   searchResultName: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  customBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+    borderWidth: 1,
+    marginLeft: 6,
+  },
+  customBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   searchResultBrand: {
     fontSize: 12,

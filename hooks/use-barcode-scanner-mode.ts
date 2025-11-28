@@ -56,7 +56,6 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
     try {
       // Check if we're in a browser environment
       if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-        console.log('[BarcodeScannerMode] Not in browser environment');
         setMode('file-upload');
         setCameraAvailable(false);
         setIsChecking(false);
@@ -65,7 +64,6 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
 
       // Check if mediaDevices API is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.log('[BarcodeScannerMode] getUserMedia not supported');
         setMode('file-upload');
         setCameraAvailable(false);
         setIsChecking(false);
@@ -74,7 +72,6 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
 
       // Check if we're in a secure context (HTTPS or localhost)
       if (window.isSecureContext === false) {
-        console.log('[BarcodeScannerMode] Not a secure context - camera requires HTTPS');
         setError('Camera requires a secure connection (HTTPS)');
         setMode('file-upload');
         setCameraAvailable(false);
@@ -87,7 +84,6 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       
       if (videoDevices.length === 0) {
-        console.log('[BarcodeScannerMode] No camera devices found');
         setMode('file-upload');
         setCameraAvailable(false);
         setIsChecking(false);
@@ -102,7 +98,6 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
           });
           
           if (permissionStatus.state === 'denied') {
-            console.log('[BarcodeScannerMode] Camera permission denied');
             setError('Camera permission was denied. You can upload a photo instead.');
             setMode('file-upload');
             setCameraAvailable(false);
@@ -111,19 +106,17 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
           }
           
           // Permission is 'granted' or 'prompt' - camera is available
-          console.log('[BarcodeScannerMode] Camera available, permission:', permissionStatus.state);
           setMode('camera');
           setCameraAvailable(true);
           setIsChecking(false);
           return;
         } catch (permErr) {
           // Permission query failed (not supported in all browsers)
-          console.log('[BarcodeScannerMode] Permission query not supported, assuming camera available');
+          // Assume camera is available
         }
       }
 
       // If we got here, camera should be available
-      console.log('[BarcodeScannerMode] Camera appears available');
       setMode('camera');
       setCameraAvailable(true);
       setIsChecking(false);
@@ -145,7 +138,6 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
   }, [checkCameraAvailability]);
 
   const switchToFileUpload = useCallback(() => {
-    console.log('[BarcodeScannerMode] Manually switching to file upload');
     setMode('file-upload');
     setCameraAvailable(false);
   }, []);

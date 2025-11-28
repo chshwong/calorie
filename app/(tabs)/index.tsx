@@ -9,12 +9,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ageFromDob, bmi } from '@/utils/calculations';
-import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
 import { getBMICategory, getGreetingKey } from '@/utils/bmi';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER } from '@/utils/types';
-import type { CalorieEntry } from '@/utils/types';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
+import { fetchRecentFoods } from '@/lib/services/recentFoods';
+import { fetchCustomFoods } from '@/lib/services/customFoods';
+import { fetchBundles } from '@/lib/services/bundles';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -23,13 +28,11 @@ import {
 
 export default function HomeScreen() {
   const { t } = useTranslation();
-  const { profile, signOut, loading, retrying, user, isAdmin } = useAuth();
+  const { signOut, loading, retrying, user, isAdmin } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const [calorieEntries, setCalorieEntries] = useState<CalorieEntry[]>([]);
-  const [entriesLoading, setEntriesLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -111,6 +114,47 @@ export default function HomeScreen() {
     const day = String(selectedDate.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   })();
+
+  // Use React Query hooks for data fetching
+  const queryClient = useQueryClient();
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  const { data: calorieEntries = [], isLoading: entriesLoading, refetch: refetchEntries } = useDailyEntries(selectedDateString);
+  
+  // Background prefetch for mealtype-log tab data (after Home data is ready)
+  // Use default meal type 'late_night' (same as mealtype-log default)
+  const defaultMealType = 'late_night';
+  useEffect(() => {
+    if (!user?.id || entriesLoading) return; // Wait until Home's own data is ready
+    
+    // Silently prefetch tab data in the background
+    queryClient.prefetchQuery({
+      queryKey: ['frequentFoods', user.id, defaultMealType],
+      queryFn: () => fetchFrequentFoods(user.id, defaultMealType),
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    });
+    
+    queryClient.prefetchQuery({
+      queryKey: ['recentFoods', user.id, defaultMealType],
+      queryFn: () => fetchRecentFoods(user.id, defaultMealType),
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    });
+    
+    queryClient.prefetchQuery({
+      queryKey: ['customFoods', user.id],
+      queryFn: () => fetchCustomFoods(user.id),
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    });
+    
+    queryClient.prefetchQuery({
+      queryKey: ['bundles', user.id],
+      queryFn: () => fetchBundles(user.id),
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    });
+  }, [user?.id, entriesLoading, queryClient]);
 
   // Function to go back one day
   const goBackOneDay = () => {
@@ -200,36 +244,13 @@ export default function HomeScreen() {
     return date.getTime() === selected.getTime();
   };
 
-  // Fetch calorie entries function - uses data service layer per engineering guidelines
-  const fetchEntries = useCallback(async (isRefresh = false) => {
-    if (!user?.id) {
-      setEntriesLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
-    try {
-      if (!isRefresh) {
-        setEntriesLoading(true);
-      }
-      
-      // Use data service layer instead of direct Supabase calls (guideline 3.1)
-      const entries = await getEntriesForDate(user.id, selectedDateString);
-      setCalorieEntries(entries);
-    } catch (error) {
-      setCalorieEntries([]);
-    } finally {
-      setEntriesLoading(false);
-      setRefreshing(false);
-    }
-  }, [user?.id, selectedDateString]);
-
   // Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
     if (refreshing) return; // Prevent multiple simultaneous refreshes
     setRefreshing(true);
-    await fetchEntries(true);
-  }, [fetchEntries, refreshing]);
+    await refetchEntries();
+    setRefreshing(false);
+  }, [refetchEntries, refreshing]);
 
   // Web-specific pull-to-refresh using scroll position detection
   // For web, we'll use onScroll to detect when user scrolls past top and trigger refresh
@@ -301,16 +322,11 @@ export default function HomeScreen() {
     storage.setBoolean(STORAGE_KEYS.SUMMARY_EXPANDED, newValue);
   };
 
-  // Fetch calorie entries for selected date - MUST be before early returns (Rules of Hooks)
-  useEffect(() => {
-    fetchEntries();
-  }, [fetchEntries]);
-
   // Refresh entries when page comes into focus (e.g., returning from mealtype-log page)
   const isInitialMount = useRef(true);
   useFocusEffect(
     useCallback(() => {
-      // Skip on initial mount since useEffect already handles it
+      // Skip on initial mount since React Query handles initial fetch
       if (isInitialMount.current) {
         isInitialMount.current = false;
         return;
@@ -318,16 +334,16 @@ export default function HomeScreen() {
       // Small delay to ensure database writes are committed
       const timer = setTimeout(() => {
         if (user?.id) {
-          fetchEntries();
+          refetchEntries();
         }
       }, 300);
       return () => clearTimeout(timer);
-    }, [user?.id, fetchEntries])
+    }, [user?.id, refetchEntries])
   );
 
   // Only show error if profile is truly missing after all attempts (not loading, not retrying, and user exists)
   // Otherwise, keep UI visible and let background loading/retries happen silently
-  if (!profile && !loading && !retrying && user) {
+  if (!profile && !profileLoading && !loading && !retrying && user) {
     return (
       <ThemedView style={[styles.container, styles.centerContent]}>
         <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center' }}>
@@ -348,7 +364,7 @@ export default function HomeScreen() {
 
   // Show a minimal loading modal if profile is not loaded yet
   // This keeps the main UI stable while loading/retrying happens in background
-  const showLoadingModal = !profile && (loading || retrying);
+  const showLoadingModal = !profile && (profileLoading || loading || retrying);
 
   // If no profile yet, show empty UI with loading modal
   if (!profile) {

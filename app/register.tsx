@@ -522,7 +522,6 @@ export default function RegisterScreen() {
       let profileError = null;
       
       try {
-        console.log('Attempting to call create_user_profile function...');
         const { data: functionData, error: functionError } = await supabase.rpc('create_user_profile', {
           p_user_id: authData.user.id,
           p_first_name: firstName.trim(),
@@ -539,7 +538,6 @@ export default function RegisterScreen() {
           console.error('Function error:', functionError);
           // Check if function doesn't exist
           if (functionError.message?.includes('function') && functionError.message?.includes('does not exist')) {
-            console.log('Function does not exist, will try direct insert');
             profileError = functionError;
           } else if (functionError.code === '42501') {
             // Permission denied - function exists but no permission
@@ -549,7 +547,6 @@ export default function RegisterScreen() {
             profileError = functionError;
           }
         } else {
-          console.log('Function succeeded, fetching profile...');
           // Function succeeded, fetch the profile to verify
           const { data: fetchedProfile, error: fetchError } = await supabase
             .from('profiles')
@@ -562,10 +559,8 @@ export default function RegisterScreen() {
             // Even if fetch fails, the function succeeded, so profile was created
             // This might be a timing issue - profile exists but not yet readable
             profileInsertData = { success: true };
-            console.log('Profile created via function (fetch failed but creation succeeded)');
           } else {
             profileInsertData = fetchedProfile;
-            console.log('Profile created successfully via function');
           }
         }
       } catch (e: any) {
@@ -576,7 +571,6 @@ export default function RegisterScreen() {
       
       // If function failed or doesn't exist, try direct insert
       if (!profileInsertData) {
-        console.log('Attempting direct insert...');
         const result = await supabase
           .from('profiles')
           .insert(profileData)
@@ -586,8 +580,6 @@ export default function RegisterScreen() {
         
         if (result.error) {
           console.error('Direct insert error:', result.error);
-        } else {
-          console.log('Profile created successfully via direct insert');
         }
       }
       
@@ -597,7 +589,6 @@ export default function RegisterScreen() {
         
         if (profileError.message?.includes('row-level security') || profileError.message?.includes('RLS')) {
           // Try one more time with a longer wait
-          console.log('RLS error detected, retrying after longer wait...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Try direct insert one more time

@@ -712,8 +712,10 @@
     
     "delete_custom_food": {
       "title": "Supprimer l'aliment personnalisé",
+      "bundle_warning_title": "Trouvé dans les Bundles",
       "message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\"? Cette action est irréversible.",
       "message_generic": "Êtes-vous sûr de vouloir supprimer cet aliment personnalisé? Cette action est irréversible.",
+      "message_with_bundles": "Cet élément est associé à {{bundleCount}} de vos Bundles :\n\n{{bundleNames}}\n\nLe supprimer le retirera de tous les Bundles associés. Êtes-vous sûr de vouloir supprimer ?",
       "confirm": "Supprimer",
       "cancel": "Annuler"
     },

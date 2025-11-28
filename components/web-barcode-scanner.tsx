@@ -31,8 +31,6 @@ function loadHtml5QrcodeFromCDN(): Promise<void> {
     script.onload = () => {
       Html5Qrcode = (window as any).Html5Qrcode;
       Html5QrcodeSupportedFormats = (window as any).Html5QrcodeSupportedFormats;
-      console.log('[WebScanner] html5-qrcode loaded from CDN');
-      console.log('[WebScanner] Supported formats:', Html5QrcodeSupportedFormats);
       resolve();
     };
     script.onerror = () => {
@@ -129,8 +127,6 @@ export function WebBarcodeScanner({
           Html5QrcodeSupportedFormats.QR_CODE,
         ].filter(Boolean) : undefined;
 
-        console.log('[WebScanner] Formats to support:', formatsToSupport);
-
         // Create scanner instance with explicit format configuration
         const scannerConfig: any = {
           verbose: false,
@@ -158,9 +154,6 @@ export function WebBarcodeScanner({
             if (scannedRef.current) return;
             scannedRef.current = true;
             
-            console.log('Barcode detected:', decodedText);
-            console.log('Barcode format:', decodedResult?.result?.format?.formatName);
-            
             // Map html5-qrcode format to expo-camera format
             const formatMap: Record<string, string> = {
               'EAN_13': 'ean13',
@@ -183,12 +176,7 @@ export function WebBarcodeScanner({
           },
           (errorMessage: string) => {
             // This is called continuously when no barcode is detected
-            // Only log errors that aren't "no barcode found"
-            if (!errorMessage.includes('No MultiFormat Readers') && 
-                !errorMessage.includes('No barcode') &&
-                !errorMessage.includes('NotFoundException')) {
-              console.warn('Scan error:', errorMessage);
-            }
+            // Silently ignore "no barcode found" errors
           }
         );
         
