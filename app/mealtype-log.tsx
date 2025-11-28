@@ -551,6 +551,7 @@ export default function LogFoodScreen() {
   
   // Barcode scanning state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [barcodeScannerKey, setBarcodeScannerKey] = useState(0); // Key to force remount
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [barcodeScanning, setBarcodeScanning] = useState(false);
@@ -604,6 +605,7 @@ export default function LogFoodScreen() {
   const scannedFoodDataParam = params.scannedFoodData; // JSON string for "Use Once" flow
   const manualEntryDataParam = params.manualEntryData; // JSON string for manual entry prefilling
   const openManualModeParam = params.openManualMode; // Flag to open manual mode
+  const openBarcodeScannerParam = params.openBarcodeScanner; // Flag to open barcode scanner
   const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual' || activeTabParam === 'favorite')
     ? activeTabParam
     : 'frequent';
@@ -2612,7 +2614,7 @@ export default function LogFoodScreen() {
         }
       }
 
-      // Handle manualEntryData - "Log as 1-time (Manual)" flow
+      // Handle manualEntryData - "1-time Log (Manual)" flow
       const manualData = Array.isArray(manualEntryDataParam) ? manualEntryDataParam[0] : manualEntryDataParam;
       const shouldOpenManual = Array.isArray(openManualModeParam) ? openManualModeParam[0] === 'true' : openManualModeParam === 'true';
       
@@ -2651,6 +2653,21 @@ export default function LogFoodScreen() {
 
     handleScannedFood();
   }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab]);
+
+  // Handle openBarcodeScanner param - open scanner when navigating from scanned-item "Scan Another"
+  useEffect(() => {
+    const shouldOpenScanner = Array.isArray(openBarcodeScannerParam) 
+      ? openBarcodeScannerParam[0] === 'true' 
+      : openBarcodeScannerParam === 'true';
+    
+    if (shouldOpenScanner && !showBarcodeScanner) {
+      console.log('[MealTypeLog] Opening barcode scanner from param');
+      setScanned(false); // Reset scanned state
+      setBarcodeScanning(false); // Reset scanning state
+      setShowBarcodeScanner(true);
+      setBarcodeScannerKey(prev => prev + 1); // Force remount
+    }
+  }, [openBarcodeScannerParam, showBarcodeScanner]);
 
   // Real-time validation function
   const validateFields = useCallback(() => {
@@ -2974,6 +2991,7 @@ export default function LogFoodScreen() {
       setScanned(false);
       setBarcodeScanning(false);
       setShowBarcodeScanner(true);
+      setBarcodeScannerKey(prev => prev + 1); // Force remount
       console.log('Scanner modal opened');
       
       // If permission is already granted, the camera will show immediately
@@ -5461,8 +5479,9 @@ export default function LogFoodScreen() {
               // File upload mode (no camera available or user chose file upload)
               if (effectiveMode === 'file-upload') {
                 return (
-                  <View style={styles.scannerContent}>
+                  <View style={styles.scannerContent} key={`file-upload-${showBarcodeScanner}`}>
                     <BarcodeFileUpload
+                      key={`barcode-upload-${barcodeScannerKey}`}
                       onBarcodeScanned={scanned ? () => {} : handleBarcodeScanned}
                       onError={(error) => {
                         console.error('File upload barcode scanner error:', error);

@@ -150,6 +150,7 @@ function ThemeProviderWrapper() {
           <Stack.Screen name="mealtype-log" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />
+          <Stack.Screen name="scanned-item" options={{ title: 'Scanned Item', presentation: 'modal' }} />
           <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
           <Stack.Screen name="my-goals" options={{ headerShown: false }} />

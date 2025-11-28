@@ -254,29 +254,51 @@ export function BarcodeFileUpload({
       processImage(file);
     }
     
-    // Reset input so same file can be selected again
-    if (input) {
-      input.value = '';
+    // Remove the input element after processing to ensure fresh input next time
+    // This is important because browsers may not fire change events for the same file
+    if (input && input.parentNode) {
+      input.remove();
+      if (fileInputRef.current === input) {
+        fileInputRef.current = null;
+      }
     }
   }, [processImage, onError, t]);
 
   const handleUploadClick = useCallback(() => {
     if (Platform.OS !== 'web') return;
     
-    // Create hidden file input if it doesn't exist
-    if (!fileInputRef.current) {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
-      input.addEventListener('change', handleFileSelect);
-      document.body.appendChild(input);
-      fileInputRef.current = input;
+    // Remove old input if it exists (forces fresh input each time)
+    if (fileInputRef.current) {
+      fileInputRef.current.removeEventListener('change', handleFileSelect);
+      fileInputRef.current.remove();
+      fileInputRef.current = null;
     }
+    
+    // Create fresh file input each time to ensure change event fires
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+    input.addEventListener('change', handleFileSelect);
+    document.body.appendChild(input);
+    fileInputRef.current = input;
     
     // Trigger file picker
     fileInputRef.current.click();
   }, [handleFileSelect]);
+
+  // Reset state when component mounts (e.g., when scanner reopens)
+  React.useEffect(() => {
+    setIsProcessing(false);
+    setError(null);
+    setSelectedFileName(null);
+    
+    // Clean up any existing file input from previous mount
+    if (fileInputRef.current && fileInputRef.current.parentNode) {
+      fileInputRef.current.remove();
+      fileInputRef.current = null;
+    }
+  }, []); // Empty dependency array - only run on mount
 
   // Cleanup on unmount
   React.useEffect(() => {

@@ -89,7 +89,15 @@ export default function ScannedItemScreen() {
   };
 
   const handleScanAnother = () => {
-    router.back();
+    // Navigate to mealtype-log with the same params and a flag to open the scanner
+    router.push({
+      pathname: '/mealtype-log',
+      params: {
+        mealType: mealType || 'breakfast',
+        entryDate: entryDate || new Date().toISOString().split('T')[0],
+        openBarcodeScanner: 'true',
+      },
+    });
   };
 
   // Use canonical food from food_master - navigate back with auto-select
@@ -142,7 +150,7 @@ export default function ScannedItemScreen() {
     }
   };
 
-  // Log as 1-time (Manual) - opens manual mode with prefilled data
+  // 1-time Log (Manual) - opens manual mode with prefilled data
   const handleLogAsManual = () => {
     if (!lookupResult) return;
     
@@ -240,19 +248,6 @@ export default function ScannedItemScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <View style={[styles.header, { borderBottomColor: colors.separator }]}>
-          <TouchableOpacity
-            style={[styles.backButton, getMinTouchTargetStyle()]}
-            onPress={handleGoBack}
-            activeOpacity={0.6}
-          >
-            <IconSymbol name="chevron.left" size={24} color={colors.text} decorative={true} />
-          </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>
-            {t('scanned_item.title', 'Scanned Item')}
-          </ThemedText>
-          <View style={styles.backButton} />
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.tint} />
           <ThemedText style={[styles.loadingText, { color: colors.text }]}>
@@ -269,29 +264,6 @@ export default function ScannedItemScreen() {
   // Render based on lookup result
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.separator }]}>
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            getMinTouchTargetStyle(),
-            { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-          ]}
-          onPress={handleGoBack}
-          activeOpacity={0.6}
-          {...getButtonAccessibilityProps(
-            t('common.go_back', 'Go back'),
-            t('common.go_back_hint', 'Double tap to go back')
-          )}
-        >
-          <IconSymbol name="chevron.left" size={24} color={colors.text} decorative={true} />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>
-          {t('scanned_item.title', 'Scanned Item')}
-        </ThemedText>
-        <View style={styles.backButton} />
-      </View>
-
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.content}>
         {/* Result display based on status */}
         {lookupResult && renderResult(lookupResult)}
@@ -317,7 +289,7 @@ export default function ScannedItemScreen() {
       case 'invalid_barcode':
         return renderInvalidBarcode(result);
       default:
-        console.warn('[ScannedItem] Unknown status, defaulting to not_found:', result.status);
+        console.warn('[ScannedItem] Unknown status, defaulting to not_found:', (result as any).status);
         return renderNotFound(result as any);
     }
   }
@@ -329,21 +301,15 @@ export default function ScannedItemScreen() {
       <>
         {/* Success Icon */}
         <View style={[styles.iconContainer, { backgroundColor: '#4CAF50' + '20' }]}>
-          <IconSymbol name="checkmark.circle.fill" size={64} color="#4CAF50" />
+          <IconSymbol name="checkmark.circle.fill" size={48} color="#4CAF50" />
         </View>
 
         <ThemedText style={styles.successText}>
           {t('scanned_item.found_in_database', 'Found in Database!')}
         </ThemedText>
 
-        <View style={[styles.sourceTag, { backgroundColor: '#4CAF50' + '20' }]}>
-          <ThemedText style={[styles.sourceTagText, { color: '#4CAF50' }]}>
-            {t('scanned_item.source_canonical', 'Canonical Food')}
-          </ThemedText>
-        </View>
-
         {/* Product info */}
-        <View style={[styles.productCard, { backgroundColor: colors.cardBackground, borderColor: colors.separator }]}>
+        <View style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.separator }]}>
           <ThemedText style={styles.productName}>{food.name}</ThemedText>
           {food.brand && (
             <ThemedText style={[styles.productBrand, { color: colors.icon }]}>
@@ -380,22 +346,22 @@ export default function ScannedItemScreen() {
             onPress={() => handleUseCanonicalFood(food.id)}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              t('scanned_item.use_this_food', 'Use This Food'),
-              t('scanned_item.use_this_food_hint', 'Add this food to your meal')
+              t('scanned_item.log_it', 'Log it'),
+              t('scanned_item.log_it_hint', 'Add this food to your meal')
             )}
           >
             <ThemedText style={styles.primaryButtonText}>
-              {t('scanned_item.use_this_food', 'Use This Food')}
+              {t('scanned_item.log_it', 'Log it')}
             </ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.secondaryButton, { borderColor: colors.tint }]}
-            onPress={handleScanAnother}
+            style={styles.textButton}
+            onPress={handleGoBack}
             activeOpacity={0.7}
           >
-            <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
-              {t('scanned_item.scan_another', 'Scan Another')}
+            <ThemedText style={[styles.textButtonText, { color: colors.icon }]}>
+              {t('common.go_back', 'Go Back')}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -430,21 +396,22 @@ export default function ScannedItemScreen() {
       <>
         {/* Success Icon */}
         <View style={[styles.iconContainer, { backgroundColor: colors.tint + '20' }]}>
-          <IconSymbol name="checkmark.circle.fill" size={64} color={colors.tint} />
+          <IconSymbol name="checkmark.circle.fill" size={48} color={colors.tint} />
         </View>
 
-        <ThemedText style={styles.successText}>
-          {t('scanned_item.found_from_source', 'Found from {{source}}', { source: sourceName })}
-        </ThemedText>
-
-        <View style={[styles.sourceTag, { backgroundColor: colors.tint + '20' }]}>
-          <ThemedText style={[styles.sourceTagText, { color: colors.tint }]}>
-            {sourceName}
+        <View style={styles.foundOnContainer}>
+          <ThemedText style={styles.foundOnText}>
+            {t('scanned_item.found_on', 'Found on')}{' '}
           </ThemedText>
+          <View style={[styles.sourceBadge, { backgroundColor: colors.tint + '20' }]}>
+            <ThemedText style={[styles.sourceBadgeText, { color: colors.tint }]}>
+              {sourceName}
+            </ThemedText>
+          </View>
         </View>
 
         {/* Product info */}
-        <View style={[styles.productCard, { backgroundColor: colors.cardBackground, borderColor: colors.separator }]}>
+        <View style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.separator }]}>
           <ThemedText style={styles.productName}>
             {cacheRow.product_name || t('scanned_item.unknown_product', 'Unknown Product')}
           </ThemedText>
@@ -536,18 +503,18 @@ export default function ScannedItemScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Secondary: Log as 1-time (Manual) */}
+          {/* Secondary: 1-time Log (Manual) */}
           <TouchableOpacity
             style={[styles.secondaryButton, { borderColor: colors.tint }]}
             onPress={handleLogAsManual}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              t('scanned_item.log_as_manual', 'Log as 1-time (Manual)'),
+              t('scanned_item.log_as_manual', '1-time Log (Manual)'),
               t('scanned_item.log_as_manual_hint', 'Log this food once without saving it')
             )}
           >
             <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
-              {t('scanned_item.log_as_manual', 'Log as 1-time (Manual)')}
+              {t('scanned_item.log_as_manual', '1-time Log (Manual)')}
             </ThemedText>
           </TouchableOpacity>
 
@@ -571,7 +538,7 @@ export default function ScannedItemScreen() {
       <>
         {/* Not Found Icon */}
         <View style={[styles.iconContainer, { backgroundColor: '#FF9800' + '20' }]}>
-          <IconSymbol name="questionmark.circle.fill" size={64} color="#FF9800" />
+          <IconSymbol name="questionmark.circle.fill" size={48} color="#FF9800" />
         </View>
 
         <ThemedText style={styles.notFoundText}>
@@ -580,7 +547,7 @@ export default function ScannedItemScreen() {
 
         <ThemedText style={[styles.notFoundDescription, { color: colors.icon }]}>
           {t('scanned_item.not_found_description', 
-            'This product was not found in our database or OpenFoodFacts. You can create a custom food entry with this barcode.'
+            'This product was not found in our databases.'
           )}
         </ThemedText>
 
@@ -596,26 +563,6 @@ export default function ScannedItemScreen() {
 
         {/* Actions */}
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: colors.tint }]}
-            onPress={handleCreateManualFood}
-            activeOpacity={0.7}
-          >
-            <ThemedText style={styles.primaryButtonText}>
-              {t('scanned_item.create_custom', 'Create Custom Food')}
-            </ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.secondaryButton, { borderColor: colors.tint }]}
-            onPress={handleScanAnother}
-            activeOpacity={0.7}
-          >
-            <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
-              {t('scanned_item.scan_another', 'Scan Another')}
-            </ThemedText>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.textButton}
             onPress={handleGoBack}
@@ -635,7 +582,7 @@ export default function ScannedItemScreen() {
       <>
         {/* Error Icon */}
         <View style={[styles.iconContainer, { backgroundColor: '#f44336' + '20' }]}>
-          <IconSymbol name="xmark.circle.fill" size={64} color="#f44336" />
+          <IconSymbol name="xmark.circle.fill" size={48} color="#f44336" />
         </View>
 
         <ThemedText style={styles.errorTitle}>
@@ -719,29 +666,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
   loadingText: {
     fontSize: 16,
@@ -756,16 +686,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   successText: {
     fontSize: 24,
@@ -783,7 +714,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     lineHeight: 20,
   },
   errorTitle: {
@@ -797,8 +728,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     lineHeight: 20,
+  },
+  foundOnContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  foundOnText: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  sourceBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 6,
+  },
+  sourceBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sourceTag: {
     paddingHorizontal: 12,
@@ -812,27 +764,28 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: '100%',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   productName: {
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
     textAlign: 'center',
   },
   productBrand: {
     fontSize: 14,
-    marginBottom: 16,
+    marginBottom: 8,
     textAlign: 'center',
   },
   nutritionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
-    marginTop: 12,
+    marginTop: 8,
   },
   nutritionItem: {
     alignItems: 'center',
@@ -854,7 +807,7 @@ const styles = StyleSheet.create({
   servingInfo: {
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 8,
   },
   servingSizeHint: {
     fontSize: 11,
@@ -864,11 +817,12 @@ const styles = StyleSheet.create({
   },
   barcodeContainer: {
     width: '100%',
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   barcodeLabel: {
     fontSize: 11,
@@ -889,11 +843,11 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     width: '100%',
-    gap: 12,
+    gap: 8,
   },
   primaryButton: {
     width: '100%',
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -906,7 +860,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     width: '100%',
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 2,
@@ -926,7 +880,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     lineHeight: 18,
   },
   errorContainer: {
