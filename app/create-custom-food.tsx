@@ -11,6 +11,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getLocalDateString } from '@/utils/calculations';
+import {
+  getButtonAccessibilityProps,
+  getMinTouchTargetStyle,
+  getFocusStyle,
+} from '@/utils/accessibility';
 
 // Weight units (for mandatory serving)
 const WEIGHT_UNITS = [
@@ -116,6 +121,18 @@ export default function CreateCustomFoodScreen() {
   const MAX_QUANTITY = 100000;
   const MAX_CALORIES = 5000;
   const MAX_MACRO = 2000;
+
+  // Clear foodName error on mount to ensure clean start (no initial error message)
+  useEffect(() => {
+    setErrors(prev => {
+      if (prev.foodName) {
+        const newErrors = { ...prev };
+        delete newErrors.foodName;
+        return newErrors;
+      }
+      return prev;
+    });
+  }, []); // Only run on mount
 
   // Load food data for editing
   useEffect(() => {
@@ -358,16 +375,12 @@ export default function CreateCustomFoodScreen() {
     return quantity * factor;
   };
 
-  // Real-time validation function
+  // Real-time validation function (excludes foodName to avoid showing errors initially)
   const validateFields = () => {
     const newErrors: { [key: string]: string } = {};
     
-    // Validate food name
-    if (!foodName.trim()) {
-      newErrors.foodName = t('create_custom_food.validation.name_required');
-    } else if (foodName.length > MAX_NAME_LENGTH) {
-      newErrors.foodName = t('create_custom_food.validation.name_too_long', { max: MAX_NAME_LENGTH, current: foodName.length });
-    }
+    // Don't validate food name in real-time - only validate on submit
+    // This allows the field to start clean with character count
     
     // Validate brand
     if (brand && brand.length > MAX_BRAND_LENGTH) {
@@ -478,10 +491,10 @@ export default function CreateCustomFoodScreen() {
     return Object.keys(newErrors).length === 0;
   };
   
-  // Run validation whenever values change
+  // Run validation whenever values change (excluding foodName to avoid showing errors initially)
   useEffect(() => {
     validateFields();
-  }, [foodName, brand, weightQuantity, weightCalories, volumeQuantity, volumeCalories, weightProtein, weightCarbs, weightFat, weightFiber, weightSaturatedFat, weightSugar, weightSodium, isWeightBased]);
+  }, [brand, weightQuantity, weightCalories, volumeQuantity, volumeCalories, weightProtein, weightCarbs, weightFat, weightFiber, weightSaturatedFat, weightSugar, weightSodium, isWeightBased]);
   
   // Check if form is valid (for Save button) - don't call validateFields to avoid infinite loop
   const isFormValid = () => {
@@ -801,20 +814,30 @@ export default function CreateCustomFoodScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[
+              styles.backButton,
+              getMinTouchTargetStyle(),
+              { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+            ]}
             onPress={() => router.back()}
             activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              'Go back',
+              'Double tap to go back'
+            )}
           >
-            <Text style={[styles.backButtonText, { color: colors.tint }]}>{t('create_custom_food.back')}</Text>
+            <ThemedText style={[styles.backButtonText, { color: colors.tint }]}>←</ThemedText>
           </TouchableOpacity>
-          <ThemedText type="title" style={styles.title}>
+          <ThemedText style={[styles.title, { color: colors.text }]}>
             {isEditing ? t('create_custom_food.title_edit') : (cloneFoodId ? t('create_custom_food.title_clone') : t('create_custom_food.title_create'))}
           </ThemedText>
           <TouchableOpacity
             style={[
               styles.checkmarkButton,
+              getMinTouchTargetStyle(),
               {
                 opacity: (loading || !isFormValid()) ? 0.4 : 1,
+                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})
               }
             ]}
             onPress={(e) => {
@@ -823,6 +846,10 @@ export default function CreateCustomFoodScreen() {
             }}
             disabled={loading || !isFormValid()}
             activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              'Save',
+              'Double tap to save'
+            )}
           >
             <IconSymbol 
               name="checkmark" 
@@ -851,12 +878,28 @@ export default function CreateCustomFoodScreen() {
                 placeholderTextColor={colors.icon}
                 value={foodName}
                 onChangeText={(text) => {
-                  setFoodName(text);
+                  if (text.length <= MAX_NAME_LENGTH) {
+                    setFoodName(text);
+                    // Clear foodName error when user starts typing
+                    if (errors.foodName) {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.foodName;
+                        return newErrors;
+                      });
+                    }
+                  }
                 }}
                 maxLength={MAX_NAME_LENGTH}
                 autoCapitalize="words"
               />
-              {errors.foodName && <Text style={styles.errorText}>{errors.foodName}</Text>}
+              {errors.foodName ? (
+                <Text style={styles.errorText}>{errors.foodName}</Text>
+              ) : (
+                <ThemedText style={[styles.helperText, { color: colors.icon }]}>
+                  {t('create_custom_food.characters_count', { count: foodName.length, max: MAX_NAME_LENGTH })}
+                </ThemedText>
+              )}
             </View>
 
             {/* Serving Type Toggle */}
@@ -1286,36 +1329,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 6,
-    paddingTop: 50,
-    paddingBottom: 8,
+    width: '100%',
+    maxWidth: 600,
+    padding: 12,
+    paddingBottom: 32,
     ...Platform.select({
       web: {
-        maxWidth: 600,
-        alignSelf: 'center',
-        width: '100%',
+        paddingLeft: 16,
+        paddingRight: 16,
       },
     }),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 0,
   },
   backButton: {
-    paddingVertical: 8,
+    marginRight: 12,
+    paddingVertical: 4,
     paddingHorizontal: 4,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: '600',
   },
   title: {
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: 'bold',
+    letterSpacing: -0.3,
     flex: 1,
-    textAlign: 'center',
   },
   checkmarkButton: {
     marginLeft: 12,
@@ -1409,6 +1453,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
     marginLeft: 2,
+  },
+  helperText: {
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.7,
   },
   hint: {
     fontSize: 10,

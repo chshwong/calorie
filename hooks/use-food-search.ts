@@ -104,15 +104,19 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
         return;
       }
       
-      // Build search conditions for each word
-      // Each word should appear somewhere in name or brand (word order independent)
-      const searchConditions: string[] = [];
+      // Primary search: entire query as substring (handles "popcorn c" matching "popcorn chicken")
+      const queryPattern = `%${cleanedQuery}%`;
       
-      words.forEach(word => {
-        const wordPattern = `%${word}%`;
-        searchConditions.push(`name.ilike.${wordPattern}`);
-        searchConditions.push(`brand.ilike.${wordPattern}`);
-      });
+      // Fallback search: first word (for broader initial results)
+      const firstWordPattern = words.length > 0 ? `%${words[0]}%` : queryPattern;
+      
+      // Build search conditions: entire query OR first word (to ensure we get relevant results)
+      const searchConditions = [
+        `name.ilike.${queryPattern}`,
+        `brand.ilike.${queryPattern}`,
+        `name.ilike.${firstWordPattern}`,
+        `brand.ilike.${firstWordPattern}`,
+      ];
 
       let allData: FoodMaster[] = [];
 
@@ -123,7 +127,7 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
           .select('*')
           .or(searchConditions.join(','))
           .eq('is_custom', false)
-          .limit(50);
+          .limit(100); // Increased limit to ensure we get enough results for client-side filtering
 
         const { data: customData, error: customError } = await supabase
           .from('food_master')
@@ -131,7 +135,7 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
           .or(searchConditions.join(','))
           .eq('is_custom', true)
           .eq('owner_user_id', userId)
-          .limit(50);
+          .limit(100);
 
         if (publicError || customError) {
           setSearchResults([]);
@@ -152,7 +156,7 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
           .from('food_master')
           .select('*')
           .or(searchConditions.join(','))
-          .limit(50)
+          .limit(100) // Increased limit to ensure we get enough results for client-side filtering
           .order('name', { ascending: true });
 
         if (error) {
@@ -165,9 +169,26 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
         allData = data || [];
       }
 
-      // Client-side filtering: ensure ALL words appear in name or brand
+      // Client-side filtering: match entire query as substring OR all words appear
+      // This handles cases like "popcorn c" matching "popcorn chicken" and "fried c" matching "fried chicken"
       const filteredResults = allData.filter(food => {
-        const searchText = normalizeText(`${food.name} ${food.brand || ''}`);
+        const foodName = normalizeText(food.name || '');
+        const foodBrand = normalizeText(food.brand || '');
+        const searchText = `${foodName} ${foodBrand}`.trim();
+        
+        // First check: entire query appears as substring in name or brand
+        // This handles partial word matches like "popcorn c" → "popcorn chicken"
+        if (foodName.includes(cleanedQuery) || foodBrand.includes(cleanedQuery)) {
+          return true;
+        }
+        
+        // Second check: entire query appears as substring in combined text
+        if (searchText.includes(cleanedQuery)) {
+          return true;
+        }
+        
+        // Third check: all words appear (word-order-independent matching)
+        // This handles cases like "chicken fried" matching "fried chicken"
         return words.every(word => searchText.includes(word));
       });
       

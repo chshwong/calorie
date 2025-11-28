@@ -536,7 +536,7 @@
       "unit": "Unité",
       "unit_placeholder": "g",
       "calories": "Calories (kcal)",
-      "calories_required": "Calories (kcal) *",
+      "calories_required": "Calories *",
       "calories_placeholder": "625",
       "protein": "Protéines (g)",
       "protein_placeholder": "0",
@@ -837,6 +837,7 @@
       "food_name_label": "Nom de l'aliment *",
       "food_name_placeholder": "ex: Barre protéinée maison de papa"
     },
+    "characters_count": "{{count}}/{{max}} caractères",
     
     "weight_serving": {
       "title": "Portion basée sur le poids *",

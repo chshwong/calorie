@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import {
@@ -29,11 +31,15 @@ const SETTINGS_STORAGE_KEY = 'app_settings';
 
 export default function SettingsScreen() {
   const { t, i18n: i18nInstance } = useTranslation();
-  const { profile, signOut, user } = useAuth();
+  const { signOut, user } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  
+  // Use React Query hooks for profile data (shared cache with Home screen)
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  const updateProfileMutation = useUpdateProfile();
   
   // Use i18n's current language as the source of truth
   const currentLanguage = (i18nInstance.language as SupportedLanguage) || 'en';
@@ -95,19 +101,15 @@ export default function SettingsScreen() {
     const newLanguage: SupportedLanguage = currentLanguage === 'en' ? 'fr' : 'en';
     await setLanguage(newLanguage);
     
-    // Save language preference to database
-    if (user?.id) {
+    // Save language preference to database using mutation (updates cache automatically)
+    if (user?.id && profile) {
       try {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ language_preference: newLanguage })
-          .eq('user_id', user.id);
-        
-        if (error) {
-          console.error('Failed to save language preference:', error);
-        }
+        await updateProfileMutation.mutateAsync({
+          language_preference: newLanguage,
+        });
       } catch (err) {
         console.error('Error saving language preference:', err);
+        Alert.alert(t('alerts.error_title'), t('settings.errors.save_language_failed'));
       }
     }
     // The UI will update automatically via useTranslation hook
@@ -449,12 +451,18 @@ export default function SettingsScreen() {
             <IconSymbol name="person.fill" size={32} color={colors.tint} />
           </View>
           <View style={styles.profileInfo}>
-            <ThemedText type="title" style={[styles.profileName, { color: colors.text }]}>
-              {profile?.first_name || t('settings.profile_section.user_fallback')}
-            </ThemedText>
-            <ThemedText style={[styles.profileEmail, { color: colors.textSecondary }]}>
-              {user?.email || ''}
-            </ThemedText>
+            {profileLoading ? (
+              <ActivityIndicator size="small" color={colors.tint} />
+            ) : (
+              <>
+                <ThemedText type="title" style={[styles.profileName, { color: colors.text }]}>
+                  {profile?.first_name || t('settings.profile_section.user_fallback')}
+                </ThemedText>
+                <ThemedText style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                  {user?.email || ''}
+                </ThemedText>
+              </>
+            )}
           </View>
         </View>
 

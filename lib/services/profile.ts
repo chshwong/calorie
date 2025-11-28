@@ -42,3 +42,38 @@ export async function getUserProfile(userId: string): Promise<any | null> {
   }
 }
 
+/**
+ * Update user profile
+ * 
+ * @param userId - The user's ID
+ * @param updates - Partial profile object with fields to update
+ * @returns Updated profile object or null if error
+ */
+export async function updateUserProfile(
+  userId: string,
+  updates: Partial<any>
+): Promise<any | null> {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Exception updating profile:', error);
+    throw error;
+  }
+}
+

@@ -536,7 +536,7 @@
       "unit": "Unit",
       "unit_placeholder": "g",
 "calories": "Calories (kcal)",
-        "calories_required": "Calories (kcal) *",
+        "calories_required": "Calories *",
         "calories_placeholder": "625",
       "protein": "Protein (g)",
       "protein_placeholder": "0",
@@ -847,6 +847,7 @@
       "food_name_label": "Food Name *",
       "food_name_placeholder": "e.g., Dad's homemade protein bar"
     },
+    "characters_count": "{{count}}/{{max}} characters",
     
     "weight_serving": {
       "title": "Weight-Based Serving *",

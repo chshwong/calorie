@@ -1044,7 +1044,35 @@ export default function HomeScreen() {
                             }).join(', ');
                             
                             return (
-                              <View key={`items-${mealType}`} style={styles.mealGroupItem}>
+                              <TouchableOpacity
+                                key={`items-${mealType}`}
+                                style={[
+                                  styles.mealGroupItem,
+                                  getMinTouchTargetStyle(),
+                                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                                ]}
+                                onPress={() => {
+                                  // Filter entries for this meal type and date (may be empty array if no entries)
+                                  const mealTypeEntries = group.entries.filter(entry => 
+                                    entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                                    entry.entry_date === selectedDateString
+                                  );
+                                  // Always go to mealtype-log page (whether entries exist or not)
+                                  router.push({
+                                    pathname: '/mealtype-log',
+                                    params: { 
+                                      mealType: mealType,
+                                      entryDate: selectedDateString,
+                                      preloadedEntries: JSON.stringify(mealTypeEntries)
+                                    }
+                                  });
+                                }}
+                                activeOpacity={0.7}
+                                {...getButtonAccessibilityProps(
+                                  `Log food for ${mealTypeLabel}`,
+                                  t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
+                                )}
+                              >
                                 <View style={styles.mealGroupItemLeft}>
                                   <ThemedText 
                                     style={[styles.mealGroupItemName, { color: colors.text }]}
@@ -1054,7 +1082,7 @@ export default function HomeScreen() {
                                     {consolidatedItems}
                                   </ThemedText>
                                 </View>
-                              </View>
+                              </TouchableOpacity>
                             );
                           })()}
                         </View>
