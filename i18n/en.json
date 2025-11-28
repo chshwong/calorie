@@ -728,8 +728,8 @@
     
     "add_bundle": {
       "title": "Add Bundle to Meal",
-      "message": "Are you sure to add all {{count}} entries from \"{{name}}\" to your food log?",
-      "message_generic": "Are you sure to add all entries to your food log?",
+      "message": "Add all {{count}} entries from \"{{name}}\" to your food log?",
+      "message_generic": "Add all entries to your food log?",
       "confirm": "Add",
       "button": "+ to Log",
       "label": "Add bundle to food log",

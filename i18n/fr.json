@@ -728,8 +728,8 @@
     
     "add_bundle": {
       "title": "Ajouter l'ensemble au repas",
-      "message": "Êtes-vous sûr de vouloir ajouter les {{count}} entrées de \"{{name}}\" à votre journal?",
-      "message_generic": "Êtes-vous sûr de vouloir ajouter toutes les entrées à votre journal?",
+      "message": "Ajouter les {{count}} entrées de \"{{name}}\" à votre journal?",
+      "message_generic": "Ajouter toutes les entrées à votre journal?",
       "confirm": "Ajouter",
       "button": "+ au journal",
       "label": "Ajouter l'ensemble au journal alimentaire",
