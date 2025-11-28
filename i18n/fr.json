@@ -730,7 +730,10 @@
       "title": "Ajouter l'ensemble au repas",
       "message": "Êtes-vous sûr de vouloir ajouter les {{count}} entrées de \"{{name}}\" à votre journal?",
       "message_generic": "Êtes-vous sûr de vouloir ajouter toutes les entrées à votre journal?",
-      "confirm": "Ajouter"
+      "confirm": "Ajouter",
+      "button": "+ au journal",
+      "label": "Ajouter l'ensemble au journal alimentaire",
+      "hint": "Double appui pour ajouter cet ensemble à votre journal alimentaire"
     },
     
     "mass_delete": {
