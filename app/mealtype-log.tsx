@@ -285,7 +285,15 @@ export default function LogFoodScreen() {
     };
     return labels[type.toLowerCase()] || t('mealtype_log.meal_types.late_night');
   };
-  const mealTypeLabel = getMealTypeLabel(mealType);
+  
+  // Create mealTypeLabels object for dropdown
+  const mealTypeLabels: Record<string, string> = {
+    'breakfast': t('mealtype_log.meal_types.breakfast'),
+    'lunch': t('mealtype_log.meal_types.lunch'),
+    'dinner': t('mealtype_log.meal_types.dinner'),
+    'afternoon_snack': t('mealtype_log.meal_types.snack'),
+    'late_night': t('mealtype_log.meal_types.late_night'),
+  };
 
   // Format date for display (using i18n)
   const formatDate = (dateString: string): string => {
@@ -321,8 +329,6 @@ export default function LogFoodScreen() {
       return dateString;
     }
   };
-  
-  const formattedDate = formatDate(entryDate);
   
   // Get today's date for comparison
   const today = new Date();
@@ -445,6 +451,21 @@ export default function LogFoodScreen() {
   // Edit state
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   
+  // Local state for mealType and entryDate when editing/adding (to avoid navigation)
+  const [currentMealType, setCurrentMealType] = useState<string | null>(null);
+  const [currentEntryDate, setCurrentEntryDate] = useState<string | null>(null);
+  
+  // Update selectedDate when entryDate or currentEntryDate changes
+  useEffect(() => {
+    try {
+      const dateToUse = currentEntryDate || entryDate;
+      const date = new Date(dateToUse + 'T00:00:00');
+      setSelectedDate(date);
+    } catch {
+      // Keep current selectedDate if parsing fails
+    }
+  }, [entryDate, currentEntryDate]);
+  
   // Delete confirmation modal state
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -475,6 +496,12 @@ export default function LogFoodScreen() {
   const [showMealTypeDropdown, setShowMealTypeDropdown] = useState(false);
   const mealTypeButtonRef = useRef<View>(null);
   const [mealTypeDropdownLayout, setMealTypeDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  // Use local state values if editing/adding, otherwise use URL params
+  const activeMealType = currentMealType || mealType;
+  const activeEntryDate = currentEntryDate || entryDate;
+  const mealTypeLabel = getMealTypeLabel(activeMealType);
+  const formattedDate = formatDate(activeEntryDate);
 
   // Load user preference for show entry details
   useEffect(() => {
@@ -2992,18 +3019,28 @@ export default function LogFoodScreen() {
               <TouchableOpacity
                 style={[
                   getMinTouchTargetStyle(),
-                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                  (editingEntryId || selectedFood || isManualMode) && { opacity: 0.5 }
                 ]}
                 onPress={() => {
+                  // Lock meal type when editing/adding
+                  if (editingEntryId || selectedFood || isManualMode) {
+                    return;
+                  }
                   mealTypeButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
                     setMealTypeDropdownLayout({ x: pageX, y: pageY + height, width, height });
                     setShowMealTypeDropdown(!showMealTypeDropdown);
                   });
                 }}
-                activeOpacity={0.7}
+                activeOpacity={(editingEntryId || selectedFood || isManualMode) ? 1 : 0.7}
+                disabled={!!(editingEntryId || selectedFood || isManualMode)}
                 {...getButtonAccessibilityProps(
-                  `Change meal type, currently ${mealTypeLabel}`,
-                  'Double tap to change meal type'
+                  (editingEntryId || selectedFood || isManualMode) 
+                    ? `Meal type locked: ${mealTypeLabel}`
+                    : `Change meal type, currently ${mealTypeLabel}`,
+                  (editingEntryId || selectedFood || isManualMode)
+                    ? 'Meal type is locked while editing or adding an entry'
+                    : 'Double tap to change meal type'
                 )}
               >
                 <ThemedText style={[styles.subHeaderMealType, { color: colors.tint }]}>{mealTypeLabel} ▼</ThemedText>
@@ -3013,13 +3050,25 @@ export default function LogFoodScreen() {
             <TouchableOpacity
               style={[
                 getMinTouchTargetStyle(),
-                { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                (editingEntryId || selectedFood || isManualMode) && { opacity: 0.5 }
               ]}
-              onPress={() => setShowDatePicker(true)}
-              activeOpacity={0.7}
+              onPress={() => {
+                // Lock date when editing/adding
+                if (editingEntryId || selectedFood || isManualMode) {
+                  return;
+                }
+                setShowDatePicker(true);
+              }}
+              activeOpacity={(editingEntryId || selectedFood || isManualMode) ? 1 : 0.7}
+              disabled={!!(editingEntryId || selectedFood || isManualMode)}
               {...getButtonAccessibilityProps(
-                `Change date, currently ${formattedDate}`,
-                'Double tap to change the date'
+                (editingEntryId || selectedFood || isManualMode)
+                  ? `Date locked: ${formattedDate}`
+                  : `Change date, currently ${formattedDate}`,
+                (editingEntryId || selectedFood || isManualMode)
+                  ? 'Date is locked while editing or adding an entry'
+                  : 'Double tap to change the date'
               )}
             >
               <ThemedText style={[styles.subHeaderDate, { color: colors.tint }]}>{formattedDate}</ThemedText>
