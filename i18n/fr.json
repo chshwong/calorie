@@ -1057,6 +1057,255 @@
     "save_and_log_hint": "Enregistrer cet aliment et l'ajouter à votre repas",
     "log_as_manual": "Ajouter comme entrée manuelle unique",
     "log_as_manual_hint": "Ajouter cet aliment une fois sans le sauvegarder"
+  },
+
+  "exercise": {
+    "title": "Exercice",
+    "today_title": "Exercice d'aujourd'hui",
+    "quick_add_title": "Ajout rapide",
+    "recent_days_title": "Jours récents",
+    "summary": {
+      "total": "Total : {{minutes}} min ({{count}} {{activities}})",
+      "activity_one": "activité",
+      "activity_other": "activités",
+      "no_exercises": "Aucun exercice enregistré"
+    },
+    "entry": {
+      "format_with_minutes": "{{name}} – {{minutes}} min",
+      "format_no_minutes": "{{name}}"
+    },
+    "recent_days": {
+      "format": "{{day}} – {{minutes}} min ({{count}} {{activities}})",
+      "format_no_exercises": "{{day}} – 0 min",
+      "activity_one": "activité",
+      "activity_other": "activités"
+    },
+    "form": {
+      "title": "Ajouter un exercice",
+      "title_edit": "Modifier l'exercice",
+      "name_label": "Nom de l'exercice",
+      "name_placeholder": "ex. : Marche",
+      "name_required": "Le nom de l'exercice est requis",
+      "name_max_length": "Le nom de l'exercice doit contenir 30 caractères ou moins",
+      "minutes_label": "Minutes (optionnel)",
+      "minutes_placeholder": "ex. : 30",
+      "minutes_range": "Les minutes doivent être entre 0 et 999",
+      "notes_label": "Notes (optionnel)",
+      "notes_placeholder": "Ajoutez des notes sur cet exercice...",
+      "notes_helper": "Notes optionnelles (max 200 caractères)",
+      "notes_max_length": "Les notes doivent contenir 200 caractères ou moins",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "error_save_failed": "Échec de l'enregistrement de l'exercice : {{error}}"
+    },
+    "quick_add": {
+      "add_custom": "+ Ajouter un exercice personnalisé",
+      "add_custom_hint": "Double appui pour ajouter un exercice personnalisé",
+      "your_recent_frequent": "Vos exercices récents et fréquents",
+      "common_exercises": "Exercices courants",
+      "common_exercises_list": {
+        "walking": "Marche",
+        "running": "Course",
+        "jogging": "Jogging",
+        "gym_workout": "Entraînement en salle",
+        "cycling": "Vélo",
+        "swimming": "Natation",
+        "yoga": "Yoga",
+        "stretching": "Étirements",
+        "hiit": "HIIT",
+        "barbell_row": "Rowing barre",
+        "bench_press": "Développé couché",
+        "biceps": "Biceps",
+        "chest": "Pectoraux",
+        "deadlift": "Soulevé de terre",
+        "lat_pulldown": "Tirage vertical",
+        "overhead_press": "Développé militaire",
+        "squat": "Squat",
+        "triceps": "Triceps"
+      }
+    },
+    "delete": {
+      "title": "Supprimer l'exercice",
+      "message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" ?",
+      "message_generic": "Êtes-vous sûr de vouloir supprimer cet exercice ?",
+      "confirm": "Supprimer",
+      "cancel": "Annuler",
+      "success": "Exercice supprimé avec succès",
+      "error": "Échec de la suppression de l'exercice : {{error}}"
+    },
+    "edit": {
+      "hint": "Double appui pour modifier cet exercice"
+    },
+    "delete_button": {
+      "hint": "Double appui pour supprimer cet exercice"
+    },
+    "loading": "Chargement des exercices...",
+    "error": "Échec du chargement des exercices"
+  },
+
+  "dashboard": {
+    "title": "Tableau de bord",
+    "today_summary": "Résumé d'aujourd'hui",
+    "snapshot": {
+      "food": "Alimentation",
+      "ex": "Ex",
+      "meds": "Médicaments",
+      "kcal": "kcal",
+      "min": "min",
+      "items": "éléments",
+      "status_ok": "OK",
+      "status_low": "Faible",
+      "status_high": "Élevé",
+      "status_done": "Fait",
+      "status_all": "Tous",
+      "status_none": "Aucun"
+    },
+    "food": {
+      "title": "Alimentation",
+      "calories": "{{calories}} kcal",
+      "entries": "{{count}} {{entries}}",
+      "entry_one": "entrée",
+      "entry_other": "entrées",
+      "fiber": "Fibres",
+      "sugar": "Sucre",
+      "chart_7d": "7j kcal"
+    },
+    "exercise": {
+      "title": "Exercice",
+      "minutes": "{{minutes}} min",
+      "activities": "{{count}} {{activities}}",
+      "activity_one": "activité",
+      "activity_other": "activités",
+      "no_exercises": "Aucun exercice enregistré aujourd'hui",
+      "main": "Principal",
+      "chart_7d": "7j min"
+    },
+    "loading": "Chargement...",
+    "meds": {
+      "title": "Médicaments",
+      "items": "{{count}} {{items}}",
+      "item_one": "élément",
+      "item_other": "éléments",
+      "no_meds": "Aucun médicament enregistré aujourd'hui",
+      "last": "Dernier : {{name}}{{dose}}",
+      "med": "méd",
+      "supp": "supp",
+      "chart_7d": "7j"
+    },
+    "streaks": {
+      "title": "Séries",
+      "log_streak": "Série de logs",
+      "best": "Meilleur",
+      "next": "Prochain",
+      "chart_5w": "5s",
+      "score_legend": "Score : 0 aucun · 3 complet"
+    },
+    "insights": {
+      "title": "Conseils",
+      "protein_low": "Protéines faibles : moy -{{percent}}% vs objectif cette sem.",
+      "exercise_pattern": "Vous bougez plus {{days}}.",
+      "meds_adherence": "Médicaments enregistrés {{days}} / {{total}} jours.",
+      "empty": "Pas encore de conseils. Continuez à enregistrer."
+    },
+    "quick": {
+      "title": "Rapide",
+      "add_food": "+ Alimentation",
+      "add_ex": "+ Ex",
+      "add_med": "+ Méd",
+      "scan": "Scanner"
+    }
+  },
+
+  "meds": {
+    "title": "Médicaments",
+    "today_title": "Médicaments d'aujourd'hui",
+    "quick_add_title": "Ajout rapide",
+    "recent_days_title": "Jours",
+    "summary": {
+      "total": "Total : {{count}} {{items}} ({{med_count}} {{med}}, {{supp_count}} {{supp}})",
+      "item_one": "élément",
+      "item_other": "éléments",
+      "med_one": "méd",
+      "med_other": "méd",
+      "supp_one": "supp",
+      "supp_other": "supp",
+      "no_meds": "Aucun médicament enregistré"
+    },
+    "entry": {
+      "format_with_dose": "{{name}} – {{dose}}",
+      "format_no_dose": "{{name}}"
+    },
+    "recent_days": {
+      "format": "{{day}} – {{count}} {{items}}",
+      "format_no_meds": "{{day}} – 0 {{items}}",
+      "item_one": "élément",
+      "item_other": "éléments"
+    },
+    "form": {
+      "title": "Ajouter un médicament",
+      "title_edit": "Modifier le médicament",
+      "name_label": "Nom",
+      "name_placeholder": "ex. : Ibuprofène",
+      "name_required": "Le nom est requis",
+      "name_max_length": "Le nom doit contenir 30 caractères ou moins",
+      "type_label": "Type",
+      "type_med": "Méd",
+      "type_supp": "Supp",
+      "type_other": "Autre",
+      "dose_label": "Dose",
+      "dose_amount_placeholder": "Quantité",
+      "dose_unit_placeholder": "Unité",
+      "dose_amount_range": "La quantité doit être entre 0 et 9999",
+      "dose_add": "Ajouter dose",
+      "notes_label": "Note",
+      "notes_placeholder": "Ajouter une note...",
+      "notes_helper": "Note optionnelle (max 200 caractères)",
+      "notes_max_length": "La note doit contenir 200 caractères ou moins",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "error_save_failed": "Échec de l'enregistrement du médicament : {{error}}"
+    },
+    "quick_add": {
+      "add_custom": "+ Ajouter personnalisé",
+      "add_custom_hint": "Double appui pour ajouter un médicament personnalisé",
+      "recent_freq": "RÉCENTS & FRÉQUENTS",
+      "common": "COURANTS",
+      "common_meds_list": {
+        "acetaminophen": "Paracétamol",
+        "ibuprofen": "Ibuprofène",
+        "antihistamine": "Antihistaminique",
+        "nasal_spray": "Spray nasal"
+      },
+      "common_supps_list": {
+        "vit_d": "Vit D",
+        "vit_c": "Vit C",
+        "multi": "Multi",
+        "fish_oil": "Huile de poisson",
+        "magnesium": "Magnésium",
+        "creatine": "Créatine",
+        "probiotic": "Probiotique",
+        "collagen": "Collagène"
+      }
+    },
+    "delete": {
+      "title": "Supprimer le médicament",
+      "message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" ?",
+      "message_generic": "Êtes-vous sûr de vouloir supprimer ce médicament ?",
+      "confirm": "Supprimer",
+      "cancel": "Annuler",
+      "success": "Médicament supprimé avec succès",
+      "error": "Échec de la suppression du médicament : {{error}}"
+    }
+  },
+
+  "tabs": {
+    "log": "Journal",
+    "exercise": "Exercice",
+    "meds": "Médicaments",
+    "dashboard": "Tableau de bord",
+    "more": "Plus"
   }
 }
 

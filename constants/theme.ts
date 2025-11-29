@@ -50,18 +50,29 @@ export const CategoryColors = {
   favorite: '#FBBF24',
 };
 
+// Dashboard accent colors (premium health app style)
+export const DashboardAccents = {
+  food: '#FDBA74',      // Soft orange
+  exercise: '#38BDF8',  // Teal/blue
+  meds: '#4ADE80',      // Green
+  streak: '#A855F7',    // Purple
+} as const;
+
 export const Colors = {
   light: {
     // Text
     text: '#11181C',
     textSecondary: StandardGrey.light,
     textTertiary: '#9BA1A6',
+    textMuted: '#6B7280',
+    textSubtle: '#9CA3AF',
     textInverse: '#FFFFFF',
     
     // Backgrounds
     background: '#FFFFFF',
     backgroundSecondary: '#F9F9F9',
     backgroundTertiary: '#F2F2F2',
+    dashboardBackground: '#F7F9FC', // Very light neutral/blue tint
     
     // Accent
     tint: tintColorLight,
@@ -73,10 +84,17 @@ export const Colors = {
     tabIconSelected: tintColorLight,
     border: '#E5E5E5',
     borderSecondary: '#D1D1D1',
+    cardBorder: 'rgba(15, 23, 42, 0.06)', // Subtle card border
     separator: '#E5E5E5',
     overlay: 'rgba(0, 0, 0, 0.5)',
     card: '#FFFFFF',
     shadow: 'rgba(0, 0, 0, 0.1)',
+    
+    // Dashboard accents
+    accentFood: DashboardAccents.food,
+    accentExercise: DashboardAccents.exercise,
+    accentMeds: DashboardAccents.meds,
+    accentStreak: DashboardAccents.streak,
     
     // Input
     inputBackground: '#FFFFFF',
@@ -91,12 +109,15 @@ export const Colors = {
     text: '#FFFFFF',
     textSecondary: StandardGrey.dark,
     textTertiary: '#8E8E93',
+    textMuted: '#9CA3AF',
+    textSubtle: '#6B7280',
     textInverse: '#11181C',
     
     // Backgrounds
     background: '#121212',
     backgroundSecondary: '#1C1C1E',
     backgroundTertiary: '#2C2C2E',
+    dashboardBackground: '#0F172A', // Dark blue-grey
     
     // Accent
     tint: tintColorDark,
@@ -108,10 +129,17 @@ export const Colors = {
     tabIconSelected: tintColorDark,
     border: '#38383A',
     borderSecondary: '#48484A',
+    cardBorder: 'rgba(255, 255, 255, 0.08)', // Subtle card border for dark mode
     separator: '#38383A',
     overlay: 'rgba(0, 0, 0, 0.7)',
     card: '#1C1C1E',
     shadow: 'rgba(0, 0, 0, 0.4)',
+    
+    // Dashboard accents
+    accentFood: DashboardAccents.food,
+    accentExercise: DashboardAccents.exercise,
+    accentMeds: DashboardAccents.meds,
+    accentStreak: DashboardAccents.streak,
     
     // Input
     inputBackground: '#1C1C1E',
@@ -160,6 +188,10 @@ export const BorderRadius = {
   '2xl': 20,
   '3xl': 24,
   full: 9999,
+  // Dashboard-specific
+  card: 18,           // Standard card radius
+  cardBottomExtra: 24, // Asymmetric bottom rounding
+  chip: 9999,          // Full pill shape
 } as const;
 
 // ============================================================================
@@ -326,6 +358,23 @@ export const Shadows = {
     },
     default: {},
   }),
+  // Premium card shadow for dashboard
+  card: Platform.select({
+    ios: {
+      shadowColor: 'rgba(15, 23, 42, 0.06)',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 12,
+    },
+    android: {
+      elevation: 4,
+    },
+    web: {
+      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
+      // Remove deprecated shadow props for web
+    },
+    default: {},
+  }),
 };
 
 // ============================================================================
@@ -347,6 +396,10 @@ export const Layout = {
   
   /** Standard gap between list items */
   listGap: Spacing.sm,
+  
+  /** Dashboard-specific spacing */
+  sectionGap: Spacing.lg,      // Gap between sections
+  cardInnerPadding: Spacing.lg, // Inner padding for cards
 };
 
 // ============================================================================

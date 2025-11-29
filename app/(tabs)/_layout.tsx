@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -10,6 +11,7 @@ import { FloatingActionButton } from '@/components/floating-action-button';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
@@ -22,15 +24,43 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Home',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+            title: t('tabs.log'),
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
           }}
         />
         <Tabs.Screen
+          name="exercise"
+          options={{
+            title: t('tabs.exercise'),
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="figure.run" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="meds"
+          options={{
+            title: t('tabs.meds'),
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="pills.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="dashboard"
+          options={{
+            title: t('tabs.dashboard'),
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: t('tabs.more'),
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="ellipsis.circle.fill" color={color} />,
+          }}
+        />
+        {/* Hide explore tab - keeping it for backward compatibility but not showing in tab bar */}
+        <Tabs.Screen
           name="explore"
           options={{
-            title: 'Explore',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+            href: null, // Hide from tab bar
           }}
         />
       </Tabs>

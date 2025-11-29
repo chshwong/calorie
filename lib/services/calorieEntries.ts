@@ -78,6 +78,45 @@ export async function getEntriesForDate(
 }
 
 /**
+ * Fetch calorie entries for a date range
+ * 
+ * @param userId - The user's ID
+ * @param startDate - Start date in YYYY-MM-DD format
+ * @param endDate - End date in YYYY-MM-DD format
+ * @returns Array of CalorieEntry objects grouped by date
+ */
+export async function getEntriesForDateRange(
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<CalorieEntry[]> {
+  if (!userId) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('calorie_entries')
+      .select(ENTRY_COLUMNS)
+      .eq('user_id', userId)
+      .gte('entry_date', startDate)
+      .lte('entry_date', endDate)
+      .order('entry_date', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching entries for date range:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching entries for date range:', error);
+    return [];
+  }
+}
+
+/**
  * Fetch recent calorie entries for a user
  * 
  * @param userId - The user's ID

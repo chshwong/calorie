@@ -5,12 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DateHeader } from '@/components/date-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSelectedDate } from '@/hooks/use-selected-date';
 import { ageFromDob, bmi } from '@/utils/calculations';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
-import { getBMICategory, getGreetingKey } from '@/utils/bmi';
+import { getBMICategory } from '@/utils/bmi';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER } from '@/utils/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -26,7 +28,7 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 
-export default function HomeScreen() {
+export default function FoodLogHomeScreen() {
   const { t } = useTranslation();
   const { signOut, loading, retrying, user, isAdmin } = useAuth();
   const router = useRouter();
@@ -35,7 +37,6 @@ export default function HomeScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [refreshing, setRefreshing] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // SECURITY: Check if we're in password recovery mode and block access
   const { isPasswordRecovery } = useAuth();
@@ -55,65 +56,16 @@ export default function HomeScreen() {
   const pullStartY = useRef<number | null>(null);
   const pullDistance = useRef<number>(0);
   
-  // Get today's date for comparison
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  // Get date from params if available (when navigating back from mealtype-log)
-  const dateParam = params.date;
-  const initialDate = dateParam && typeof dateParam === 'string' 
-    ? new Date(dateParam + 'T00:00:00') 
-    : new Date(today);
-  
-  // State for selected date (defaults to today or date from params)
-  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
-  
-  // Calendar view month (for navigation)
-  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
-    return new Date(selectedDate);
-  });
-
-  // Check if selected date is from current year
-  const currentYear = today.getFullYear();
-  const selectedYear = selectedDate.getFullYear();
-  const isCurrentYear = selectedYear === currentYear;
-  
-  // Calculate if it's today or yesterday
-  const isToday = selectedDate.getTime() === today.getTime();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = selectedDate.getTime() === yesterday.getTime();
-  
-  // Format selected date for display (short form)
-  // Exclude weekday for today/yesterday to save space
-  // Include year only if date is from previous year
-  const dateOptions: Intl.DateTimeFormatOptions = { 
-    ...(isToday || isYesterday ? {} : { weekday: 'short' }),
-    month: 'short', 
-    day: 'numeric',
-    ...(isCurrentYear ? {} : { year: 'numeric' })
-  };
-  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
-  
-  // Format display date with appropriate prefix (short form)
-  // Note: Using t() function requires it to be called after useTranslation hook
-  const getDisplayDate = (t: (key: string) => string) => {
-  if (isToday) {
-      return `${t('common.today')}, ${formattedDate}`;
-  } else if (isYesterday) {
-      return `${t('common.yesterday')}, ${formattedDate}`;
-  }
-    return formattedDate;
-  };
-  
-  // Format selected date as YYYY-MM-DD for SQL query (in user's local timezone)
-  // Use local date to ensure it matches what the user sees
-  const selectedDateString = (() => {
-    const year = selectedDate.getFullYear();
-    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-    const day = String(selectedDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  })();
+  // Use shared date hook
+  const {
+    selectedDate,
+    setSelectedDate,
+    selectedDateString,
+    isToday,
+    today,
+    calendarViewMonth,
+    setCalendarViewMonth,
+  } = useSelectedDate();
 
   // Use React Query hooks for data fetching
   const queryClient = useQueryClient();
@@ -156,28 +108,7 @@ export default function HomeScreen() {
     });
   }, [user?.id, entriesLoading, queryClient]);
 
-  // Function to go back one day
-  const goBackOneDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
-  };
-
-  // Function to go forward one day (only if not today)
-  const goForwardOneDay = () => {
-    if (!isToday) {
-      const newDate = new Date(selectedDate);
-      newDate.setDate(newDate.getDate() + 1);
-      setSelectedDate(newDate);
-    }
-  };
-
-  // Function to open date picker
-  const openDatePicker = () => {
-    setShowDatePicker(true);
-  };
-
-  // Function to handle date selection
+  // Function to handle date selection from date picker
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     setShowDatePicker(false);
@@ -291,23 +222,6 @@ export default function HomeScreen() {
     }
   }, [refreshing, isPulling, onRefresh]);
 
-  // Update selected date if date param changes (when navigating back from mealtype-log)
-  useEffect(() => {
-    if (dateParam && typeof dateParam === 'string') {
-      const paramDate = new Date(dateParam + 'T00:00:00');
-      // Check if date is valid and different from current selected date
-      if (!isNaN(paramDate.getTime())) {
-        setSelectedDate((currentDate) => {
-          // Only update if the date is different to avoid unnecessary re-renders
-          if (paramDate.getTime() !== currentDate.getTime()) {
-            setCalendarViewMonth(new Date(paramDate));
-            return paramDate;
-          }
-          return currentDate;
-        });
-      }
-    }
-  }, [dateParam]);
 
   // Load summary expanded preference from storage (uses adapter per guideline 7)
   useEffect(() => {
@@ -401,11 +315,6 @@ export default function HomeScreen() {
   const actualAge = ageFromDob(profile.date_of_birth);
   const bmiValue = bmi(profile.height_cm, profile.weight_lb);
 
-  // Get time of day greeting using domain utility
-  const hour = new Date().getHours();
-  const greetingKey = getGreetingKey(hour);
-  const greeting = t(greetingKey);
-
   // Get BMI category using domain utility
   const bmiCategory = getBMICategory(bmiValue);
 
@@ -443,338 +352,113 @@ export default function HomeScreen() {
         contentOffset={Platform.OS === 'web' && isPulling ? { x: 0, y: -Math.min(pullToRefreshDistance, 80) } : undefined}
       >
         <View style={styles.scrollContent}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <View style={styles.greetingRow}>
-                <ThemedText style={styles.greeting}>{greeting},</ThemedText>
-                <ThemedText type="title" style={styles.welcomeText}>
-                  {profile.first_name}!
-                </ThemedText>
-              </View>
-            </View>
-            <View style={styles.headerButtons}>
-              {/* Manual Refresh Button for Web */}
-              {Platform.OS === 'web' && (
+          {/* Date Header with Greeting and Navigation */}
+          <DateHeader
+            showGreeting={true}
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            selectedDateString={selectedDateString}
+            isToday={isToday}
+            getDisplayDate={(t) => {
+              const todayDate = new Date();
+              todayDate.setHours(0, 0, 0, 0);
+              const yesterday = new Date(todayDate);
+              yesterday.setDate(yesterday.getDate() - 1);
+              const currentYear = todayDate.getFullYear();
+              const selectedYear = selectedDate.getFullYear();
+              const isCurrentYear = selectedYear === currentYear;
+              const dateOptions: Intl.DateTimeFormatOptions = { 
+                ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+                month: 'short', 
+                day: 'numeric',
+                ...(isCurrentYear ? {} : { year: 'numeric' })
+              };
+              const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
+              if (isToday) {
+                return `${t('common.today')}, ${formattedDate}`;
+              } else if (selectedDate.getTime() === yesterday.getTime()) {
+                return `${t('common.yesterday')}, ${formattedDate}`;
+              }
+              return formattedDate;
+            }}
+            goBackOneDay={() => {
+              const newDate = new Date(selectedDate);
+              newDate.setDate(newDate.getDate() - 1);
+              setSelectedDate(newDate);
+            }}
+            goForwardOneDay={() => {
+              if (!isToday) {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() + 1);
+                setSelectedDate(newDate);
+              }
+            }}
+            calendarViewMonth={calendarViewMonth}
+            setCalendarViewMonth={setCalendarViewMonth}
+            today={today}
+            rightActions={
+              <>
+                {/* Manual Refresh Button for Web */}
+                {Platform.OS === 'web' && (
+                  <TouchableOpacity
+                    style={[
+                      styles.refreshButton, 
+                      getMinTouchTargetStyle(),
+                      { 
+                        backgroundColor: colors.tint + '12',
+                        ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                      }
+                    ]}
+                    onPress={onRefresh}
+                    disabled={refreshing}
+                    activeOpacity={0.6}
+                    {...getButtonAccessibilityProps(
+                      t('home.accessibility.refresh_entries'),
+                      t('home.accessibility.refresh_hint')
+                    )}
+                  >
+                    <View 
+                      style={[styles.refreshIconContainer, { backgroundColor: 'transparent' }]}
+                      accessibilityElementsHidden={true}
+                      importantForAccessibility="no-hide-descendants"
+                    >
+                      {refreshing ? (
+                        <ActivityIndicator size="small" color={colors.tint} />
+                      ) : (
+                        <IconSymbol name="arrow.clockwise" size={20} color={colors.tint} decorative={true} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[
-                    styles.refreshButton, 
+                    styles.profileButton, 
                     getMinTouchTargetStyle(),
                     { 
                       backgroundColor: colors.tint + '12',
                       ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
                     }
                   ]}
-                  onPress={onRefresh}
-                  disabled={refreshing}
+                  onPress={() => router.push('/settings')}
                   activeOpacity={0.6}
+                  testID="profile-button"
                   {...getButtonAccessibilityProps(
-                    t('home.accessibility.refresh_entries'),
-                    t('home.accessibility.refresh_hint')
+                    t('home.accessibility.profile_settings'),
+                    t('home.accessibility.profile_hint')
                   )}
                 >
                   <View 
-                    style={[styles.refreshIconContainer, { backgroundColor: 'transparent' }]}
+                    style={[styles.profileIconContainer, { backgroundColor: 'transparent' }]}
                     accessibilityElementsHidden={true}
                     importantForAccessibility="no-hide-descendants"
                   >
-                    {refreshing ? (
-                      <ActivityIndicator size="small" color={colors.tint} />
-                    ) : (
-                      <IconSymbol name="arrow.clockwise" size={20} color={colors.tint} decorative={true} />
-                    )}
+                    <IconSymbol name="person.fill" size={20} color={colors.tint} decorative={true} />
                   </View>
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.profileButton, 
-                  getMinTouchTargetStyle(),
-                  { 
-                    backgroundColor: colors.tint + '12',
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                  }
-                ]}
-                onPress={() => router.push('/settings')}
-                activeOpacity={0.6}
-                testID="profile-button"
-                {...getButtonAccessibilityProps(
-                  t('home.accessibility.profile_settings'),
-                  t('home.accessibility.profile_hint')
-                )}
-              >
-                <View 
-                  style={[styles.profileIconContainer, { backgroundColor: 'transparent' }]}
-                  accessibilityElementsHidden={true}
-                  importantForAccessibility="no-hide-descendants"
-                >
-                  <IconSymbol name="person.fill" size={20} color={colors.tint} decorative={true} />
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
+              </>
+            }
+          />
 
-          {/* Date Navigation Section */}
-          <View style={styles.dateNavigation} accessibilityRole="toolbar">
-            <TouchableOpacity
-              onPress={goBackOneDay}
-              activeOpacity={0.6}
-              style={[
-                styles.dateNavButtonSimple,
-                getMinTouchTargetStyle(),
-                { 
-                  ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                }
-              ]}
-              {...getButtonAccessibilityProps(
-                t('home.date_picker.previous_day'),
-                'Double tap to go to the previous day'
-              )}
-            >
-              <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-                <Text style={[styles.dateNavButtonText, { color: colors.text }]}>‹</Text>
-              </View>
-            </TouchableOpacity>
-            <View style={styles.dateDisplay}>
-              <ThemedText 
-                style={[styles.dateDisplayText, { color: colors.text }]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                accessibilityRole="text"
-              >
-                {getDisplayDate(t)}
-              </ThemedText>
-            </View>
-            <TouchableOpacity
-              style={[
-                styles.calendarButton, 
-                getMinTouchTargetStyle(),
-                { 
-                  backgroundColor: colors.tint,
-                  ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
-                }
-              ]}
-              onPress={openDatePicker}
-              activeOpacity={0.8}
-              {...getButtonAccessibilityProps(
-                t('home.date_picker.select_date'),
-                'Double tap to open date picker'
-              )}
-            >
-              <IconSymbol name="calendar" size={18} color="#fff" decorative={true} />
-            </TouchableOpacity>
-            {!isToday && (
-              <TouchableOpacity
-                onPress={goForwardOneDay}
-                activeOpacity={0.6}
-                style={[
-                  styles.dateNavButtonSimple,
-                  getMinTouchTargetStyle(),
-                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                ]}
-                {...getButtonAccessibilityProps(
-                  t('home.date_picker.next_day'),
-                  'Double tap to go to the next day'
-                )}
-              >
-                <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-                  <Text style={[styles.dateNavButtonText, { color: colors.text }]}>›</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            {isToday && <View style={styles.dateNavButtonPlaceholder} />}
-          </View>
-
-          {/* Date Picker Modal */}
-          <Modal
-            visible={showDatePicker}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowDatePicker(false)}
-            onShow={() => {
-              // Initialize calendar view to selected date when modal opens
-              setCalendarViewMonth(new Date(selectedDate));
-            }}
-          >
-            <TouchableOpacity
-              style={[styles.datePickerModalOverlay, { backgroundColor: colors.overlay }]}
-              activeOpacity={1}
-              onPress={() => setShowDatePicker(false)}
-            >
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={(e) => e.stopPropagation()}
-              >
-                <View style={[styles.datePickerModalContent, { backgroundColor: colors.card }]}>
-                  <View style={[styles.datePickerHeader, { borderBottomColor: colors.separator }]}>
-                    <ThemedText style={[styles.datePickerTitle, { color: colors.text }]}>
-                      {t('home.date_picker.title')}
-                    </ThemedText>
-                    <TouchableOpacity
-                      onPress={() => setShowDatePicker(false)}
-                      style={[
-                        styles.datePickerCloseButton,
-                        getMinTouchTargetStyle(),
-                        { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                      ]}
-                      {...getButtonAccessibilityProps(
-                        'Close date picker',
-                        'Double tap to close date picker'
-                      )}
-                    >
-                      <IconSymbol name="xmark" size={20} color={colors.text} decorative={true} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {/* Selected Date Display */}
-                  <View style={[styles.datePickerSelectedDateContainer, { borderBottomColor: colors.separator }]}>
-                    <ThemedText style={[styles.datePickerSelectedDate, { color: colors.text }]}>
-                      {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </ThemedText>
-                  </View>
-
-                  {/* Calendar Grid */}
-                  <View style={styles.datePickerBody}>
-                    {/* Month/Year Navigation */}
-                    <View style={styles.calendarHeader}>
-                      <TouchableOpacity
-                        onPress={handlePreviousMonth}
-                        style={[
-                          styles.calendarNavButton,
-                          getMinTouchTargetStyle(),
-                          { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                        ]}
-                        activeOpacity={0.7}
-                        {...getButtonAccessibilityProps(
-                          t('home.date_picker.previous_month'),
-                          'Double tap to go to the previous month'
-                        )}
-                      >
-                        <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>←</ThemedText>
-                      </TouchableOpacity>
-                      <View style={styles.calendarMonthYear}>
-                        <ThemedText style={[styles.calendarMonthYearText, { color: colors.text }]}>
-                          {calendarViewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </ThemedText>
-                      </View>
-                      <TouchableOpacity
-                        onPress={handleNextMonth}
-                        style={[
-                          styles.calendarNavButton,
-                          getMinTouchTargetStyle(),
-                          { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                        ]}
-                        activeOpacity={0.7}
-                        {...getButtonAccessibilityProps(
-                          t('home.date_picker.next_month'),
-                          'Double tap to go to the next month'
-                        )}
-                      >
-                        <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>→</ThemedText>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Days of Week Header */}
-                    <View style={styles.calendarWeekDays}>
-                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                        <View key={index} style={styles.calendarWeekDay}>
-                          <ThemedText style={[styles.calendarWeekDayText, { color: colors.textSecondary }]}>
-                            {day}
-                          </ThemedText>
-                        </View>
-                      ))}
-                    </View>
-
-                    {/* Calendar Grid */}
-                    <View style={styles.calendarGrid}>
-                      {generateCalendarDays(calendarViewMonth).map((day, index) => {
-                        if (day === null) {
-                          return <View key={`empty-${index}`} style={styles.calendarDay} />;
-                        }
-                        
-                        const isSelectedDay = isSelectedInCalendar(day, calendarViewMonth);
-                        const isTodayDay = isTodayInCalendar(day, calendarViewMonth);
-                        
-                        return (
-                          <TouchableOpacity
-                            key={`day-${day}`}
-                            style={[
-                              styles.calendarDay,
-                              isSelectedDay && { backgroundColor: colors.tint },
-                              isTodayDay && !isSelectedDay && { 
-                                borderWidth: 1, 
-                                borderColor: colors.tint,
-                                borderRadius: 8,
-                              },
-                            ]}
-                            onPress={() => {
-                              const newDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
-                              handleDateSelect(newDate);
-                            }}
-                            activeOpacity={0.7}
-                            {...getButtonAccessibilityProps(
-                              `Select ${day}`,
-                              `Double tap to select ${day}`
-                            )}
-                          >
-                            <ThemedText
-                              style={[
-                                styles.calendarDayText,
-                                { color: isSelectedDay ? '#fff' : (isTodayDay ? colors.tint : colors.text) },
-                                isSelectedDay && styles.calendarDayTextSelected,
-                              ]}
-                            >
-                              {day}
-                            </ThemedText>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-
-                  {/* Footer with Cancel/OK buttons */}
-                  <View style={[styles.datePickerFooter, { borderTopColor: colors.separator }]}>
-                    <TouchableOpacity
-                      style={[
-                        styles.datePickerCancelButton,
-                        getMinTouchTargetStyle(),
-                        { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                      ]}
-                      onPress={() => setShowDatePicker(false)}
-                      activeOpacity={0.7}
-                      {...getButtonAccessibilityProps(
-                        t('common.cancel'),
-                        'Double tap to cancel date selection'
-                      )}
-                    >
-                      <ThemedText style={[styles.datePickerCancelButtonText, { color: colors.text }]}>
-                        {t('common.cancel')}
-                      </ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.datePickerTodayButton, 
-                        getMinTouchTargetStyle(),
-                        { 
-                          backgroundColor: colors.tint,
-                          ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
-                        }
-                      ]}
-                      onPress={() => {
-                        handleDateSelect(new Date(today));
-                      }}
-                      {...getButtonAccessibilityProps(
-                        t('home.date_picker.today_button'),
-                        'Double tap to select today\'s date'
-                      )}
-                    >
-                      <Text style={styles.datePickerTodayButtonText}>{t('home.date_picker.today_button')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </Modal>
 
           {/* Stats Grid - 4 squares */}
           <View style={styles.statsGrid}>
