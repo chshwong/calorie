@@ -1,0 +1,969 @@
+import { useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Alert, Platform, ActivityIndicator, Text } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DateHeader } from '@/components/date-header';
+import { WaterDropGauge } from '@/components/water/water-drop-gauge';
+import { BarChart } from '@/components/charts/bar-chart';
+import { useAuth } from '@/contexts/AuthContext';
+import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, ModuleThemes } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSelectedDate } from '@/hooks/use-selected-date';
+import { useWaterDaily } from '@/hooks/use-water-logs';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal } from '@/utils/waterUnits';
+import { useWaterQuickAddPresets } from '@/hooks/use-water-quick-add-presets';
+import { AnimatedWaterIcon } from '@/components/water/animated-water-icon';
+import { getPresetIconName } from '@/utils/waterQuickAddPresets';
+import {
+  getButtonAccessibilityProps,
+  getMinTouchTargetStyle,
+  getFocusStyle,
+} from '@/utils/accessibility';
+
+
+export default function WaterScreen() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+
+  // Use shared date hook
+  const {
+    selectedDate,
+    setSelectedDate,
+    selectedDateString,
+    isToday,
+    today,
+    calendarViewMonth,
+    setCalendarViewMonth,
+  } = useSelectedDate();
+
+  // Get profile for water unit preference
+  const { data: profile } = useUserProfile();
+
+  // Get water data (last 14 days for history, using selected date)
+  const { todayWater, history, isLoading, addWater, setGoal, setTotal, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal } = useWaterDaily({ 
+    daysBack: 14,
+    targetDateString: selectedDateString,
+  });
+
+  // Determine active water unit: for today use profile, for past dates use water_daily.water_unit
+  const activeWaterUnit: WaterUnit = isToday 
+    ? ((profile?.water_unit as WaterUnit) || 'ml')
+    : ((todayWater?.water_unit as WaterUnit) || (profile?.water_unit as WaterUnit) || 'ml');
+
+  // Get values in active unit
+  const total = todayWater?.total || 0;
+  
+  // Get effective goal (with fallback to defaults)
+  const storedGoalInUnit = todayWater?.goal || (todayWater?.goal_ml ? fromMl(todayWater.goal_ml, activeWaterUnit) : null);
+  const effectiveGoal = getEffectiveGoal(activeWaterUnit, storedGoalInUnit);
+  const goal = effectiveGoal.goalInUnit;
+  const goalMl = effectiveGoal.goalMl; // Canonical ml for calculations
+
+  // Get quick-add presets
+  const { presets, activeWaterUnit: presetsUnit } = useWaterQuickAddPresets();
+  
+  // Animation state for quick add chips
+  const [animatingChipId, setAnimatingChipId] = useState<string | null>(null);
+
+  // Format display (for secondary/cups line)
+  const totalMl = toMl(total, activeWaterUnit);
+  const display = formatWaterDisplay(totalMl, activeWaterUnit === 'floz' ? 'imperial' : 'metric');
+
+  // Water accent color from module theme
+  const waterTheme = ModuleThemes.water;
+  const accentColor = waterTheme.accent;
+
+  // Custom input modal state
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customInput, setCustomInput] = useState('');
+  const [customInputError, setCustomInputError] = useState(false);
+  
+  // Edit total modal state
+  const [showEditTotalModal, setShowEditTotalModal] = useState(false);
+  const [editTotalInput, setEditTotalInput] = useState('');
+  const [editTotalError, setEditTotalError] = useState('');
+
+  // Handle quick-add preset press
+  const handleQuickAddPreset = useCallback((amount: number, unit: WaterUnit, presetId: string) => {
+    if (!user?.id) return;
+    // Convert amount from preset unit to ml for internal storage
+    const deltaMl = toMl(amount, unit);
+    addWater(deltaMl, goalMl);
+    // Trigger animation
+    setAnimatingChipId(presetId);
+    // Reset animation state after animation completes
+    setTimeout(() => setAnimatingChipId(null), 500);
+  }, [user?.id, addWater, goalMl]);
+
+  // Handle custom input (adds to current total)
+  const handleCustomInput = () => {
+    // Parse input as if it's in the active unit
+    const cleaned = customInput.trim().replace(/[^0-9.]/g, '');
+    const numericValue = parseFloat(cleaned);
+    
+    if (isNaN(numericValue) || numericValue <= 0) {
+      setCustomInputError(true);
+      return;
+    }
+
+    // Convert to ml for validation
+    const inputMl = toMl(numericValue, activeWaterUnit);
+    
+    // Validate max (5000ml equivalent)
+    if (inputMl > 5000) {
+      setCustomInputError(true);
+      return;
+    }
+    
+    setCustomInputError(false);
+    addWater(inputMl, goalMl);
+    setCustomInput('');
+    setShowCustomModal(false);
+  };
+
+  // Handle edit total (set absolute value in active unit)
+  const handleEditTotal = () => {
+    // Parse input as if it's in the active unit
+    const cleaned = editTotalInput.trim().replace(/[^0-9.]/g, '');
+    const numericValue = parseFloat(cleaned);
+    
+    if (isNaN(numericValue) || numericValue < 0) {
+      setEditTotalError(t('water.edit_total.invalid'));
+      return;
+    }
+
+    // Convert to ml for validation
+    const inputMl = toMl(numericValue, activeWaterUnit);
+
+    // Validate limits (0-5000ml)
+    if (inputMl > 5000) {
+      setEditTotalError(t('water.edit_total.max_limit', { max: 5000 }));
+      return;
+    }
+
+    setEditTotalError('');
+    try {
+      // setTotal expects value in the row's water_unit
+      setTotal(numericValue);
+      setEditTotalInput('');
+      setShowEditTotalModal(false);
+    } catch (error: any) {
+      setEditTotalError(error.message || t('water.edit_total.error'));
+    }
+  };
+
+  // Settings panel state
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [settingsWaterUnit, setSettingsWaterUnit] = useState<WaterUnit>(activeWaterUnit);
+  const [settingsGoal, setSettingsGoal] = useState(goal.toString()); // Uses effective goal (with defaults)
+  const [settingsGoalError, setSettingsGoalError] = useState('');
+
+  // Initialize settings when panel opens
+  const handleOpenSettings = () => {
+    setSettingsWaterUnit(activeWaterUnit);
+    setSettingsGoal(goal.toString());
+    setSettingsGoalError('');
+    setShowSettingsPanel(true);
+  };
+
+
+  // Handle save settings
+  const handleSaveSettings = () => {
+    const goalValue = parseFloat(settingsGoal);
+    
+    if (isNaN(goalValue) || goalValue <= 0) {
+      setSettingsGoalError(t('water.settings.goal_required'));
+      return;
+    }
+
+    // Convert to ml for validation
+    const goalMl = toMl(goalValue, settingsWaterUnit);
+
+    // Validate goal limits (480-5000ml)
+    if (goalMl < 480 || goalMl > 5000) {
+      setSettingsGoalError(t('water.settings.goal_out_of_range', { min: 480, max: 5000 }));
+      return;
+    }
+
+    setSettingsGoalError('');
+    try {
+      updateUnitAndGoal(settingsWaterUnit, goalValue);
+      setShowSettingsPanel(false);
+    } catch (error: any) {
+      setSettingsGoalError(error.message || t('water.set_goal.error'));
+    }
+  };
+
+
+  // Prepare history data for chart (last 7 days, excluding selected date)
+  // Convert total from each row's water_unit to ml for consistent chart display
+  const historyData = history
+    .filter(w => w.date !== selectedDateString)
+    .slice(-7) // Last 7 days (excluding selected date)
+    .map((water) => {
+      const waterUnit = (water.water_unit as WaterUnit) || 'ml';
+      const totalMl = toMl(water.total || 0, waterUnit);
+      return {
+        date: water.date,
+        value: totalMl,
+      };
+    });
+
+  if (!user) {
+    return (
+      <ThemedView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </ThemedView>
+    );
+  }
+
+  return (
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Date Header */}
+        <DateHeader
+          showGreeting={true}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          selectedDateString={selectedDateString}
+          isToday={isToday}
+          getDisplayDate={(t) => {
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            const yesterday = new Date(todayDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const formattedDate = selectedDate.toLocaleDateString('en-US', {
+              ...(selectedDate.getTime() === todayDate.getTime() || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+              month: 'short',
+              day: 'numeric',
+            });
+            if (selectedDate.getTime() === todayDate.getTime()) {
+              return `${t('common.today')}, ${formattedDate}`;
+            } else if (selectedDate.getTime() === yesterday.getTime()) {
+              return `${t('common.yesterday')}, ${formattedDate}`;
+            }
+            return formattedDate;
+          }}
+          goBackOneDay={() => {
+            const newDate = new Date(selectedDate);
+            newDate.setDate(newDate.getDate() - 1);
+            setSelectedDate(newDate);
+          }}
+          goForwardOneDay={() => {
+            if (!isToday) {
+              const newDate = new Date(selectedDate);
+              newDate.setDate(newDate.getDate() + 1);
+              setSelectedDate(newDate);
+            }
+          }}
+          calendarViewMonth={calendarViewMonth}
+          setCalendarViewMonth={setCalendarViewMonth}
+          today={today}
+        />
+
+        {/* Today's Water Section - Card */}
+        <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+          <View style={[styles.cardHeader, { borderBottomColor: colors.separator }]}>
+            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+              {isToday ? t('water.today_title') : selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </ThemedText>
+            <View style={styles.headerRight}>
+              {isLoading && (
+                <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
+              )}
+              {isToday && (
+                <TouchableOpacity
+                  onPress={handleOpenSettings}
+                  style={[styles.gearButton, { backgroundColor: colors.backgroundSecondary }]}
+                  {...getButtonAccessibilityProps(t('water.settings.title'))}
+                >
+                  <IconSymbol name="gearshape" size={FontSize.lg} color={colors.text} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.tint} />
+            </View>
+          ) : (
+            <>
+              {/* Main content: Edit Total button (upper left) + Droplet (center) */}
+              <View style={styles.waterDisplay}>
+                {/* Edit Total button - positioned upper left */}
+                <View style={styles.editTotalButtonContainer}>
+                  <TouchableOpacity
+                    style={[styles.editTotalCompactButton, { 
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: colors.border,
+                    }]}
+                    onPress={() => {
+                      setEditTotalInput(total.toString());
+                      setEditTotalError('');
+                      setShowEditTotalModal(true);
+                    }}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('water.edit_total.button'))}
+                  >
+                    <ThemedText style={[styles.editTotalCompactButtonText, { color: colors.text }]}>
+                      {t('water.edit_total.button')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Water Drop Gauge - centered */}
+                <View style={styles.dropletContainer}>
+                  <WaterDropGauge
+                    totalMl={totalMl}
+                    goalMl={goalMl}
+                    unitPreference={activeWaterUnit}
+                    size="large"
+                  />
+                </View>
+              </View>
+
+              {/* Quick Add Chips - single horizontal row under droplet */}
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickAddChipsRow}
+                style={styles.quickAddChipsRowContainer}
+              >
+                {/* 4 Preset Chips */}
+                {presets.map((preset) => {
+                  const displayAmount = formatWaterValue(preset.amount, preset.unit);
+                  // Map iconType to AnimatedWaterIcon variant
+                  const iconVariant = preset.iconType === 'smallCup' 
+                    ? 'cup' 
+                    : preset.iconType === 'cup' 
+                      ? 'cup'
+                      : preset.iconType === 'glass'
+                        ? 'glass'
+                        : preset.iconType === 'bottle'
+                          ? 'bottleSmall'
+                          : preset.iconType === 'largeBottle'
+                            ? 'bottleLarge'
+                            : 'cup';
+                  
+                  return (
+                    <TouchableOpacity
+                      key={preset.id}
+                      style={[styles.quickAddChip, { 
+                        backgroundColor: colors.backgroundSecondary,
+                        borderColor: colors.border,
+                      }]}
+                      onPress={() => handleQuickAddPreset(preset.amount, preset.unit, preset.id)}
+                      disabled={isAddingWater}
+                      activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(
+                        t('water.quick_presets.add', { amount: displayAmount, label: t(preset.labelKey) })
+                      )}
+                    >
+                      <AnimatedWaterIcon
+                        variant={iconVariant}
+                        isAnimating={animatingChipId === preset.id}
+                        size={FontSize.base}
+                        color={colors.tint}
+                      />
+                      <ThemedText
+                        style={[styles.quickAddChipText, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {displayAmount}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+                
+                {/* 5th Chip: Custom Amount */}
+                <TouchableOpacity
+                  style={[styles.quickAddChip, { 
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                  }]}
+                  onPress={() => setShowCustomModal(true)}
+                  disabled={isAddingWater}
+                  activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(t('water.quick_presets.custom_amount'))}
+                >
+                  <IconSymbol
+                    name={getPresetIconName('custom')}
+                    size={FontSize.base}
+                    color={colors.textSecondary}
+                  />
+                  <ThemedText
+                    style={[styles.quickAddChipText, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {t('water.quick_presets.custom')}
+                  </ThemedText>
+                </TouchableOpacity>
+              </ScrollView>
+            </>
+          )}
+        </View>
+
+        {/* History Chart Section - Card */}
+        {historyData.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+              {t('water.history_title')}
+            </ThemedText>
+            <BarChart
+              data={historyData}
+              maxValue={goalMl}
+              goalValue={goalMl}
+              selectedDate={selectedDateString}
+              colorScale={(value, max) => {
+                const ratio = value / max;
+                if (ratio < 0.5) return colors.infoLight;
+                if (ratio < 0.8) return colors.info;
+                return accentColor;
+              }}
+              height={120}
+              showLabels={true}
+            />
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Custom Input Modal */}
+      <Modal
+        visible={showCustomModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCustomModal(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="title" style={{ color: colors.text }}>
+                {t('water.custom_input')}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setShowCustomModal(false)}
+                style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
+                {...getButtonAccessibilityProps(t('common.close'))}
+              >
+                <IconSymbol name="xmark" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <ThemedText style={[styles.formLabel, { color: colors.text }]}>
+                {t('water.custom_input_label', { unit: activeWaterUnit === 'floz' ? 'fl oz' : activeWaterUnit === 'cup' ? 'cups' : 'ml' })}
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.formInput,
+                  {
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: customInputError ? colors.error : colors.border,
+                  },
+                ]}
+                value={customInput}
+                onChangeText={(text) => {
+                  setCustomInput(text);
+                  setCustomInputError(false);
+                }}
+                placeholder={activeWaterUnit === 'floz' ? '20' : activeWaterUnit === 'cup' ? '8' : '500'}
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+                autoFocus
+              />
+              {customInputError && (
+                <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                  {t('water.custom_input_error')}
+                </ThemedText>
+              )}
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => {
+                    setShowCustomModal(false);
+                    setCustomInput('');
+                    setCustomInputError(false);
+                  }}
+                  {...getButtonAccessibilityProps(t('common.cancel'))}
+                >
+                  <ThemedText style={{ color: colors.text }}>{t('common.cancel')}</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                  onPress={handleCustomInput}
+                  disabled={isAddingWater}
+                  {...getButtonAccessibilityProps(t('common.add'))}
+                >
+                  {isAddingWater ? (
+                    <ActivityIndicator size="small" color={colors.textInverse} />
+                  ) : (
+                    <ThemedText style={[styles.saveButtonText, { color: colors.textInverse }]}>
+                      {t('common.add')}
+                    </ThemedText>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Total Modal */}
+      <Modal
+        visible={showEditTotalModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowEditTotalModal(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="title" style={{ color: colors.text }}>
+                {t('water.edit_total.title')}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setShowEditTotalModal(false)}
+                style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
+                {...getButtonAccessibilityProps(t('common.close'))}
+              >
+                <IconSymbol name="xmark" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <ThemedText style={[styles.formLabel, { color: colors.text }]}>
+                {t('water.edit_total.label', { unit: activeWaterUnit === 'floz' ? 'fl oz' : activeWaterUnit === 'cup' ? 'cups' : 'ml' })}
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.formInput,
+                  {
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: editTotalError ? colors.error : colors.border,
+                  },
+                ]}
+                value={editTotalInput}
+                onChangeText={(text) => {
+                  setEditTotalInput(text);
+                  setEditTotalError('');
+                }}
+                placeholder={activeWaterUnit === 'floz' ? '64' : activeWaterUnit === 'cup' ? '8' : '2000'}
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+                autoFocus
+              />
+              {editTotalError && (
+                <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                  {editTotalError}
+                </ThemedText>
+              )}
+              <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
+                {t('water.edit_total.helper', { max: 5000 })}
+              </ThemedText>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => {
+                    setShowEditTotalModal(false);
+                    setEditTotalInput('');
+                    setEditTotalError('');
+                  }}
+                  {...getButtonAccessibilityProps(t('common.cancel'))}
+                >
+                  <ThemedText style={{ color: colors.text }}>{t('common.cancel')}</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                  onPress={handleEditTotal}
+                  disabled={isSettingTotal}
+                  {...getButtonAccessibilityProps(t('common.save'))}
+                >
+                  {isSettingTotal ? (
+                    <ActivityIndicator size="small" color={colors.textInverse} />
+                  ) : (
+                    <ThemedText style={[styles.saveButtonText, { color: colors.textInverse }]}>
+                      {t('common.save')}
+                    </ThemedText>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Settings Panel Modal */}
+      {isToday && (
+        <Modal
+          visible={showSettingsPanel}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowSettingsPanel(false)}
+        >
+          <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="title" style={{ color: colors.text }}>
+                  {t('water.settings.title')}
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => setShowSettingsPanel(false)}
+                  style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
+                  {...getButtonAccessibilityProps(t('common.close'))}
+                >
+                  <IconSymbol name="xmark" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                {/* Water Units Row */}
+                <View style={styles.settingsRow}>
+                  <ThemedText style={[styles.formLabel, { color: colors.text }]}>
+                    {t('water.settings.water_units')}
+                  </ThemedText>
+                  <View style={styles.dropdownContainer}>
+                    <TouchableOpacity
+                      style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => {
+                        // Cycle through units: ml -> floz -> cup -> ml
+                        const units: WaterUnit[] = ['ml', 'floz', 'cup'];
+                        const currentIndex = units.indexOf(settingsWaterUnit);
+                        const nextIndex = (currentIndex + 1) % units.length;
+                        const newUnit = units[nextIndex];
+                        
+                        // Convert goal from current unit to new unit
+                        const currentGoalValue = parseFloat(settingsGoal);
+                        if (!isNaN(currentGoalValue) && currentGoalValue > 0) {
+                          // Convert from current unit to ml, then to new unit
+                          const goalMl = toMl(currentGoalValue, settingsWaterUnit);
+                          const convertedGoal = fromMl(goalMl, newUnit);
+                          // Round to 1 decimal place for display
+                          const roundedGoal = Math.round(convertedGoal * 10) / 10;
+                          setSettingsGoal(roundedGoal.toString());
+                        }
+                        
+                        setSettingsWaterUnit(newUnit);
+                      }}
+                      {...getButtonAccessibilityProps(t('water.settings.water_units'))}
+                    >
+                      <ThemedText style={[styles.dropdownText, { color: colors.text }]}>
+                        {settingsWaterUnit === 'ml' ? t('water.ml') : settingsWaterUnit === 'floz' ? t('water.floz') : t('water.cup')}
+                      </ThemedText>
+                      <IconSymbol name="chevron.down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Goal Row */}
+                <View style={styles.settingsRow}>
+                  <ThemedText style={[styles.formLabel, { color: colors.text }]}>
+                    {t('water.settings.goal')} ({settingsWaterUnit === 'ml' ? t('water.ml') : settingsWaterUnit === 'floz' ? t('water.floz') : t('water.cup')})
+                  </ThemedText>
+                  <TextInput
+                    style={[
+                      styles.formInput,
+                      {
+                        backgroundColor: colors.card,
+                        color: colors.text,
+                        borderColor: settingsGoalError ? colors.error : colors.border,
+                      },
+                    ]}
+                    value={settingsGoal}
+                    onChangeText={(text) => {
+                      setSettingsGoal(text);
+                      setSettingsGoalError('');
+                    }}
+                    placeholder={settingsWaterUnit === 'floz' ? '64' : settingsWaterUnit === 'cup' ? '8' : '2000'}
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                  {settingsGoalError && (
+                    <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                      {settingsGoalError}
+                    </ThemedText>
+                  )}
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                    onPress={() => {
+                      setShowSettingsPanel(false);
+                      setSettingsGoalError('');
+                    }}
+                    {...getButtonAccessibilityProps(t('water.settings.cancel'))}
+                  >
+                    <ThemedText style={{ color: colors.text }}>{t('water.settings.cancel')}</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                    onPress={handleSaveSettings}
+                    disabled={isUpdatingUnitAndGoal}
+                    {...getButtonAccessibilityProps(t('water.settings.save'))}
+                  >
+                    {isUpdatingUnitAndGoal ? (
+                      <ActivityIndicator size="small" color={colors.textInverse} />
+                    ) : (
+                      <ThemedText style={[styles.saveButtonText, { color: colors.textInverse }]}>
+                        {t('water.settings.save')}
+                      </ThemedText>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    padding: Layout.screenPadding,
+  },
+  card: {
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md, // Reduced from lg to tighten spacing
+    marginBottom: Spacing.lg,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs, // Reduced from sm to tighten spacing
+    paddingBottom: Spacing.xs,
+    borderBottomWidth: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  gearButton: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  cardTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    marginBottom: Spacing.xs,
+  },
+  summary: {
+    fontSize: FontSize.sm,
+  },
+  loadingIndicator: {
+    marginVertical: Spacing.sm,
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+  },
+  waterDisplay: {
+    position: 'relative',
+    alignItems: 'center',
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xs,
+    minHeight: 280, // Ensure enough space for droplet
+  },
+  editTotalButtonContainer: {
+    position: 'absolute',
+    top: Spacing.xs,
+    left: 0,
+    zIndex: 10,
+  },
+  editTotalCompactButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  editTotalCompactButtonText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+    lineHeight: FontSize.xs * 1.5, // Use theme line height
+  },
+  dropletContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  quickAddChipsRowContainer: {
+    width: '100%',
+  },
+  quickAddChipsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.sm, // Use gap-based spacing for even distribution
+    paddingTop: Spacing.xs, // Small gap from droplet
+    paddingBottom: Spacing.xs, // Small bottom padding
+    paddingHorizontal: Spacing.xs, // Small horizontal padding
+    minHeight: 70, // Match chip height to ensure baseline alignment
+  },
+  quickAddChip: {
+    width: 70, // Fixed width for consistent sizing
+    height: 70, // Fixed height to match width (square chips)
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xs, // Symmetric padding on all sides
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.xs / 2, // Small gap between icon and text
+    ...getMinTouchTargetStyle(),
+  },
+  quickAddChipText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+    lineHeight: FontSize.xs * 1.5, // Use theme line height
+  },
+  stats: {
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    gap: Spacing.xs / 2,
+  },
+  primaryText: {
+    fontSize: FontSize.xl,
+    fontWeight: '600',
+  },
+  secondaryText: {
+    fontSize: FontSize.sm,
+  },
+  formHelper: {
+    fontSize: FontSize.xs,
+    marginTop: Spacing.xs,
+  },
+  customButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+    ...getMinTouchTargetStyle(),
+  },
+  customButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    borderTopLeftRadius: BorderRadius['2xl'],
+    borderTopRightRadius: BorderRadius['2xl'],
+    padding: Spacing.lg,
+    maxHeight: '85%',
+    width: '100%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  closeButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    ...getMinTouchTargetStyle(),
+  },
+  modalBody: {
+    gap: Spacing.lg,
+  },
+  formLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  formInput: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    fontSize: FontSize.md,
+  },
+  errorText: {
+    fontSize: FontSize.xs,
+    marginTop: Spacing.xs,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  modalButton: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  saveButton: {
+    // backgroundColor set inline
+  },
+  saveButtonText: {
+    fontWeight: '600',
+  },
+  settingsRow: {
+    marginBottom: Spacing.md,
+  },
+  dropdownContainer: {
+    marginTop: Spacing.xs,
+  },
+  dropdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    ...getMinTouchTargetStyle(),
+  },
+  dropdownText: {
+    fontSize: FontSize.base,
+    fontWeight: '500',
+  },
+});
+

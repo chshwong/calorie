@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions, ViewStyle } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
+import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
+import { SurfaceCard } from '@/components/common/surface-card';
+import { QuickAddHeading } from '@/components/common/quick-add-heading';
+import { ModuleFAB } from '@/components/module/module-fab';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -260,11 +264,11 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
         ) : (
           <TouchableOpacity
             onPress={startEditingMinutes}
-            style={[styles.minutesBadge, { backgroundColor: '#DFF2FF', borderColor: '#A5D8FF' }]}
+            style={[styles.minutesBadge, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps('Edit minutes')}
           >
-            <ThemedText style={[styles.minutesBadgeText, { color: '#0369A1' }]}>
+            <ThemedText style={[styles.minutesBadgeText, { color: colors.info }]}>
               {log.minutes !== null ? `${log.minutes} min` : 'Add min'}
             </ThemedText>
           </TouchableOpacity>
@@ -277,7 +281,7 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
             styles.deleteButtonGhost,
             {
               borderColor: colors.separator,
-              backgroundColor: deleteHovered ? '#FEE2E2' : 'transparent',
+              backgroundColor: deleteHovered ? colors.errorLight : 'transparent',
             },
           ]}
           activeOpacity={0.7}
@@ -299,7 +303,7 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
 // Responsive container component for exercise sections
 type ExerciseSectionContainerProps = {
   children: React.ReactNode;
-  style?: any;
+  style?: ViewStyle;
 };
 
 function ExerciseSectionContainer({ children, style }: ExerciseSectionContainerProps) {
@@ -368,7 +372,7 @@ function QuickAddChip({ label, icon, minutes, colors, onPress }: QuickAddChipPro
         {...getButtonAccessibilityProps(`${label}${minutes ? ` - ${minutes} min` : ''}`)}
       >
         {icon && (
-          <IconSymbol name={icon as any} size={14} color={colors.tint} style={{ marginRight: Spacing.xs }} />
+          <IconSymbol name={icon as Parameters<typeof IconSymbol>[0]['name']} size={14} color={colors.tint} style={{ marginRight: Spacing.xs }} />
         )}
         <ThemedText style={[styles.chipText, { color: colors.text }]}>
           {label}
@@ -575,7 +579,7 @@ export default function ExerciseHomeScreen() {
           onSuccess: () => {
             closeCustomForm();
           },
-          onError: (error: any) => {
+          onError: (error: Error) => {
             Alert.alert(t('exercise.form.error_save_failed', { error: error.message || t('common.unexpected_error') }));
           },
         }
@@ -594,7 +598,7 @@ export default function ExerciseHomeScreen() {
           onSuccess: () => {
             closeCustomForm();
           },
-          onError: (error: any) => {
+          onError: (error: Error) => {
             Alert.alert(t('exercise.form.error_save_failed', { error: error.message || t('common.unexpected_error') }));
           },
         }
@@ -617,7 +621,7 @@ export default function ExerciseHomeScreen() {
         setShowDeleteConfirm(false);
         setDeleteTarget(null);
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         setShowDeleteConfirm(false);
         setDeleteTarget(null);
         Alert.alert(t('exercise.delete.error', { error: error.message || t('common.unexpected_error') }));
@@ -639,7 +643,7 @@ export default function ExerciseHomeScreen() {
         updates: { minutes },
       },
       {
-        onError: (error: any) => {
+        onError: (error: Error) => {
           Alert.alert(t('exercise.form.error_save_failed', { error: error.message || t('common.unexpected_error') }));
         },
       }
@@ -687,7 +691,7 @@ export default function ExerciseHomeScreen() {
   // Background gradient colors
   const backgroundGradient = colorScheme === 'dark'
     ? { from: colors.background, to: colors.backgroundSecondary }
-    : { from: '#FFFFFF', to: '#F8FAFC' };
+    : { from: colors.background, to: colors.backgroundSecondary };
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: backgroundGradient.from }]}>
@@ -708,9 +712,13 @@ export default function ExerciseHomeScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
+        {/* Module Identity Bar */}
+        <ModuleIdentityBar module="exercise" />
+
         {/* Date Header with Greeting and Navigation */}
-        <DateHeader 
+        <DateHeader
           showGreeting={true}
+          module="exercise"
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
           selectedDateString={selectedDateString}
@@ -751,9 +759,9 @@ export default function ExerciseHomeScreen() {
 
         {/* Today's Exercise Section - Card */}
         <ExerciseSectionContainer>
-          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+          <SurfaceCard module="exercise">
           {/* Sticky header */}
-          <View style={[styles.cardHeader, { backgroundColor: colors.card }]}>
+          <View style={styles.cardHeader}>
             <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
               {isToday ? t('exercise.today_title') : formatDateForDisplay(selectedDate)}
             </ThemedText>
@@ -800,12 +808,12 @@ export default function ExerciseHomeScreen() {
               )}
             </>
           )}
-          </View>
+          </SurfaceCard>
         </ExerciseSectionContainer>
 
         {/* Quick Add Section - Card */}
         <ExerciseSectionContainer>
-          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+          <SurfaceCard module="exercise">
           <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
             {t('exercise.quick_add_title')}
           </ThemedText>
@@ -813,9 +821,11 @@ export default function ExerciseHomeScreen() {
           {/* Recent/Frequent Exercises */}
           {hasRecentFrequent && (
             <>
-              <ThemedText style={[styles.chipSectionLabel, { color: colors.textSecondary }]}>
-                {t('exercise.quick_add.your_recent_frequent')}
-              </ThemedText>
+              <QuickAddHeading 
+                labelKey="exercise.quick_add.your_recent_frequent"
+                module="exercise"
+                icon="dumbbell.fill"
+              />
               <ScrollView
                 style={styles.chipsScrollContainer}
                 contentContainerStyle={styles.chipsWrapContainer}
@@ -836,9 +846,11 @@ export default function ExerciseHomeScreen() {
           )}
 
           {/* Static Default Exercises */}
-          <ThemedText style={[styles.chipSectionLabel, { color: colors.textSecondary, marginTop: hasRecentFrequent ? Spacing.md : 0 }]}>
-            {t('exercise.quick_add.common_exercises')}
-          </ThemedText>
+          <QuickAddHeading 
+            labelKey="exercise.quick_add.common_exercises"
+            module="exercise"
+            icon="figure.run"
+          />
           <ScrollView
             style={styles.chipsScrollContainer}
             contentContainerStyle={styles.chipsWrapContainer}
@@ -870,8 +882,8 @@ export default function ExerciseHomeScreen() {
             <ThemedText style={[styles.customButtonText, { color: colors.tint }]}>
               {t('exercise.quick_add.add_custom')}
             </ThemedText>
-          </TouchableOpacity>
-          </View>
+            </TouchableOpacity>
+          </SurfaceCard>
         </ExerciseSectionContainer>
 
         {/* Recent Days Section - Lighter Card */}
@@ -912,6 +924,9 @@ export default function ExerciseHomeScreen() {
           </View>
         </ExerciseSectionContainer>
       </ScrollView>
+      
+      {/* Module-specific FAB */}
+      <ModuleFAB module="exercise" icon="plus" />
 
       {/* Delete Confirmation Modal */}
       <Modal
@@ -1242,6 +1257,7 @@ const styles = StyleSheet.create({
     // Chip height: ~40px (padding + content)
     // Row spacing: 8px marginBottom
     // 3 rows: (40px * 3) + (8px * 2) = 136px, rounded to 140px with buffer
+    // This is a layout constraint, not a spacing token, so hardcoded value is acceptable per guideline 8.1
     maxHeight: 140,
     marginBottom: Spacing.sm,
     ...(Platform.OS === 'web' && {

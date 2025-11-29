@@ -10,9 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
-import { ageFromDob, bmi } from '@/utils/calculations';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
-import { getBMICategory } from '@/utils/bmi';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER } from '@/utils/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -312,12 +310,6 @@ export default function FoodLogHomeScreen() {
     );
   }
 
-  const actualAge = ageFromDob(profile.date_of_birth);
-  const bmiValue = bmi(profile.height_cm, profile.weight_lb);
-
-  // Get BMI category using domain utility
-  const bmiCategory = getBMICategory(bmiValue);
-
   // Calculate daily totals using domain utility
   const dailyTotals = calculateDailyTotals(calorieEntries);
 
@@ -458,44 +450,6 @@ export default function FoodLogHomeScreen() {
               </>
             }
           />
-
-
-          {/* Stats Grid - 4 squares */}
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-              <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>{t('home.stats.age')}</ThemedText>
-              <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                {Math.round(actualAge)}
-              </ThemedText>
-              <ThemedText style={[styles.statUnit, { color: colors.textTertiary }]}>{t('home.stats.years')}</ThemedText>
-            </View>
-
-            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-              <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>{t('home.stats.height')}</ThemedText>
-              <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                {Math.round(profile.height_cm)}
-              </ThemedText>
-              <ThemedText style={[styles.statUnit, { color: colors.textTertiary }]}>{t('units.cm')}</ThemedText>
-            </View>
-
-            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-              <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>{t('home.stats.weight')}</ThemedText>
-              <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                {Math.round(profile.weight_lb)}
-              </ThemedText>
-              <ThemedText style={[styles.statUnit, { color: colors.textTertiary }]}>{t('units.lbs')}</ThemedText>
-            </View>
-
-            <View style={[styles.statCard, { backgroundColor: bmiCategory.color + '12' }]}>
-              <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>{t('home.stats.bmi')}</ThemedText>
-              <ThemedText style={[styles.statValue, { color: bmiCategory.color }]}>
-                {bmiValue.toFixed(1)}
-              </ThemedText>
-              <ThemedText style={[styles.statUnit, { color: bmiCategory.color, opacity: 0.85 }]}>
-                {t(bmiCategory.labelKey)}
-              </ThemedText>
-            </View>
-          </View>
 
           {/* Daily Totals Summary */}
           <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>
@@ -1039,52 +993,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     paddingHorizontal: 0,
     flexShrink: 1,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Platform.select({ web: 6, default: 8 }),
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: Platform.select({ web: 1, default: 0 }),
-    width: Platform.select({ web: 'auto', default: '47%' }), // 2 columns on mobile
-    padding: Platform.select({ web: 12, default: 14 }),
-    borderRadius: 16,
-    alignItems: 'center',
-    minHeight: 90,
-    backgroundColor: 'transparent',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 2,
-      },
-    }),
-  },
-  statLabel: {
-    fontSize: Platform.select({ web: 9, default: 10 }),
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    fontWeight: '600',
-    opacity: 0.7,
-  },
-  statValue: {
-    fontSize: Platform.select({ web: 22, default: 20 }),
-    fontWeight: 'bold',
-    marginBottom: 2,
-    letterSpacing: -0.3,
-  },
-  statUnit: {
-    fontSize: Platform.select({ web: 10, default: 11 }),
-    opacity: 1.0,
-    fontWeight: '500',
   },
   dailyTotalsCard: {
     padding: Platform.select({ web: 16, default: 18 }),

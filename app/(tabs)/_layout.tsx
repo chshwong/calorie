@@ -7,7 +7,6 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { FloatingActionButton } from '@/components/floating-action-button';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -43,6 +42,13 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="water"
+          options={{
+            title: t('tabs.water'),
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="drop.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="dashboard"
           options={{
             title: t('tabs.dashboard'),
@@ -64,7 +70,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-      <FloatingActionButton />
     </View>
   );
 }

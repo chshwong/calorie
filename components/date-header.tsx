@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Spacing, FontSize } from '@/constants/theme';
+import { Colors, Spacing, FontSize, ModuleThemes, type ModuleType } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -20,6 +20,8 @@ type DateHeaderProps = {
   rightActions?: React.ReactNode;
   /** Whether to show the greeting section */
   showGreeting?: boolean;
+  /** Optional module type for accent colors (exercise, meds, etc.) */
+  module?: ModuleType;
   /** Optional: Use provided date state instead of creating its own */
   selectedDate?: Date;
   setSelectedDate?: (date: Date) => void;
@@ -40,6 +42,7 @@ type DateHeaderProps = {
 export function DateHeader({ 
   rightActions, 
   showGreeting = true,
+  module,
   selectedDate: propSelectedDate,
   setSelectedDate: propSetSelectedDate,
   selectedDateString: propSelectedDateString,
@@ -56,6 +59,9 @@ export function DateHeader({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { data: profile } = useUserProfile();
+  
+  // Get module accent color if module is provided
+  const moduleAccent = module ? ModuleThemes[module].accent : colors.tint;
   
   // Use provided date state or create own instance
   const hookDateState = useSelectedDate();
@@ -180,7 +186,7 @@ export function DateHeader({
           )}
         >
           <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-            <Text style={[styles.dateNavButtonText, { color: colors.text }]}>‹</Text>
+            <Text style={[styles.dateNavButtonText, { color: moduleAccent }]}>‹</Text>
           </View>
         </TouchableOpacity>
         <View style={styles.dateDisplay}>
@@ -198,7 +204,7 @@ export function DateHeader({
             styles.calendarButton, 
             getMinTouchTargetStyle(),
             { 
-              backgroundColor: colors.tint,
+              backgroundColor: moduleAccent,
               ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
             }
           ]}
@@ -229,7 +235,7 @@ export function DateHeader({
             )}
           >
             <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
-              <Text style={[styles.dateNavButtonText, { color: colors.text }]}>›</Text>
+              <Text style={[styles.dateNavButtonText, { color: moduleAccent }]}>›</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -347,10 +353,10 @@ export function DateHeader({
                         key={`day-${day}`}
                         style={[
                           styles.calendarDay,
-                          isSelectedDay && { backgroundColor: colors.tint },
+                          isSelectedDay && { backgroundColor: moduleAccent },
                           isTodayDay && !isSelectedDay && { 
                             borderWidth: 1, 
-                            borderColor: colors.tint,
+                            borderColor: moduleAccent,
                             borderRadius: 8,
                           },
                         ]}
@@ -367,7 +373,7 @@ export function DateHeader({
                         <ThemedText
                           style={[
                             styles.calendarDayText,
-                            { color: isSelectedDay ? '#fff' : (isTodayDay ? colors.tint : colors.text) },
+                            { color: isSelectedDay ? '#fff' : (isTodayDay ? moduleAccent : colors.text) },
                             isSelectedDay && styles.calendarDayTextSelected,
                           ]}
                         >

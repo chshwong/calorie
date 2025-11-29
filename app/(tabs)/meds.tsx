@@ -7,6 +7,10 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
+import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
+import { SurfaceCard } from '@/components/common/surface-card';
+import { QuickAddHeading } from '@/components/common/quick-add-heading';
+import { ModuleFAB } from '@/components/module/module-fab';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -19,6 +23,7 @@ import {
   useUpdateMedLog,
   useDeleteMedLog,
 } from '@/hooks/use-med-logs';
+import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -208,7 +213,9 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
   };
 
   const doseText = formatDose();
-  const typeLabel = log.type === 'med' ? t('meds.form.type_med') : log.type === 'supp' ? t('meds.form.type_supp') : t('meds.form.type_other');
+  // Display legacy 'other' type as 'med'
+  const displayType = log.type === 'other' ? 'med' : log.type;
+  const typeLabel = displayType === 'med' ? t('meds.form.type_med') : t('meds.form.type_supp');
   
   const rowStyle = animationValue
     ? {
@@ -482,6 +489,10 @@ export default function MedsHomeScreen() {
   const { data: medLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useMedLogsForDate(selectedDateString);
   const { data: recentDaysSummary = [] } = useMedSummaryForRecentDays(7);
   const { data: recentAndFrequentMeds = [], isLoading: isLoadingRecentFrequent } = useMedRecentAndFrequent(60);
+  
+  // Preferences
+  const { data: medPrefs = { primarySection: 'med', hideMedWhenEmpty: false, hideSuppWhenEmpty: false } } = useMedPreferences();
+  const updatePrefsMutation = useUpdateMedPreferences();
 
   // Mutations
   const createMutation = useCreateMedLog();
@@ -495,7 +506,7 @@ export default function MedsHomeScreen() {
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [editingLog, setEditingLog] = useState<{ id: string; name: string; type: 'med' | 'supp' | 'other'; dose_amount: number | null; dose_unit: string | null; notes: string | null } | null>(null);
   const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState<'med' | 'supp' | 'other'>('med');
+  const [formType, setFormType] = useState<'med' | 'supp'>('med');
   const [formDoseAmount, setFormDoseAmount] = useState('');
   const [formDoseUnit, setFormDoseUnit] = useState('');
   const [formNotes, setFormNotes] = useState('');
@@ -503,11 +514,28 @@ export default function MedsHomeScreen() {
   // Delete confirmation modal state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  
+  // Preferences modal state
+  const [showPrefsModal, setShowPrefsModal] = useState(false);
 
   // Calculate totals for selected date
   const totalItems = medLogs.length;
-  const medCount = medLogs.filter(log => log.type === 'med').length;
-  const suppCount = medLogs.filter(log => log.type === 'supp').length;
+  // Split logs by type (treat legacy 'other' as 'med')
+  const medLogsFiltered = medLogs.filter(log => {
+    const normalizedType = log.type === 'other' ? 'med' : log.type;
+    return normalizedType === 'med';
+  });
+  const suppLogsFiltered = medLogs.filter(log => {
+    const normalizedType = log.type === 'other' ? 'med' : log.type;
+    return normalizedType === 'supp';
+  });
+  const medCount = medLogsFiltered.length;
+  const suppCount = suppLogsFiltered.length;
+  
+  // Determine section order based on preferences
+  const primarySection = medPrefs.primarySection || 'med';
+  const showMedSection = !medPrefs.hideMedWhenEmpty || medCount > 0;
+  const showSuppSection = !medPrefs.hideSuppWhenEmpty || suppCount > 0;
 
   // Animate newly added med
   useEffect(() => {
@@ -564,7 +592,8 @@ export default function MedsHomeScreen() {
   const openEditForm = (log: { id: string; name: string; type: 'med' | 'supp' | 'other'; dose_amount: number | null; dose_unit: string | null; notes: string | null }) => {
     setEditingLog(log);
     setFormName(log.name);
-    setFormType(log.type);
+    // Convert legacy 'other' type to 'med' for editing
+    setFormType(log.type === 'other' ? 'med' : (log.type === 'med' || log.type === 'supp' ? log.type : 'med'));
     setFormDoseAmount(log.dose_amount?.toString() || '');
     setFormDoseUnit(log.dose_unit || '');
     setFormNotes(log.notes || '');
@@ -608,12 +637,14 @@ export default function MedsHomeScreen() {
 
     if (editingLog) {
       // Update existing
+      // Ensure type is 'med' or 'supp' (never 'other')
+      const updateType: 'med' | 'supp' = formType === 'med' || formType === 'supp' ? formType : 'med';
       updateMutation.mutate(
         {
           logId: editingLog.id,
           updates: {
             name: formName.trim(),
-            type: formType,
+            type: updateType,
             dose_amount: doseAmount,
             dose_unit: formDoseUnit.trim() || null,
             notes: formNotes.trim() || null,
@@ -630,12 +661,14 @@ export default function MedsHomeScreen() {
       );
     } else {
       // Create new
+      // Ensure type is 'med' or 'supp' (never 'other')
+      const createType: 'med' | 'supp' = formType === 'med' || formType === 'supp' ? formType : 'med';
       createMutation.mutate(
         {
           user_id: user.id,
           date: selectedDateString,
           name: formName.trim(),
-          type: formType,
+          type: createType,
           dose_amount: doseAmount,
           dose_unit: formDoseUnit.trim() || null,
           notes: formNotes.trim() || null,
@@ -774,9 +807,13 @@ export default function MedsHomeScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
+        {/* Module Identity Bar */}
+        <ModuleIdentityBar module="meds" />
+
         {/* Date Header with Greeting and Navigation */}
         <DateHeader 
           showGreeting={true}
+          module="meds"
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
           selectedDateString={selectedDateString}
@@ -817,12 +854,21 @@ export default function MedsHomeScreen() {
 
         {/* Today's Meds Section - Card */}
         <MedSectionContainer>
-          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+          <SurfaceCard module="meds">
           {/* Sticky header */}
           <View style={[styles.cardHeader, { backgroundColor: colors.card }]}>
-            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-              {isToday ? t('meds.today_title') : formatDateForDisplay(selectedDate)}
-            </ThemedText>
+            <View style={styles.cardHeaderTop}>
+              <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+                {isToday ? t('meds.today_title') : formatDateForDisplay(selectedDate)}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setShowPrefsModal(true)}
+                style={[styles.settingsButton, { backgroundColor: colors.backgroundSecondary }]}
+                {...getButtonAccessibilityProps('Settings')}
+              >
+                <IconSymbol name="ellipsis" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             {logsLoading ? (
               <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
             ) : (
@@ -847,35 +893,178 @@ export default function MedsHomeScreen() {
             </View>
           ) : (
             <>
-              {medLogs.length === 0 ? (
+              {totalItems === 0 ? (
                 <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>
                   {t('meds.summary.no_meds')}
                 </ThemedText>
               ) : (
-                <View style={styles.medList}>
-                  {medLogs.map((log, index) => (
-                    <MedRow
-                      key={log.id}
-                      log={log}
-                      colors={colors}
-                      onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
-                      onDelete={() => handleDelete(log.id, log.name)}
-                      onDoseUpdate={handleDoseUpdate}
-                      isLast={index === medLogs.length - 1}
-                      animationValue={animationRefs.current.get(log.id)}
-                      t={t}
-                    />
-                  ))}
+                <View style={styles.sectionsContainer}>
+                  {/* Render sections based on primarySection preference */}
+                  {primarySection === 'med' ? (
+                    <>
+                      {/* Med Section First */}
+                      {showMedSection && (
+                        <View style={styles.typeSection}>
+                          <View style={styles.typeSectionHeader}>
+                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
+                              {t('meds.form.type_med')}
+                            </ThemedText>
+                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
+                              {medCount} {medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
+                            </ThemedText>
+                          </View>
+                          {medCount > 0 ? (
+                            <View style={styles.medList}>
+                              {medLogsFiltered.map((log, index) => (
+                                <MedRow
+                                  key={log.id}
+                                  log={log}
+                                  colors={colors}
+                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
+                                  onDelete={() => handleDelete(log.id, log.name)}
+                                  onDoseUpdate={handleDoseUpdate}
+                                  isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
+                                  animationValue={animationRefs.current.get(log.id)}
+                                  t={t}
+                                />
+                              ))}
+                            </View>
+                          ) : (
+                            <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+                              {t('meds.summary.none')}
+                            </ThemedText>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Divider between sections */}
+                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && (
+                        <View style={[styles.sectionDivider, { backgroundColor: colors.separator }]} />
+                      )}
+
+                      {/* Supp Section Second */}
+                      {showSuppSection && (
+                        <View style={styles.typeSection}>
+                          <View style={styles.typeSectionHeader}>
+                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
+                              {t('meds.form.type_supp')}
+                            </ThemedText>
+                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
+                              {suppCount} {suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
+                            </ThemedText>
+                          </View>
+                          {suppCount > 0 ? (
+                            <View style={styles.medList}>
+                              {suppLogsFiltered.map((log, index) => (
+                                <MedRow
+                                  key={log.id}
+                                  log={log}
+                                  colors={colors}
+                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
+                                  onDelete={() => handleDelete(log.id, log.name)}
+                                  onDoseUpdate={handleDoseUpdate}
+                                  isLast={index === suppLogsFiltered.length - 1}
+                                  animationValue={animationRefs.current.get(log.id)}
+                                  t={t}
+                                />
+                              ))}
+                            </View>
+                          ) : (
+                            <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+                              {t('meds.summary.none')}
+                            </ThemedText>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Supp Section First */}
+                      {showSuppSection && (
+                        <View style={styles.typeSection}>
+                          <View style={styles.typeSectionHeader}>
+                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
+                              {t('meds.form.type_supp')}
+                            </ThemedText>
+                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
+                              {suppCount} {suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
+                            </ThemedText>
+                          </View>
+                          {suppCount > 0 ? (
+                            <View style={styles.medList}>
+                              {suppLogsFiltered.map((log, index) => (
+                                <MedRow
+                                  key={log.id}
+                                  log={log}
+                                  colors={colors}
+                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
+                                  onDelete={() => handleDelete(log.id, log.name)}
+                                  onDoseUpdate={handleDoseUpdate}
+                                  isLast={index === suppLogsFiltered.length - 1 && (!showMedSection || medCount === 0)}
+                                  animationValue={animationRefs.current.get(log.id)}
+                                  t={t}
+                                />
+                              ))}
+                            </View>
+                          ) : (
+                            <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+                              {t('meds.summary.none')}
+                            </ThemedText>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Divider between sections */}
+                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && (
+                        <View style={[styles.sectionDivider, { backgroundColor: colors.separator }]} />
+                      )}
+
+                      {/* Med Section Second */}
+                      {showMedSection && (
+                        <View style={styles.typeSection}>
+                          <View style={styles.typeSectionHeader}>
+                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
+                              {t('meds.form.type_med')}
+                            </ThemedText>
+                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
+                              {medCount} {medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
+                            </ThemedText>
+                          </View>
+                          {medCount > 0 ? (
+                            <View style={styles.medList}>
+                              {medLogsFiltered.map((log, index) => (
+                                <MedRow
+                                  key={log.id}
+                                  log={log}
+                                  colors={colors}
+                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
+                                  onDelete={() => handleDelete(log.id, log.name)}
+                                  onDoseUpdate={handleDoseUpdate}
+                                  isLast={index === medLogsFiltered.length - 1}
+                                  animationValue={animationRefs.current.get(log.id)}
+                                  t={t}
+                                />
+                              ))}
+                            </View>
+                          ) : (
+                            <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+                              {t('meds.summary.none')}
+                            </ThemedText>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  )}
                 </View>
               )}
             </>
           )}
-          </View>
+          </SurfaceCard>
         </MedSectionContainer>
 
         {/* Quick Add Section - Card */}
         <MedSectionContainer>
-          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+          <SurfaceCard module="meds">
           <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
             {t('meds.quick_add_title')}
           </ThemedText>
@@ -883,9 +1072,11 @@ export default function MedsHomeScreen() {
           {/* Recent/Frequent Meds */}
           {hasRecentFrequent && (
             <>
-              <ThemedText style={[styles.chipSectionLabel, { color: colors.textSecondary }]}>
-                {t('meds.quick_add.recent_freq')}
-              </ThemedText>
+              <QuickAddHeading 
+                labelKey="meds.quick_add.recent_freq"
+                module="meds"
+                icon="pill.fill"
+              />
               <ScrollView
                 style={styles.chipsScrollContainer}
                 contentContainerStyle={styles.chipsWrapContainer}
@@ -909,9 +1100,11 @@ export default function MedsHomeScreen() {
           )}
 
           {/* Static Common Meds */}
-          <ThemedText style={[styles.chipSectionLabel, { color: colors.textSecondary, marginTop: hasRecentFrequent ? Spacing.md : 0 }]}>
-            {t('meds.quick_add.common')}
-          </ThemedText>
+          <QuickAddHeading 
+            labelKey="meds.quick_add.common"
+            module="meds"
+            icon="pills.fill"
+          />
           <ScrollView
             style={styles.chipsScrollContainer}
             contentContainerStyle={styles.chipsWrapContainer}
@@ -956,7 +1149,7 @@ export default function MedsHomeScreen() {
               {t('meds.quick_add.add_custom')}
             </ThemedText>
           </TouchableOpacity>
-          </View>
+          </SurfaceCard>
         </MedSectionContainer>
 
         {/* Recent Days Section - Lighter Card */}
@@ -1106,18 +1299,6 @@ export default function MedsHomeScreen() {
                         {t('meds.form.type_supp')}
                       </ThemedText>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.typeOption,
-                        formType === 'other' && { backgroundColor: colors.tintLight, borderColor: colors.tint },
-                      ]}
-                      onPress={() => setFormType('other')}
-                      {...getButtonAccessibilityProps(t('meds.form.type_other'))}
-                    >
-                      <ThemedText style={{ color: formType === 'other' ? colors.tint : colors.text }}>
-                        {t('meds.form.type_other')}
-                      </ThemedText>
-                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -1197,6 +1378,9 @@ export default function MedsHomeScreen() {
           </View>
         </View>
       </Modal>
+      
+      {/* Module-specific FAB */}
+      <ModuleFAB module="meds" icon="plus" />
     </ThemedView>
   );
 }
@@ -1232,8 +1416,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cardHeader: {
-    marginBottom: Spacing.md,
-    paddingBottom: Spacing.sm,
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.separator,
     // Sticky positioning for web (optional)
@@ -1242,6 +1426,17 @@ const styles = StyleSheet.create({
       top: 0,
       zIndex: 10,
     }),
+  },
+  cardHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  settingsButton: {
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    ...getMinTouchTargetStyle(),
   },
   cardTitle: {
     fontSize: FontSize.lg,
@@ -1268,10 +1463,41 @@ const styles = StyleSheet.create({
   medList: {
     marginTop: Spacing.xs,
   },
+  // Sections container for Med/Supp split
+  sectionsContainer: {
+    marginTop: Spacing.xs,
+  },
+  typeSection: {
+    marginBottom: Spacing.sm,
+  },
+  typeSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    paddingVertical: Spacing.xs,
+  },
+  typeSectionTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  typeSectionCount: {
+    fontSize: FontSize.xs,
+  },
+  sectionDivider: {
+    height: 1,
+    marginVertical: Spacing.sm,
+  },
+  emptySectionText: {
+    fontSize: FontSize.xs,
+    fontStyle: 'italic',
+    paddingVertical: Spacing.xs,
+    paddingLeft: Spacing.xs,
+  },
   medRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
     paddingRight: Spacing.sm,
   },
   medRowContent: {
@@ -1516,14 +1742,14 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   doseAmountInput: {
-    flex: 1,
+    flex: 2,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     fontSize: FontSize.md,
   },
   doseUnitInput: {
-    flex: 1,
+    width: 100,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
@@ -1584,6 +1810,34 @@ const styles = StyleSheet.create({
   },
   deleteConfirmButton: {
     // backgroundColor set inline
+  },
+  // Preferences modal styles
+  prefsToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    ...getMinTouchTargetStyle(),
+  },
+  prefsToggleLabel: {
+    fontSize: FontSize.base,
+    flex: 1,
+  },
+  toggleSwitch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.light.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignSelf: 'flex-end',
   },
 });
 

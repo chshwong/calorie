@@ -20,7 +20,8 @@
     "day": "Day",
     "unexpected_error": "An unexpected error occurred. Please try again.",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "add": "Add"
   },
 
   "home": {
@@ -269,12 +270,18 @@
       "units": "Units",
       "units_metric": "Metric (kg, cm)",
       "units_imperial": "Imperial (lbs, in)",
+      "water_units": "Water Units",
+      "water_units_metric": "Metric (ml)",
+      "water_units_imperial": "Imperial (fl oz)",
       "dark_mode": "Dark Mode",
       "dark_mode_system": "System",
       "dark_mode_on": "On",
       "dark_mode_off": "Off",
       "notifications": "Notifications",
       "notifications_subtitle": "Enable push notifications"
+    },
+    "errors": {
+      "save_preference_failed": "Failed to save preference. Please try again."
     },
     "privacy": {
       "title": "Privacy & Security",
@@ -1160,6 +1167,30 @@
   "dashboard": {
     "title": "Dashboard",
     "today_summary": "Today's Summary",
+    "body": {
+      "age": {
+        "label": "Age",
+        "unit": "years"
+      },
+      "height": {
+        "label": "Height",
+        "unit": "cm"
+      },
+      "weight": {
+        "label": "Weight",
+        "unit": "lbs"
+      },
+      "bmi": {
+        "label": "BMI",
+        "no_data": "No data",
+        "classification": {
+          "underweight": "Underweight",
+          "normal": "Normal Weight",
+          "overweight": "Overweight/Muscular",
+          "obese": "Obese"
+        }
+      }
+    },
     "snapshot": {
       "food": "Food",
       "ex": "Ex",
@@ -1252,7 +1283,8 @@
       "med_other": "meds",
       "supp_one": "supp",
       "supp_other": "supps",
-      "no_meds": "No meds logged yet"
+      "no_meds": "No meds logged yet",
+      "none": "None"
     },
     "entry": {
       "format_with_dose": "{{name}} – {{dose}}",
@@ -1319,6 +1351,14 @@
       "cancel": "Cancel",
       "success": "Med deleted successfully",
       "error": "Failed to delete med: {{error}}"
+    },
+    "preferences": {
+      "title": "Meds Preferences",
+      "primary_section": "Show First",
+      "hide_when_empty": "Hide When Empty",
+      "hide_when_empty_hint": "Hide sections only when they have no items",
+      "hide_med": "Hide Med section when empty",
+      "hide_supp": "Hide Supp section when empty"
     }
   },
 
@@ -1326,8 +1366,84 @@
     "log": "Log",
     "exercise": "Exercise",
     "meds": "Meds",
+    "water": "Water",
     "dashboard": "Dashboard",
     "more": "More"
+  },
+
+  "water": {
+    "dashboard": {
+      "title": "Water",
+      "ml": "ml",
+      "goal": "Goal: {{goal}} ml",
+      "set_goal": "Set Goal",
+      "card_label": "Water: {{ml}} / {{goal}} ml"
+    },
+    "today_title": "Today's Water",
+    "ml": "ml",
+    "floz": "fl oz",
+    "cup": "cup",
+    "cups": "cups",
+    "of_goal": "of goal",
+    "goal_label": "Goal {{value}}",
+    "settings": {
+      "title": "Water Settings",
+      "water_units": "Water Units",
+      "goal": "Goal",
+      "save": "Save",
+      "cancel": "Cancel",
+      "goal_out_of_range": "Goal must be between {{min}} and {{max}} ml",
+      "goal_required": "Goal is required"
+    },
+    "summary": {
+      "goal": "Goal: {{goal}} ml"
+    },
+    "adjust": {
+      "minus50": "-50 ml",
+      "minus100": "-100 ml"
+    },
+    "edit_total": {
+      "title": "Edit Total",
+      "button": "Edit Total",
+      "label": "Total Amount ({{unit}})",
+      "helper": "Maximum: {{max}} ml",
+      "invalid": "Please enter a valid amount between 0 and 5000",
+      "max_limit": "Maximum is {{max}} ml",
+      "error": "Failed to update total"
+    },
+    "set_goal": {
+      "title": "Set Water Goal",
+      "button": "Set Goal",
+      "message": "Daily Goal ({{unit}})",
+      "invalid": "Please enter a valid goal between 480 and 5000 ml",
+      "error": "Failed to set goal"
+    },
+    "edit_goal": "Edit Goal",
+    "goal_limit_error": "Goal must be between {{min}} ml and {{max}} ml",
+    "quick_add_title": "Quick Add",
+    "quick_presets": {
+      "small": "Small",
+      "cup": "Cup",
+      "bottle": "Bottle",
+      "large_bottle": "Large Bottle",
+      "quarter_cup": "1/4 Cup",
+      "two_cups": "2 Cups",
+      "four_cups": "4 Cups",
+      "custom": "Custom",
+      "custom_amount": "Custom Amount",
+      "add": "Add {{amount}} {{label}}"
+    },
+    "custom_input": "Custom",
+    "custom_input_label": "Amount ({{unit}})",
+    "custom_input_error": "Please enter a valid amount",
+    "history_title": "Last 7 Days",
+    "set_goal": {
+      "title": "Set Water Goal",
+      "message": "Enter your daily water goal in {{unit}}",
+      "button": "Set Goal",
+      "invalid": "Please enter a valid goal amount"
+    },
+    "edit_goal": "Edit Goal"
   }
 }
 

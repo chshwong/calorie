@@ -61,6 +61,36 @@ export const DashboardAccents = {
   fat: '#8B5CF6',       // Purple for fat
 } as const;
 
+// Module theme tokens for visual differentiation
+// Used to create subtle but clear identity for each module (Exercise, Meds, etc.)
+export type ModuleType = 'exercise' | 'meds' | 'food' | 'water';
+
+export const ModuleThemes = {
+  exercise: {
+    accent: DashboardAccents.exercise,      // #F59E0B - Orange
+    tint: DashboardAccents.exercise + '08', // ~3% opacity for subtle backgrounds
+    iconColor: DashboardAccents.exercise,
+  },
+  meds: {
+    accent: DashboardAccents.meds,          // #10B981 - Teal/green
+    tint: DashboardAccents.meds + '08',     // ~3% opacity for subtle backgrounds
+    iconColor: DashboardAccents.meds,
+  },
+  food: {
+    accent: DashboardAccents.food,           // #3B82F6 - Blue
+    tint: DashboardAccents.food + '08',
+    iconColor: DashboardAccents.food,
+  },
+  water: {
+    accent: '#0EA5E9',                      // Sky blue for water
+    tint: '#0EA5E9' + '08',
+    iconColor: '#0EA5E9',
+    fill: '#0EA5E9',                        // Water fill color (can be same as accent or slightly different)
+    goalLine: '#0EA5E9',                    // Goal indicator line color
+    tick: '#0EA5E9',                        // Side tick marks color
+  },
+} as const;
+
 export const Colors = {
   light: {
     // Text

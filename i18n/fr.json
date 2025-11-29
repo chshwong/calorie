@@ -1147,6 +1147,30 @@
   "dashboard": {
     "title": "Tableau de bord",
     "today_summary": "Résumé d'aujourd'hui",
+    "body": {
+      "age": {
+        "label": "Âge",
+        "unit": "ans"
+      },
+      "height": {
+        "label": "Taille",
+        "unit": "cm"
+      },
+      "weight": {
+        "label": "Poids",
+        "unit": "lbs"
+      },
+      "bmi": {
+        "label": "IMC",
+        "no_data": "Aucune donnée",
+        "classification": {
+          "underweight": "Insuffisance pondérale",
+          "normal": "Poids normal",
+          "overweight": "Surpoids/Musclé",
+          "obese": "Obèse"
+        }
+      }
+    },
     "snapshot": {
       "food": "Alimentation",
       "ex": "Ex",

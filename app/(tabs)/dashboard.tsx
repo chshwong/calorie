@@ -12,6 +12,8 @@ import { StatTile } from '@/components/dashboard/stat-tile';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { BarChart } from '@/components/charts/bar-chart';
 import { CircularStat } from '@/components/dashboard/circular-stat';
+import { BodyStatsRow } from '@/components/body/body-stats-row';
+import { WaterCard } from '@/components/dashboard/water-card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, DashboardAccents } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -395,6 +397,11 @@ export default function DashboardScreen() {
           today={today}
         />
 
+        {/* Body Metrics Row */}
+        <DashboardSectionContainer>
+          <BodyStatsRow />
+        </DashboardSectionContainer>
+
         {/* Today Snapshot */}
         <DashboardSectionContainer>
           <View style={styles.snapshotTiles}>
@@ -681,6 +688,11 @@ export default function DashboardScreen() {
             </View>
             </PremiumCard>
           </TouchableOpacity>
+        </DashboardSectionContainer>
+
+        {/* Water Card */}
+        <DashboardSectionContainer>
+          <WaterCard onPress={() => router.push(`/water?date=${selectedDateString}`)} />
         </DashboardSectionContainer>
 
         {/* Streaks Card */}

@@ -71,6 +71,12 @@ const MAPPING = {
   'sparkles': { type: 'community', name: 'star' },
   'flame.fill': { type: 'community', name: 'fire' },
   'lightbulb.fill': 'lightbulb',
+  'gearshape': 'settings',
+  'gearshape.fill': 'settings',
+  'cup.and.saucer.fill': { type: 'community', name: 'cup-outline' },
+  'wineglass.fill': { type: 'community', name: 'glass-wine' },
+  'bottle.fill': { type: 'community', name: 'bottle-wine-outline' },
+  'plus': 'add',
 } as IconMapping;
 
 /**

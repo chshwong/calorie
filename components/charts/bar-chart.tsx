@@ -60,15 +60,29 @@ export function BarChart({
   
   const getColor = colorScale || defaultColorScale;
   
-  // Animate bars
-  const animatedHeights = useRef(
-    data.map(() => new Animated.Value(0))
-  ).current;
+  // Animate bars - ensure animatedHeights array matches data length
+  const animatedHeightsRef = useRef<Animated.Value[]>([]);
+  
+  // Update animatedHeights array when data length changes
+  useEffect(() => {
+    const currentLength = animatedHeightsRef.current.length;
+    const dataLength = data.length;
+    
+    if (dataLength > currentLength) {
+      // Add new animated values for new data items
+      for (let i = currentLength; i < dataLength; i++) {
+        animatedHeightsRef.current.push(new Animated.Value(0));
+      }
+    } else if (dataLength < currentLength) {
+      // Remove excess animated values (keep array in sync)
+      animatedHeightsRef.current = animatedHeightsRef.current.slice(0, dataLength);
+    }
+  }, [data.length]);
 
   useEffect(() => {
-    if (animated) {
+    if (animated && animatedHeightsRef.current.length === data.length) {
       Animated.parallel(
-        animatedHeights.map((animValue, index) =>
+        animatedHeightsRef.current.map((animValue, index) =>
           Animated.timing(animValue, {
             toValue: data[index]?.value || 0,
             duration: 300,
@@ -77,9 +91,11 @@ export function BarChart({
           })
         )
       ).start();
-    } else {
+    } else if (!animated && animatedHeightsRef.current.length === data.length) {
       data.forEach((item, index) => {
-        animatedHeights[index].setValue(item.value);
+        if (animatedHeightsRef.current[index]) {
+          animatedHeightsRef.current[index].setValue(item.value);
+        }
       });
     }
   }, [data, animated]);
@@ -125,10 +141,12 @@ export function BarChart({
                     style={[
                       styles.bar,
                       {
-                        height: animated ? animatedHeights[index].interpolate({
-                          inputRange: [0, chartMax],
-                          outputRange: [0, height],
-                        }) : barHeight,
+                        height: animated && animatedHeightsRef.current[index] 
+                          ? animatedHeightsRef.current[index].interpolate({
+                              inputRange: [0, chartMax],
+                              outputRange: [0, height],
+                            })
+                          : barHeight,
                         backgroundColor: getColor(item.value, chartMax),
                         borderColor: isSelected ? colors.tint : 'transparent',
                         borderWidth: isSelected ? 2 : 0,

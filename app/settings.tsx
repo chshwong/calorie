@@ -540,6 +540,31 @@ export default function SettingsScreen() {
             }
           />
           <SettingItem
+            icon="drop.fill"
+            title={t('settings.preferences.water_units')}
+            subtitle={profile?.water_unit_preference === 'imperial' ? t('settings.preferences.water_units_imperial') : t('settings.preferences.water_units_metric')}
+            onPress={async () => {
+              if (!user?.id || !profile) return;
+              const newPreference = profile.water_unit_preference === 'imperial' ? 'metric' : 'imperial';
+              try {
+                await updateProfileMutation.mutateAsync({
+                  water_unit_preference: newPreference,
+                });
+              } catch (err) {
+                console.error('Error saving water unit preference:', err);
+                Alert.alert(t('alerts.error_title'), t('settings.errors.save_preference_failed'));
+              }
+            }}
+            rightComponent={
+              <View style={styles.switchContainer}>
+                <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
+                  {profile?.water_unit_preference === 'imperial' ? 'fl oz' : 'ml'}
+                </Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </View>
+            }
+          />
+          <SettingItem
             icon={colorScheme === 'dark' ? 'moon.fill' : 'sun.max.fill'}
             title={t('settings.preferences.dark_mode')}
             subtitle={themeMode === 'auto' ? t('settings.preferences.dark_mode_system') : themeMode === 'dark' ? t('settings.preferences.dark_mode_on') : t('settings.preferences.dark_mode_off')}

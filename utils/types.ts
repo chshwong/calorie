@@ -143,6 +143,7 @@ export interface UserProfile {
   language_preference?: string;
   weight_unit_preference?: 'lbs' | 'kg';
   height_unit_preference?: 'cm' | 'ft';
+  water_unit_preference?: 'metric' | 'imperial';
   created_at: string;
   updated_at: string;
 }

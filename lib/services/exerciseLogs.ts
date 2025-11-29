@@ -145,13 +145,16 @@ export async function getExerciseSummaryForRecentDays(
  * Fetch recent and frequent exercises for Quick Add
  * Returns combined list: frequent (top 8) + recent (top 8, excluding frequent), max 10 total
  * 
+ * NEW LOGIC (Exercise only): Groups by name only (not name+minutes), shows latest minutes for each name
+ * 
  * @param userId - The user's ID
  * @param days - Number of days to look back (default: 60)
- * @returns Array of exercises with name and minutes, max 10 items
+ * @returns Array of exercises with name and minutes (latest minutes for that name), max 10 items
  * 
  * Required index: exercise_log_user_date_idx ON exercise_log(user_id, date)
- * Note: This query scans recent logs and groups in-memory. For better performance with large datasets,
- * consider a precomputed stats table similar to user_food_stats (see guideline 6.1).
+ * 
+ * Implementation: Uses efficient aggregation by fetching all logs in window, then grouping by name
+ * to compute frequency, recency, and latest minutes per exercise name.
  */
 export async function getRecentAndFrequentExercises(
   userId: string,
@@ -170,11 +173,13 @@ export async function getRecentAndFrequentExercises(
 
     const startDateString = startDate.toISOString().split('T')[0];
 
+    // Fetch all logs in the time window
     const { data, error } = await supabase
       .from('exercise_log')
-      .select('name, minutes, created_at')
+      .select('name, minutes, date, created_at')
       .eq('user_id', userId)
       .gte('date', startDateString)
+      .order('date', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -182,25 +187,54 @@ export async function getRecentAndFrequentExercises(
       return [];
     }
 
-    // Group by (name, minutes) combination
-    const exerciseMap = new Map<string, { name: string; minutes: number | null; last_used: string; count: number }>();
+    if (!data || data.length === 0) {
+      return [];
+    }
 
+    // Group by name only (not name+minutes)
+    // For each name, track: frequency, most recent date+created_at, latest minutes
+    // Since data is sorted by date DESC, created_at DESC:
+    // - The first log for each name has the most recent timestamp (last_at)
+    // - We need to find the most recent log with non-null minutes for each name
+    const exerciseMap = new Map<string, {
+      name: string;
+      freq: number;
+      last_at: string; // Combined date + created_at for sorting (most recent timestamp)
+      last_minutes: number | null; // Latest non-null minutes for this name
+      last_minutes_at: string | null; // Timestamp of the log with last_minutes (for comparison)
+    }>();
+
+    // Group by name and track frequency, most recent timestamp, and latest minutes
     (data || []).forEach((log) => {
-      const key = `${log.name}|${log.minutes ?? 'null'}`;
-      const existing = exerciseMap.get(key);
+      const name = log.name;
+      const existing = exerciseMap.get(name);
+
+      // Create a sortable timestamp: date + created_at
+      const sortableTime = `${log.date}T${log.created_at}`;
 
       if (existing) {
-        existing.count += 1;
-        // Keep the most recent created_at
-        if (log.created_at > existing.last_used) {
-          existing.last_used = log.created_at;
+        existing.freq += 1;
+        // Update last_at if this log is more recent (for recency ranking)
+        // Since data is sorted DESC, the first occurrence is the most recent
+        if (sortableTime > existing.last_at) {
+          existing.last_at = sortableTime;
+        }
+        // Update last_minutes if this log has non-null minutes and is more recent than current last_minutes
+        // Since data is sorted DESC, we compare timestamps to find the most recent non-null minutes
+        if (log.minutes !== null) {
+          if (existing.last_minutes_at === null || sortableTime > existing.last_minutes_at) {
+            existing.last_minutes = log.minutes;
+            existing.last_minutes_at = sortableTime;
+          }
         }
       } else {
-        exerciseMap.set(key, {
+        // First occurrence of this name - initialize
+        exerciseMap.set(name, {
           name: log.name,
-          minutes: log.minutes,
-          last_used: log.created_at,
-          count: 1,
+          freq: 1,
+          last_at: sortableTime,
+          last_minutes: log.minutes !== null ? log.minutes : null,
+          last_minutes_at: log.minutes !== null ? sortableTime : null,
         });
       }
     });
@@ -210,21 +244,21 @@ export async function getRecentAndFrequentExercises(
     // 1. Frequent list: top 8 by frequency (desc), then recency (desc)
     const frequent = allExercises
       .sort((a, b) => {
-        if (b.count !== a.count) {
-          return b.count - a.count; // Higher frequency first
+        if (b.freq !== a.freq) {
+          return b.freq - a.freq; // Higher frequency first
         }
-        return b.last_used.localeCompare(a.last_used); // More recent first
+        return b.last_at.localeCompare(a.last_at); // More recent first
       })
       .slice(0, 8)
-      .map(({ name, minutes }) => ({ name, minutes }));
+      .map(({ name, last_minutes }) => ({ name, minutes: last_minutes }));
 
     // 2. Recent list: top 8 by recency, excluding frequent items
-    const frequentKeys = new Set(frequent.map((e) => `${e.name}|${e.minutes ?? 'null'}`));
+    const frequentNames = new Set(frequent.map((e) => e.name));
     const recent = allExercises
-      .filter((e) => !frequentKeys.has(`${e.name}|${e.minutes ?? 'null'}`))
-      .sort((a, b) => b.last_used.localeCompare(a.last_used)) // Most recent first
+      .filter((e) => !frequentNames.has(e.name))
+      .sort((a, b) => b.last_at.localeCompare(a.last_at)) // Most recent first
       .slice(0, 8)
-      .map(({ name, minutes }) => ({ name, minutes }));
+      .map(({ name, last_minutes }) => ({ name, minutes: last_minutes }));
 
     // 3. Combine: frequent first, then recent, max 10 total
     const combined = [...frequent, ...recent].slice(0, 10);

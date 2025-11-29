@@ -11,12 +11,13 @@
 import { supabase } from '@/lib/supabase';
 
 // Type definition for med log
+// Note: 'other' type is deprecated but may exist in legacy data (displayed as 'med')
 export type MedLog = {
   id: string;
   user_id: string;
   date: string; // YYYY-MM-DD format
   name: string;
-  type: 'med' | 'supp' | 'other';
+  type: 'med' | 'supp' | 'other'; // 'other' is legacy only, new entries must be 'med' or 'supp'
   dose_amount: number | null;
   dose_unit: string | null;
   notes: string | null;
@@ -149,7 +150,7 @@ export async function getMedSummaryForRecentDays(
 export async function getRecentAndFrequentMeds(
   userId: string,
   days: number = 60
-): Promise<Array<{ name: string; type: 'med' | 'supp' | 'other'; dose_amount: number | null; dose_unit: string | null }>> {
+): Promise<Array<{ name: string; type: 'med' | 'supp'; dose_amount: number | null; dose_unit: string | null }>> {
   if (!userId) {
     return [];
   }
@@ -176,10 +177,13 @@ export async function getRecentAndFrequentMeds(
     }
 
     // Group by (name, type, dose_amount, dose_unit) combination
-    const medMap = new Map<string, { name: string; type: 'med' | 'supp' | 'other'; dose_amount: number | null; dose_unit: string | null; last_used: string; count: number }>();
+    // Filter out 'other' type (legacy) - treat as 'med' if needed
+    const medMap = new Map<string, { name: string; type: 'med' | 'supp'; dose_amount: number | null; dose_unit: string | null; last_used: string; count: number }>();
 
     (data || []).forEach((log) => {
-      const key = `${log.name}|${log.type}|${log.dose_amount ?? 'null'}|${log.dose_unit ?? 'null'}`;
+      // Convert legacy 'other' type to 'med'
+      const normalizedType = log.type === 'other' ? 'med' : (log.type === 'med' || log.type === 'supp' ? log.type : 'med');
+      const key = `${log.name}|${normalizedType}|${log.dose_amount ?? 'null'}|${log.dose_unit ?? 'null'}`;
       const existing = medMap.get(key);
 
       if (existing) {
@@ -191,7 +195,7 @@ export async function getRecentAndFrequentMeds(
       } else {
         medMap.set(key, {
           name: log.name,
-          type: log.type,
+          type: normalizedType,
           dose_amount: log.dose_amount,
           dose_unit: log.dose_unit,
           last_used: log.created_at,

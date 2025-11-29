@@ -7,10 +7,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateUserProfile } from '@/lib/services/profile';
+import { syncTodayWaterGoalWithProfile } from '@/lib/services/waterLogs';
 
 /**
  * Hook for updating user profile
  * Updates the cache on success
+ * If water_goal_ml is updated, syncs today's water_daily.goal_ml
  */
 export function useUpdateProfile() {
   const { user } = useAuth();
@@ -24,10 +26,24 @@ export function useUpdateProfile() {
       }
       return updateUserProfile(userId, updates);
     },
-    onSuccess: (updatedProfile) => {
+    onSuccess: async (updatedProfile, variables) => {
       // Update the cache with the new profile data
       if (userId) {
         queryClient.setQueryData(['userProfile', userId], updatedProfile);
+      }
+
+      // If water_goal_ml was updated, sync today's water_daily.goal_ml
+      if (variables.water_goal_ml !== undefined) {
+        try {
+          const syncedWater = await syncTodayWaterGoalWithProfile(userId);
+          if (syncedWater) {
+            // Invalidate water queries to refresh UI
+            queryClient.invalidateQueries({ queryKey: ['waterDaily', userId] });
+          }
+        } catch (error) {
+          // Log error but don't fail the profile update
+          console.error('Error syncing today water goal with profile:', error);
+        }
       }
     },
   });
