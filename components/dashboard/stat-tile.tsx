@@ -131,13 +131,15 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
-    padding: Layout.cardInnerPadding,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: Layout.cardInnerPaddingCompact,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: 3, // Reduced from Spacing.xs (4) to 3
     width: '100%',
   },
   label: {

@@ -1183,7 +1183,14 @@
       "fiber": "Fiber",
       "sugar": "Sugar",
       "chart_7d": "7d kcal",
-      "avg": "Avg"
+      "avg": "Avg",
+      "remaining": "left",
+      "goal": "Goal",
+      "consumed": "Food",
+      "carbs": "Carbs",
+      "fat": "Fat",
+      "protein": "Protein",
+      "left": "left"
     },
     "exercise": {
       "title": "Exercise",

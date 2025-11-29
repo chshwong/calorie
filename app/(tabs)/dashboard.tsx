@@ -11,6 +11,7 @@ import { PremiumCard } from '@/components/dashboard/premium-card';
 import { StatTile } from '@/components/dashboard/stat-tile';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { BarChart } from '@/components/charts/bar-chart';
+import { CircularStat } from '@/components/dashboard/circular-stat';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, DashboardAccents } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -37,11 +38,11 @@ type HeatmapProps = {
   data: Array<{ date: string; score: number }>;
   selectedDate?: string;
   onCellPress?: (date: string) => void;
-  colors: typeof Colors.light;
+  colors: typeof Colors.light | typeof Colors.dark;
   weeks?: number;
 };
 
-function Heatmap({ data, selectedDate, onCellPress, colors, weeks = 5 }: HeatmapProps) {
+function Heatmap({ data, selectedDate, onCellPress, colors: heatmapColors, weeks = 5 }: HeatmapProps) {
   const { t } = useTranslation();
   
   // Organize data into grid (weeks x days)
@@ -55,10 +56,10 @@ function Heatmap({ data, selectedDate, onCellPress, colors, weeks = 5 }: Heatmap
     grid.push(week);
   }
 
-  const accentColor = colors.accentStreak;
+  const accentColor = heatmapColors.accentStreak;
   
   const getScoreColor = (score: number) => {
-    if (score === 0) return colors.backgroundSecondary;
+    if (score === 0) return heatmapColors.backgroundSecondary;
     if (score === 1) return `${accentColor}30`; // 30% opacity
     if (score === 2) return `${accentColor}60`; // 60% opacity
     return accentColor;
@@ -78,7 +79,7 @@ function Heatmap({ data, selectedDate, onCellPress, colors, weeks = 5 }: Heatmap
                         styles.heatmapCell,
                         {
                           backgroundColor: getScoreColor(cell.score),
-                          borderColor: isSelected ? colors.accentStreak : 'transparent',
+                          borderColor: isSelected ? heatmapColors.accentStreak : 'transparent',
                           borderWidth: isSelected ? 2 : 0,
                         },
                       ]}
@@ -91,7 +92,7 @@ function Heatmap({ data, selectedDate, onCellPress, colors, weeks = 5 }: Heatmap
           </View>
         ))}
       </View>
-      <ThemedText style={[styles.heatmapLegend, { color: colors.textSubtle }]}>
+      <ThemedText style={[styles.heatmapLegend, { color: heatmapColors.textSubtle }]}>
         {t('dashboard.streaks.score_legend')}
       </ThemedText>
     </View>
@@ -106,7 +107,7 @@ function generateInsights(
   weeklyExercise: ReturnType<typeof useWeeklyExerciseMinutes>,
   medSummary: ReturnType<typeof useDailyMedSummary>,
   weeklyMed: ReturnType<typeof useWeeklyMedPresence>,
-  t: (key: string) => string
+  t: (key: string, options?: any) => string
 ): Array<{ icon: string; text: string }> {
   const insights: Array<{ icon: string; text: string }> = [];
 
@@ -176,6 +177,18 @@ export default function DashboardScreen() {
   const proteinBarAnim = useRef(new Animated.Value(0)).current;
   const carbsBarAnim = useRef(new Animated.Value(0)).current;
   const fatBarAnim = useRef(new Animated.Value(0)).current;
+
+  // Responsive layout
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const isSmallScreen = screenWidth < 375;
+  const isMobile = screenWidth < 768;
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+    });
+    return () => subscription?.remove();
+  }, []);
 
   // Dashboard data hooks
   const foodSummary = useDailyFoodSummary(selectedDateString);
@@ -283,7 +296,8 @@ export default function DashboardScreen() {
     } else if (action === 'med') {
       router.push(`/meds?date=${selectedDateString}`);
     } else if (action === 'scan') {
-      router.push('/barcode-scanner');
+      // TODO: Add barcode scanner route
+      // router.push('/barcode-scanner');
     }
   };
 
@@ -336,7 +350,7 @@ export default function DashboardScreen() {
         />
       )}
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 60 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
@@ -432,91 +446,87 @@ export default function DashboardScreen() {
                     {t('dashboard.food.title')}
                   </ThemedText>
                 </View>
-                <ThemedText style={[styles.cardSubtitle, { color: colors.textMuted }]}>
-                  {Math.round(foodSummary.caloriesTotal)} / {foodSummary.caloriesGoal} {t('dashboard.snapshot.kcal')}
-                </ThemedText>
               </View>
 
-            {/* Donut Chart */}
-            {macroSegments.length > 0 && (
-              <View style={styles.chartContainer}>
-                <DonutChart
-                  segments={macroSegments.map(seg => ({
-                    ...seg,
-                    color: seg.label === 'P' ? colors.info : seg.label === 'C' ? colors.warning : colors.success,
-                  }))}
-                  centerValue={Math.round(foodSummary.caloriesTotal).toString()}
-                  size={140}
-                  strokeWidth={16}
-                />
-              </View>
-            )}
-
-            {/* Macro Goal Bars */}
-            <View style={styles.macroBarsContainer}>
-              <View style={styles.macroBarRow}>
-                <ThemedText style={[styles.macroBarLabel, { color: colors.text }]}>
-                  P {Math.round(foodSummary.proteinG)} / {foodSummary.proteinGoalG}g
-                </ThemedText>
-                <View style={[styles.macroBarTrack, { backgroundColor: colors.backgroundSecondary }]}>
-                  <Animated.View
-                    style={[
-                      styles.macroBarFill,
-                      {
-                        width: proteinBarAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%'],
-                        }),
-                        backgroundColor: colors.info,
-                      },
-                    ]}
-                  />
+            {/* Calories CircularStat - Remaining */}
+            <View style={[styles.caloriesRow, isMobile && styles.caloriesRowMobile]}>
+              <CircularStat
+                value={foodSummary.caloriesTotal}
+                max={foodSummary.caloriesGoal}
+                label=""
+                subtitle={t('dashboard.food.remaining')}
+                accentColor={colors.accentFood}
+                size={isSmallScreen ? "medium" : "large"}
+                mode="remaining"
+                showLabel={false}
+              />
+              <View style={[styles.caloriesInfo, isMobile && styles.caloriesInfoMobile]}>
+                <View style={styles.caloriesInfoRow}>
+                  <ThemedText style={[styles.caloriesInfoLabel, { color: colors.textMuted }]}>
+                    {t('dashboard.food.goal')}
+                  </ThemedText>
+                  <ThemedText style={[styles.caloriesInfoValue, { color: colors.text }]}>
+                    {foodSummary.caloriesGoal}
+                  </ThemedText>
                 </View>
-              </View>
-              <View style={styles.macroBarRow}>
-                <ThemedText style={[styles.macroBarLabel, { color: colors.text }]}>
-                  C {Math.round(foodSummary.carbsG)} / {foodSummary.carbsGoalG}g
-                </ThemedText>
-                <View style={[styles.macroBarTrack, { backgroundColor: colors.backgroundSecondary }]}>
-                  <Animated.View
-                    style={[
-                      styles.macroBarFill,
-                      {
-                        width: carbsBarAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%'],
-                        }),
-                        backgroundColor: colors.warning,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-              <View style={styles.macroBarRow}>
-                <ThemedText style={[styles.macroBarLabel, { color: colors.text }]}>
-                  F {Math.round(foodSummary.fatG)} / {foodSummary.fatGoalG}g
-                </ThemedText>
-                <View style={[styles.macroBarTrack, { backgroundColor: colors.backgroundSecondary }]}>
-                  <Animated.View
-                    style={[
-                      styles.macroBarFill,
-                      {
-                        width: fatBarAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%'],
-                        }),
-                        backgroundColor: colors.success,
-                      },
-                    ]}
-                  />
+                <View style={styles.caloriesInfoRow}>
+                  <ThemedText style={[styles.caloriesInfoLabel, { color: colors.textMuted }]}>
+                    {t('dashboard.food.consumed')}
+                  </ThemedText>
+                  <ThemedText style={[styles.caloriesInfoValue, { color: colors.text }]}>
+                    {Math.round(foodSummary.caloriesTotal)}
+                  </ThemedText>
                 </View>
               </View>
             </View>
 
-            {/* Extra line */}
-            <ThemedText style={[styles.extraLine, { color: colors.textSubtle }]}>
-              {t('dashboard.food.fiber')} {Math.round(foodSummary.fiberG)} / {foodSummary.fiberGoalG || 25}g · {t('dashboard.food.sugar')} {Math.round(foodSummary.sugarG)}g
-            </ThemedText>
+            {/* Macros Row - Three CircularStats */}
+            <View style={styles.macrosRow}>
+              <View style={styles.macroItem}>
+                <CircularStat
+                  value={foodSummary.carbsG}
+                  max={foodSummary.carbsGoalG}
+                  label={t('dashboard.food.carbs')}
+                  subtitle={`/ ${foodSummary.carbsGoalG}g`}
+                  accentColor={DashboardAccents.carbs}
+                  size="small"
+                  mode="consumed"
+                />
+                <ThemedText style={[styles.macroRemainingText, { color: colors.textMuted }]}>
+                  {Math.max(0, foodSummary.carbsGoalG - foodSummary.carbsG)}g {t('dashboard.food.left')}
+                </ThemedText>
+              </View>
+              
+              <View style={styles.macroItem}>
+                <CircularStat
+                  value={foodSummary.fatG}
+                  max={foodSummary.fatGoalG}
+                  label={t('dashboard.food.fat')}
+                  subtitle={`/ ${foodSummary.fatGoalG}g`}
+                  accentColor={DashboardAccents.fat}
+                  size="small"
+                  mode="consumed"
+                />
+                <ThemedText style={[styles.macroRemainingText, { color: colors.textMuted }]}>
+                  {Math.max(0, foodSummary.fatGoalG - foodSummary.fatG)}g {t('dashboard.food.left')}
+                </ThemedText>
+              </View>
+              
+              <View style={styles.macroItem}>
+                <CircularStat
+                  value={foodSummary.proteinG}
+                  max={foodSummary.proteinGoalG}
+                  label={t('dashboard.food.protein')}
+                  subtitle={`/ ${foodSummary.proteinGoalG}g`}
+                  accentColor={DashboardAccents.protein}
+                  size="small"
+                  mode="consumed"
+                />
+                <ThemedText style={[styles.macroRemainingText, { color: colors.textMuted }]}>
+                  {Math.max(0, foodSummary.proteinGoalG - foodSummary.proteinG)}g {t('dashboard.food.left')}
+                </ThemedText>
+              </View>
+            </View>
 
             {/* 7-day kcal chart */}
             <View style={styles.chartSection}>
@@ -529,7 +539,7 @@ export default function DashboardScreen() {
                 goalValue={foodSummary.caloriesGoal}
                 selectedDate={selectedDateString}
                 onBarPress={handleDateSelect}
-                height={100}
+                height={isSmallScreen ? 70 : isMobile ? 80 : 85}
                 colorScale={() => colors.accentFood}
               />
               {/* Chart subtitle */}
@@ -584,7 +594,7 @@ export default function DashboardScreen() {
                   data={weeklyExercise.data.map(d => ({ date: d.date, value: d.totalMinutes }))}
                   selectedDate={selectedDateString}
                   onBarPress={handleDateSelect}
-                  height={100}
+                  height={isSmallScreen ? 70 : isMobile ? 80 : 85}
                   colorScale={(value, max) => {
                     if (value < 30) return `${colors.accentExercise}70`; // 70% opacity
                     if (value < 60) return `${colors.accentExercise}90`; // 90% opacity
@@ -835,6 +845,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.screenPadding,
+    paddingBottom: Layout.screenPadding + Layout.sectionGapCompact,
   },
   // Snapshot tiles
   snapshotCard: {
@@ -846,11 +857,10 @@ const styles = StyleSheet.create({
   snapshotTiles: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.md,
+    gap: Layout.sectionGapCompact,
   },
   statTile: {
     flex: 1,
-    minWidth: 100,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
@@ -880,7 +890,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Layout.titleGapCompact,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
   },
   cardTitle: {
     fontSize: FontSize.lg,
@@ -892,66 +907,102 @@ const styles = StyleSheet.create({
   // Chart containers
   chartContainer: {
     alignItems: 'center',
-    marginVertical: Spacing.md,
+    marginTop: Layout.chartGapCompact,
+    marginBottom: Layout.chartGapCompact,
   },
   chartSection: {
-    marginTop: Layout.cardInnerPadding,
+    marginTop: Layout.chartGapCompact * 1.5,
   },
   chartTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
-    marginBottom: Spacing.sm,
+    marginBottom: Layout.chartGapCompact,
+  },
+  chartSubtitle: {
+    fontSize: FontSize.xs,
+    marginTop: Layout.rowGapCompact,
+    textAlign: 'center',
   },
   streakChip: {
     alignSelf: 'center',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.chip,
-    marginTop: Spacing.sm,
+    marginTop: Layout.rowGapCompact,
   },
   streakChipText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
   },
-  // Macro bars
-  macroBarsContainer: {
+  // Calories row
+  caloriesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Layout.chartGapCompact,
+    marginBottom: Layout.chartGapCompact * 1.5,
+  },
+  caloriesRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  caloriesInfo: {
+    flex: 1,
+    marginLeft: Spacing.md,
     gap: Spacing.sm,
-    marginTop: Spacing.md,
   },
-  macroBarRow: {
-    gap: Spacing.xs,
+  caloriesInfoMobile: {
+    marginLeft: 0,
+    width: '100%',
+    alignItems: 'center',
   },
-  macroBarLabel: {
+  caloriesInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  caloriesInfoLabel: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
   },
-  macroBarTrack: {
-    height: 6,
-    borderRadius: BorderRadius.sm,
-    overflow: 'hidden',
+  caloriesInfoValue: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
   },
-  macroBarFill: {
-    height: '100%',
-    borderRadius: BorderRadius.sm,
+  // Macros row
+  macrosRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+    marginTop: Layout.chartGapCompact,
+    marginBottom: Layout.chartGapCompact,
+    gap: Spacing.xs,
+    flexWrap: 'wrap',
   },
-  extraLine: {
+  macroItem: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 80,
+    maxWidth: 120,
+  },
+  macroRemainingText: {
     fontSize: FontSize.xs,
-    marginTop: Spacing.sm,
     textAlign: 'center',
+    marginTop: Spacing.xs,
   },
   // Exercise styles
   exerciseToday: {
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Layout.chartGapCompact,
   },
   exerciseValue: {
     fontSize: FontSize['2xl'],
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.xs,
+    marginBottom: 3,
   },
   exerciseSubtext: {
     fontSize: FontSize.sm,
-    marginBottom: Spacing.xs,
+    marginBottom: 3,
   },
   exerciseMain: {
     fontSize: FontSize.xs,
@@ -959,16 +1010,16 @@ const styles = StyleSheet.create({
   // Meds styles
   medsToday: {
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Layout.chartGapCompact,
   },
   medsValue: {
     fontSize: FontSize['2xl'],
     fontWeight: '700',
-    marginBottom: Spacing.xs,
+    marginBottom: 3,
   },
   medsSubtext: {
     fontSize: FontSize.sm,
-    marginBottom: Spacing.xs,
+    marginBottom: 3,
   },
   medsLast: {
     fontSize: FontSize.xs,
@@ -977,7 +1028,8 @@ const styles = StyleSheet.create({
   adherenceRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    gap: Spacing.xs,
+    gap: Layout.rowGapCompact,
+    marginTop: Layout.chartGapCompact,
   },
   adherenceDot: {
     width: 36,
@@ -994,12 +1046,12 @@ const styles = StyleSheet.create({
   // Streaks styles
   streakMain: {
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Layout.chartGapCompact,
   },
   streakValue: {
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.xs,
+    marginBottom: 3,
   },
   streakSubtext: {
     fontSize: FontSize.sm,
@@ -1010,59 +1062,25 @@ const styles = StyleSheet.create({
   },
   heatmapGrid: {
     flexDirection: 'row',
-    gap: Spacing.xs,
+    gap: 4, // Reduced from Spacing.xs (4) - keep same but explicit
   },
   heatmapWeek: {
-    gap: Spacing.xs,
+    gap: 4, // Reduced from Spacing.xs (4) - keep same but explicit
   },
   heatmapCell: {
-    width: 24,
-    height: 24,
+    width: 22, // Slightly reduced from 24
+    height: 22, // Slightly reduced from 24
     borderRadius: BorderRadius.sm,
     ...getMinTouchTargetStyle(),
   },
   heatmapLegend: {
     fontSize: FontSize.xs,
-    marginTop: Spacing.sm,
+    marginTop: Layout.rowGapCompact,
     textAlign: 'center',
-  },
-  // Quick actions
-  quickActionsCard: {
-    borderRadius: BorderRadius.card,
-    padding: Layout.cardInnerPadding,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  quickActionsTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    marginBottom: Layout.cardInnerPadding,
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  quickActionButton: {
-    flex: 1,
-    minWidth: 80,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-    gap: Spacing.xs,
-    ...getMinTouchTargetStyle(),
-  },
-  quickActionLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
   },
   // Insights styles
   insightsList: {
-    gap: Spacing.md,
+    gap: Layout.rowGapCompact,
   },
   insightRow: {
     flexDirection: 'row',
@@ -1077,32 +1095,34 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontStyle: 'italic',
     textAlign: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: Layout.chartGapCompact,
   },
   // Quick actions
   quickActionsCard: {
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    paddingTop: Layout.cardInnerPaddingY,
+    paddingBottom: Layout.cardInnerPaddingY,
+    paddingHorizontal: Layout.cardInnerPaddingCompact,
     overflow: 'hidden',
     width: '100%',
   },
   quickActionsTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',
-    marginBottom: Spacing.md,
+    marginBottom: Layout.titleGapCompact,
   },
   quickActionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Layout.rowGapCompact,
   },
   quickActionButton: {
     flex: 1,
-    minWidth: 80,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     gap: Spacing.xs,

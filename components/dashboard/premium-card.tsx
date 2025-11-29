@@ -39,7 +39,9 @@ export function PremiumCard({ children, style, asymmetricBottom = false }: Premi
 
 const styles = StyleSheet.create({
   card: {
-    padding: Layout.cardInnerPadding,
+    paddingTop: Layout.cardInnerPaddingY,
+    paddingBottom: Layout.cardInnerPaddingY,
+    paddingHorizontal: Layout.cardInnerPaddingCompact,
     overflow: 'hidden',
     width: '100%',
   },

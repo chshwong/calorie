@@ -40,7 +40,7 @@ export function DashboardSectionContainer({ children, style }: DashboardSectionC
 const styles = StyleSheet.create({
   responsiveContainer: {
     width: '100%',
-    marginBottom: Spacing.lg,
+    marginBottom: 10, // Compact spacing (reduced from Spacing.lg/16)
   },
   responsiveContainerLarge: {
     maxWidth: 900,

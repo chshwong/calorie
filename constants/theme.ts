@@ -50,12 +50,15 @@ export const CategoryColors = {
   favorite: '#FBBF24',
 };
 
-// Dashboard accent colors (premium health app style)
+// Dashboard accent colors (MyFitnessPal-style bright colors)
 export const DashboardAccents = {
-  food: '#FDBA74',      // Soft orange
-  exercise: '#38BDF8',  // Teal/blue
-  meds: '#4ADE80',      // Green
-  streak: '#A855F7',    // Purple
+  food: '#3B82F6',      // Bright blue for calories
+  exercise: '#F59E0B',  // Orange for exercise
+  meds: '#10B981',      // Teal/green for meds
+  streak: '#A855F7',    // Purple for streaks
+  protein: '#F59E0B',   // Orange for protein
+  carbs: '#10B981',     // Green for carbs
+  fat: '#8B5CF6',       // Purple for fat
 } as const;
 
 export const Colors = {
@@ -72,7 +75,7 @@ export const Colors = {
     background: '#FFFFFF',
     backgroundSecondary: '#F9F9F9',
     backgroundTertiary: '#F2F2F2',
-    dashboardBackground: '#F7F9FC', // Very light neutral/blue tint
+    dashboardBackground: '#F5F7FA', // Very light neutral (MyFitnessPal style)
     
     // Accent
     tint: tintColorLight,
@@ -400,6 +403,14 @@ export const Layout = {
   /** Dashboard-specific spacing */
   sectionGap: Spacing.lg,      // Gap between sections
   cardInnerPadding: Spacing.lg, // Inner padding for cards
+  
+  /** Dashboard compact spacing (reduced by 30-50%) */
+  sectionGapCompact: 10,        // Reduced from 16 (~40% reduction)
+  cardInnerPaddingCompact: 10,   // Reduced from 16 (~40%)
+  cardInnerPaddingY: 8,         // Top/bottom padding only (~50% reduction)
+  chartGapCompact: 6,             // Gaps in charts (~50% reduction)
+  rowGapCompact: 6,               // Gaps between rows (~50% reduction)
+  titleGapCompact: 6,             // Gap after titles (~50% reduction)
 };
 
 // ============================================================================
