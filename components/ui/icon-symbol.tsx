@@ -77,6 +77,8 @@ const MAPPING = {
   'wineglass.fill': { type: 'community', name: 'glass-wine' },
   'bottle.fill': { type: 'community', name: 'bottle-wine-outline' },
   'plus': 'add',
+  'doc.on.doc': 'content-copy',
+  'ellipsis': 'more-horiz',
 } as IconMapping;
 
 /**

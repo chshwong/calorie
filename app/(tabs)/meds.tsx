@@ -11,7 +11,12 @@ import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
 import { ModuleFAB } from '@/components/module/module-fab';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { CloneDayModal } from '@/components/clone-day-modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { showAppToast } from '@/components/ui/app-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
@@ -24,6 +29,7 @@ import {
   useDeleteMedLog,
 } from '@/hooks/use-med-logs';
 import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
+import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -106,14 +112,14 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
         damping: 15,
         stiffness: 300,
       }),
       Animated.timing(opacityAnim, {
         toValue: 1,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
 
@@ -143,14 +149,14 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
         damping: 15,
         stiffness: 300,
       }),
       Animated.timing(opacityAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => {
       setIsEditingDose(false);
@@ -191,14 +197,14 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
         damping: 15,
         stiffness: 300,
       }),
       Animated.timing(opacityAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => {
       setIsEditingDose(false);
@@ -409,7 +415,7 @@ function QuickAddChip({ label, icon, dose, colors, onPress }: QuickAddChipProps)
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.95,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       damping: 15,
       stiffness: 300,
     }).start();
@@ -418,7 +424,7 @@ function QuickAddChip({ label, icon, dose, colors, onPress }: QuickAddChipProps)
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       damping: 15,
       stiffness: 300,
     }).start();
@@ -515,8 +521,45 @@ export default function MedsHomeScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   
-  // Preferences modal state
-  const [showPrefsModal, setShowPrefsModal] = useState(false);
+  // Clone modal state
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const cloneMutation = useCloneDayEntriesMutation('pill_intake');
+  
+  // Success confirmation modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Previous day copy hook - reusable pattern
+  const { cloneFromPreviousDay, isLoading: isCloningFromPreviousDay } = useCloneFromPreviousDay({
+    entityType: 'pill_intake',
+    currentDate: selectedDate,
+    onSuccess: (clonedCount) => {
+      if (clonedCount > 0) {
+        const message = t('meds.previous_day_copy.success_message', {
+          count: clonedCount,
+          items: clonedCount === 1 ? t('meds.clone.item_one') : t('meds.clone.item_other'),
+        });
+        setSuccessMessage(message);
+        setShowSuccessModal(true);
+      }
+    },
+    onError: (error: Error) => {
+      // Handle same-date error specifically
+      if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
+        Alert.alert(
+          t('meds.clone.error_title'),
+          t('meds.clone.same_date_error')
+        );
+      } else {
+        Alert.alert(
+          t('meds.clone.error_title'),
+          t('meds.clone.error_message', {
+            error: error.message || t('common.unexpected_error'),
+          })
+        );
+      }
+    },
+  });
 
   // Calculate totals for selected date
   const totalItems = medLogs.length;
@@ -547,7 +590,7 @@ export default function MedsHomeScreen() {
         Animated.timing(animValue, {
           toValue: 1,
           duration: 150,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }).start();
       }
     }
@@ -790,28 +833,18 @@ export default function MedsHomeScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: backgroundGradient.from }]}>
-      {/* Subtle background gradient effect for web */}
-      {Platform.OS === 'web' && (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              background: `linear-gradient(to bottom, ${backgroundGradient.from}, ${backgroundGradient.to})`,
-              pointerEvents: 'none',
-            },
-          ]}
-        />
-      )}
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-        {/* Module Identity Bar */}
-        <ModuleIdentityBar module="meds" />
+        {/* Desktop Container for Header and Content */}
+        <DesktopPageContainer>
+          {/* Module Identity Bar */}
+          <ModuleIdentityBar module="meds" />
 
-        {/* Date Header with Greeting and Navigation */}
-        <DateHeader 
+          {/* Date Header with Greeting and Navigation */}
+          <DateHeader 
           showGreeting={true}
           module="meds"
           selectedDate={selectedDate}
@@ -855,18 +888,23 @@ export default function MedsHomeScreen() {
         {/* Today's Meds Section - Card */}
         <MedSectionContainer>
           <SurfaceCard module="meds">
-          {/* Sticky header */}
-          <View style={[styles.cardHeader, { backgroundColor: colors.card }]}>
+          {/* Header */}
+          <View style={[styles.cardHeader, { borderBottomColor: colors.separator }]}>
             <View style={styles.cardHeaderTop}>
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {isToday ? t('meds.today_title') : formatDateForDisplay(selectedDate)}
               </ThemedText>
               <TouchableOpacity
-                onPress={() => setShowPrefsModal(true)}
-                style={[styles.settingsButton, { backgroundColor: colors.backgroundSecondary }]}
-                {...getButtonAccessibilityProps('Settings')}
+                onPress={() => {
+                  showAppToast(t('meds.clone.toast_cloning'));
+                  setShowCloneModal(true);
+                }}
+                style={styles.cloneButton}
+                activeOpacity={0.7}
+                {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                {...getButtonAccessibilityProps(t('meds.clone.accessibility_label'))}
               >
-                <IconSymbol name="ellipsis" size={18} color={colors.textSecondary} />
+                <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
               </TouchableOpacity>
             </View>
             {logsLoading ? (
@@ -1065,9 +1103,33 @@ export default function MedsHomeScreen() {
         {/* Quick Add Section - Card */}
         <MedSectionContainer>
           <SurfaceCard module="meds">
-          <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-            {t('meds.quick_add_title')}
-          </ThemedText>
+          <View style={styles.quickAddHeader}>
+            <ThemedText type="subtitle" style={[styles.quickAddTitle, { color: colors.text }]}>
+              {t('meds.quick_add_title')}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={() => {
+                showAppToast(t('meds.clone.toast_cloning'));
+                cloneFromPreviousDay();
+              }}
+              style={styles.previousDayButton}
+              activeOpacity={0.7}
+              disabled={isCloningFromPreviousDay}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+              {...getButtonAccessibilityProps(
+                isToday 
+                  ? t('meds.previous_day_copy.accessibility_label_yesterday')
+                  : t('meds.previous_day_copy.accessibility_label_previous')
+              )}
+            >
+              <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
+              <ThemedText style={[styles.previousDayButtonText, { color: colors.tint }]}>
+                {isToday 
+                  ? t('meds.previous_day_copy.label_yesterday')
+                  : t('meds.previous_day_copy.label_previous')}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
 
           {/* Recent/Frequent Meds */}
           {hasRecentFrequent && (
@@ -1189,6 +1251,7 @@ export default function MedsHomeScreen() {
           )}
           </View>
         </MedSectionContainer>
+        </DesktopPageContainer>
       </ScrollView>
 
       {/* Delete Confirmation Modal */}
@@ -1378,6 +1441,76 @@ export default function MedsHomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Clone Day Modal */}
+      <CloneDayModal
+        visible={showCloneModal}
+        onClose={() => setShowCloneModal(false)}
+        onConfirm={(targetDate) => {
+          showAppToast(t('meds.clone.toast_cloning'));
+          const targetDateString = targetDate.toISOString().split('T')[0];
+          cloneMutation.mutate(
+            {
+              sourceDate: selectedDateString,
+              targetDate: targetDateString,
+            },
+            {
+              onSuccess: (clonedCount) => {
+                setShowCloneModal(false);
+                // Small delay to ensure clone modal closes before showing success modal
+                setTimeout(() => {
+                  if (clonedCount > 0) {
+                    const message = t('meds.clone.success_message', {
+                      count: clonedCount,
+                      items: clonedCount === 1 ? t('meds.clone.item_one') : t('meds.clone.item_other'),
+                      date: targetDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      }),
+                    });
+                    setSuccessMessage(message);
+                    setShowSuccessModal(true);
+                    // If viewing the target date, refresh will happen automatically via query invalidation
+                  } else {
+                    setSuccessMessage(t('meds.clone.no_entries_message'));
+                    setShowSuccessModal(true);
+                  }
+                }, 100);
+              },
+              onError: (error: any) => {
+                // Handle same-date error specifically
+                if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
+                  Alert.alert(
+                    t('meds.clone.error_title'),
+                    t('meds.clone.same_date_error')
+                  );
+                } else {
+                  Alert.alert(
+                    t('meds.clone.error_title'),
+                    t('meds.clone.error_message', {
+                      error: error.message || t('common.unexpected_error'),
+                    })
+                  );
+                }
+              },
+            }
+          );
+        }}
+        sourceDate={selectedDate}
+        isLoading={cloneMutation.isPending}
+      />
+
+      {/* Success Confirmation Modal */}
+      <ConfirmModal
+        visible={showSuccessModal}
+        title=""
+        message={successMessage}
+        confirmText={t('common.ok')}
+        cancelText={null}
+        onConfirm={() => setShowSuccessModal(false)}
+        onCancel={() => setShowSuccessModal(false)}
+      />
       
       {/* Module-specific FAB */}
       <ModuleFAB module="meds" icon="plus" />
@@ -1398,6 +1531,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.screenPadding,
+    ...(Platform.OS === 'web' && {
+      paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
+    }),
   },
   // Responsive container for med sections
   responsiveContainer: {
@@ -1419,7 +1555,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.separator,
+    // Background inherits from parent SurfaceCard
     // Sticky positioning for web (optional)
     ...(Platform.OS === 'web' && {
       position: 'sticky',
@@ -1433,10 +1569,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xs,
   },
-  settingsButton: {
-    padding: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+  cloneButton: {
+    // Transparent background - icon sits directly on card background
+    backgroundColor: 'transparent',
+    // Proper touch target via padding (icon is 20px, so padding ensures 44x44 minimum)
+    padding: (44 - 20) / 2, // (minTouchTarget - iconSize) / 2 = 12px padding
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Ensure minimum touch target size
     ...getMinTouchTargetStyle(),
+  },
+  quickAddHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  previousDayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: (44 - 16) / 2, // Ensure minimum touch target
+    paddingHorizontal: Spacing.sm,
+    gap: Spacing.xs,
+    ...getMinTouchTargetStyle(),
+  },
+  previousDayButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  quickAddTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
   },
   cardTitle: {
     fontSize: FontSize.lg,

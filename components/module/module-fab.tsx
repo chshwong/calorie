@@ -10,8 +10,8 @@
  * - Theme-aware (dark/light mode)
  */
 
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View, Platform, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, TouchableOpacity, View, Platform, Text, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { 
@@ -42,9 +42,25 @@ export function ModuleFAB({ module, onPress, icon, iconText }: ModuleFABProps) {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   
+  // Hide FAB on desktop/large screens (>= 768px)
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const isDesktop = screenWidth >= 768;
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+    });
+    return () => subscription?.remove();
+  }, []);
+  
   const moduleTheme = ModuleThemes[module];
   const fabColor = moduleTheme.accent;
   const iconColor = '#FFFFFF'; // White icon on colored background
+  
+  // Don't render FAB on desktop/large screens (>= 768px)
+  if (isDesktop) {
+    return null;
+  }
   
   // Animation values
   const scale = useSharedValue(1);

@@ -1272,7 +1272,7 @@
 
   "meds": {
     "title": "Meds",
-    "today_title": "Today's Meds",
+    "today_title": "Today's 💊",
     "quick_add_title": "Quick Add",
     "recent_days_title": "Days",
     "summary": {
@@ -1359,13 +1359,35 @@
       "hide_when_empty_hint": "Hide sections only when they have no items",
       "hide_med": "Hide Med section when empty",
       "hide_supp": "Hide Supp section when empty"
+    },
+    "clone": {
+      "title": "Clone today's intake",
+      "subtitle": "Choose a date to copy today's pills/supplements to.",
+      "confirm": "Clone",
+      "accessibility_label": "Clone today's intake to another date",
+      "toast_cloning": "Cloning…",
+      "success_message": "{{count}} {{items}} added to {{date}}",
+      "item_one": "item",
+      "item_other": "items",
+      "no_entries_title": "No Entries",
+      "no_entries_message": "There are no entries to clone for this date.",
+      "error_title": "Clone Failed",
+      "error_message": "Failed to clone entries: {{error}}",
+      "same_date_error": "You cannot clone to the same date."
+    },
+    "previous_day_copy": {
+      "label_yesterday": "From Yesterday",
+      "label_previous": "From Previous Day",
+      "accessibility_label_yesterday": "Copy yesterday's intake to today",
+      "accessibility_label_previous": "Copy previous day's intake to current day",
+      "success_message": "{{count}} {{items}} copied over from previous day."
     }
   },
 
   "tabs": {
     "log": "Log",
     "exercise": "Exercise",
-    "meds": "Meds",
+    "meds": "Supps",
     "water": "Water",
     "dashboard": "Dashboard",
     "more": "More"
@@ -1411,6 +1433,7 @@
       "max_limit": "Maximum is {{max}} ml",
       "error": "Failed to update total"
     },
+    "custom_button": "+ Custom",
     "set_goal": {
       "title": "Set Water Goal",
       "button": "Set Goal",
@@ -1436,6 +1459,12 @@
     "custom_input": "Custom",
     "custom_input_label": "Amount ({{unit}})",
     "custom_input_error": "Please enter a valid amount",
+    "custom_input_error_invalid": "Please enter a valid amount",
+    "custom_input_error_range": "Amount must be between 0 and {{max}} {{unit}}",
+    "error": {
+      "max_total_exceeded_title": "Maximum Total Exceeded",
+      "max_total_exceeded_message": "Total daily water cannot exceed {{max}}ml. If you do drink more than that, you got to be careful!"
+    },
     "history_title": "Last 7 Days",
     "set_goal": {
       "title": "Set Water Goal",

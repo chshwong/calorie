@@ -156,6 +156,12 @@ export async function addWater(
       // Convert current total from row's unit to ml, add delta, convert back
       const currentTotalMl = toMl(existing.total, existing.water_unit);
       const newTotalMl = Math.max(0, currentTotalMl + deltaMl);
+      
+      // Validate total doesn't exceed 6000ml
+      if (newTotalMl > 6000) {
+        throw new Error('Total water cannot exceed 6000 ml. Current total plus this amount would exceed the limit.');
+      }
+      
       const newTotal = fromMl(newTotalMl, existing.water_unit);
       
       const { data, error } = await supabase
@@ -176,6 +182,11 @@ export async function addWater(
       // Only if deltaMl is positive (can't start with negative)
       const initialMl = Math.max(0, deltaMl);
       
+      // Validate total doesn't exceed 6000ml
+      if (initialMl > 6000) {
+        throw new Error('Total water cannot exceed 6000 ml. This amount would exceed the limit.');
+      }
+      
       // Get or create the record (will use profile goal if goalMl not provided)
       const waterDaily = await getOrCreateWaterDailyForDate(userId, dateString);
       if (!waterDaily) {
@@ -184,6 +195,13 @@ export async function addWater(
       
       // Update total if deltaMl is positive (convert to row's unit)
       if (initialMl > 0) {
+        // Validate total doesn't exceed 6000ml (check against existing total if any)
+        const existingTotalMl = toMl(waterDaily.total || 0, waterDaily.water_unit);
+        const newTotalMl = existingTotalMl + initialMl;
+        if (newTotalMl > 6000) {
+          throw new Error('Total water cannot exceed 6000 ml. Current total plus this amount would exceed the limit.');
+        }
+        
         const newTotal = fromMl(initialMl, waterDaily.water_unit);
         const { data, error } = await supabase
           .from('water_daily')

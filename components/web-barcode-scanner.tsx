@@ -75,6 +75,8 @@ export function WebBarcodeScanner({
   const [isCameraError, setIsCameraError] = useState(false);
   const hasStartedRef = useRef(false);
   const scannedRef = useRef(false);
+  const startTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -105,13 +107,21 @@ export function WebBarcodeScanner({
       try {
         const scannerId = 'web-barcode-scanner';
         
-        // Check if element exists
+        // Check if element exists and is visible
         const scannerElement = document.getElementById(scannerId);
         if (!scannerElement) {
           console.error('Scanner element not found');
           setError(t('mealtype_log.scanner.element_not_found', 'Scanner element not found'));
           setIsInitializing(false);
           return;
+        }
+        
+        // Ensure element is visible (required for camera on some mobile browsers)
+        const elementStyle = window.getComputedStyle(scannerElement);
+        if (elementStyle.display === 'none' || elementStyle.visibility === 'hidden') {
+          console.warn('Scanner element is hidden, making it visible');
+          scannerElement.style.display = 'block';
+          scannerElement.style.visibility = 'visible';
         }
         
         // Get supported formats - prioritize product barcodes (EAN-13, UPC-A)
@@ -141,48 +151,130 @@ export function WebBarcodeScanner({
 
         scannerRef.current = new Html5Qrcode(scannerId, scannerConfig);
         
-        // Start scanning with back camera
-        await scannerRef.current.start(
-          { facingMode: 'environment' }, // Use back camera
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: 1.777778, // 16:9
-          },
-          (decodedText: string, decodedResult: any) => {
-            // Prevent duplicate scans
-            if (scannedRef.current) return;
-            scannedRef.current = true;
-            
-            // Map html5-qrcode format to expo-camera format
-            const formatMap: Record<string, string> = {
-              'EAN_13': 'ean13',
-              'EAN_8': 'ean8',
-              'UPC_A': 'upc_a',
-              'UPC_E': 'upc_e',
-              'CODE_128': 'code128',
-              'CODE_39': 'code39',
-              'CODE_93': 'code93',
-              'QR_CODE': 'qr',
-            };
-            
-            const format = decodedResult?.result?.format?.formatName || 'unknown';
-            const mappedFormat = formatMap[format] || format.toLowerCase();
-            
-            onBarcodeScanned({
-              type: mappedFormat,
-              data: decodedText
-            });
-          },
-          (errorMessage: string) => {
-            // This is called continuously when no barcode is detected
-            // Silently ignore "no barcode found" errors
-          }
-        );
+        // Wrap camera start in a timeout using Promise.race
+        // This ensures we timeout even if start() hangs indefinitely
+        const startCamera = () => {
+          return scannerRef.current.start(
+            { facingMode: 'environment' }, // Use back camera
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 150 },
+              aspectRatio: 1.777778, // 16:9
+            },
+            (decodedText: string, decodedResult: any) => {
+              // Prevent duplicate scans
+              if (scannedRef.current) return;
+              scannedRef.current = true;
+              
+              // Map html5-qrcode format to expo-camera format
+              const formatMap: Record<string, string> = {
+                'EAN_13': 'ean13',
+                'EAN_8': 'ean8',
+                'UPC_A': 'upc_a',
+                'UPC_E': 'upc_e',
+                'CODE_128': 'code128',
+                'CODE_39': 'code39',
+                'CODE_93': 'code93',
+                'QR_CODE': 'qr',
+              };
+              
+              const format = decodedResult?.result?.format?.formatName || 'unknown';
+              const mappedFormat = formatMap[format] || format.toLowerCase();
+              
+              onBarcodeScanned({
+                type: mappedFormat,
+                data: decodedText
+              });
+            },
+            (errorMessage: string) => {
+              // This is called continuously when no barcode is detected
+              // Silently ignore "no barcode found" errors
+            }
+          );
+        };
         
-        setIsScanning(true);
-        setIsInitializing(false);
-        onPermissionGranted?.();
+        // Create a timeout promise that will reject after 8 seconds
+        // Also set a direct timeout to update UI immediately if needed
+        let timeoutFired = false;
+        const timeoutPromise = new Promise((_, reject) => {
+          startTimeoutRef.current = setTimeout(() => {
+            console.error('[WebBarcodeScanner] Camera start timeout after 8 seconds');
+            timeoutFired = true;
+            reject(new Error('Camera start timed out after 8 seconds'));
+          }, 8000); // 8 second timeout
+        });
+        
+        // Also set a direct timeout as backup to FORCE update UI after 8 seconds
+        // This will work even if Promise.race fails or hangs
+        uiTimeoutRef.current = setTimeout(() => {
+          console.error('[WebBarcodeScanner] FORCE timeout - directly updating UI after 8 seconds');
+          // Force update state directly - this bypasses any promise issues
+          const timeoutError = 'Camera start timed out. Please try again or use file upload.';
+          setError(t('mealtype_log.scanner.camera_timeout', timeoutError));
+          setIsCameraError(true);
+          setIsInitializing(false);
+          onError?.(timeoutError);
+          if (onCameraFailed) {
+            onCameraFailed(timeoutError);
+          }
+          // Try to clean up the scanner
+          if (scannerRef.current) {
+            try {
+              scannerRef.current.stop().catch(() => {});
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+          }
+        }, 8000);
+        
+        try {
+          console.log('[WebBarcodeScanner] Starting camera with 8 second timeout...');
+          // Race between camera start and timeout
+          await Promise.race([startCamera(), timeoutPromise]);
+          
+          // Clear timeout if we got here successfully
+          if (startTimeoutRef.current) {
+            clearTimeout(startTimeoutRef.current);
+            startTimeoutRef.current = null;
+          }
+          if (uiTimeoutRef.current) {
+            clearTimeout(uiTimeoutRef.current);
+            uiTimeoutRef.current = null;
+          }
+          
+          console.log('[WebBarcodeScanner] Camera started successfully');
+          setIsScanning(true);
+          setIsInitializing(false);
+          onPermissionGranted?.();
+        } catch (startError: any) {
+          // Clear timeouts since we're handling the error
+          if (startTimeoutRef.current) {
+            clearTimeout(startTimeoutRef.current);
+            startTimeoutRef.current = null;
+          }
+          if (uiTimeoutRef.current) {
+            clearTimeout(uiTimeoutRef.current);
+            uiTimeoutRef.current = null;
+          }
+          
+          console.error('[WebBarcodeScanner] Camera start error:', startError);
+          
+          // Check if it's a timeout error
+          if (startError?.message?.includes('timed out') || timeoutFired) {
+            console.error('[WebBarcodeScanner] Camera start timeout detected');
+            // Try to clean up the scanner
+            if (scannerRef.current) {
+              try {
+                scannerRef.current.stop().catch(() => {});
+              } catch (e) {
+                // Ignore cleanup errors
+              }
+            }
+            throw new Error('Camera start timed out. Please try again or use file upload.');
+          }
+          
+          throw startError; // Re-throw other errors to be caught by outer catch
+        }
         
       } catch (err: any) {
         console.error('Error starting scanner:', err);
@@ -190,7 +282,11 @@ export function WebBarcodeScanner({
         let errorMsg = t('mealtype_log.scanner.camera_start_failed', 'Failed to start camera');
         let shouldSuggestFileUpload = false;
         
-        if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
+        // Check for timeout first
+        if (err?.message?.includes('timed out') || err?.message?.includes('timeout')) {
+          errorMsg = t('mealtype_log.scanner.camera_timeout', 'Camera start timed out. Please try again or use file upload.');
+          shouldSuggestFileUpload = true;
+        } else if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
           errorMsg = t('mealtype_log.scanner.permission_denied', 'Camera permission denied. Please allow camera access in your browser settings.');
           shouldSuggestFileUpload = true;
         } else if (err?.name === 'NotFoundError') {
@@ -216,11 +312,29 @@ export function WebBarcodeScanner({
       }
     };
     
-    // Small delay to ensure DOM is ready
-    const timeoutId = setTimeout(initScanner, 100);
+    // Small delay to ensure DOM is ready, but check if element exists first
+    const timeoutId = setTimeout(() => {
+      // Double-check element exists before starting
+      const scannerElement = document.getElementById('web-barcode-scanner');
+      if (!scannerElement) {
+        console.error('Scanner element still not found after delay');
+        setError(t('mealtype_log.scanner.element_not_found', 'Scanner element not found'));
+        setIsInitializing(false);
+        return;
+      }
+      initScanner();
+    }, 100);
     
     return () => {
       clearTimeout(timeoutId);
+      if (startTimeoutRef.current) {
+        clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = null;
+      }
+      if (uiTimeoutRef.current) {
+        clearTimeout(uiTimeoutRef.current);
+        uiTimeoutRef.current = null;
+      }
       if (scannerRef.current) {
         try {
           scannerRef.current.stop().catch(() => {});

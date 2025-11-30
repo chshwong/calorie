@@ -3,12 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platfo
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from 'expo-secure-store';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { WebBarcodeScanner } from '@/components/web-barcode-scanner';
-import { BarcodeFileUpload } from '@/components/barcode-file-upload';
-import { useBarcodeScannerMode } from '@/hooks/use-barcode-scanner-mode';
+import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -591,42 +588,8 @@ export default function LogFoodScreen() {
   
   // Barcode scanning state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [barcodeScannerKey, setBarcodeScannerKey] = useState(0); // Key to force remount
-  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [barcodeScanning, setBarcodeScanning] = useState(false);
-  const [forcePermissionCheck, setForcePermissionCheck] = useState(0);
-  const [requestingPermission, setRequestingPermission] = useState(false);
-  // Web-specific: track browser permission separately since expo-camera hook doesn't sync properly on mobile web
-  const [webCameraPermissionGranted, setWebCameraPermissionGranted] = useState(false);
-  // Web-specific: track if user manually switched to file upload mode
-  const [webForceFileUpload, setWebForceFileUpload] = useState(false);
-  
-  // Use the barcode scanner mode hook for web platform detection
-  const { 
-    mode: barcodeScannerMode, 
-    isChecking: isScannerModeChecking,
-    cameraAvailable: webCameraAvailable,
-    switchToFileUpload: switchToFileUploadMode,
-    recheckCamera,
-  } = useBarcodeScannerMode();
-  
-  // Reset file upload mode when modal closes
-  
-  // Reset file upload mode when modal closes
-  useEffect(() => {
-    if (!showBarcodeScanner) {
-      setWebForceFileUpload(false);
-    }
-  }, [showBarcodeScanner]);
-  
-  // Auto-open camera when permission is granted while modal is open
-  useEffect(() => {
-    if (showBarcodeScanner && permission && permission.granted) {
-      setScanned(false);
-      setBarcodeScanning(false);
-    }
-  }, [showBarcodeScanner, permission]);
   
   // Tab state (Frequent, Recent, Custom)
   // Check if activeTab is provided in params
@@ -2636,15 +2599,10 @@ export default function LogFoodScreen() {
   // Handle barcode scan button press
   const handleBarcodeScanPress = useCallback(async () => {
     try {
-      // Open the scanner modal first - it will handle permission requests
+      // Open the scanner modal - UniversalBarcodeScanner will handle everything
       setScanned(false);
       setBarcodeScanning(false);
       setShowBarcodeScanner(true);
-      setBarcodeScannerKey(prev => prev + 1); // Force remount
-      
-      // If permission is already granted, the camera will show immediately
-      // If not, the modal will show the permission request screen
-      
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
       
@@ -2656,11 +2614,13 @@ export default function LogFoodScreen() {
     }
   }, []);
 
-  // Handle barcode scan result
-  const handleBarcodeScanned = useCallback(async (result: { type: string; data: string }) => {
+  // Handle barcode scan result - UniversalBarcodeScanner passes code as string
+  const handleBarcodeScanned = useCallback(async (code: string) => {
     if (scanned || barcodeScanning) return;
     
-    const { data: barcodeData } = result;
+    const barcodeData = code?.trim();
+    if (!barcodeData) return;
+    
     setScanned(true);
     setBarcodeScanning(true);
     
@@ -5042,235 +5002,19 @@ export default function LogFoodScreen() {
             <View style={styles.scannerCloseButton} />
           </View>
           
-          {/* For web, use mode detection to show camera or file upload */}
-          {/* For native, use expo-camera hook permission state */}
-          {(() => {
-            // On web, use the barcode scanner mode hook to determine what to show
-            if (Platform.OS === 'web') {
-              // Determine effective mode: check if user manually switched to file upload
-              const effectiveMode = webForceFileUpload ? 'file-upload' : barcodeScannerMode;
-              
-              // Still checking camera availability
-              if (isScannerModeChecking && !webForceFileUpload) {
-                return (
-                  <View style={styles.scannerContent}>
-                    <ActivityIndicator size="large" color={colors.tint} />
-                    <ThemedText style={[styles.scannerText, { color: colors.text }]}>
-                      {t('mealtype_log.scanner.checking_camera', 'Checking camera availability...')}
-                    </ThemedText>
-                  </View>
-                );
-              }
-              
-              // File upload mode (no camera available or user chose file upload)
-              if (effectiveMode === 'file-upload') {
-                return (
-                  <View style={styles.scannerContent} key={`file-upload-${showBarcodeScanner}`}>
-                    <BarcodeFileUpload
-                      key={`barcode-upload-${barcodeScannerKey}`}
-                      onBarcodeScanned={scanned ? () => {} : handleBarcodeScanned}
-                      onError={(error) => {
-                        console.error('File upload barcode scanner error:', error);
-                      }}
-                      onSwitchToCamera={webCameraAvailable ? () => {
-                        setWebForceFileUpload(false);
-                        recheckCamera();
-                      } : undefined}
-                      cameraAvailable={webCameraAvailable}
-                      colors={{
-                        tint: colors.tint,
-                        text: colors.text,
-                        background: colors.background,
-                        textSecondary: colors.icon,
-                      }}
-                    />
-                    {barcodeScanning && (
-                      <View style={styles.scannerOverlay}>
-                        <ActivityIndicator size="large" color={colors.tint} />
-                        <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
-                          {t('mealtype_log.scanner.processing', 'Processing barcode...')}
-                        </ThemedText>
-                      </View>
-                    )}
-                  </View>
-                );
-              }
-              
-              // Camera mode
-              return (
-                <View style={styles.scannerContent}>
-                  <WebBarcodeScanner
-                    onBarcodeScanned={scanned ? () => {} : handleBarcodeScanned}
-                    onPermissionGranted={() => setWebCameraPermissionGranted(true)}
-                    onError={(error) => {
-                      console.error('Web barcode scanner error:', error);
-                    }}
-                    onCameraFailed={() => {
-                      setWebForceFileUpload(true);
-                    }}
-                    onSwitchToFileUpload={() => {
-                      setWebForceFileUpload(true);
-                    }}
-                    colors={{
-                      tint: colors.tint,
-                      text: colors.text,
-                      background: colors.background,
-                      textSecondary: colors.icon,
-                    }}
-                  />
-                  {barcodeScanning && (
-                    <View style={styles.scannerOverlay}>
-                      <ActivityIndicator size="large" color={colors.tint} />
-                      <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
-                        {t('mealtype_log.scanner.processing', 'Processing barcode...')}
-                      </ThemedText>
-                    </View>
-                  )}
-                </View>
-              );
-            }
-            
-            const hasPermission = permission?.granted;
-            
-            if (!permission) {
-              // Native: waiting for permission hook to initialize
-              return (
-                <View style={styles.scannerContent}>
-                  <ActivityIndicator size="large" color={colors.tint} />
-                  <ThemedText style={[styles.scannerText, { color: colors.text }]}>
-                    {t('mealtype_log.scanner.requesting_permission')}
-                  </ThemedText>
-                </View>
-              );
-            }
-            
-            if (!hasPermission) {
-              // Native: Need to request permission
-              return (
-            <View style={styles.scannerContent}>
-              <ThemedText style={[styles.scannerText, { color: colors.text }]}>
-                {t('mealtype_log.scanner.permission_required')}
-              </ThemedText>
-              {requestingPermission && (
-                <ActivityIndicator size="large" color={colors.tint} style={{ marginVertical: 20 }} />
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.scannerButton, 
-                  { 
-                    backgroundColor: requestingPermission ? colors.icon + '40' : colors.tint,
-                    opacity: requestingPermission ? 0.6 : 1
-                  }
-                ]}
-                    onPress={async () => {
-                  if (requestingPermission) {
-                    return;
-                  }
-                  
-                  setRequestingPermission(true);
-                      
-                    try {
-                      const result = await requestPermission();
-                      
-                      if (!result) {
-                        Alert.alert(
-                          t('alerts.permission_error'),
-                          t('mealtype_log.camera.permission_error'),
-                          [{ text: t('common.ok') }]
-                        );
-                        setRequestingPermission(false);
-                        return;
-                      }
-                      
-                      if (result.granted) {
-                        setForcePermissionCheck(prev => prev + 1);
-                        setRequestingPermission(false);
-                      } else {
-                        let message = t('mealtype_log.camera.permission_required_message');
-                        
-                        if (result.status === 'denied') {
-                          if (result.canAskAgain) {
-                            message += '\n\n' + t('mealtype_log.camera.permission_required_hint_can_ask');
-                          } else {
-                            message += '\n\n' + t('mealtype_log.camera.permission_required_hint_settings');
-                          }
-                        }
-                        
-                        Alert.alert(
-                          t('alerts.camera_permission_required'),
-                          message,
-                          [
-                            { 
-                              text: t('common.cancel'), 
-                              style: 'cancel', 
-                              onPress: () => setShowBarcodeScanner(false) 
-                            },
-                            { 
-                              text: result.canAskAgain ? t('mealtype_log.scanner.try_again') : t('common.ok'),
-                              onPress: () => {
-                                if (!result.canAskAgain) {
-                                  setShowBarcodeScanner(false);
-                                }
-                              }
-                            }
-                          ]
-                        );
-                        setRequestingPermission(false);
-                      }
-                    } catch (error: any) {
-                      Alert.alert(
-                        t('alerts.error_title'),
-                        t('mealtype_log.camera.permission_request_failed', { error: error?.message || t('common.unexpected_error') }),
-                        [{ text: t('common.ok') }]
-                      );
-                      setRequestingPermission(false);
-                    }
-                }}
-                activeOpacity={0.7}
-              >
-                    <ThemedText style={styles.scannerButtonText}>
-                      {requestingPermission ? t('mealtype_log.scanner.requesting') : t('mealtype_log.scanner.grant_permission')}
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              );
-            }
-            
-            // Native: Permission is granted - show CameraView
-            return (
-              <View style={styles.scannerContent}>
-                <CameraView
-                  style={styles.barcodeScanner}
-                  facing="back"
-                  onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-                  barcodeScannerSettings={{
-                    barcodeTypes: [
-                      'ean13',
-                      'ean8',
-                      'upc_a',
-                      'upc_e',
-                      'code128',
-                      'code39',
-                      'code93',
-                    ],
-                  }}
-                />
-                {barcodeScanning && (
-                  <View style={styles.scannerOverlay}>
-                    <ActivityIndicator size="large" color={colors.tint} />
-                    <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
-                      Processing barcode...
-                    </ThemedText>
-                  </View>
-                )}
-                <View style={styles.scannerInstructions}>
-                  <ThemedText style={[styles.scannerInstructionText, { color: '#fff' }]}>
-                    Position the barcode within the frame
-                  </ThemedText>
-                </View>
+          <View style={styles.scannerContent}>
+            <UniversalBarcodeScanner
+              onDetected={handleBarcodeScanned}
+            />
+            {barcodeScanning && (
+              <View style={styles.scannerOverlay}>
+                <ActivityIndicator size="large" color={colors.tint} />
+                <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
+                  {t('mealtype_log.scanner.processing', 'Processing barcode...')}
+                </ThemedText>
               </View>
-            );
-          })()}
+            )}
+          </View>
         </ThemedView>
       </Modal>
 

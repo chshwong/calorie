@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { PremiumCard } from '@/components/dashboard/premium-card';
 import { StatTile } from '@/components/dashboard/stat-tile';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -356,8 +357,10 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-        {/* Date Header */}
-        <DateHeader
+        {/* Desktop Container for Header and Content */}
+        <DesktopPageContainer>
+          {/* Date Header */}
+          <DateHeader
           showGreeting={true}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
@@ -839,6 +842,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         </DashboardSectionContainer>
+        </DesktopPageContainer>
       </ScrollView>
     </ThemedView>
   );
@@ -858,6 +862,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Layout.screenPadding,
     paddingBottom: Layout.screenPadding + Layout.sectionGapCompact,
+    ...(Platform.OS === 'web' && {
+      paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
+    }),
   },
   // Snapshot tiles
   snapshotCard: {

@@ -13,6 +13,7 @@ import { useAppFonts } from '@/hooks/use-fonts';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider as AppThemeProvider } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/theme';
+import { ToastProvider } from '@/components/ui/app-toast';
 
 // Create QueryClient with sensible defaults
 const queryClient = new QueryClient({
@@ -138,8 +139,9 @@ function ThemeProviderWrapper() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
+      <ToastProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
@@ -159,6 +161,7 @@ function ThemeProviderWrapper() {
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

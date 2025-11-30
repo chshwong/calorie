@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Alert, Platform, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Pressable, ScrollView, Modal, TextInput, Platform, ActivityIndicator, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { DateHeader } from '@/components/date-header';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { BarChart } from '@/components/charts/bar-chart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +19,6 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal } from '@/utils/waterUnits';
 import { useWaterQuickAddPresets } from '@/hooks/use-water-quick-add-presets';
 import { AnimatedWaterIcon } from '@/components/water/animated-water-icon';
-import { getPresetIconName } from '@/utils/waterQuickAddPresets';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -47,7 +48,7 @@ export default function WaterScreen() {
   const { data: profile } = useUserProfile();
 
   // Get water data (last 14 days for history, using selected date)
-  const { todayWater, history, isLoading, addWater, setGoal, setTotal, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal } = useWaterDaily({ 
+  const { todayWater, history, isLoading, addWater, setGoal, setTotal, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal, addWaterError } = useWaterDaily({ 
     daysBack: 14,
     targetDateString: selectedDateString,
   });
@@ -73,7 +74,10 @@ export default function WaterScreen() {
   const [animatingChipId, setAnimatingChipId] = useState<string | null>(null);
 
   // Format display (for secondary/cups line)
-  const totalMl = toMl(total, activeWaterUnit);
+  // Convert total to ml using the row's water_unit, not activeWaterUnit
+  const totalMl = todayWater 
+    ? toMl(total, todayWater.water_unit as WaterUnit)
+    : 0;
   const display = formatWaterDisplay(totalMl, activeWaterUnit === 'floz' ? 'imperial' : 'metric');
 
   // Water accent color from module theme
@@ -83,24 +87,55 @@ export default function WaterScreen() {
   // Custom input modal state
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customInput, setCustomInput] = useState('');
-  const [customInputError, setCustomInputError] = useState(false);
+  const [customInputError, setCustomInputError] = useState('');
   
   // Edit total modal state
   const [showEditTotalModal, setShowEditTotalModal] = useState(false);
   const [editTotalInput, setEditTotalInput] = useState('');
   const [editTotalError, setEditTotalError] = useState('');
+  
+  // Error modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorModalTitle, setErrorModalTitle] = useState('');
+  const [errorModalMessage, setErrorModalMessage] = useState('');
 
   // Handle quick-add preset press
   const handleQuickAddPreset = useCallback((amount: number, unit: WaterUnit, presetId: string) => {
     if (!user?.id) return;
     // Convert amount from preset unit to ml for internal storage
     const deltaMl = toMl(amount, unit);
+    
+    // Check if adding would exceed 6000ml total
+    // Use totalMl which is already calculated correctly from todayWater.water_unit
+    const newTotalMl = totalMl + deltaMl;
+    
+    if (newTotalMl > 6000) {
+      setErrorModalTitle(t('water.error.max_total_exceeded_title'));
+      setErrorModalMessage(t('water.error.max_total_exceeded_message', { max: 6000 }));
+      setShowErrorModal(true);
+      return;
+    }
+    
     addWater(deltaMl, goalMl);
     // Trigger animation
     setAnimatingChipId(presetId);
     // Reset animation state after animation completes
     setTimeout(() => setAnimatingChipId(null), 500);
-  }, [user?.id, addWater, goalMl]);
+  }, [user?.id, addWater, goalMl, totalMl, t]);
+  
+  // Handle service-level errors from addWater mutation
+  useEffect(() => {
+    if (addWaterError) {
+      const errorMessage = addWaterError instanceof Error 
+        ? addWaterError.message 
+        : t('water.error.max_total_exceeded_message', { max: 6000 });
+      setErrorModalTitle(t('water.error.max_total_exceeded_title'));
+      setErrorModalMessage(errorMessage);
+      setShowErrorModal(true);
+      // Note: The error will be cleared automatically when the next mutation runs
+      // or when the component unmounts. React Query handles this.
+    }
+  }, [addWaterError, t]);
 
   // Handle custom input (adds to current total)
   const handleCustomInput = () => {
@@ -109,20 +144,32 @@ export default function WaterScreen() {
     const numericValue = parseFloat(cleaned);
     
     if (isNaN(numericValue) || numericValue <= 0) {
-      setCustomInputError(true);
+      setCustomInputError(t('water.custom_input_error_invalid'));
       return;
     }
 
     // Convert to ml for validation
     const inputMl = toMl(numericValue, activeWaterUnit);
     
-    // Validate max (5000ml equivalent)
-    if (inputMl > 5000) {
-      setCustomInputError(true);
+    // Validate input amount is 0-5000ml
+    if (inputMl < 0 || inputMl > 5000) {
+      // Convert max to user's active unit for friendly error message
+      const maxInActiveUnit = fromMl(5000, activeWaterUnit);
+      const unitLabel = activeWaterUnit === 'floz' ? t('water.floz') : activeWaterUnit === 'cup' ? t('water.cup') : t('water.ml');
+      setCustomInputError(t('water.custom_input_error_range', { max: Math.round(maxInActiveUnit), unit: unitLabel }));
       return;
     }
     
-    setCustomInputError(false);
+    // Check if adding would exceed 6000ml total
+    // Use totalMl which is already calculated correctly
+    const newTotalMl = totalMl + inputMl;
+    
+    if (newTotalMl > 6000) {
+      setCustomInputError(t('water.error.max_total_exceeded_message', { max: 6000 }));
+      return;
+    }
+    
+    setCustomInputError('');
     addWater(inputMl, goalMl);
     setCustomInput('');
     setShowCustomModal(false);
@@ -230,8 +277,10 @@ export default function WaterScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Date Header */}
-        <DateHeader
+        {/* Desktop Container for Header and Content */}
+        <DesktopPageContainer>
+          {/* Date Header */}
+          <DateHeader
           showGreeting={true}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
@@ -299,9 +348,9 @@ export default function WaterScreen() {
             </View>
           ) : (
             <>
-              {/* Main content: Edit Total button (upper left) + Droplet (center) */}
+              {/* Main content: Edit Total + Custom buttons (left) + Droplet (center) */}
               <View style={styles.waterDisplay}>
-                {/* Edit Total button - positioned upper left */}
+                {/* Edit Total + Custom buttons - stacked vertically on left */}
                 <View style={styles.editTotalButtonContainer}>
                   <TouchableOpacity
                     style={[styles.editTotalCompactButton, { 
@@ -320,6 +369,39 @@ export default function WaterScreen() {
                       {t('water.edit_total.button')}
                     </ThemedText>
                   </TouchableOpacity>
+                  
+                  {/* Custom button - directly under Edit Total */}
+                  <TouchableOpacity
+                    style={[styles.customButton, { 
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: colors.border,
+                    }]}
+                    onPress={() => setShowCustomModal(true)}
+                    disabled={isAddingWater}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('water.custom_button'))}
+                  >
+                    <View style={styles.customButtonContent}>
+                      {/* Icon row: plus + droplet - droplet is main visual */}
+                      <View style={styles.customButtonIconRow}>
+                        <IconSymbol
+                          name="plus"
+                          size={FontSize.md} // Reduced by 1 step for proportion (was lg)
+                          color={colors.tint}
+                        />
+                        <IconSymbol
+                          name="drop.fill"
+                          size={Math.round(FontSize['4xl'] * 1.175)} // Increased by ~17.5% (36 * 1.175 = 42.3 → 42dp)
+                          color={waterTheme.accent}
+                          style={{ marginLeft: 0 }} // No spacing - icons touching
+                        />
+                      </View>
+                      {/* Label text */}
+                      <ThemedText style={[styles.customButtonText, { color: colors.text }]}>
+                        {t('water.quick_presets.custom')}
+                      </ThemedText>
+                    </View>
+                  </TouchableOpacity>
                 </View>
                 
                 {/* Water Drop Gauge - centered */}
@@ -333,83 +415,99 @@ export default function WaterScreen() {
                 </View>
               </View>
 
-              {/* Quick Add Chips - single horizontal row under droplet */}
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.quickAddChipsRow}
-                style={styles.quickAddChipsRowContainer}
-              >
-                {/* 4 Preset Chips */}
-                {presets.map((preset) => {
-                  const displayAmount = formatWaterValue(preset.amount, preset.unit);
-                  // Map iconType to AnimatedWaterIcon variant
-                  const iconVariant = preset.iconType === 'smallCup' 
-                    ? 'cup' 
-                    : preset.iconType === 'cup' 
-                      ? 'cup'
-                      : preset.iconType === 'glass'
-                        ? 'glass'
-                        : preset.iconType === 'bottle'
-                          ? 'bottleSmall'
-                          : preset.iconType === 'largeBottle'
-                            ? 'bottleLarge'
-                            : 'cup';
-                  
-                  return (
-                    <TouchableOpacity
-                      key={preset.id}
-                      style={[styles.quickAddChip, { 
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                      }]}
-                      onPress={() => handleQuickAddPreset(preset.amount, preset.unit, preset.id)}
-                      disabled={isAddingWater}
-                      activeOpacity={0.7}
-                      {...getButtonAccessibilityProps(
-                        t('water.quick_presets.add', { amount: displayAmount, label: t(preset.labelKey) })
-                      )}
-                    >
-                      <AnimatedWaterIcon
-                        variant={iconVariant}
-                        isAnimating={animatingChipId === preset.id}
-                        size={FontSize.base}
-                        color={colors.tint}
-                      />
-                      <ThemedText
-                        style={[styles.quickAddChipText, { color: colors.text }]}
-                        numberOfLines={1}
+              {/* Quick Add Controls - single horizontal row under droplet (4 presets only) */}
+              <View style={styles.quickAddControlsRowContainer}>
+                <View style={styles.quickAddControlsRow}>
+                  {/* 4 Preset Controls - icon + label, no card background */}
+                  {/* Icon mapping based on preset index (0-3), same across all units */}
+                  {presets.map((preset, index) => {
+                    const displayAmount = formatWaterValue(preset.amount, preset.unit);
+                    
+                    // Icon variant map: same 4 container types across all units
+                    // Index 0: glass (small glass) - smallest container
+                    // Index 1: cup (standard cup) - base size container
+                    // Index 2: bottleSmall (small bottle) - larger container
+                    // Index 3: bottleLarge (large bottle) - largest container
+                    const iconVariants: ('glass' | 'cup' | 'bottleSmall' | 'bottleLarge')[] = [
+                      'glass',      // Index 0: smallest
+                      'cup',        // Index 1: base
+                      'bottleSmall', // Index 2: larger
+                      'bottleLarge', // Index 3: largest
+                    ];
+                    
+                    // Scale map: different sizes to show container volume differences
+                    // Index 0: 0.5x (half the height of base - ~50% of 250ml icon)
+                    // Index 1: 1.0x (base size - 250ml stays the same)
+                    // Index 2: 1.2x (20% larger than base - 500ml)
+                    // Index 3: 1.45x (45% larger than base - 1000ml, slightly reduced to prevent bottom cutoff)
+                    const BASE_SCALE = 1.0;
+                    const scaleMultipliers = [
+                      0.5,   // Index 0: smallest (50ml) - half height of base
+                      BASE_SCALE, // Index 1: base (250ml) - unchanged
+                      1.2,   // Index 2: larger (500ml) - 20% bigger than base
+                      1.45,  // Index 3: largest (1000ml) - 45% bigger than base (reduced from 1.5 to prevent bottom cutoff)
+                    ];
+                    
+                    const iconVariant = iconVariants[index] || 'cup';
+                    const iconScale = scaleMultipliers[index] || BASE_SCALE;
+                    
+                    const isAnimating = animatingChipId === preset.id;
+                    
+                    return (
+                      <Pressable
+                        key={preset.id}
+                        style={({ pressed }) => [
+                          styles.quickAddControl,
+                          pressed && styles.quickAddControlPressed,
+                        ]}
+                        onPress={() => handleQuickAddPreset(preset.amount, preset.unit, preset.id)}
+                        disabled={isAddingWater}
+                        hitSlop={Spacing.sm} // Ensure minimum 44x44 touch target
+                        {...getButtonAccessibilityProps(
+                          t('water.quick_presets.add', { amount: displayAmount, label: t(preset.labelKey) })
+                        )}
                       >
-                        {displayAmount}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  );
-                })}
-                
-                {/* 5th Chip: Custom Amount */}
-                <TouchableOpacity
-                  style={[styles.quickAddChip, { 
-                    backgroundColor: colors.backgroundSecondary,
-                    borderColor: colors.border,
-                  }]}
-                  onPress={() => setShowCustomModal(true)}
-                  disabled={isAddingWater}
-                  activeOpacity={0.7}
-                  {...getButtonAccessibilityProps(t('water.quick_presets.custom_amount'))}
-                >
-                  <IconSymbol
-                    name={getPresetIconName('custom')}
-                    size={FontSize.base}
-                    color={colors.textSecondary}
-                  />
-                  <ThemedText
-                    style={[styles.quickAddChipText, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {t('water.quick_presets.custom')}
-                  </ThemedText>
-                </TouchableOpacity>
-              </ScrollView>
+                        {({ pressed }) => (
+                          <View style={styles.quickAddControlContent}>
+                            {/* Icon - large, centered with subtle highlight on press */}
+                            {/* Icon container uses fixed size; icon scales internally */}
+                            <View style={styles.quickAddIconContainer}>
+                              {pressed && (
+                                <View 
+                                  style={[
+                                    styles.quickAddIconHighlight,
+                                    { backgroundColor: colors.tint + '20' } // 20% opacity tint
+                                  ]} 
+                                />
+                              )}
+                              {/* Wrap 1000ml icon in View with translateY to raise it and prevent bottom cutoff */}
+                              <View style={index === 3 ? { transform: [{ translateY: -8 }] } : undefined}>
+                                <AnimatedWaterIcon
+                                  variant={iconVariant}
+                                  isAnimating={isAnimating}
+                                  size={48} // Base icon size (40-48 dp range)
+                                  baseScale={iconScale} // Apply size multiplier
+                                  color={colors.tint}
+                                />
+                              </View>
+                            </View>
+                            {/* Label text - directly under icon */}
+                            <ThemedText
+                              style={[
+                                styles.quickAddControlText,
+                                { color: pressed ? colors.tint : colors.text }
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {displayAmount}
+                            </ThemedText>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
             </>
           )}
         </View>
@@ -436,6 +534,7 @@ export default function WaterScreen() {
             />
           </View>
         )}
+        </DesktopPageContainer>
       </ScrollView>
 
       {/* Custom Input Modal */}
@@ -476,7 +575,7 @@ export default function WaterScreen() {
                 value={customInput}
                 onChangeText={(text) => {
                   setCustomInput(text);
-                  setCustomInputError(false);
+                  setCustomInputError('');
                 }}
                 placeholder={activeWaterUnit === 'floz' ? '20' : activeWaterUnit === 'cup' ? '8' : '500'}
                 placeholderTextColor={colors.textSecondary}
@@ -485,7 +584,7 @@ export default function WaterScreen() {
               />
               {customInputError && (
                 <ThemedText style={[styles.errorText, { color: colors.error }]}>
-                  {t('water.custom_input_error')}
+                  {customInputError}
                 </ThemedText>
               )}
 
@@ -495,7 +594,7 @@ export default function WaterScreen() {
                   onPress={() => {
                     setShowCustomModal(false);
                     setCustomInput('');
-                    setCustomInputError(false);
+                    setCustomInputError('');
                   }}
                   {...getButtonAccessibilityProps(t('common.cancel'))}
                 >
@@ -730,6 +829,17 @@ export default function WaterScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Error Modal */}
+      <ConfirmModal
+        visible={showErrorModal}
+        title={errorModalTitle}
+        message={errorModalMessage}
+        confirmText={t('common.ok')}
+        cancelText={null}
+        onConfirm={() => setShowErrorModal(false)}
+        onCancel={() => setShowErrorModal(false)}
+      />
     </ThemedView>
   );
 }
@@ -744,6 +854,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.screenPadding,
+    ...(Platform.OS === 'web' && {
+      paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
+    }),
   },
   card: {
     borderRadius: BorderRadius.xl,
@@ -800,6 +913,9 @@ const styles = StyleSheet.create({
     top: Spacing.xs,
     left: 0,
     zIndex: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
   },
   editTotalCompactButton: {
     paddingHorizontal: Spacing.sm,
@@ -816,41 +932,95 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: FontSize.xs * 1.5, // Use theme line height
   },
+  customButton: {
+    paddingHorizontal: Spacing.xs, // Reduced by one size step (was sm)
+    paddingVertical: Spacing.xs / 4, // Reduced vertical padding further
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  customButtonContent: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs / 4, // Minimal gap between graphic and text - maintained for consistency
+  },
+  customButtonIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0, // No gap - icons nearly touching, spacing handled by marginLeft on droplet
+    padding: 0,
+    margin: 0,
+  },
+  customButtonText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+    lineHeight: FontSize.xs * 1.5, // Use theme line height
+  },
   dropletContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
   },
-  quickAddChipsRowContainer: {
+  quickAddControlsRowContainer: {
     width: '100%',
-  },
-  quickAddChipsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.sm, // Use gap-based spacing for even distribution
     paddingTop: Spacing.xs, // Small gap from droplet
     paddingBottom: Spacing.xs, // Small bottom padding
-    paddingHorizontal: Spacing.xs, // Small horizontal padding
-    minHeight: 70, // Match chip height to ensure baseline alignment
   },
-  quickAddChip: {
-    width: 70, // Fixed width for consistent sizing
-    height: 70, // Fixed height to match width (square chips)
+  quickAddControlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start', // Align from top - bottom alignment handled inside each preset
+    gap: Spacing.sm, // Use gap-based spacing for even distribution
+    paddingHorizontal: Spacing.xs, // Small horizontal padding
+  },
+  quickAddControl: {
+    flex: 1, // Each control takes equal space (4 controls fill the row)
+    minWidth: 0, // Allow flex to shrink below content size
+    alignItems: 'center',
+    justifyContent: 'flex-start', // Column starts from top
+    // No background, no border - transparent by default
+  },
+  quickAddControlPressed: {
+    // Subtle press feedback - no visible change, handled by icon animation
+  },
+  quickAddControlContent: {
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.xs, // Symmetric padding on all sides
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    gap: Spacing.xs / 2, // Small gap between icon and text
-    ...getMinTouchTargetStyle(),
+    justifyContent: 'flex-start', // Column layout: icon area at top, label below
+    width: '100%', // Full width of control
   },
-  quickAddChipText: {
+  quickAddIconContainer: {
+    // Fixed height icon area - accommodates tallest icon (1.5x scale = 72dp)
+    // Base icon size 48dp * max scale 1.5 = 72dp, using 80dp for safety margin
+    height: Spacing['6xl'] + Spacing.lg, // Fixed height: 80dp - all icons align at bottom
+    width: '100%', // Full width of control
+    justifyContent: 'flex-end', // Bottom-align icons within this area
+    alignItems: 'center', // Center horizontally
+    overflow: 'hidden', // Prevent icons from exceeding bounds
+    padding: 0,
+    margin: 0,
+    position: 'relative', // For highlight positioning
+  },
+  quickAddIconHighlight: {
+    position: 'absolute',
+    width: Spacing['6xl'] + Spacing.lg + Spacing.sm, // Slightly larger than container for subtle glow
+    height: Spacing['6xl'] + Spacing.lg + Spacing.sm,
+    borderRadius: (Spacing['6xl'] + Spacing.lg + Spacing.sm) / 2, // Circular highlight
+    opacity: 0.3,
+  },
+  quickAddControlText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
     textAlign: 'center',
     lineHeight: FontSize.xs * 1.5, // Use theme line height
+    marginTop: Spacing.xs, // Fixed gap between icon area and label - prevents overlap
+    marginBottom: 0, // No bottom margin
+    padding: 0, // No padding
   },
   stats: {
     alignItems: 'center',

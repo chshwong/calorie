@@ -24,3 +24,5 @@ ADD CONSTRAINT med_log_type_valid CHECK (type IN ('med','supp'));
 -- Note: The constraint change will prevent any new 'other' inserts going forward.
 -- Legacy 'other' rows have been converted to 'med' above.
 
+
+

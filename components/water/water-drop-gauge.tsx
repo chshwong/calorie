@@ -47,6 +47,7 @@ const DROPLET_TRANSLATE_Y = (140 * (1 - DROPLET_SCALE)) / 2; // 10.5
 // Droplet path: teardrop shape
 // Point at top (50, 0), curves down to rounded bottom
 // Using cubic Bezier curves for smooth teardrop shape
+// This is the canonical path used for both outline and clipPath
 const DROPLET_PATH = 'M 50 0 C 25 35 5 65 5 95 C 5 120 25 140 50 140 C 75 140 95 120 95 95 C 95 65 75 35 50 0 Z';
 
 // Goal line horizontal padding from edges
@@ -200,12 +201,10 @@ function WaterDropGaugeComponent({
           {...(Platform.OS === 'web' && { pointerEvents: 'none' })}
         >
           <Defs>
-            {/* ClipPath for droplet shape - scaled to match the transformed droplet */}
+            {/* ClipPath for droplet shape - uses exact same DROPLET_PATH as outline */}
+            {/* No transform applied here - transform is applied to the group that uses it */}
             <ClipPath id="water-drop-clip">
-              <Path 
-                d={DROPLET_PATH}
-                transform={`translate(${DROPLET_TRANSLATE_X}, ${DROPLET_TRANSLATE_Y}) scale(${DROPLET_SCALE})`}
-              />
+              <Path d={DROPLET_PATH} />
             </ClipPath>
             
             {/* Gradient for water fill */}
@@ -218,8 +217,12 @@ function WaterDropGaugeComponent({
           {/* Scaled droplet group - wraps all droplet elements */}
           <G transform={`translate(${DROPLET_TRANSLATE_X}, ${DROPLET_TRANSLATE_Y}) scale(${DROPLET_SCALE})`}>
             {/* Group for clipped content (water fill) */}
+            {/* The clipPath ensures fill stays inside droplet outline */}
+            {/* Fill spans full width - clipPath handles the contour */}
             <G clipPath="url(#water-drop-clip)">
               {/* Water fill (animated rectangle from bottom up) */}
+              {/* Full width rectangle (x=0, width=100) - only constrained vertically */}
+              {/* The clipPath handles the droplet contour, no manual inset needed */}
               <AnimatedRect
                 animatedProps={animatedFillProps}
                 x="0"

@@ -10,6 +10,7 @@ import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
 import { ModuleFAB } from '@/components/module/module-fab';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -712,11 +713,13 @@ export default function ExerciseHomeScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-        {/* Module Identity Bar */}
-        <ModuleIdentityBar module="exercise" />
+        {/* Desktop Container for Header and Content */}
+        <DesktopPageContainer>
+          {/* Module Identity Bar */}
+          <ModuleIdentityBar module="exercise" />
 
-        {/* Date Header with Greeting and Navigation */}
-        <DateHeader
+          {/* Date Header with Greeting and Navigation */}
+          <DateHeader
           showGreeting={true}
           module="exercise"
           selectedDate={selectedDate}
@@ -923,6 +926,7 @@ export default function ExerciseHomeScreen() {
           )}
           </View>
         </ExerciseSectionContainer>
+        </DesktopPageContainer>
       </ScrollView>
       
       {/* Module-specific FAB */}
@@ -1090,6 +1094,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.screenPadding,
+    ...(Platform.OS === 'web' && {
+      paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
+    }),
   },
   // Responsive container for exercise sections
   responsiveContainer: {

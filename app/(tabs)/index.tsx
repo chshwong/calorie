@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -344,8 +345,10 @@ export default function FoodLogHomeScreen() {
         contentOffset={Platform.OS === 'web' && isPulling ? { x: 0, y: -Math.min(pullToRefreshDistance, 80) } : undefined}
       >
         <View style={styles.scrollContent}>
-          {/* Date Header with Greeting and Navigation */}
-          <DateHeader
+          {/* Desktop Container for Header and Content */}
+          <DesktopPageContainer>
+            {/* Date Header with Greeting and Navigation */}
+            <DateHeader
             showGreeting={true}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
@@ -736,6 +739,7 @@ export default function FoodLogHomeScreen() {
               )}
             </View>
           </View>
+          </DesktopPageContainer>
         </View>
       </ScrollView>
       
@@ -786,12 +790,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     width: '100%',
-    maxWidth: 600,
     ...Platform.select({
       web: {
         padding: 16,
         paddingTop: 30,
         paddingBottom: 16,
+        paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
       },
       default: {
         padding: 16,

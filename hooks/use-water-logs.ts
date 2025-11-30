@@ -484,6 +484,7 @@ export function useWaterDaily(options?: {
     isSettingGoal: setGoalMutation.isPending,
     isSettingTotal: setTotalMutation.isPending,
     isUpdatingUnitAndGoal: updateUnitAndGoalMutation.isPending,
+    addWaterError: addWaterMutation.error,
   };
 }
 
