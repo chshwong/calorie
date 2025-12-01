@@ -33,6 +33,7 @@ export interface CalorieEntry {
   fat_g: number | null;
   fiber_g: number | null;
   saturated_fat_g: number | null;
+  trans_fat_g: number | null;
   sugar_g: number | null;
   sodium_mg: number | null;
   notes: string | null;
@@ -50,6 +51,7 @@ export interface DailyTotals {
   fat: number;
   fiber: number;
   saturatedFat: number;
+  transFat: number;
   sugar: number;
   sodium: number;
 }
@@ -180,6 +182,8 @@ export interface ExternalFoodCache {
   fat_100g: number | null;
   /** Saturated fat in grams per 100g/ml */
   saturated_fat_100g: number | null;
+  /** Trans fat in grams per 100g/ml */
+  trans_fat_100g: number | null;
   /** Sugars in grams per 100g/ml */
   sugars_100g: number | null;
   /** Fiber in grams per 100g/ml */

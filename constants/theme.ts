@@ -23,9 +23,11 @@ const tintColorDark = '#5BB8FF';
 
 // Standardized grey color used across the entire app
 // This is the primary grey for secondary text, icons, and UI elements
+// Light mode: Dark grey close to primary text for high contrast (similar to Tailwind gray-700)
+// Dark mode: Mid-light grey for good contrast on dark backgrounds
 export const StandardGrey = {
-  light: '#1F2937',  // Darker grey for light mode
-  dark: '#4B5563',   // Darker grey for dark mode
+  light: '#404040',  // Dark grey for light mode - almost as dark as body text for high contrast
+  dark: '#9CA3AF',   // Mid-light grey for dark mode - maintains good contrast
 } as const;
 
 // Semantic colors (same for both themes)
@@ -132,7 +134,7 @@ export const Colors = {
     // Input
     inputBackground: '#FFFFFF',
     inputBorder: '#E5E5E5',
-    inputPlaceholder: StandardGrey.light,
+    inputPlaceholder: StandardGrey.light, // Use textSecondary for placeholders
     
     // Semantic (spread from SemanticColors)
     ...SemanticColors,
@@ -177,7 +179,7 @@ export const Colors = {
     // Input
     inputBackground: '#1C1C1E',
     inputBorder: '#38383A',
-    inputPlaceholder: StandardGrey.dark,
+    inputPlaceholder: StandardGrey.dark, // Use textSecondary for placeholders
     
     // Semantic (spread from SemanticColors)
     ...SemanticColors,

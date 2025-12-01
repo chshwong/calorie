@@ -31,7 +31,7 @@ const SETTINGS_STORAGE_KEY = 'app_settings';
 
 export default function SettingsScreen() {
   const { t, i18n: i18nInstance } = useTranslation();
-  const { signOut, user } = useAuth();
+  const { signOut, user, isAdmin } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -618,6 +618,20 @@ export default function SettingsScreen() {
             }}
           />
         </SettingSection>
+
+        {/* Admin Section - Only show if user is admin */}
+        {isAdmin && (
+          <SettingSection title={t('settings.admin.title')}>
+            <SettingItem
+              icon="lock.shield.fill"
+              title={t('home.admin_button')}
+              subtitle={t('settings.admin.subtitle')}
+              onPress={() => {
+                router.push('/admin-page');
+              }}
+            />
+          </SettingSection>
+        )}
 
         {/* Danger Zone */}
         <SettingSection title={t('settings.danger_zone.title')}>

@@ -400,7 +400,7 @@ export default function MyGoalsScreen() {
     return (
       <ThemedView style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <ThemedText style={[styles.loadingText, { color: colors.icon }]}>
+        <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
           Loading goals...
         </ThemedText>
       </ThemedView>
@@ -444,7 +444,7 @@ export default function MyGoalsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.scrollContent}>
-          <ThemedText style={[styles.subtitle, { color: colors.icon }]}>
+          <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
             Set your daily nutrition and weight goals
           </ThemedText>
 
@@ -457,7 +457,7 @@ export default function MyGoalsScreen() {
               </View>
               <View style={styles.goalHeaderText}>
                 <ThemedText style={[styles.label, { color: colors.text }]}>Daily Calories Target</ThemedText>
-                <ThemedText style={[styles.description, { color: colors.icon }]}>
+                <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
                   Set optional lower and/or upper range
                 </ThemedText>
               </View>
@@ -567,7 +567,7 @@ export default function MyGoalsScreen() {
               </View>
               <View style={styles.goalHeaderText}>
                 <ThemedText style={[styles.label, { color: colors.text }]}>Daily Nutrients Target</ThemedText>
-                <ThemedText style={[styles.description, { color: colors.icon }]}>
+                <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
                   Target protein intake per day
                 </ThemedText>
               </View>
@@ -1202,7 +1202,7 @@ export default function MyGoalsScreen() {
               <View style={styles.datePickerBody}>
                 {/* Year Picker */}
                 <View style={styles.datePickerRow}>
-                  <ThemedText style={[styles.datePickerLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.datePickerLabel, { color: colors.textSecondary }]}>
                     Year
                   </ThemedText>
                   <ScrollView style={styles.datePickerScrollView} showsVerticalScrollIndicator={false}>
@@ -1249,7 +1249,7 @@ export default function MyGoalsScreen() {
 
                 {/* Month Picker */}
                 <View style={styles.datePickerRow}>
-                  <ThemedText style={[styles.datePickerLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.datePickerLabel, { color: colors.textSecondary }]}>
                     Month
                   </ThemedText>
                   <ScrollView style={styles.datePickerScrollView} showsVerticalScrollIndicator={false}>
@@ -1291,7 +1291,7 @@ export default function MyGoalsScreen() {
 
                 {/* Day Picker */}
                 <View style={styles.datePickerRow}>
-                  <ThemedText style={[styles.datePickerLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.datePickerLabel, { color: colors.textSecondary }]}>
                     Day
                   </ThemedText>
                   <ScrollView style={styles.datePickerScrollView} showsVerticalScrollIndicator={false}>

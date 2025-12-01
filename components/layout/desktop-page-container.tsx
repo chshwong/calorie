@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   containerDesktop: {
     maxWidth: 900, // Canonical desktop width matching Exercise screen
     alignSelf: 'center',
-    paddingHorizontal: Spacing.xl, // 32px on desktop
+    paddingHorizontal: Spacing.lg, // 16px on desktop (matching user requirements)
   },
 });
 

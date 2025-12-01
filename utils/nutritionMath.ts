@@ -30,6 +30,7 @@ export interface FoodMaster {
   carbs_g: number | null;
   fat_g: number | null;
   saturated_fat_g: number | null;
+  trans_fat_g: number | null;
   sugar_g: number | null;
   fiber_g: number | null;
   sodium_mg: number | null;
@@ -498,6 +499,7 @@ export function getPerMasterUnit(food: FoodMaster): Nutrients {
     carbs_g: food.carbs_g != null ? food.carbs_g * factor : null,
     fat_g: food.fat_g != null ? food.fat_g * factor : null,
     saturated_fat_g: food.saturated_fat_g != null ? food.saturated_fat_g * factor : null,
+    trans_fat_g: food.trans_fat_g != null ? food.trans_fat_g * factor : null,
     sugar_g: food.sugar_g != null ? food.sugar_g * factor : null,
     fiber_g: food.fiber_g != null ? food.fiber_g * factor : null,
     sodium_mg: food.sodium_mg != null ? food.sodium_mg * factor : null,
@@ -533,6 +535,7 @@ export function calculateNutrientsForEntry(
     carbs_g: perUnit.carbs_g != null ? perUnit.carbs_g * masterUnits : null,
     fat_g: perUnit.fat_g != null ? perUnit.fat_g * masterUnits : null,
     saturated_fat_g: perUnit.saturated_fat_g != null ? perUnit.saturated_fat_g * masterUnits : null,
+    trans_fat_g: perUnit.trans_fat_g != null ? perUnit.trans_fat_g * masterUnits : null,
     sugar_g: perUnit.sugar_g != null ? perUnit.sugar_g * masterUnits : null,
     fiber_g: perUnit.fiber_g != null ? perUnit.fiber_g * masterUnits : null,
     sodium_mg: perUnit.sodium_mg != null ? perUnit.sodium_mg * masterUnits : null,
@@ -558,6 +561,7 @@ export function calculateNutrientsSimple(
     carbs_g: perUnit.carbs_g != null ? perUnit.carbs_g * quantityInMasterUnits : null,
     fat_g: perUnit.fat_g != null ? perUnit.fat_g * quantityInMasterUnits : null,
     saturated_fat_g: perUnit.saturated_fat_g != null ? perUnit.saturated_fat_g * quantityInMasterUnits : null,
+    trans_fat_g: perUnit.trans_fat_g != null ? perUnit.trans_fat_g * quantityInMasterUnits : null,
     sugar_g: perUnit.sugar_g != null ? perUnit.sugar_g * quantityInMasterUnits : null,
     fiber_g: perUnit.fiber_g != null ? perUnit.fiber_g * quantityInMasterUnits : null,
     sodium_mg: perUnit.sodium_mg != null ? perUnit.sodium_mg * quantityInMasterUnits : null,

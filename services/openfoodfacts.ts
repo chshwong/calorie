@@ -37,6 +37,8 @@ export type OpenFoodFactsProduct = {
   fat100g: number | null;
   /** Saturated fat in grams per 100g/ml */
   saturatedFat100g: number | null;
+  /** Trans fat in grams per 100g/ml */
+  transFat100g: number | null;
   /** Sugars in grams per 100g/ml */
   sugars100g: number | null;
   /** Fiber in grams per 100g/ml */
@@ -120,6 +122,7 @@ export async function fetchProductByBarcode(
       carbs100g: parseNumericField(nutriments.carbohydrates_100g),
       fat100g: parseNumericField(nutriments.fat_100g),
       saturatedFat100g: parseNumericField(nutriments['saturated-fat_100g']),
+      transFat100g: parseNumericField(nutriments['trans-fat_100g']),
       sugars100g: parseNumericField(nutriments.sugars_100g),
       fiber100g: parseNumericField(nutriments.fiber_100g),
       sodium100g: parseNumericField(nutriments.sodium_100g),

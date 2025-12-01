@@ -57,6 +57,7 @@
       "fat": "Lipides",
       "fiber": "Fibres",
       "saturated_fat": "Gras saturés",
+      "trans_fat": "Gras trans",
       "sugar": "Sucre",
       "sodium": "Sodium",
       "loading_entries": "Chargement des entrées..."
@@ -235,6 +236,28 @@
 
   "onboarding": {
     "title": "Terminer la configuration",
+    "goal": {
+      "title": "Quel est votre objectif?",
+      "subtitle": "Cela nous aide à établir un plan personnalisé pour vous.",
+      "lose_weight": {
+        "label": "Perdre du poids",
+        "description": "Brûler les graisses et mincir."
+      },
+      "maintain_weight": {
+        "label": "Maintenir le poids",
+        "description": "Rester où vous vous sentez à l'aise."
+      },
+      "gain_weight": {
+        "label": "Prendre du poids",
+        "description": "Augmenter la taille ou la force."
+      },
+      "recomp": {
+        "label": "Recomp",
+        "description": "Perdre de la graisse et gagner du muscle à peu près au même poids."
+      },
+      "advanced_goal": "Objectif avancé",
+      "error_select_goal": "Veuillez sélectionner votre objectif"
+    },
     "step1_title": "Informations personnelles",
     "step1_subtitle": "Parlez-nous un peu de vous",
     "step2_title": "Informations physiques",
@@ -287,6 +310,10 @@
       "app_version": "Version de l'application",
       "terms_of_service": "Conditions d'utilisation",
       "help_support": "Aide et support"
+    },
+    "admin": {
+      "title": "Admin",
+      "subtitle": "Panneau d'administration et outils"
     },
     "danger_zone": {
       "title": "Zone dangereuse",
@@ -548,6 +575,8 @@
       "fiber_placeholder": "0",
       "saturated_fat": "Gras saturés (g)",
       "saturated_fat_placeholder": "0",
+      "trans_fat": "Gras trans (g)",
+      "trans_fat_placeholder": "0",
       "sugar": "Sucre (g)",
       "sugar_placeholder": "0",
       "sodium": "Sodium (mg)",
@@ -560,6 +589,7 @@
       "fat_short": "Lip",
       "fiber_short": "Fib",
       "saturated_fat_short": "Gras sat",
+      "trans_fat_short": "Gras trans",
       "sugar_short": "Sucre",
       "sodium_short": "Sodium"
     },
@@ -869,6 +899,7 @@
     "other_nutrients": {
       "title": "Autres nutriments",
       "saturated_fat": "Gras sat (g)",
+      "trans_fat": "Gras trans (g)",
       "sugar": "Sucre (g)",
       "sodium": "Sodium (mg)",
       "placeholder": "0"
@@ -913,6 +944,8 @@
       "fiber_exceeds_limit": "Les fibres ne peuvent pas dépasser {{max}}g",
       "saturated_fat_invalid": "Les gras saturés doivent être un nombre valide",
       "saturated_fat_exceeds_limit": "Les gras saturés ne peuvent pas dépasser {{max}}g",
+      "trans_fat_invalid": "Les gras trans doivent être un nombre valide",
+      "trans_fat_exceeds_limit": "Les gras trans ne peuvent pas dépasser {{max}}g",
       "sugar_invalid": "Le sucre doit être un nombre valide",
       "sugar_exceeds_limit": "Le sucre ne peut pas dépasser {{max}}g",
       "sodium_invalid": "Le sodium doit être un nombre valide",

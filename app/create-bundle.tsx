@@ -487,7 +487,7 @@ export default function CreateBundleScreen() {
       <ThemedView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.tint} />
-          <ThemedText style={[styles.loadingText, { color: colors.icon }]}>
+          <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
             {t('create_bundle.loading')}
           </ThemedText>
         </View>
@@ -554,11 +554,11 @@ export default function CreateBundleScreen() {
               }
             }}
             placeholder={t('create_bundle.bundle_name_placeholder')}
-            placeholderTextColor={colors.icon}
+            placeholderTextColor={colors.textSecondary}
             maxLength={40}
           />
         </View>
-        <ThemedText style={[styles.helperText, { color: colors.icon, marginBottom: 12 }]}>
+        <ThemedText style={[styles.helperText, { color: colors.textSecondary, marginBottom: 12 }]}>
           {t('create_bundle.characters_count', { count: bundleName.length })}
         </ThemedText>
 
@@ -619,7 +619,7 @@ export default function CreateBundleScreen() {
                     onChangeText={(text) => handleItemQuantityChange(item.id, text)}
                     keyboardType="decimal-pad"
                     placeholder="1"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                   />
                 </View>
                 
@@ -647,7 +647,7 @@ export default function CreateBundleScreen() {
                       >
                         {item.serving?.label || item.unit}
                       </ThemedText>
-                      <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
+                      <ThemedText style={[styles.dropdownArrow, { color: colors.textSecondary }]}>▼</ThemedText>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -657,7 +657,7 @@ export default function CreateBundleScreen() {
                   <ThemedText style={[styles.bundleItemKcalText, { color: colors.tint }]}>
                     {Math.round(item.calculatedNutrition?.calories_kcal || 0)}
                   </ThemedText>
-                  <ThemedText style={[styles.bundleItemKcalUnit, { color: colors.icon }]}>kcal</ThemedText>
+                  <ThemedText style={[styles.bundleItemKcalUnit, { color: colors.textSecondary }]}>kcal</ThemedText>
                 </View>
                 
                 {/* Delete Button */}
@@ -709,14 +709,14 @@ export default function CreateBundleScreen() {
                   <ThemedText style={[styles.summaryCaloriesValue, { color: colors.tint }]}>
                     {Math.round(totals.calories)}
                   </ThemedText>
-                  <ThemedText style={[styles.summaryCaloriesLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.summaryCaloriesLabel, { color: colors.textSecondary }]}>
                     kcal
                   </ThemedText>
                 </View>
                 <View style={styles.summaryMacros}>
                   {totals.protein > 0 && (
                     <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon }]}>{t('create_bundle.macros.protein')}</ThemedText>
+                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.protein')}</ThemedText>
                       <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
                         {Math.round(totals.protein * 10) / 10}g
                       </ThemedText>
@@ -724,7 +724,7 @@ export default function CreateBundleScreen() {
                   )}
                   {totals.carbs > 0 && (
                     <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon }]}>{t('create_bundle.macros.carbs')}</ThemedText>
+                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.carbs')}</ThemedText>
                       <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
                         {Math.round(totals.carbs * 10) / 10}g
                       </ThemedText>
@@ -732,7 +732,7 @@ export default function CreateBundleScreen() {
                   )}
                   {totals.fat > 0 && (
                     <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon }]}>{t('create_bundle.macros.fat')}</ThemedText>
+                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.fat')}</ThemedText>
                       <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
                         {Math.round(totals.fat * 10) / 10}g
                       </ThemedText>
@@ -740,7 +740,7 @@ export default function CreateBundleScreen() {
                   )}
                   {totals.fiber > 0 && (
                     <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon }]}>{t('create_bundle.macros.fiber')}</ThemedText>
+                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.fiber')}</ThemedText>
                       <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
                         {Math.round(totals.fiber * 10) / 10}g
                       </ThemedText>
@@ -751,7 +751,7 @@ export default function CreateBundleScreen() {
                   <View style={[styles.summaryMacros, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.icon + '30' }]}>
                     {totals.saturatedFat > 0 && (
                       <View style={styles.summaryMacroItem}>
-                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon, fontSize: 11 }]}>{t('create_bundle.macros.saturated_fat_short')}</ThemedText>
+                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.saturated_fat_short')}</ThemedText>
                         <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
                           {Math.round(totals.saturatedFat * 10) / 10}g
                         </ThemedText>
@@ -759,7 +759,7 @@ export default function CreateBundleScreen() {
                     )}
                     {totals.sugar > 0 && (
                       <View style={styles.summaryMacroItem}>
-                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon, fontSize: 11 }]}>{t('create_bundle.macros.sugar_short')}</ThemedText>
+                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.sugar_short')}</ThemedText>
                         <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
                           {Math.round(totals.sugar * 10) / 10}g
                         </ThemedText>
@@ -767,7 +767,7 @@ export default function CreateBundleScreen() {
                     )}
                     {totals.sodium > 0 && (
                       <View style={styles.summaryMacroItem}>
-                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.icon, fontSize: 11 }]}>{t('create_bundle.macros.sodium_short')}</ThemedText>
+                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.sodium_short')}</ThemedText>
                         <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
                           {Math.round(totals.sodium * 10) / 10}mg
                         </ThemedText>

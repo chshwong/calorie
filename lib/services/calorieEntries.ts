@@ -35,6 +35,7 @@ const ENTRY_COLUMNS = `
   fat_g,
   fiber_g,
   saturated_fat_g,
+  trans_fat_g,
   sugar_g,
   sodium_mg,
   notes,

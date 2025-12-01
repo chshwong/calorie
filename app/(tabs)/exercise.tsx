@@ -9,6 +9,7 @@ import { DateHeader } from '@/components/date-header';
 import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
+import { QuickAddChip } from '@/components/common/quick-add-chip';
 import { ModuleFAB } from '@/components/module/module-fab';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { useAuth } from '@/contexts/AuthContext';
@@ -332,57 +333,6 @@ function ExerciseSectionContainer({ children, style }: ExerciseSectionContainerP
   );
 }
 
-// Presentational component for quick add chip
-type QuickAddChipProps = {
-  label: string;
-  icon?: string;
-  minutes?: number | null;
-  colors: typeof Colors.light;
-  onPress: () => void;
-};
-
-function QuickAddChip({ label, icon, minutes, colors, onPress }: QuickAddChipProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: true,
-      damping: 15,
-      stiffness: 300,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      damping: 15,
-      stiffness: 300,
-    }).start();
-    onPress();
-  };
-
-  return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
-        style={[styles.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={1}
-        {...getButtonAccessibilityProps(`${label}${minutes ? ` - ${minutes} min` : ''}`)}
-      >
-        {icon && (
-          <IconSymbol name={icon as Parameters<typeof IconSymbol>[0]['name']} size={14} color={colors.tint} style={{ marginRight: Spacing.xs }} />
-        )}
-        <ThemedText style={[styles.chipText, { color: colors.text }]}>
-          {label}
-          {minutes !== null && minutes !== undefined && ` – ${minutes}`}
-        </ThemedText>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
 
 export default function ExerciseHomeScreen() {
   const { t } = useTranslation();
@@ -835,15 +785,18 @@ export default function ExerciseHomeScreen() {
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled={true}
               >
-                {recentAndFrequentExercises.map((exercise, index) => (
-                  <QuickAddChip
-                    key={`recent-${index}-${exercise.name}-${exercise.minutes}`}
-                    label={exercise.name}
-                    minutes={exercise.minutes}
-                    colors={colors}
-                    onPress={() => handleQuickAdd(exercise.name, exercise.minutes)}
-                  />
-                ))}
+                {recentAndFrequentExercises.map((exercise, index) => {
+                  const minutesText = exercise.minutes !== null && exercise.minutes !== undefined ? `${exercise.minutes} min` : null;
+                  return (
+                    <QuickAddChip
+                      key={`recent-${index}-${exercise.name}-${exercise.minutes}`}
+                      label={exercise.name}
+                      metadata={minutesText}
+                      colors={colors}
+                      onPress={() => handleQuickAdd(exercise.name, exercise.minutes)}
+                    />
+                  );
+                })}
               </ScrollView>
             </>
           )}
@@ -1276,21 +1229,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingBottom: Spacing.xs, // Small padding at bottom for better scroll feel
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
-    ...getMinTouchTargetStyle(),
-  },
-  chipText: {
-    fontSize: FontSize.base,
-    fontWeight: '500',
   },
   customButton: {
     flexDirection: 'row',

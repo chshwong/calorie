@@ -356,7 +356,7 @@ export default function EditProfileScreen() {
     return (
       <ThemedView style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <ThemedText style={[styles.loadingText, { color: colors.icon }]}>
+        <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
           Loading profile...
         </ThemedText>
       </ThemedView>
@@ -369,7 +369,7 @@ export default function EditProfileScreen() {
         <ThemedText type="title" style={[styles.errorTitle, { color: colors.text }]}>
           Profile Not Found
         </ThemedText>
-        <ThemedText style={[styles.errorText, { color: colors.icon }]}>
+        <ThemedText style={[styles.errorText, { color: colors.textSecondary }]}>
           Your profile could not be loaded. Please try again later.
         </ThemedText>
         <TouchableOpacity
@@ -418,7 +418,7 @@ export default function EditProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <ThemedText style={[styles.subtitle, { color: colors.icon }]}>
+        <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
           Update your personal information
         </ThemedText>
 
@@ -427,7 +427,7 @@ export default function EditProfileScreen() {
           <TextInput
             style={[styles.input, { borderColor: colors.icon + '40', color: colors.text, backgroundColor: colors.background }]}
             placeholder="Preferred Name"
-            placeholderTextColor={colors.icon}
+            placeholderTextColor={colors.textSecondary}
             value={firstName}
             onChangeText={(text) => {
               if (text.length <= 40) {
@@ -444,14 +444,14 @@ export default function EditProfileScreen() {
             onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
-            <ThemedText style={[styles.dateInputText, { color: dateOfBirth ? colors.text : colors.icon }]}>
+            <ThemedText style={[styles.dateInputText, { color: dateOfBirth ? colors.text : colors.textSecondary }]}>
               {dateOfBirth || 'Select Date of Birth'}
             </ThemedText>
             <IconSymbol name="calendar" size={20} color={colors.icon} />
           </TouchableOpacity>
 
           <ThemedText style={[styles.label, { color: colors.text }]}>Gender at Birth</ThemedText>
-          <ThemedText style={[styles.description, { color: colors.icon }]}>
+          <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
             For accuracy on caloric calculations
           </ThemedText>
           <View style={styles.genderContainer}>
@@ -537,7 +537,7 @@ export default function EditProfileScreen() {
               <TextInput
                 style={[styles.input, { borderColor: colors.icon + '40', color: colors.text, backgroundColor: colors.background }]}
                 placeholder="50 to 304.8"
-                placeholderTextColor={colors.icon}
+                placeholderTextColor={colors.textSecondary}
                 value={heightCm}
                 onChangeText={(text) => setHeightCm(filterNumericInput(text))}
                 keyboardType="numeric"
@@ -548,18 +548,18 @@ export default function EditProfileScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: colors.icon + '40', color: colors.text, backgroundColor: colors.background }]}
                     placeholder="ft (max 10)"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={heightFt}
                     onChangeText={(text) => setHeightFt(filterNumericInput(text))}
                     keyboardType="numeric"
                   />
-                  <Text style={[styles.unitLabel, { color: colors.icon }]}>ft</Text>
+                  <Text style={[styles.unitLabel, { color: colors.textSecondary }]}>ft</Text>
                 </View>
                 <View style={styles.dualInputContainer}>
                   <TextInput
                     style={[styles.input, { borderColor: colors.icon + '40', color: colors.text, backgroundColor: colors.background }]}
                     placeholder="in"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={heightIn}
                     onChangeText={(text) => setHeightIn(filterNumericInput(text))}
                     keyboardType="numeric"
@@ -623,7 +623,7 @@ export default function EditProfileScreen() {
               <TextInput
                 style={[styles.input, { borderColor: colors.icon + '40', color: colors.text, backgroundColor: colors.background }]}
                 placeholder="45 to 1200"
-                placeholderTextColor={colors.icon}
+                placeholderTextColor={colors.textSecondary}
                 value={weightLb}
                 onChangeText={(text) => setWeightLb(filterNumericInput(text))}
                 keyboardType="numeric"
@@ -632,7 +632,7 @@ export default function EditProfileScreen() {
               <TextInput
                 style={[styles.input, { borderColor: colors.icon + '40', color: colors.text, backgroundColor: colors.background }]}
                 placeholder="20 to 544"
-                placeholderTextColor={colors.icon}
+                placeholderTextColor={colors.textSecondary}
                 value={weightKg}
                 onChangeText={(text) => setWeightKg(filterNumericInput(text))}
                 keyboardType="numeric"
@@ -693,7 +693,7 @@ export default function EditProfileScreen() {
               <View style={styles.datePickerBody}>
                 {/* Year Picker */}
                 <View style={styles.datePickerRow}>
-                  <ThemedText style={[styles.datePickerLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.datePickerLabel, { color: colors.textSecondary }]}>
                     Year
                   </ThemedText>
                   <ScrollView style={styles.datePickerScrollView} showsVerticalScrollIndicator={false}>
@@ -737,7 +737,7 @@ export default function EditProfileScreen() {
 
                 {/* Month Picker */}
                 <View style={styles.datePickerRow}>
-                  <ThemedText style={[styles.datePickerLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.datePickerLabel, { color: colors.textSecondary }]}>
                     Month
                   </ThemedText>
                   <ScrollView style={styles.datePickerScrollView} showsVerticalScrollIndicator={false}>
@@ -779,7 +779,7 @@ export default function EditProfileScreen() {
 
                 {/* Day Picker */}
                 <View style={styles.datePickerRow}>
-                  <ThemedText style={[styles.datePickerLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.datePickerLabel, { color: colors.textSecondary }]}>
                     Day
                   </ThemedText>
                   <ScrollView style={styles.datePickerScrollView} showsVerticalScrollIndicator={false}>

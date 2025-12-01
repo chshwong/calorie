@@ -10,13 +10,16 @@ import { DateHeader } from '@/components/date-header';
 import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
+import { QuickAddChip } from '@/components/common/quick-add-chip';
 import { ModuleFAB } from '@/components/module/module-fab';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { showAppToast } from '@/components/ui/app-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
+import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
@@ -28,7 +31,6 @@ import {
   useUpdateMedLog,
   useDeleteMedLog,
 } from '@/hooks/use-med-logs';
-import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
 import {
   getButtonAccessibilityProps,
@@ -37,22 +39,26 @@ import {
 } from '@/utils/accessibility';
 
 // Common meds and supplements with icons and i18n keys
-const COMMON_MEDS: Array<{ i18nKey: string; icon: string; type: 'med' }> = [
-  { i18nKey: 'meds.quick_add.common_meds_list.acetaminophen', icon: 'pills.fill', type: 'med' },
-  { i18nKey: 'meds.quick_add.common_meds_list.ibuprofen', icon: 'pills.fill', type: 'med' },
-  { i18nKey: 'meds.quick_add.common_meds_list.antihistamine', icon: 'pills.fill', type: 'med' },
-  { i18nKey: 'meds.quick_add.common_meds_list.nasal_spray', icon: 'drop.fill', type: 'med' },
-];
-
+// Supplements appear first, then meds (per user requirements)
 const COMMON_SUPPS: Array<{ i18nKey: string; icon: string; type: 'supp' }> = [
+  { i18nKey: 'meds.quick_add.common_supps_list.creatine', icon: 'sparkles', type: 'supp' },
+  { i18nKey: 'meds.quick_add.common_supps_list.zinc', icon: 'sparkles', type: 'supp' },
+  { i18nKey: 'meds.quick_add.common_supps_list.calcium', icon: 'sparkles', type: 'supp' },
+  { i18nKey: 'meds.quick_add.common_supps_list.vit_b12', icon: 'sparkles', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.vit_d', icon: 'sparkles', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.vit_c', icon: 'sparkles', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.multi', icon: 'sparkles', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.fish_oil', icon: 'drop.fill', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.magnesium', icon: 'sparkles', type: 'supp' },
-  { i18nKey: 'meds.quick_add.common_supps_list.creatine', icon: 'sparkles', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.probiotic', icon: 'sparkles', type: 'supp' },
   { i18nKey: 'meds.quick_add.common_supps_list.collagen', icon: 'sparkles', type: 'supp' },
+];
+
+const COMMON_MEDS: Array<{ i18nKey: string; icon: string; type: 'med' }> = [
+  { i18nKey: 'meds.quick_add.common_meds_list.metformin', icon: 'pills.fill', type: 'med' },
+  { i18nKey: 'meds.quick_add.common_meds_list.statin', icon: 'pills.fill', type: 'med' },
+  { i18nKey: 'meds.quick_add.common_meds_list.levothyroxine', icon: 'pills.fill', type: 'med' },
+  { i18nKey: 'meds.quick_add.common_meds_list.lisinopril', icon: 'pills.fill', type: 'med' },
 ];
 
 
@@ -400,57 +406,6 @@ function MedSectionContainer({ children, style }: MedSectionContainerProps) {
   );
 }
 
-// Presentational component for quick add chip
-type QuickAddChipProps = {
-  label: string;
-  icon?: string;
-  dose?: string | null;
-  colors: typeof Colors.light;
-  onPress: () => void;
-};
-
-function QuickAddChip({ label, icon, dose, colors, onPress }: QuickAddChipProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: Platform.OS !== 'web',
-      damping: 15,
-      stiffness: 300,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: Platform.OS !== 'web',
-      damping: 15,
-      stiffness: 300,
-    }).start();
-    onPress();
-  };
-
-  return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
-        style={[styles.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={1}
-        {...getButtonAccessibilityProps(`${label}${dose ? ` – ${dose}` : ''}`)}
-      >
-        {icon && (
-          <IconSymbol name={icon as any} size={14} color={colors.tint} style={{ marginRight: Spacing.xs }} />
-        )}
-        <ThemedText style={[styles.chipText, { color: colors.text }]}>
-          {label}
-          {dose && ` – ${dose}`}
-        </ThemedText>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
 
 export default function MedsHomeScreen() {
   const { t } = useTranslation();
@@ -497,8 +452,31 @@ export default function MedsHomeScreen() {
   const { data: recentAndFrequentMeds = [], isLoading: isLoadingRecentFrequent } = useMedRecentAndFrequent(60);
   
   // Preferences
-  const { data: medPrefs = { primarySection: 'med', hideMedWhenEmpty: false, hideSuppWhenEmpty: false } } = useMedPreferences();
+  const { data: medPrefs = { primarySection: 'med', hideMedWhenEmpty: false, hideSuppWhenEmpty: false, collapsedMedSection: false, collapsedSuppSection: false } } = useMedPreferences();
   const updatePrefsMutation = useUpdateMedPreferences();
+  
+  // Local collapsed state (synced with preferences)
+  const [isMedCollapsed, setIsMedCollapsed] = useState(medPrefs.collapsedMedSection ?? false);
+  const [isSuppCollapsed, setIsSuppCollapsed] = useState(medPrefs.collapsedSuppSection ?? false);
+  
+  // Sync local state with preferences when they load
+  useEffect(() => {
+    setIsMedCollapsed(medPrefs.collapsedMedSection ?? false);
+    setIsSuppCollapsed(medPrefs.collapsedSuppSection ?? false);
+  }, [medPrefs.collapsedMedSection, medPrefs.collapsedSuppSection]);
+  
+  // Handlers to toggle and persist collapsed state
+  const handleToggleMedSection = () => {
+    const newValue = !isMedCollapsed;
+    setIsMedCollapsed(newValue);
+    updatePrefsMutation.mutate({ collapsedMedSection: newValue });
+  };
+  
+  const handleToggleSuppSection = () => {
+    const newValue = !isSuppCollapsed;
+    setIsSuppCollapsed(newValue);
+    updatePrefsMutation.mutate({ collapsedSuppSection: newValue });
+  };
 
   // Mutations
   const createMutation = useCreateMedLog();
@@ -942,15 +920,17 @@ export default function MedsHomeScreen() {
                     <>
                       {/* Med Section First */}
                       {showMedSection && (
-                        <View style={styles.typeSection}>
-                          <View style={styles.typeSectionHeader}>
-                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
-                              {t('meds.form.type_med')}
-                            </ThemedText>
-                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
-                              {medCount} {medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
-                            </ThemedText>
-                          </View>
+                        <CollapsibleSection
+                          title={t('meds.form.type_med')}
+                          summary={
+                            medCount > 0
+                              ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                              : t('meds.summary.none')
+                          }
+                          isCollapsed={isMedCollapsed}
+                          onToggle={handleToggleMedSection}
+                          accessibilityLabel={t('meds.section.toggle_med')}
+                        >
                           {medCount > 0 ? (
                             <View style={styles.medList}>
                               {medLogsFiltered.map((log, index) => (
@@ -972,25 +952,27 @@ export default function MedsHomeScreen() {
                               {t('meds.summary.none')}
                             </ThemedText>
                           )}
-                        </View>
+                        </CollapsibleSection>
                       )}
 
                       {/* Divider between sections */}
-                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && (
+                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && !isMedCollapsed && !isSuppCollapsed && (
                         <View style={[styles.sectionDivider, { backgroundColor: colors.separator }]} />
                       )}
 
                       {/* Supp Section Second */}
                       {showSuppSection && (
-                        <View style={styles.typeSection}>
-                          <View style={styles.typeSectionHeader}>
-                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
-                              {t('meds.form.type_supp')}
-                            </ThemedText>
-                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
-                              {suppCount} {suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
-                            </ThemedText>
-                          </View>
+                        <CollapsibleSection
+                          title={t('meds.form.type_supp')}
+                          summary={
+                            suppCount > 0
+                              ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                              : t('meds.summary.none')
+                          }
+                          isCollapsed={isSuppCollapsed}
+                          onToggle={handleToggleSuppSection}
+                          accessibilityLabel={t('meds.section.toggle_supp')}
+                        >
                           {suppCount > 0 ? (
                             <View style={styles.medList}>
                               {suppLogsFiltered.map((log, index) => (
@@ -1012,22 +994,24 @@ export default function MedsHomeScreen() {
                               {t('meds.summary.none')}
                             </ThemedText>
                           )}
-                        </View>
+                        </CollapsibleSection>
                       )}
                     </>
                   ) : (
                     <>
                       {/* Supp Section First */}
                       {showSuppSection && (
-                        <View style={styles.typeSection}>
-                          <View style={styles.typeSectionHeader}>
-                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
-                              {t('meds.form.type_supp')}
-                            </ThemedText>
-                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
-                              {suppCount} {suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
-                            </ThemedText>
-                          </View>
+                        <CollapsibleSection
+                          title={t('meds.form.type_supp')}
+                          summary={
+                            suppCount > 0
+                              ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                              : t('meds.summary.none')
+                          }
+                          isCollapsed={isSuppCollapsed}
+                          onToggle={handleToggleSuppSection}
+                          accessibilityLabel={t('meds.section.toggle_supp')}
+                        >
                           {suppCount > 0 ? (
                             <View style={styles.medList}>
                               {suppLogsFiltered.map((log, index) => (
@@ -1049,25 +1033,27 @@ export default function MedsHomeScreen() {
                               {t('meds.summary.none')}
                             </ThemedText>
                           )}
-                        </View>
+                        </CollapsibleSection>
                       )}
 
                       {/* Divider between sections */}
-                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && (
+                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && !isMedCollapsed && !isSuppCollapsed && (
                         <View style={[styles.sectionDivider, { backgroundColor: colors.separator }]} />
                       )}
 
                       {/* Med Section Second */}
                       {showMedSection && (
-                        <View style={styles.typeSection}>
-                          <View style={styles.typeSectionHeader}>
-                            <ThemedText style={[styles.typeSectionTitle, { color: colors.text }]}>
-                              {t('meds.form.type_med')}
-                            </ThemedText>
-                            <ThemedText style={[styles.typeSectionCount, { color: colors.textSecondary }]}>
-                              {medCount} {medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}
-                            </ThemedText>
-                          </View>
+                        <CollapsibleSection
+                          title={t('meds.form.type_med')}
+                          summary={
+                            medCount > 0
+                              ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                              : t('meds.summary.none')
+                          }
+                          isCollapsed={isMedCollapsed}
+                          onToggle={handleToggleMedSection}
+                          accessibilityLabel={t('meds.section.toggle_med')}
+                        >
                           {medCount > 0 ? (
                             <View style={styles.medList}>
                               {medLogsFiltered.map((log, index) => (
@@ -1089,7 +1075,7 @@ export default function MedsHomeScreen() {
                               {t('meds.summary.none')}
                             </ThemedText>
                           )}
-                        </View>
+                        </CollapsibleSection>
                       )}
                     </>
                   )}
@@ -1151,7 +1137,7 @@ export default function MedsHomeScreen() {
                     <QuickAddChip
                       key={`recent-${index}-${med.name}-${med.type}-${med.dose_amount}-${med.dose_unit}`}
                       label={med.name}
-                      dose={doseText}
+                      metadata={doseText}
                       colors={colors}
                       onPress={() => handleQuickAdd(med.name, med.type, med.dose_amount, med.dose_unit)}
                     />
@@ -1173,18 +1159,7 @@ export default function MedsHomeScreen() {
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
           >
-            {COMMON_MEDS.map((med) => {
-              const translatedName = t(med.i18nKey);
-              return (
-                <QuickAddChip
-                  key={`med-${med.i18nKey}`}
-                  label={translatedName}
-                  icon={med.icon}
-                  colors={colors}
-                  onPress={() => handleQuickAdd(translatedName, med.type)}
-                />
-              );
-            })}
+            {/* Supplements first, then meds */}
             {COMMON_SUPPS.map((supp) => {
               const translatedName = t(supp.i18nKey);
               return (
@@ -1194,6 +1169,18 @@ export default function MedsHomeScreen() {
                   icon={supp.icon}
                   colors={colors}
                   onPress={() => handleQuickAdd(translatedName, supp.type)}
+                />
+              );
+            })}
+            {COMMON_MEDS.map((med) => {
+              const translatedName = t(med.i18nKey);
+              return (
+                <QuickAddChip
+                  key={`med-${med.i18nKey}`}
+                  label={translatedName}
+                  icon={med.icon}
+                  colors={colors}
+                  onPress={() => handleQuickAdd(translatedName, med.type)}
                 />
               );
             })}
@@ -1752,7 +1739,9 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   chipsScrollContainer: {
-    maxHeight: 140,
+    // Constrain to 2.5 rows: chip height (44px min touch target) + marginBottom (8px) = 52px per row
+    // 2.5 rows = 2.5 * 52px = 130px
+    maxHeight: 130,
     marginBottom: Spacing.sm,
     ...(Platform.OS === 'web' && {
       overflowY: 'auto',
@@ -1763,21 +1752,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingBottom: Spacing.xs,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
-    ...getMinTouchTargetStyle(),
-  },
-  chipText: {
-    fontSize: FontSize.base,
-    fontWeight: '500',
   },
   customButton: {
     flexDirection: 'row',

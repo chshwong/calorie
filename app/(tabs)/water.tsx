@@ -15,6 +15,7 @@ import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, M
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useWaterDaily } from '@/hooks/use-water-logs';
+import type { WaterDaily } from '@/lib/services/waterLogs';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal } from '@/utils/waterUnits';
 import { useWaterQuickAddPresets } from '@/hooks/use-water-quick-add-presets';
@@ -249,19 +250,51 @@ export default function WaterScreen() {
   };
 
 
-  // Prepare history data for chart (last 7 days, excluding selected date)
-  // Convert total from each row's water_unit to ml for consistent chart display
-  const historyData = history
-    .filter(w => w.date !== selectedDateString)
-    .slice(-7) // Last 7 days (excluding selected date)
-    .map((water) => {
+  // Prepare history data for chart (last 7 calendar days including today)
+  // Generate exactly 7 days, ordered oldest to newest (left to right)
+  const last7Days: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateString = date.toISOString().split('T')[0];
+    last7Days.push(dateString);
+  }
+
+  // Create a map of existing water data by date for quick lookup
+  const waterDataMap = new Map<string, WaterDaily>();
+  history.forEach((water) => {
+    waterDataMap.set(water.date, water);
+  });
+
+  // Build chart data for last 7 days
+  // Chart uses ml internally for consistent scaling, but displays values in active unit
+  const historyData = last7Days.map((dateString) => {
+    const water = waterDataMap.get(dateString);
+    if (water) {
       const waterUnit = (water.water_unit as WaterUnit) || 'ml';
       const totalMl = toMl(water.total || 0, waterUnit);
+      const totalInActiveUnit = fromMl(totalMl, activeWaterUnit);
+      const displayValue = formatWaterValue(totalInActiveUnit, activeWaterUnit);
       return {
-        date: water.date,
-        value: totalMl,
+        date: dateString,
+        value: totalMl, // Use ml for chart calculations (consistent scale)
+        displayValue, // Formatted string for label in active unit
       };
-    });
+    } else {
+      // No data for this day - show 0 but still render bar
+      return {
+        date: dateString,
+        value: 0,
+        displayValue: formatWaterValue(0, activeWaterUnit),
+      };
+    }
+  });
+
+  // Calculate goal display value in active unit for reference line label
+  const goalInActiveUnit = fromMl(goalMl, activeWaterUnit);
+  const goalDisplayValue = t('water.chart.goal_label', { 
+    value: formatWaterValue(goalInActiveUnit, activeWaterUnit)
+  });
 
   if (!user) {
     return (
@@ -513,15 +546,16 @@ export default function WaterScreen() {
         </View>
 
         {/* History Chart Section - Card */}
-        {historyData.length > 0 && (
-          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
-            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-              {t('water.history_title')}
-            </ThemedText>
+        <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+          <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+            {t('water.history_title')}
+          </ThemedText>
+          <View style={styles.chartWrapper}>
             <BarChart
               data={historyData}
               maxValue={goalMl}
               goalValue={goalMl}
+              goalDisplayValue={goalDisplayValue}
               selectedDate={selectedDateString}
               colorScale={(value, max) => {
                 const ratio = value / max;
@@ -529,11 +563,12 @@ export default function WaterScreen() {
                 if (ratio < 0.8) return colors.info;
                 return accentColor;
               }}
-              height={120}
+              height={140}
               showLabels={true}
+              emptyMessage={t('water.chart.empty_message')}
             />
           </View>
-        )}
+        </View>
         </DesktopPageContainer>
       </ScrollView>
 
@@ -890,6 +925,9 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: '700',
     marginBottom: Spacing.xs,
+  },
+  chartWrapper: {
+    marginTop: Spacing.sm, // Add spacing between title and chart
   },
   summary: {
     fontSize: FontSize.sm,

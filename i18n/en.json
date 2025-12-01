@@ -58,6 +58,7 @@
       "fat": "Fat",
       "fiber": "Fiber",
       "saturated_fat": "Saturated Fat",
+      "trans_fat": "Trans Fat",
       "sugar": "Sugar",
       "sodium": "Sodium",
       "loading_entries": "Loading entries..."
@@ -236,6 +237,28 @@
 
   "onboarding": {
     "title": "Complete Setup",
+    "goal": {
+      "title": "What's your goal?",
+      "subtitle": "This helps us set up a personalized plan for you.",
+      "lose_weight": {
+        "label": "Lose Weight",
+        "description": "Burn fat and slim down."
+      },
+      "maintain_weight": {
+        "label": "Maintain Weight",
+        "description": "Stay where you feel comfortable."
+      },
+      "gain_weight": {
+        "label": "Gain Weight",
+        "description": "Build size or strength."
+      },
+      "recomp": {
+        "label": "Recomp",
+        "description": "Lose fat and gain muscle at about the same weight."
+      },
+      "advanced_goal": "Advanced goal",
+      "error_select_goal": "Please select your goal"
+    },
     "step1_title": "Personal Information",
     "step1_subtitle": "Tell us a bit about yourself",
     "step2_title": "Physical Information",
@@ -294,6 +317,10 @@
       "app_version": "App Version",
       "terms_of_service": "Terms of Service",
       "help_support": "Help & Support"
+    },
+    "admin": {
+      "title": "Admin",
+      "subtitle": "Admin panel and tools"
     },
     "danger_zone": {
       "title": "Danger Zone",
@@ -555,6 +582,8 @@
       "fiber_placeholder": "0",
       "saturated_fat": "Saturated Fat (g)",
       "saturated_fat_placeholder": "0",
+      "trans_fat": "Trans Fat (g)",
+      "trans_fat_placeholder": "0",
       "sugar": "Sugar (g)",
       "sugar_placeholder": "0",
       "sodium": "Sodium (mg)",
@@ -887,6 +916,7 @@
     "other_nutrients": {
       "title": "Other Nutrients",
       "saturated_fat": "Sat Fat (g)",
+      "trans_fat": "Trans Fat (g)",
       "sugar": "Sugar (g)",
       "sodium": "Sodium (mg)",
       "placeholder": "0"
@@ -933,6 +963,8 @@
       "fiber_exceeds_limit": "Fiber cannot exceed {{max}}g",
       "saturated_fat_invalid": "Saturated fat must be a valid number",
       "saturated_fat_exceeds_limit": "Saturated fat cannot exceed {{max}}g",
+      "trans_fat_invalid": "Trans fat must be a valid number",
+      "trans_fat_exceeds_limit": "Trans fat cannot exceed {{max}}g",
       "sugar_invalid": "Sugar must be a valid number",
       "sugar_exceeds_limit": "Sugar cannot exceed {{max}}g",
       "sodium_invalid": "Sodium must be a valid number",
@@ -1327,18 +1359,21 @@
       "recent_freq": "RECENT & FREQ",
       "common": "COMMON",
       "common_meds_list": {
-        "acetaminophen": "Acetaminophen",
-        "ibuprofen": "Ibuprofen",
-        "antihistamine": "Antihistamine",
-        "nasal_spray": "Nasal Spray"
+        "metformin": "Metformin",
+        "statin": "Statin",
+        "levothyroxine": "Levothyroxine",
+        "lisinopril": "Lisinopril"
       },
       "common_supps_list": {
+        "creatine": "Creatine",
+        "zinc": "Zinc",
+        "calcium": "Calcium",
+        "vit_b12": "Vit B12",
         "vit_d": "Vit D",
         "vit_c": "Vit C",
         "multi": "Multi",
         "fish_oil": "Fish Oil",
         "magnesium": "Magnesium",
-        "creatine": "Creatine",
         "probiotic": "Probiotic",
         "collagen": "Collagen"
       }
@@ -1358,7 +1393,11 @@
       "hide_when_empty": "Hide When Empty",
       "hide_when_empty_hint": "Hide sections only when they have no items",
       "hide_med": "Hide Med section when empty",
-      "hide_supp": "Hide Supp section when empty"
+      "hide_supp": "Hide Supp section when empty",
+      "section": {
+        "toggle_med": "Toggle Medications section",
+        "toggle_supp": "Toggle Supplements section"
+      }
     },
     "clone": {
       "title": "Clone today's intake",
@@ -1466,6 +1505,10 @@
       "max_total_exceeded_message": "Total daily water cannot exceed {{max}}ml. If you do drink more than that, you got to be careful!"
     },
     "history_title": "Last 7 Days",
+    "chart": {
+      "goal_label": "Goal {{value}}",
+      "empty_message": "Log some water to see your history"
+    },
     "set_goal": {
       "title": "Set Water Goal",
       "message": "Enter your daily water goal in {{unit}}",

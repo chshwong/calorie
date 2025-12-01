@@ -29,7 +29,7 @@ import {
 
 export default function FoodLogHomeScreen() {
   const { t } = useTranslation();
-  const { signOut, loading, retrying, user, isAdmin } = useAuth();
+  const { signOut, loading, retrying, user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
@@ -106,12 +106,6 @@ export default function FoodLogHomeScreen() {
       gcTime: 5 * 60 * 1000,
     });
   }, [user?.id, entriesLoading, queryClient]);
-
-  // Function to handle date selection from date picker
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
-    setShowDatePicker(false);
-  };
 
   // Generate calendar days for a given month
   const generateCalendarDays = (viewMonth: Date) => {
@@ -457,7 +451,7 @@ export default function FoodLogHomeScreen() {
           {/* Daily Totals Summary */}
           <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>
             <View style={[styles.dailyTotalsHeader, { borderBottomColor: colors.separator }]}>
-              <ThemedText style={[styles.dailyTotalsTitle, { color: colors.text }]}>
+              <ThemedText style={[styles.dailyTotalsTitle, { color: colors.textSecondary }]}>
                 {isToday ? t('home.summary.title_today') : t('home.summary.title_other')}
               </ThemedText>
               {entriesLoading ? (
@@ -471,56 +465,85 @@ export default function FoodLogHomeScreen() {
             
             {!entriesLoading && (
               <View style={styles.dailyTotalsContent}>
-                <View style={styles.dailyTotalsRow}>
+                <View style={styles.dailyTotalsMainRow}>
                   {/* Total Calories - Left Side */}
                   <View style={styles.dailyTotalItem}>
-                    <View style={styles.dailyTotalLabelRow}>
-                      <ThemedText style={[styles.dailyTotalLabel, { color: colors.textSecondary }]}>{t('home.summary.total_calories')}</ThemedText>
-                    </View>
+                    <ThemedText style={[styles.dailyTotalLabel, { color: colors.textSecondary }]}>{t('home.summary.total_calories')}</ThemedText>
                     <ThemedText style={[styles.dailyTotalValue, { color: colors.tint }]}>
                       {dailyTotals.calories} {t('units.kcal')}
                     </ThemedText>
                   </View>
 
-                  {/* Macronutrients - Right Side */}
-                  {(dailyTotals.protein > 0 || dailyTotals.carbs > 0 || dailyTotals.fat > 0 || dailyTotals.fiber > 0) && (
-                    <View style={styles.dailyMacrosContainer}>
-                      <View style={styles.dailyMacrosRow}>
-                        {dailyTotals.protein > 0 && (
-                          <View style={styles.dailyMacroItem}>
-                            <ThemedText style={[styles.dailyMacroLabel, { color: colors.textSecondary }]}>{t('home.summary.protein')}</ThemedText>
-                            <ThemedText style={[styles.dailyMacroValue, { color: colors.text }]}>
-                              {dailyTotals.protein}{t('units.g')}
-                            </ThemedText>
-                          </View>
-                        )}
-                        {dailyTotals.carbs > 0 && (
-                          <View style={styles.dailyMacroItem}>
-                            <ThemedText style={[styles.dailyMacroLabel, { color: colors.textSecondary }]}>{t('home.summary.carbs')}</ThemedText>
-                            <ThemedText style={[styles.dailyMacroValue, { color: colors.text }]}>
-                              {dailyTotals.carbs}{t('units.g')}
-                            </ThemedText>
-                          </View>
-                        )}
-                        {dailyTotals.fat > 0 && (
-                          <View style={styles.dailyMacroItem}>
-                            <ThemedText style={[styles.dailyMacroLabel, { color: colors.textSecondary }]}>{t('home.summary.fat')}</ThemedText>
-                            <ThemedText style={[styles.dailyMacroValue, { color: colors.text }]}>
-                              {dailyTotals.fat}{t('units.g')}
-                            </ThemedText>
-                          </View>
-                        )}
-                        {dailyTotals.fiber > 0 && (
-                          <View style={styles.dailyMacroItem}>
-                            <ThemedText style={[styles.dailyMacroLabel, { color: colors.textSecondary }]}>{t('home.summary.fiber')}</ThemedText>
-                            <ThemedText style={[styles.dailyMacroValue, { color: colors.text }]}>
-                              {dailyTotals.fiber}{t('units.g')}
-                            </ThemedText>
-                          </View>
-                        )}
+                  {/* Macro Gauge - Right Side */}
+                  {(dailyTotals.protein > 0 || dailyTotals.carbs > 0 || dailyTotals.fat > 0) && (() => {
+                    const totalMacros = dailyTotals.protein + dailyTotals.carbs + dailyTotals.fat;
+                    const proteinFlex = totalMacros > 0 ? dailyTotals.protein : 0;
+                    const carbsFlex = totalMacros > 0 ? dailyTotals.carbs : 0;
+                    const fatFlex = totalMacros > 0 ? dailyTotals.fat : 0;
+                    
+                    const segments = [];
+                    if (proteinFlex > 0) segments.push({ flex: proteinFlex, color: '#10B981' });
+                    if (carbsFlex > 0) segments.push({ flex: carbsFlex, color: '#F59E0B' });
+                    if (fatFlex > 0) segments.push({ flex: fatFlex, color: '#8B5CF6' });
+                    
+                    return (
+                      <View style={styles.dailyMacrosContainer}>
+                        {/* Horizontal Gauge Bar */}
+                        <View style={styles.macroGaugeBar}>
+                          {segments.map((segment, index) => {
+                            const isFirst = index === 0;
+                            const isLast = index === segments.length - 1;
+                            const borderRadius = Platform.select({ web: 5, default: 4 });
+                            
+                            return (
+                              <View
+                                key={index}
+                                style={[
+                                  styles.macroGaugeSegment,
+                                  {
+                                    flex: segment.flex,
+                                    backgroundColor: segment.color,
+                                    borderTopLeftRadius: isFirst ? borderRadius : 0,
+                                    borderBottomLeftRadius: isFirst ? borderRadius : 0,
+                                    borderTopRightRadius: isLast ? borderRadius : 0,
+                                    borderBottomRightRadius: isLast ? borderRadius : 0,
+                                  },
+                                ]}
+                              />
+                            );
+                          })}
+                        </View>
+                        
+                        {/* Compact Legend */}
+                        <View style={styles.macroLegend}>
+                          {dailyTotals.protein > 0 && (
+                            <View style={styles.macroLegendItem}>
+                              <View style={[styles.macroLegendDot, { backgroundColor: '#10B981' }]} />
+                              <ThemedText style={[styles.macroLegendText, { color: colors.textSecondary }]}>
+                                {t('home.summary.protein')} {dailyTotals.protein}{t('units.g')}
+                              </ThemedText>
+                            </View>
+                          )}
+                          {dailyTotals.carbs > 0 && (
+                            <View style={styles.macroLegendItem}>
+                              <View style={[styles.macroLegendDot, { backgroundColor: '#F59E0B' }]} />
+                              <ThemedText style={[styles.macroLegendText, { color: colors.textSecondary }]}>
+                                {t('home.summary.carbs')} {dailyTotals.carbs}{t('units.g')}
+                              </ThemedText>
+                            </View>
+                          )}
+                          {dailyTotals.fat > 0 && (
+                            <View style={styles.macroLegendItem}>
+                              <View style={[styles.macroLegendDot, { backgroundColor: '#8B5CF6' }]} />
+                              <ThemedText style={[styles.macroLegendText, { color: colors.textSecondary }]}>
+                                {t('home.summary.fat')} {dailyTotals.fat}{t('units.g')}
+                              </ThemedText>
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  )}
+                    );
+                  })()}
                 </View>
                 
                 {/* Sub-fats Section - Collapsible */}
@@ -541,7 +564,7 @@ export default function FoodLogHomeScreen() {
                     accessibilityState={{ expanded: summaryExpanded }}
                   >
                     <View style={styles.subFatsHeaderRight}>
-                      <ThemedText style={[styles.subFatsTitle, { color: colors.text }]}>{t('home.summary.more_details')}</ThemedText>
+                      <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>{t('home.summary.more_details')}</ThemedText>
                       <IconSymbol 
                         name={summaryExpanded ? "chevron.up" : "chevron.down"} 
                         size={16} 
@@ -555,19 +578,25 @@ export default function FoodLogHomeScreen() {
                     <View style={styles.subFatsRow}>
                       <View style={styles.subFatItem}>
                         <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.saturated_fat')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.text }]}>
+                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
                           {dailyTotals.saturatedFat}{t('units.g')}
                         </ThemedText>
                       </View>
                       <View style={styles.subFatItem}>
+                        <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.trans_fat')}</ThemedText>
+                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
+                          {dailyTotals.transFat}{t('units.g')}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.subFatItem}>
                         <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.sugar')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.text }]}>
+                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
                           {dailyTotals.sugar}{t('units.g')}
                         </ThemedText>
                       </View>
                       <View style={styles.subFatItem}>
                         <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.sodium')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.text }]}>
+                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
                           {dailyTotals.sodium}{t('units.mg')}
                         </ThemedText>
                       </View>
@@ -742,35 +771,6 @@ export default function FoodLogHomeScreen() {
           </DesktopPageContainer>
         </View>
       </ScrollView>
-      
-      {/* Footer with ADMIN Button - Only show if user is admin */}
-      {isAdmin && (
-        <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.separator }]}>
-          <View style={styles.footerContent}>
-            <View style={styles.footerSpacer} />
-            <TouchableOpacity
-              style={[
-                styles.adminButton,
-                getMinTouchTargetStyle(),
-                {
-                  backgroundColor: colors.tint,
-                  ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
-                }
-              ]}
-              onPress={() => {
-                router.push('/admin-page');
-              }}
-              activeOpacity={0.8}
-              {...getButtonAccessibilityProps(
-                t('home.admin_button'),
-                'Double tap to open admin panel'
-              )}
-            >
-              <Text style={styles.adminButtonText}>{t('home.admin_button')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </ThemedView>
   );
 }
@@ -999,19 +999,20 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   dailyTotalsCard: {
-    padding: Platform.select({ web: 16, default: 18 }),
-    borderRadius: 16,
+    paddingVertical: Platform.select({ web: 14, default: 12 }),
+    paddingHorizontal: Platform.select({ web: 24, default: 20 }),
+    borderRadius: Platform.select({ web: 16, default: 14 }),
     marginBottom: 16,
     ...Platform.select({
       web: {
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)',
         transition: 'box-shadow 0.2s ease',
       },
       default: {
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
       },
     }),
   },
@@ -1019,10 +1020,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    opacity: 0.4,
   },
   dailyTotalsHeaderRight: {
     flexDirection: 'row',
@@ -1036,77 +1036,115 @@ const styles = StyleSheet.create({
   dailyTotalsContent: {
     gap: 0,
   },
-  dailyTotalsRow: {
+  dailyTotalsMainRow: {
     flexDirection: Platform.select({ web: 'row', default: 'column' }),
     justifyContent: 'space-between',
     alignItems: Platform.select({ web: 'flex-start', default: 'stretch' }),
-    gap: Platform.select({ web: 20, default: 16 }),
+    gap: Platform.select({ web: 24, default: 16 }),
   },
   dailyTotalItem: {
-    flex: 1,
-    minWidth: 0,
-  },
-  dailyTotalLabelRow: {
-    marginBottom: 2,
+    flexDirection: 'column',
+    flexShrink: 0,
+    minWidth: Platform.select({ web: 160, default: undefined }),
+    maxWidth: Platform.select({ web: undefined, default: '100%' }),
   },
   dailyTotalLabel: {
-    fontSize: 11,
+    fontSize: Platform.select({ web: 10, default: 11 }),
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontWeight: '600',
-    opacity: 1.0,
+    letterSpacing: 0.6,
+    fontWeight: '500',
+    marginBottom: 6,
+    lineHeight: Platform.select({ web: 14, default: 15 }),
   },
   dailyTotalValue: {
     fontSize: Platform.select({ web: 28, default: 24 }),
-    fontWeight: 'bold',
-    letterSpacing: -0.5,
+    fontWeight: '700',
+    letterSpacing: -0.8,
+    lineHeight: Platform.select({ web: 34, default: 30 }),
+    flexShrink: 0,
   },
   dailyMacrosContainer: {
     flex: Platform.select({ web: 1, default: 0 }),
     alignItems: Platform.select({ web: 'flex-end', default: 'flex-start' }),
     justifyContent: 'flex-start',
     width: Platform.select({ web: 'auto', default: '100%' }),
+    minWidth: 0,
+  },
+  macroGaugeBar: {
+    flexDirection: 'row',
+    width: '100%',
+    height: Platform.select({ web: 10, default: 8 }),
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  macroGaugeSegment: {
+    minWidth: 2,
+  },
+  macroLegend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Platform.select({ web: 12, default: 10 }),
+    justifyContent: Platform.select({ web: 'flex-end', default: 'flex-start' }),
+    alignItems: 'center',
+  },
+  macroLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  macroLegendDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  macroLegendText: {
+    fontSize: Platform.select({ web: 10, default: 11 }),
+    fontWeight: '500',
+    lineHeight: Platform.select({ web: 14, default: 15 }),
   },
   dailyMacrosRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Platform.select({ web: 16, default: 12 }),
+    gap: Platform.select({ web: 24, default: 20 }),
     justifyContent: Platform.select({ web: 'flex-end', default: 'flex-start' }),
+    alignItems: 'flex-start',
   },
   dailyMacroItem: {
-    alignItems: 'center',
-    minWidth: Platform.select({ web: 50, default: 60 }),
+    alignItems: 'flex-start',
+    minWidth: Platform.select({ web: 65, default: 70 }),
   },
   dailyMacroLabel: {
-    fontSize: Platform.select({ web: 9, default: 10 }),
-    fontWeight: '600',
-    opacity: 1.0,
-    marginBottom: 2,
+    fontSize: Platform.select({ web: 10, default: 11 }),
+    fontWeight: '500',
+    marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    lineHeight: Platform.select({ web: 14, default: 15 }),
   },
   dailyMacroValue: {
-    fontSize: Platform.select({ web: 14, default: 15 }),
-    fontWeight: 'bold',
+    fontSize: Platform.select({ web: 16, default: 17 }),
+    fontWeight: '600',
+    lineHeight: Platform.select({ web: 22, default: 24 }),
   },
   subFatsSection: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
     borderTopWidth: 1,
-    opacity: 0.3,
   },
   subFatsHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 0,
+    paddingVertical: 0,
   },
   subFatsHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   subFatsTitle: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1114,23 +1152,29 @@ const styles = StyleSheet.create({
   subFatsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 2,
     justifyContent: 'flex-start',
+    marginTop: 0,
+    marginBottom: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   subFatItem: {
     alignItems: 'flex-start',
-    minWidth: 70,
+    minWidth: Platform.select({ web: 80, default: 70 }),
+    marginVertical: 0,
+    paddingVertical: 0,
   },
   subFatLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    opacity: 1.0,
-    marginBottom: 2,
+    fontSize: Platform.select({ web: 9, default: 10 }),
+    fontWeight: '500',
+    marginBottom: 0,
+    marginTop: 0,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   subFatValue: {
-    fontSize: 13,
+    fontSize: Platform.select({ web: 12, default: 13 }),
     fontWeight: '600',
   },
   entriesSectionCard: {
@@ -1680,64 +1724,5 @@ const styles = StyleSheet.create({
   webRefreshText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  footer: {
-    width: '100%',
-    borderTopWidth: 1,
-    ...Platform.select({
-      web: {
-        position: 'sticky',
-        bottom: 0,
-        zIndex: 100,
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.08)',
-      },
-      default: {
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 5,
-      },
-    }),
-  },
-  footerContent: {
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: Platform.select({ web: 16, default: 16 }),
-    paddingVertical: Platform.select({ web: 12, default: 12 }),
-    paddingBottom: Platform.select({ web: 12, default: 16 }),
-  },
-  footerSpacer: {
-    flex: 1,
-  },
-  adminButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-        transition: 'all 0.2s ease',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
-      },
-    }),
-  },
-  adminButtonText: {
-    color: '#fff',
-    fontSize: Platform.select({ web: 13, default: 14 }),
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
 });

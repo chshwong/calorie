@@ -51,6 +51,7 @@ export interface FoodNutrients {
   carbs_g: number | null;
   fat_g: number | null;
   saturated_fat_g: number | null;
+  trans_fat_g: number | null;
   sugar_g: number | null;
   fiber_g: number | null;
   sodium_mg: number | null;
@@ -253,6 +254,7 @@ export function computeNutrientsForServing(
     carbs_g: food.carbs_g != null ? food.carbs_g * factor : null,
     fat_g: food.fat_g != null ? food.fat_g * factor : null,
     saturated_fat_g: food.saturated_fat_g != null ? food.saturated_fat_g * factor : null,
+    trans_fat_g: food.trans_fat_g != null ? food.trans_fat_g * factor : null,
     sugar_g: food.sugar_g != null ? food.sugar_g * factor : null,
     fiber_g: food.fiber_g != null ? food.fiber_g * factor : null,
     sodium_mg: food.sodium_mg != null ? food.sodium_mg * factor : null,
@@ -329,6 +331,7 @@ export function getDefaultServingWithNutrients(
       carbs_g: food.carbs_g,
       fat_g: food.fat_g,
       saturated_fat_g: food.saturated_fat_g,
+      trans_fat_g: food.trans_fat_g,
       sugar_g: food.sugar_g,
       fiber_g: food.fiber_g,
       sodium_mg: food.sodium_mg,
@@ -466,6 +469,7 @@ export function formatNutrientsForDisplay(nutrients: FoodNutrients): {
   sugar: string;
   sodium: string;
   saturatedFat: string;
+  transFat: string;
 } {
   const round = (value: number | null, decimals: number = 1): string => {
     if (value == null) return '-';
@@ -481,6 +485,7 @@ export function formatNutrientsForDisplay(nutrients: FoodNutrients): {
     sugar: round(nutrients.sugar_g),
     sodium: round(nutrients.sodium_mg, 0),
     saturatedFat: round(nutrients.saturated_fat_g),
+    transFat: round(nutrients.trans_fat_g),
   };
 }
 

@@ -424,6 +424,7 @@ export default function LogFoodScreen() {
   const [fat, setFat] = useState('');
   const [fiber, setFiber] = useState('');
   const [saturatedFat, setSaturatedFat] = useState('');
+  const [transFat, setTransFat] = useState('');
   const [sugar, setSugar] = useState('');
   const [sodium, setSodium] = useState('');
   const [loading, setLoading] = useState(false);
@@ -904,6 +905,7 @@ export default function LogFoodScreen() {
           let fat = 0;
           let fiber = 0;
           let saturatedFat = 0;
+          let transFat = 0;
           let sugar = 0;
           let sodium = 0;
           let itemName = item.item_name || t('mealtype_log.food_log.unknown_food');
@@ -947,6 +949,7 @@ export default function LogFoodScreen() {
             fat = (food.fat_g || 0) * multiplier;
             fiber = (food.fiber_g || 0) * multiplier;
             saturatedFat = (food.saturated_fat_g || 0) * multiplier;
+            transFat = (food.trans_fat_g || 0) * multiplier;
             sugar = (food.sugar_g || 0) * multiplier;
             sodium = (food.sodium_mg || 0) * multiplier;
           }
@@ -968,6 +971,7 @@ export default function LogFoodScreen() {
           const validatedFat = (fat > 0 && isFinite(fat)) ? Math.round(fat * 100) / 100 : null;
           const validatedFiber = (fiber > 0 && isFinite(fiber)) ? Math.round(fiber * 100) / 100 : null;
           const validatedSaturatedFat = (saturatedFat > 0 && isFinite(saturatedFat)) ? Math.round(saturatedFat * 100) / 100 : null;
+          const validatedTransFat = (transFat > 0 && isFinite(transFat)) ? Math.round(transFat * 100) / 100 : null;
           const validatedSugar = (sugar > 0 && isFinite(sugar)) ? Math.round(sugar * 100) / 100 : null;
           const validatedSodium = (sodium > 0 && isFinite(sodium)) ? Math.round(sodium * 100) / 100 : null;
 
@@ -1000,6 +1004,9 @@ export default function LogFoodScreen() {
           // Only include fat detail fields if they have values greater than 0
           if (validatedSaturatedFat !== null) {
             entryData.saturated_fat_g = validatedSaturatedFat;
+          }
+          if (validatedTransFat !== null) {
+            entryData.trans_fat_g = validatedTransFat;
           }
 
           // Only include sugar_g if it has a value greater than 0
@@ -1096,7 +1103,8 @@ export default function LogFoodScreen() {
 
   const handleBundleAddCancel = useCallback(() => {
     setBundleAddConfirmVisible(false);
-    setBundleToAdd(null);
+    // Don't clear bundleToAdd immediately to avoid showing generic message flash
+    // It will be cleared when a new bundle is selected or component unmounts
   }, []);
 
   // Delete bundle
@@ -1385,6 +1393,7 @@ export default function LogFoodScreen() {
     setFat(entry.fat_g?.toString() || '');
     setFiber(entry.fiber_g?.toString() || '');
     setSaturatedFat(entry.saturated_fat_g?.toString() || '');
+    setTransFat(entry.trans_fat_g?.toString() || '');
     setSugar(entry.sugar_g?.toString() || '');
     setSodium(entry.sodium_mg?.toString() || '');
     
@@ -1557,6 +1566,7 @@ export default function LogFoodScreen() {
     setFat('');
     setFiber('');
     setSaturatedFat('');
+    setTransFat('');
     setSugar('');
     setSodium('');
     setSelectedFood(null);
@@ -1731,6 +1741,14 @@ export default function LogFoodScreen() {
         }
       }
       
+      // Only include trans_fat_g if it has a value greater than 0
+      if (transFat && transFat.trim() !== '') {
+        const parsedTransFat = parseFloat(transFat);
+        if (!isNaN(parsedTransFat) && isFinite(parsedTransFat) && parsedTransFat > 0) {
+          entryData.trans_fat_g = Math.round(parsedTransFat * 100) / 100;
+        }
+      }
+      
       // Only include sugar_g if it has a value greater than 0 (match Bundle logic - don't include if 0)
       if (sugar && sugar.trim() !== '') {
         const parsedSugar = parseFloat(sugar);
@@ -1810,7 +1828,7 @@ export default function LogFoodScreen() {
       const allowedFields = [
         'user_id', 'entry_date', 'eaten_at', 'meal_type', 'item_name', 'quantity', 'unit',
         'calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g',
-        'saturated_fat_g', 'sugar_g', 'sodium_mg', 'food_id', 'serving_id'
+        'saturated_fat_g', 'trans_fat_g', 'sugar_g', 'sodium_mg', 'food_id', 'serving_id'
       ];
       
       for (const key of allowedFields) {
@@ -2217,6 +2235,7 @@ export default function LogFoodScreen() {
             fat_g: externalFood.fat_100g || 0,
             fiber_g: externalFood.fiber_100g || null,
             saturated_fat_g: externalFood.saturated_fat_100g || null,
+            trans_fat_g: externalFood.trans_fat_100g || null,
             sugar_g: externalFood.sugars_100g || null,
             sodium_mg: externalFood.sodium_100g ? Math.round(externalFood.sodium_100g * 1000) : null,
             serving_size: 100, // External data is per 100g
@@ -2445,6 +2464,7 @@ export default function LogFoodScreen() {
     setFat(nutrients.fat_g != null ? nutrients.fat_g.toFixed(1) : '');
     setFiber(nutrients.fiber_g != null ? nutrients.fiber_g.toFixed(1) : '');
     setSaturatedFat(nutrients.saturated_fat_g != null ? nutrients.saturated_fat_g.toFixed(1) : '');
+    setTransFat(nutrients.trans_fat_g != null ? nutrients.trans_fat_g.toFixed(1) : '');
     setSugar(nutrients.sugar_g != null ? nutrients.sugar_g.toFixed(1) : '');
     setSodium(nutrients.sodium_mg != null ? nutrients.sodium_mg.toFixed(1) : '');
   }, []);
@@ -2505,25 +2525,54 @@ export default function LogFoodScreen() {
   /**
    * Quick Add - adds food entry with default serving immediately
    * Uses centralized serving logic from lib/servings.ts
+   * For Recent tab: uses latest entry's serving if provided
    */
-  const handleQuickAdd = async (food: FoodMaster) => {
+  const handleQuickAdd = async (food: FoodMaster, latestEntry?: CalorieEntry) => {
     if (!user?.id) return;
 
     try {
-      // 1. Fetch food servings using centralized data access
-      const servings = await getServingsForFood(food.id);
-
-      // 2. Get default serving using centralized logic (SINGLE SOURCE OF TRUTH)
-      const defaultServing = getDefaultServingForFood(food, servings);
-
-      // 3. Calculate nutrients using centralized logic (SINGLE SOURCE OF TRUTH)
+      let servingQuantity: number;
+      let servingUnit: string;
+      let servingId: string | null = null;
       let nutrients: Nutrients;
-      if (defaultServing.serving) {
-        // Use the saved serving for calculation
-        nutrients = computeNutrientsForFoodServing(food, defaultServing.serving, defaultServing.quantity);
+
+      if (latestEntry) {
+        // Recent tab: use latest entry's serving configuration
+        servingQuantity = latestEntry.quantity;
+        servingUnit = latestEntry.unit;
+        servingId = latestEntry.serving_id || null;
+        
+        // Calculate nutrients based on the latest entry's portion
+        // Fetch servings to check if this was a saved serving
+        const servings = await getServingsForFood(food.id);
+        const savedServing = servingId ? servings.find(s => s.id === servingId) : null;
+        
+        if (savedServing) {
+          // Use the saved serving for calculation
+          nutrients = computeNutrientsForFoodServing(food, savedServing, servingQuantity);
+        } else {
+          // Using raw quantity/unit - calculate from food_master
+          nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
+        }
       } else {
-        // Using canonical fallback - nutrients match food_master
-        nutrients = computeNutrientsForRawQuantity(food, defaultServing.quantity, defaultServing.unit);
+        // Other tabs: use default serving
+        // 1. Fetch food servings using centralized data access
+        const servings = await getServingsForFood(food.id);
+
+        // 2. Get default serving using centralized logic (SINGLE SOURCE OF TRUTH)
+        const defaultServing = getDefaultServingForFood(food, servings);
+        servingQuantity = defaultServing.quantity;
+        servingUnit = defaultServing.unit;
+        servingId = defaultServing.serving?.id || null;
+
+        // 3. Calculate nutrients using centralized logic (SINGLE SOURCE OF TRUTH)
+        if (defaultServing.serving) {
+          // Use the saved serving for calculation
+          nutrients = computeNutrientsForFoodServing(food, defaultServing.serving, defaultServing.quantity);
+        } else {
+          // Using canonical fallback - nutrients match food_master
+          nutrients = computeNutrientsForRawQuantity(food, defaultServing.quantity, defaultServing.unit);
+        }
       }
 
       // 4. Prepare entry data
@@ -2537,8 +2586,8 @@ export default function LogFoodScreen() {
         meal_type: mealType.toLowerCase(),
         item_name: food.name + (food.brand ? ` (${food.brand})` : ''),
         food_id: food.id,
-        quantity: defaultServing.quantity,
-        unit: defaultServing.unit,
+        quantity: servingQuantity,
+        unit: servingUnit,
         calories_kcal: Math.round(nutrients.calories_kcal),
         protein_g: nutrients.protein_g !== null ? Math.round(nutrients.protein_g * 10) / 10 : null,
         carbs_g: nutrients.carbs_g !== null ? Math.round(nutrients.carbs_g * 10) / 10 : null,
@@ -2547,13 +2596,16 @@ export default function LogFoodScreen() {
       };
 
       // Include serving_id if it's a saved serving
-      if (defaultServing.serving) {
-        entryData.serving_id = defaultServing.serving.id;
+      if (servingId) {
+        entryData.serving_id = servingId;
       }
 
       // Include optional nutrients if available
       if (nutrients.saturated_fat_g !== null && nutrients.saturated_fat_g > 0) {
         entryData.saturated_fat_g = Math.round(nutrients.saturated_fat_g * 100) / 100;
+      }
+      if (nutrients.trans_fat_g !== null && nutrients.trans_fat_g > 0) {
+        entryData.trans_fat_g = Math.round(nutrients.trans_fat_g * 100) / 100;
       }
       if (nutrients.sugar_g !== null && nutrients.sugar_g > 0) {
         entryData.sugar_g = Math.round(nutrients.sugar_g * 100) / 100;
@@ -2812,7 +2864,7 @@ export default function LogFoodScreen() {
                     <ThemedText style={[styles.calendarMonthYearText, { color: colors.text }]}>
                       {calendarViewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                     </ThemedText>
-                    <ThemedText style={[styles.calendarDropdownArrow, { color: colors.icon }]}>▼</ThemedText>
+                    <ThemedText style={[styles.calendarDropdownArrow, { color: colors.textSecondary }]}>▼</ThemedText>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleNextMonth}
@@ -2827,7 +2879,7 @@ export default function LogFoodScreen() {
                 <View style={styles.calendarWeekDays}>
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
                     <View key={index} style={styles.calendarWeekDay}>
-                      <ThemedText style={[styles.calendarWeekDayText, { color: colors.icon }]}>
+                      <ThemedText style={[styles.calendarWeekDayText, { color: colors.textSecondary }]}>
                         {day}
                       </ThemedText>
                     </View>
@@ -3006,7 +3058,7 @@ export default function LogFoodScreen() {
                 <ThemedText style={[styles.subHeaderMealType, { color: colors.tint }]}>{mealTypeLabel} ▼</ThemedText>
               </TouchableOpacity>
             </View>
-            <ThemedText style={[styles.subHeaderSeparator, { color: colors.icon }]}> • </ThemedText>
+            <ThemedText style={[styles.subHeaderSeparator, { color: colors.textSecondary }]}> • </ThemedText>
             <TouchableOpacity
               style={[
                 getMinTouchTargetStyle(),
@@ -3061,7 +3113,7 @@ export default function LogFoodScreen() {
                   }
                 ]}
                 placeholder={t('mealtype_log.search_placeholder')}
-                placeholderTextColor={colors.icon}
+                placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={handleSearchChange}
                 autoCapitalize="none"
@@ -3146,11 +3198,11 @@ export default function LogFoodScreen() {
                             {food.name}
                           </ThemedText>
                           {food.brand && (
-                            <ThemedText style={[styles.searchResultBrand, { color: colors.icon }]}>
+                            <ThemedText style={[styles.searchResultBrand, { color: colors.textSecondary }]}>
                               {food.brand}
                             </ThemedText>
                           )}
-                          <ThemedText style={[styles.searchResultNutrition, { color: colors.icon }]}>
+                          <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary }]}>
                             {food.defaultServingQty} {food.defaultServingUnit} • {food.defaultServingCalories} kcal
                           </ThemedText>
                         </View>
@@ -3192,7 +3244,7 @@ export default function LogFoodScreen() {
                     'Double tap to scroll tabs to the left'
                   )}
                 >
-                  <ThemedText style={[styles.tabsScrollArrowText, { color: colors.icon }]}>‹</ThemedText>
+                  <ThemedText style={[styles.tabsScrollArrowText, { color: colors.textSecondary }]}>‹</ThemedText>
                 </TouchableOpacity>
               )}
               
@@ -3284,6 +3336,7 @@ export default function LogFoodScreen() {
                       setFat('');
                       setFiber('');
                       setSaturatedFat('');
+                      setTransFat('');
                       setSugar('');
                       setSodium('');
                       setSelectedServing(null);
@@ -3315,7 +3368,7 @@ export default function LogFoodScreen() {
                     'Double tap to scroll tabs to the right'
                   )}
                 >
-                  <ThemedText style={[styles.tabsScrollArrowText, { color: colors.icon }]}>›</ThemedText>
+                  <ThemedText style={[styles.tabsScrollArrowText, { color: colors.textSecondary }]}>›</ThemedText>
                 </TouchableOpacity>
               )}
             </View>
@@ -3336,7 +3389,7 @@ export default function LogFoodScreen() {
                 accessibilityHint={t('mealtype_log.expand_content_hint')}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <ThemedText style={[styles.collapsedHintText, { color: colors.icon, fontSize: 11, marginRight: 6 }]}>
+                  <ThemedText style={[styles.collapsedHintText, { color: colors.textSecondary, fontSize: 11, marginRight: 6 }]}>
                     {t('mealtype_log.tap_to_expand')}
                   </ThemedText>
                   <IconSymbol
@@ -3364,7 +3417,7 @@ export default function LogFoodScreen() {
                             {frequentFoodsLoading ? (
                               <View style={styles.emptyTabState}>
                                 <ActivityIndicator size="small" color={colors.tint} />
-                                <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 8 }]}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
                                   {t('mealtype_log.frequent_foods.loading')}
                                 </ThemedText>
                               </View>
@@ -3404,7 +3457,7 @@ export default function LogFoodScreen() {
                                               </ThemedText>
                                             </View>
                                             <ThemedText 
-                                              style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                              style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
                                               numberOfLines={1}
                                             >
                                               {rightSideText}
@@ -3454,7 +3507,7 @@ export default function LogFoodScreen() {
                             {recentFoodsLoading ? (
                               <View style={styles.emptyTabState}>
                                 <ActivityIndicator size="small" color={colors.tint} />
-                                <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 8 }]}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
                                   {t('mealtype_log.recent_foods.loading')}
                                 </ThemedText>
                               </View>
@@ -3467,7 +3520,11 @@ export default function LogFoodScreen() {
                                 >
                                   {recentFoods.map((food) => {
                                     const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                    const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                    // Use latest entry serving info if available, otherwise fall back to default
+                                    const servingQty = food.latestEntry ? food.latestServingQty : food.defaultServingQty;
+                                    const servingUnit = food.latestEntry ? food.latestServingUnit : food.defaultServingUnit;
+                                    const servingCalories = food.latestEntry ? food.latestServingCalories : food.defaultServingCalories;
+                                    const nutritionInfo = `${servingQty} ${servingUnit} • ${servingCalories} kcal`;
                                     const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                     const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                     const rightSideText = `${brandText}${nutritionInfo}`;
@@ -3494,7 +3551,7 @@ export default function LogFoodScreen() {
                                               </ThemedText>
                                             </View>
                                             <ThemedText 
-                                              style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                              style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
                                               numberOfLines={1}
                                             >
                                               {rightSideText}
@@ -3513,7 +3570,7 @@ export default function LogFoodScreen() {
                                           </View>
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                                            onPress={() => handleQuickAdd(food)}
+                                            onPress={() => handleQuickAdd(food, food.latestEntry || undefined)}
                                             activeOpacity={0.7}
                                             accessibilityLabel={t('mealtype_log.quick_add')}
                                             accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
@@ -3532,10 +3589,10 @@ export default function LogFoodScreen() {
                               </View>
                             ) : (
                               <View style={styles.emptyTabState}>
-                                <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
                                   {t('mealtype_log.recent_foods.empty')}
                                 </ThemedText>
-                                <ThemedText style={[styles.emptyTabSubtext, { color: colors.icon }]}>
+                                <ThemedText style={[styles.emptyTabSubtext, { color: colors.textSecondary }]}>
                                   {t('mealtype_log.recent_foods.hint')}
                                 </ThemedText>
                               </View>
@@ -3598,7 +3655,7 @@ export default function LogFoodScreen() {
                             {customFoodsLoading ? (
                               <View style={styles.emptyTabState}>
                                 <ActivityIndicator size="large" color={colors.tint} />
-                                <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 12 }]}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 12 }]}>
                                   {t('mealtype_log.custom_foods.loading')}
                                 </ThemedText>
                               </View>
@@ -3678,7 +3735,7 @@ export default function LogFoodScreen() {
                                               </View>
                                               {!customFoodEditMode && (
                                                 <ThemedText 
-                                                  style={[styles.searchResultNutrition, { color: colors.icon, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                                  style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
                                                   numberOfLines={1}
                                                 >
                                                   {rightSideText}
@@ -3790,7 +3847,7 @@ export default function LogFoodScreen() {
                               </View>
                             ) : (
                               <View style={styles.emptyTabState}>
-                                <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
+                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
                                   {t('mealtype_log.custom_foods.empty')}
                                 </ThemedText>
                               </View>
@@ -3877,7 +3934,7 @@ export default function LogFoodScreen() {
                         {bundlesLoading ? (
                           <View style={styles.emptyTabState}>
                             <ActivityIndicator size="large" color={colors.tint} />
-                            <ThemedText style={[styles.emptyTabText, { color: colors.icon, marginTop: 12 }]}>
+                            <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 12 }]}>
                               {t('mealtype_log.bundles.loading')}
                             </ThemedText>
                           </View>
@@ -3926,7 +3983,7 @@ export default function LogFoodScreen() {
                                           ellipsizeMode="tail"
                                         >
                                           {bundle.name}{' '}
-                                          <ThemedText style={{ color: colors.icon, fontSize: 11 }}>
+                                          <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>
                                             ({bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'})
                                           </ThemedText>
                                         </ThemedText>
@@ -3938,26 +3995,26 @@ export default function LogFoodScreen() {
                                           )}
                                           {(bundle.totalProtein || bundle.totalCarbs || bundle.totalFat || bundle.totalFiber) && (
                                             <>
-                                              <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 8 }]}>
+                                              <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 8 }]}>
                                                 •
                                               </ThemedText>
                                               {bundle.totalProtein ? (
-                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
                                                   P: {bundle.totalProtein}g
                                                 </ThemedText>
                                               ) : null}
                                               {bundle.totalCarbs ? (
-                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
                                                   C: {bundle.totalCarbs}g
                                                 </ThemedText>
                                               ) : null}
                                               {bundle.totalFat ? (
-                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
                                                   Fat: {bundle.totalFat}g
                                                 </ThemedText>
                                               ) : null}
                                               {bundle.totalFiber ? (
-                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginLeft: 4 }]}>
+                                                <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
                                                   Fib: {bundle.totalFiber}g
                                                 </ThemedText>
                                               ) : null}
@@ -3982,7 +4039,7 @@ export default function LogFoodScreen() {
                                           ellipsizeMode="tail"
                                         >
                                           {bundle.name}{' '}
-                                          <ThemedText style={{ color: colors.icon, fontSize: 11 }}>
+                                          <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>
                                             ({bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'})
                                           </ThemedText>
                                         </ThemedText>
@@ -4036,10 +4093,10 @@ export default function LogFoodScreen() {
                           </View>
                         ) : (
                           <View style={styles.emptyTabState}>
-                            <ThemedText style={[styles.emptyTabText, { color: colors.icon }]}>
+                            <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
                               {t('mealtype_log.bundles.empty')}
                             </ThemedText>
-                            <ThemedText style={[styles.emptyTabSubtext, { color: colors.icon }]}>
+                            <ThemedText style={[styles.emptyTabSubtext, { color: colors.textSecondary }]}>
                               {t('mealtype_log.bundles.hint')}
                             </ThemedText>
                           </View>
@@ -4140,7 +4197,7 @@ export default function LogFoodScreen() {
                       }
                     ]}
                     placeholder={t('mealtype_log.form.food_item_placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={itemName}
                     onChangeText={setItemName}
                     autoCapitalize="words"
@@ -4176,7 +4233,7 @@ export default function LogFoodScreen() {
                       }
                     ]}
                     placeholder="0"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={calories}
                     onChangeText={(text) => {
                       handleCaloriesChange(text);
@@ -4220,7 +4277,7 @@ export default function LogFoodScreen() {
                       }
                     ]}
                     placeholder="1"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={quantity}
                     onChangeText={(text) => setQuantity(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -4256,7 +4313,7 @@ export default function LogFoodScreen() {
                       }
                     ]}
                     placeholder="plate"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={unit}
                     onChangeText={setUnit}
                     maxLength={14}
@@ -4299,7 +4356,7 @@ export default function LogFoodScreen() {
                       }
                     ]}
                     placeholder="1"
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={quantity}
                     onChangeText={handleQuantityChange}
                     keyboardType="decimal-pad"
@@ -4379,10 +4436,10 @@ export default function LogFoodScreen() {
               onPress={toggleMacros}
               activeOpacity={0.7}
             >
-              <ThemedText style={[styles.sectionTitleText, { color: colors.icon }]}>
+              <ThemedText style={[styles.sectionTitleText, { color: colors.textSecondary }]}>
                 Macronutrients
               </ThemedText>
-              <ThemedText style={[styles.expandIcon, { color: colors.icon }]}>
+              <ThemedText style={[styles.expandIcon, { color: colors.textSecondary }]}>
                 {macrosExpanded ? '▲' : '▼'}
               </ThemedText>
             </TouchableOpacity>
@@ -4417,7 +4474,7 @@ export default function LogFoodScreen() {
                       <TextInput
                         style={[styles.input, { borderColor: proteinError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={protein}
                         onChangeText={(text) => {
                           setProtein(validateNumericInput(text));
@@ -4433,7 +4490,7 @@ export default function LogFoodScreen() {
                       <TextInput
                         style={[styles.input, { borderColor: carbsError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={carbs}
                         onChangeText={(text) => {
                           setCarbs(validateNumericInput(text));
@@ -4449,7 +4506,7 @@ export default function LogFoodScreen() {
                       <TextInput
                         style={[styles.input, { borderColor: fatError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={fat}
                         onChangeText={(text) => {
                           setFat(validateNumericInput(text));
@@ -4465,7 +4522,7 @@ export default function LogFoodScreen() {
                       <TextInput
                         style={[styles.input, { borderColor: fiberError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={fiber}
                         onChangeText={(text) => {
                           setFiber(validateNumericInput(text));
@@ -4487,10 +4544,10 @@ export default function LogFoodScreen() {
               onPress={toggleFattyAcids}
               activeOpacity={0.7}
             >
-              <ThemedText style={[styles.sectionTitleText, { color: colors.icon }]}>
+              <ThemedText style={[styles.sectionTitleText, { color: colors.textSecondary }]}>
                 Other Nutrients
               </ThemedText>
-              <ThemedText style={[styles.expandIcon, { color: colors.icon }]}>
+              <ThemedText style={[styles.expandIcon, { color: colors.textSecondary }]}>
                 {fattyAcidsExpanded ? '▲' : '▼'}
               </ThemedText>
             </TouchableOpacity>
@@ -4504,6 +4561,9 @@ export default function LogFoodScreen() {
                       Sat Fat (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{saturatedFat || '0'}</ThemedText>
                     </ThemedText>
                     <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                      Trans Fat (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{transFat || '0'}</ThemedText>
+                    </ThemedText>
+                    <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
                       Sugar (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{sugar || '0'}</ThemedText>
                     </ThemedText>
                     <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
@@ -4513,23 +4573,34 @@ export default function LogFoodScreen() {
                 ) : (
                   // Input fields for custom entries - all in one row
                   <View style={styles.row}>
-                    <View style={[styles.field, { flex: 1, marginRight: 8 }]}>
+                    <View style={[styles.field, { flex: 1, marginRight: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.saturated_fat')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={saturatedFat}
                         onChangeText={(text) => setSaturatedFat(validateNumericInput(text))}
                         keyboardType="decimal-pad"
                       />
                     </View>
-                    <View style={[styles.field, { flex: 1, marginLeft: 4, marginRight: 4 }]}>
+                    <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.trans_fat')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={transFat}
+                        onChangeText={(text) => setTransFat(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                    <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.sugar')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={sugar}
                         onChangeText={(text) => setSugar(validateNumericInput(text))}
                         keyboardType="decimal-pad"
@@ -4540,7 +4611,7 @@ export default function LogFoodScreen() {
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor={colors.icon}
+                        placeholderTextColor={colors.textSecondary}
                         value={sodium}
                         onChangeText={(text) => setSodium(validateNumericInput(text))}
                         keyboardType="decimal-pad"
@@ -4596,7 +4667,7 @@ export default function LogFoodScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {!entriesLoading && entries.length > 0 && (
                 <View style={styles.toggleContainer}>
-                  <ThemedText style={[styles.toggleLabel, { color: colors.icon }]}>
+                  <ThemedText style={[styles.toggleLabel, { color: colors.textSecondary }]}>
                     {t('mealtype_log.food_log.details')}
                   </ThemedText>
                   <TouchableOpacity
@@ -4698,13 +4769,13 @@ export default function LogFoodScreen() {
           {entriesLoading ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
               <ActivityIndicator size="small" color={colors.tint} />
-              <ThemedText style={[styles.emptyStateText, { color: colors.icon }]}>
+              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
                 {t('common.loading')}
               </ThemedText>
             </View>
           ) : entries.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
-              <ThemedText style={[styles.emptyStateText, { color: colors.icon }]}>
+              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
                 {t('mealtype_log.food_log.no_entries')}
               </ThemedText>
             </View>
@@ -4759,7 +4830,7 @@ export default function LogFoodScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
                           {entry.food_id && foodBrandMap[entry.food_id] && (
                             <ThemedText 
-                              style={[styles.entrySummary, { color: colors.icon, fontSize: 11, marginLeft: 6 }]}
+                              style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11, marginLeft: 6 }]}
                               numberOfLines={1}
                             >
                               {foodBrandMap[entry.food_id]?.length > 14 
@@ -4767,7 +4838,7 @@ export default function LogFoodScreen() {
                                 : foodBrandMap[entry.food_id]} •{' '}
                             </ThemedText>
                           )}
-                          <ThemedText style={[styles.entrySummary, { color: colors.icon, fontSize: 11 }]}>
+                          <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>
                             {entry.quantity} x {entry.unit} •{' '}
                           </ThemedText>
                           <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
@@ -4778,19 +4849,19 @@ export default function LogFoodScreen() {
                       {showEntryDetails && (
                         <View style={styles.entryMacros}>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.protein_g ?? 0}g</ThemedText>
                           </View>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.carbs_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.carbs_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.carbs_g ?? 0}g</ThemedText>
                           </View>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.fat_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fat_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fat_g ?? 0}g</ThemedText>
                           </View>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fiber_g ?? 0}g</ThemedText>
                           </View>
                         </View>
@@ -4798,15 +4869,15 @@ export default function LogFoodScreen() {
                       {showEntryDetails && (
                         <View style={[styles.entryMacros, { marginTop: 2 }]}>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.saturated_fat_g ?? 0}g</ThemedText>
                           </View>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sugar_g ?? 0}g</ThemedText>
                           </View>
                           <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.icon }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sodium_mg ?? 0}mg</ThemedText>
                           </View>
                         </View>

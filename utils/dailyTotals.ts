@@ -43,6 +43,9 @@ export function calculateDailyTotals(entries: CalorieEntry[]): DailyTotals {
     saturatedFat: Math.round(
       entries.reduce((sum, entry) => sum + (entry.saturated_fat_g || 0), 0)
     ),
+    transFat: Math.round(
+      entries.reduce((sum, entry) => sum + (entry.trans_fat_g || 0), 0)
+    ),
     sugar: Math.round(
       entries.reduce((sum, entry) => sum + (entry.sugar_g || 0), 0)
     ),

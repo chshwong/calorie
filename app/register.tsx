@@ -8,9 +8,7 @@ import {
   ScrollView,
   Alert,
   Platform,
-  Animated,
   ActivityIndicator,
-  Modal,
   Dimensions,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
@@ -20,7 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ageFromDob } from '@/utils/calculations';
+import { ensureProfileExists } from '@/lib/services/profileService';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -28,8 +26,6 @@ import {
   getFocusStyle,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
-
-type Gender = 'male' | 'female' | 'not_telling';
 
 type PasswordValidation = {
   minLength: boolean;
@@ -80,35 +76,6 @@ function isPasswordValid(validation: PasswordValidation): boolean {
   return Object.values(validation).every(v => v === true);
 }
 
-function StepIndicator({ currentStep, totalSteps, colors }: { currentStep: number; totalSteps: number; colors: any }) {
-  return (
-    <View style={styles.stepIndicatorContainer}>
-      {Array.from({ length: totalSteps }, (_, i) => (
-        <View key={i} style={styles.stepIndicatorRow}>
-          <View
-            style={[
-              styles.stepDot,
-              {
-                backgroundColor: i < currentStep ? colors.tint : colors.border,
-                borderColor: i === currentStep ? colors.tint : colors.border,
-              },
-            ]}
-          />
-          {i < totalSteps - 1 && (
-            <View
-              style={[
-                styles.stepLine,
-                {
-                  backgroundColor: i < currentStep ? colors.tint : colors.border,
-                },
-              ]}
-            />
-          )}
-        </View>
-      ))}
-    </View>
-  );
-}
 
 function PasswordRequirement({ met, label }: { met: boolean; label: string }) {
   const colorScheme = useColorScheme();
@@ -129,56 +96,12 @@ function PasswordRequirement({ met, label }: { met: boolean; label: string }) {
 }
 
 export default function RegisterScreen() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
-  
-  // Step 1: Email & Password
+  // Email & Password only (pure auth)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  // Step 2: Personal Info
-  const [firstName, setFirstName] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [gender, setGender] = useState<Gender>('male');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
-    // Default to 25 years ago when first opening
-    const defaultDate = new Date();
-    defaultDate.setFullYear(defaultDate.getFullYear() - 25);
-    return defaultDate;
-  });
-  const [showYearMonthPicker, setShowYearMonthPicker] = useState(false);
-  const yearScrollViewRef = useRef<ScrollView>(null);
-  const monthScrollViewRef = useRef<ScrollView>(null);
-  
-  // Auto-scroll to current year/month when picker opens
-  useEffect(() => {
-    if (showYearMonthPicker && yearScrollViewRef.current) {
-      const currentYear = calendarViewMonth.getFullYear();
-      const yearIndex = new Date().getFullYear() - currentYear;
-      const yearItemHeight = 60; // Approximate height of each year item (44px min height + 4px gap + padding)
-      
-      setTimeout(() => {
-        yearScrollViewRef.current?.scrollTo({
-          y: Math.max(0, (yearIndex - 2) * yearItemHeight),
-          animated: true,
-        });
-      }, 100);
-    }
-  }, [showYearMonthPicker, calendarViewMonth]);
-  
-  // Step 3: Physical Info
-  const [heightCm, setHeightCm] = useState('');
-  const [heightFt, setHeightFt] = useState('');
-  const [heightIn, setHeightIn] = useState('');
-  const [weightLb, setWeightLb] = useState('');
-  const [weightKg, setWeightKg] = useState('');
-  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm');
-  const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>('lbs');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,113 +114,6 @@ export default function RegisterScreen() {
   const passwordValidation = validatePassword(password, email);
   const isPasswordValidState = isPasswordValid(passwordValidation);
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
-  
-  // Convert selectedDate to YYYY-MM-DD format
-  const updateDateOfBirth = (date: Date) => {
-    setSelectedDate(date);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    setDateOfBirth(`${year}-${month}-${day}`);
-  };
-  
-  // Handle opening date picker - reset to 25 years ago if no date is selected
-  const handleOpenDatePicker = () => {
-    if (!dateOfBirth) {
-      const defaultDate = new Date();
-      defaultDate.setFullYear(defaultDate.getFullYear() - 25);
-      setCalendarViewMonth(new Date(defaultDate));
-      setSelectedDate(defaultDate);
-    } else {
-      // If date exists, show that month
-      const existingDate = new Date(dateOfBirth + 'T00:00:00');
-      setCalendarViewMonth(new Date(existingDate));
-    }
-    setShowDatePicker(true);
-  };
-  
-  // Calendar helper functions
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-  
-  const getFirstDayOfMonth = (date: Date) => {
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
-    return firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  };
-  
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    const newMonth = new Date(calendarViewMonth);
-    if (direction === 'prev') {
-      newMonth.setMonth(newMonth.getMonth() - 1);
-    } else {
-      newMonth.setMonth(newMonth.getMonth() + 1);
-    }
-    setCalendarViewMonth(newMonth);
-  };
-  
-  const handleDateSelect = (day: number) => {
-    const newDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Don't allow future dates
-    if (newDate > today) {
-      return;
-    }
-    
-    updateDateOfBirth(newDate);
-  };
-  
-  const isDateSelected = (day: number) => {
-    if (!selectedDate) return false;
-    return (
-      selectedDate.getDate() === day &&
-      selectedDate.getMonth() === calendarViewMonth.getMonth() &&
-      selectedDate.getFullYear() === calendarViewMonth.getFullYear()
-    );
-  };
-  
-  const isDateDisabled = (day: number) => {
-    const date = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date > today;
-  };
-  
-  // Filter numeric input
-  const filterNumericInput = (text: string): string => {
-    let filtered = text.replace(/[^0-9.]/g, '');
-    const parts = filtered.split('.');
-    if (parts.length > 2) {
-      filtered = parts[0] + '.' + parts.slice(1).join('');
-    }
-    return filtered;
-  };
-  
-  // Conversion functions
-  const convertHeightToCm = (): number | null => {
-    if (heightUnit === 'cm') {
-      const cm = parseFloat(heightCm);
-      return isNaN(cm) ? null : cm;
-    } else {
-      const ft = parseFloat(heightFt);
-      const inches = parseFloat(heightIn);
-      if (isNaN(ft) || isNaN(inches)) return null;
-      const totalInches = ft * 12 + inches;
-      return totalInches * 2.54;
-    }
-  };
-  
-  const convertWeightToLb = (): number | null => {
-    if (weightUnit === 'lbs') {
-      const lbs = parseFloat(weightLb);
-      return isNaN(lbs) ? null : lbs;
-    } else {
-      const kg = parseFloat(weightKg);
-      return isNaN(kg) ? null : kg * 2.20462;
-    }
-  };
   
   const validateStep1 = (): string | null => {
     if (!email) {
@@ -328,98 +144,11 @@ export default function RegisterScreen() {
     return null;
   };
   
-  const validateStep2 = (): string | null => {
-    if (!firstName || firstName.trim().length === 0) {
-      return 'Preferred Name is required';
-    }
-    
-    if (firstName.length > 40) {
-      return 'Preferred Name must be 40 characters or less';
-    }
-    
-    if (!dateOfBirth) {
-      return 'Date of birth is required';
-    }
-    
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(dateOfBirth)) {
-      return 'Date of birth must be in YYYY-MM-DD format';
-    }
-    
-    const dobDate = new Date(dateOfBirth + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (dobDate > today) {
-      return 'Date of birth cannot be in the future';
-    }
-    
-    const actualAge = ageFromDob(dateOfBirth);
-    
-    if (actualAge < 13) {
-      return 'You must be at least 13 years old';
-    }
-    
-    if (actualAge > 150) {
-      return 'Date of birth cannot be more than 150 years ago';
-    }
-    
-    return null;
-  };
-  
-  const validateStep3 = (): string | null => {
-    const heightCmValue = convertHeightToCm();
-    if (!heightCmValue) {
-      return 'Height is required';
-    }
-    
-    const weightLbValue = convertWeightToLb();
-    if (!weightLbValue) {
-      return 'Weight is required';
-    }
-    
-    if (heightCmValue < 50 || heightCmValue > 304.8) {
-      return 'Height must be between 50 cm and 304.8 cm (approximately 1\'8" to 10\'0")';
-    }
-    
-    if (weightLbValue < 45 || weightLbValue > 1200) {
-      return 'Weight must be between 45 and 1200 lbs (approximately 20 to 544 kg)';
-    }
-    
-    return null;
-  };
-  
-  const handleNext = () => {
-    setError(null);
-    
-    if (currentStep === 1) {
-      const validationError = validateStep1();
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      const validationError = validateStep2();
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-      setCurrentStep(3);
-    }
-  };
-  
-  const handleBack = () => {
-    setError(null);
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-  
   const handleRegister = async () => {
     setError(null);
     
-    const validationError = validateStep3();
+    // Validate Step 1 (email/password) only
+    const validationError = validateStep1();
     if (validationError) {
       setError(validationError);
       Alert.alert('Validation Error', validationError);
@@ -491,155 +220,9 @@ export default function RegisterScreen() {
         }
       }
       
-      if (!sessionEstablished) {
-        // Even if session isn't established, we can still try to create the profile
-        // The function should handle it, or we'll get a clear error
-      }
-      
-      const heightCmValue = convertHeightToCm();
-      const weightLbValue = convertWeightToLb();
-      
-      if (!heightCmValue || !weightLbValue) {
-        throw new Error('Height and Weight are required');
-      }
-      
-      // Insert profile
-      const profileData = {
-        user_id: authData.user.id,
-        first_name: firstName.trim(),
-        date_of_birth: dateOfBirth,
-        gender,
-        height_cm: heightCmValue,
-        weight_lb: weightLbValue,
-        height_unit: heightUnit,
-        weight_unit: weightUnit,
-        is_active: true,
-        onboarding_complete: true,
-      };
-      
-      // Try using the database function first (if it exists and supports all fields)
-      let profileInsertData = null;
-      let profileError = null;
-      
-      try {
-        const { data: functionData, error: functionError } = await supabase.rpc('create_user_profile', {
-          p_user_id: authData.user.id,
-          p_first_name: firstName.trim(),
-          p_date_of_birth: dateOfBirth,
-          p_gender: gender,
-          p_height_cm: heightCmValue,
-          p_weight_lb: weightLbValue,
-          p_height_unit: heightUnit,
-          p_weight_unit: weightUnit,
-          p_onboarding_complete: true,
-        });
-        
-        if (functionError) {
-          console.error('Function error:', functionError);
-          // Check if function doesn't exist
-          if (functionError.message?.includes('function') && functionError.message?.includes('does not exist')) {
-            profileError = functionError;
-          } else if (functionError.code === '42501') {
-            // Permission denied - function exists but no permission
-            console.error('Permission denied to execute function. Function may not have proper grants.');
-            profileError = functionError;
-          } else {
-            profileError = functionError;
-          }
-        } else {
-          // Function succeeded, fetch the profile to verify
-          const { data: fetchedProfile, error: fetchError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', authData.user.id)
-            .single();
-          
-          if (fetchError) {
-            console.error('Error fetching profile after function call:', fetchError);
-            // Even if fetch fails, the function succeeded, so profile was created
-            // This might be a timing issue - profile exists but not yet readable
-            profileInsertData = { success: true };
-          } else {
-            profileInsertData = fetchedProfile;
-          }
-        }
-      } catch (e: any) {
-        console.error('Exception calling function:', e);
-        // Function call failed (might not exist), will try direct insert
-        profileError = e;
-      }
-      
-      // If function failed or doesn't exist, try direct insert
-      if (!profileInsertData) {
-        const result = await supabase
-          .from('profiles')
-          .insert(profileData)
-          .select();
-        profileInsertData = result.data;
-        profileError = result.error;
-        
-        if (result.error) {
-          console.error('Direct insert error:', result.error);
-        }
-      }
-      
-      if (profileError) {
-        // Provide more helpful error message
-        let errorMsg = profileError.message || 'Failed to create profile';
-        
-        if (profileError.message?.includes('row-level security') || profileError.message?.includes('RLS')) {
-          // Try one more time with a longer wait
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Try direct insert one more time
-          const retryResult = await supabase
-            .from('profiles')
-            .insert(profileData)
-            .select();
-          
-          if (!retryResult.error) {
-            profileInsertData = retryResult.data;
-            profileError = null;
-          } else {
-            errorMsg = 'Unable to create profile. The database function may not be set up correctly. Please contact support with this error code: RLS-001';
-            console.error('Profile creation failed after retry:', retryResult.error);
-          }
-        } else if (profileError.message?.includes('duplicate key') || profileError.message?.includes('already exists')) {
-          // Profile might already exist, try to fetch it
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', authData.user.id)
-            .single();
-          
-          if (existingProfile) {
-            // Profile exists, just update it
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update(profileData)
-              .eq('user_id', authData.user.id);
-            
-            if (!updateError) {
-              profileInsertData = { ...existingProfile, ...profileData };
-              profileError = null;
-            } else {
-              errorMsg = `Failed to update existing profile: ${updateError.message}`;
-            }
-          } else {
-            errorMsg = `Profile may already exist. Please try logging in.`;
-          }
-        } else if (profileError.message?.includes('function') || profileError.message?.includes('does not exist')) {
-          // Function doesn't exist, but direct insert should work
-          errorMsg = 'Database function not found. Please ensure the create_user_profile function is set up in your database.';
-        } else {
-          errorMsg = `Database error: ${errorMsg}. Please try again.`;
-        }
-        
-        if (profileError) {
-          setError(errorMsg);
-          throw new Error(errorMsg);
-        }
-      }
+      // Ensure profile exists with onboarding_complete = false
+      // This creates a minimal profile that will be completed during onboarding
+      await ensureProfileExists(authData.user.id);
       
       // Navigate to confirmation screen
       router.replace('/register-confirmation');
@@ -786,326 +369,6 @@ export default function RegisterScreen() {
     </View>
   );
   
-  const renderStep2 = () => (
-    <View style={styles.stepContent}>
-      <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
-        Personal Information
-      </ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        Tell us a bit about yourself
-      </ThemedText>
-      
-      <View style={styles.inputContainer}>
-        <ThemedText style={[styles.label, { color: colors.text }]}>Preferred Name</ThemedText>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: error && !firstName ? '#EF4444' : colors.border,
-              color: colors.text,
-              backgroundColor: colors.background,
-              ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-            },
-          ]}
-          placeholder="Enter your preferred name"
-          placeholderTextColor={colors.textSecondary}
-          value={firstName}
-          onChangeText={(text) => {
-            if (text.length <= 40) {
-              setFirstName(text);
-              setError(null);
-            }
-          }}
-          maxLength={40}
-          autoCapitalize="words"
-          autoComplete="given-name"
-          editable={!loading}
-          {...getInputAccessibilityProps('Preferred name', 'Enter your preferred name', error && !firstName ? error : undefined, true)}
-        />
-      </View>
-      
-      <View style={styles.inputContainer}>
-        <ThemedText style={[styles.label, { color: colors.text }]}>Date of Birth</ThemedText>
-          <TouchableOpacity
-            style={[
-              styles.dateInput,
-              {
-                borderColor: error && !dateOfBirth ? '#EF4444' : colors.border,
-                backgroundColor: colors.backgroundSecondary,
-              },
-            ]}
-            onPress={handleOpenDatePicker}
-            disabled={loading}
-            {...getButtonAccessibilityProps('Date of birth', 'Double tap to select your date of birth')}
-          >
-          <Text style={[styles.dateInputText, { color: dateOfBirth ? colors.text : colors.textSecondary }]}>
-            {dateOfBirth || 'Select your date of birth'}
-          </Text>
-          <IconSymbol name="calendar" size={20} color={colors.icon} />
-        </TouchableOpacity>
-        
-        {dateOfBirth && (
-          <View style={styles.ageDisplay}>
-            <ThemedText style={[styles.ageLabel, { color: colors.textSecondary }]}>
-              Age: <Text style={{ color: colors.text, fontWeight: '600' }}>{ageFromDob(dateOfBirth)} years old</Text>
-            </ThemedText>
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.inputContainer}>
-        <ThemedText style={[styles.label, { color: colors.text }]}>Gender at Birth</ThemedText>
-        <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
-          For accuracy on caloric calculations
-        </ThemedText>
-        <View style={styles.genderContainer}>
-          {(['male', 'female', 'not_telling'] as Gender[]).map((g) => {
-            const displayText = g === 'not_telling' ? 'Not Telling' : g.charAt(0).toUpperCase() + g.slice(1);
-            return (
-              <TouchableOpacity
-                key={g}
-                style={[
-                  styles.genderButton,
-                  { borderColor: colors.border },
-                  gender === g && { backgroundColor: colors.tint, borderColor: colors.tint },
-                ]}
-                onPress={() => setGender(g)}
-                disabled={loading}
-                {...getButtonAccessibilityProps(`${displayText}${gender === g ? ' selected' : ''}`, `Double tap to select ${displayText}`)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: gender === g }}
-              >
-                <Text
-                  style={[
-                    styles.genderButtonText,
-                    { color: gender === g ? '#fff' : colors.text },
-                  ]}
-                >
-                  {displayText}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {gender === 'not_telling' && (
-          <ThemedText style={[styles.description, { color: colors.textSecondary, marginTop: 8 }]}>
-            No problem at all. For caloric calculations, we'll use values based on XX-typical physiology. This is only for estimating energy needs and isn't a statement about gender.
-          </ThemedText>
-        )}
-      </View>
-    </View>
-  );
-  
-  const renderStep3 = () => (
-    <View style={styles.stepContent}>
-      <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
-        Physical Information
-      </ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        Help us calculate your caloric needs
-      </ThemedText>
-      
-      <View style={styles.measurementSection}>
-        <View style={styles.measurementHeader}>
-          <ThemedText style={[styles.label, { color: colors.text }]}>Height</ThemedText>
-          <View style={styles.unitToggle}>
-            <TouchableOpacity
-              style={[
-                styles.unitButton,
-                { borderColor: colors.border },
-                heightUnit === 'cm' && { backgroundColor: colors.tint, borderColor: colors.tint },
-              ]}
-              onPress={() => {
-                setHeightUnit('cm');
-                if (heightFt && heightIn) {
-                  const totalInches = parseFloat(heightFt) * 12 + parseFloat(heightIn);
-                  const cm = totalInches * 2.54;
-                  setHeightCm(cm.toFixed(1));
-                }
-              }}
-              disabled={loading}
-            >
-              <Text style={[styles.unitButtonText, { color: heightUnit === 'cm' ? '#fff' : colors.text }]}>
-                cm
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.unitButton,
-                { borderColor: colors.border },
-                heightUnit === 'ft' && { backgroundColor: colors.tint, borderColor: colors.tint },
-              ]}
-              onPress={() => {
-                setHeightUnit('ft');
-                if (heightCm) {
-                  const totalInches = parseFloat(heightCm) / 2.54;
-                  const feet = Math.floor(totalInches / 12);
-                  const inches = Math.round(totalInches % 12);
-                  setHeightFt(feet.toString());
-                  setHeightIn(inches.toString());
-                }
-              }}
-              disabled={loading}
-            >
-              <Text style={[styles.unitButtonText, { color: heightUnit === 'ft' ? '#fff' : colors.text }]}>
-                ft/in
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        {heightUnit === 'cm' ? (
-          <TextInput
-            style={[
-              styles.input,
-              {
-                borderColor: error && !heightCm ? '#EF4444' : colors.border,
-                color: colors.text,
-                backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-              },
-            ]}
-            placeholder="50 to 304.8"
-            placeholderTextColor={colors.textSecondary}
-            value={heightCm}
-            onChangeText={(text) => setHeightCm(filterNumericInput(text))}
-            keyboardType="numeric"
-            editable={!loading}
-            {...getInputAccessibilityProps('Height in centimeters', 'Enter your height in centimeters', error && !heightCm ? error : undefined, true)}
-          />
-        ) : (
-          <View style={styles.dualInputRow}>
-            <View style={styles.dualInputContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    borderColor: error && !heightFt ? '#EF4444' : colors.border,
-                    color: colors.text,
-                    backgroundColor: colors.backgroundSecondary,
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                  },
-                ]}
-                placeholder="ft (max 10)"
-                placeholderTextColor={colors.textSecondary}
-                value={heightFt}
-                onChangeText={(text) => setHeightFt(filterNumericInput(text))}
-                keyboardType="numeric"
-                editable={!loading}
-                {...getInputAccessibilityProps('Height in feet', 'Enter your height in feet', error && !heightFt ? error : undefined, true)}
-              />
-              <Text style={[styles.unitLabel, { color: colors.textSecondary }]}>ft</Text>
-            </View>
-            <View style={styles.dualInputContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    borderColor: error && !heightIn ? '#EF4444' : colors.border,
-                    color: colors.text,
-                    backgroundColor: colors.backgroundSecondary,
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                  },
-                ]}
-                placeholder="in"
-                placeholderTextColor={colors.textSecondary}
-                value={heightIn}
-                onChangeText={(text) => setHeightIn(filterNumericInput(text))}
-                keyboardType="numeric"
-                editable={!loading}
-                {...getInputAccessibilityProps('Height in inches', 'Enter your height in inches', error && !heightIn ? error : undefined, true)}
-              />
-              <Text style={[styles.unitLabel, { color: colors.textSecondary }]}>in</Text>
-            </View>
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.measurementSection}>
-        <View style={styles.measurementHeader}>
-          <ThemedText style={[styles.label, { color: colors.text }]}>Weight</ThemedText>
-          <View style={styles.unitToggle}>
-            <TouchableOpacity
-              style={[
-                styles.unitButton,
-                { borderColor: colors.border },
-                weightUnit === 'lbs' && { backgroundColor: colors.tint, borderColor: colors.tint },
-              ]}
-              onPress={() => {
-                setWeightUnit('lbs');
-                if (weightKg) {
-                  const lbs = parseFloat(weightKg) * 2.20462;
-                  setWeightLb(lbs.toFixed(1));
-                }
-              }}
-              disabled={loading}
-            >
-              <Text style={[styles.unitButtonText, { color: weightUnit === 'lbs' ? '#fff' : colors.text }]}>
-                lbs
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.unitButton,
-                { borderColor: colors.border },
-                weightUnit === 'kg' && { backgroundColor: colors.tint, borderColor: colors.tint },
-              ]}
-              onPress={() => {
-                setWeightUnit('kg');
-                if (weightLb) {
-                  const kg = parseFloat(weightLb) / 2.20462;
-                  setWeightKg(kg.toFixed(1));
-                }
-              }}
-              disabled={loading}
-            >
-              <Text style={[styles.unitButtonText, { color: weightUnit === 'kg' ? '#fff' : colors.text }]}>
-                kg
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        {weightUnit === 'lbs' ? (
-          <TextInput
-            style={[
-              styles.input,
-              {
-                borderColor: error && !weightLb ? '#EF4444' : colors.border,
-                color: colors.text,
-                backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-              },
-            ]}
-            placeholder="45 to 1200"
-            placeholderTextColor={colors.textSecondary}
-            value={weightLb}
-            onChangeText={(text) => setWeightLb(filterNumericInput(text))}
-            keyboardType="numeric"
-            editable={!loading}
-            {...getInputAccessibilityProps('Weight in pounds', 'Enter your weight in pounds', error && !weightLb ? error : undefined, true)}
-          />
-        ) : (
-          <TextInput
-            style={[
-              styles.input,
-              {
-                borderColor: error && !weightKg ? '#EF4444' : colors.border,
-                color: colors.text,
-                backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-              },
-            ]}
-            placeholder="20 to 544"
-            placeholderTextColor={colors.textSecondary}
-            value={weightKg}
-            onChangeText={(text) => setWeightKg(filterNumericInput(text))}
-            keyboardType="numeric"
-            editable={!loading}
-            {...getInputAccessibilityProps('Weight in kilograms', 'Enter your weight in kilograms', error && !weightKg ? error : undefined, true)}
-          />
-        )}
-      </View>
-    </View>
-  );
   
   return (
     <ThemedView style={styles.container}>
@@ -1115,440 +378,67 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.cardContainer, { maxWidth: isDesktop ? 520 : '100%' }]}>
-          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
             {/* Header with Back Button */}
             <View style={styles.cardHeader}>
-              {currentStep > 1 ? (
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={handleBack}
-                  disabled={loading}
-                  {...getButtonAccessibilityProps('Back', 'Double tap to go back to previous step')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="chevron.left" size={24} color={colors.text} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => router.push('/login')}
-                  disabled={loading}
-                  {...getButtonAccessibilityProps('Back to login', 'Double tap to go back to login')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="chevron.left" size={24} color={colors.text} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.push('/login')}
+                disabled={loading}
+                {...getButtonAccessibilityProps('Back to login', 'Double tap to go back to login')}
+                {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
+              >
+                <IconSymbol name="chevron.left" size={24} color={colors.text} />
+              </TouchableOpacity>
               <ThemedText type="title" style={[styles.headerTitle, { color: colors.text }]}>
                 Create Account
               </ThemedText>
               <View style={styles.backButton} />
             </View>
             
-            <StepIndicator currentStep={currentStep} totalSteps={totalSteps} colors={colors} />
-            
             <View style={styles.cardContent}>
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
-        
-        {error && (
-          <View
-            style={[styles.errorContainer, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#EF4444' }]}
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-            {...(Platform.OS === 'web' ? { role: 'alert', 'aria-live': 'polite' as const } : {})}
-          >
-            <ThemedText style={[styles.errorText, { color: '#EF4444' }]}>{error}</ThemedText>
-          </View>
-        )}
-        
-        <View style={styles.buttonContainer}>
-          {currentStep < totalSteps ? (
-            <TouchableOpacity
-              style={[
-                styles.button,
-                getMinTouchTargetStyle(),
-                {
-                  backgroundColor: colors.tint,
-                  opacity: loading ? 0.6 : 1,
-                  ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
-                },
-              ]}
-              onPress={handleNext}
-              disabled={loading}
-              {...getButtonAccessibilityProps('Next', 'Double tap to continue to next step', loading)}
-            >
-              <Text style={styles.buttonText}>Next</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.button,
-                getMinTouchTargetStyle(),
-                {
-                  backgroundColor: colors.tint,
-                  opacity: loading ? 0.6 : 1,
-                  ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
-                },
-              ]}
-              onPress={handleRegister}
-              disabled={loading}
-              {...getButtonAccessibilityProps(loading ? 'Creating account' : 'Create Account', 'Double tap to create your account', loading)}
-            >
-              {loading ? (
-                <View style={styles.buttonLoading}>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.buttonText}>Creating...</Text>
+              {renderStep1()}
+              
+              {error && (
+                <View
+                  style={[styles.errorContainer, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#EF4444' }]}
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                  {...(Platform.OS === 'web' ? { role: 'alert', 'aria-live': 'polite' as const } : {})}
+                >
+                  <ThemedText style={[styles.errorText, { color: '#EF4444' }]}>{error}</ThemedText>
                 </View>
-              ) : (
-                <Text style={styles.buttonText}>Create Account</Text>
               )}
-            </TouchableOpacity>
-          )}
-            </View>
+              
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    getMinTouchTargetStyle(),
+                    {
+                      backgroundColor: colors.tint,
+                      opacity: loading ? 0.6 : 1,
+                      ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
+                    },
+                  ]}
+                  onPress={handleRegister}
+                  disabled={loading}
+                  {...getButtonAccessibilityProps(loading ? 'Creating account' : 'Create Account', 'Double tap to create your account', loading)}
+                >
+                  {loading ? (
+                    <View style={styles.buttonLoading}>
+                      <ActivityIndicator color="#fff" size="small" />
+                      <Text style={styles.buttonText}>Creating...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.buttonText}>Create Account</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
       </ScrollView>
-      
-      {/* Date Picker Modal */}
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <TouchableOpacity
-          style={[styles.datePickerOverlay, { backgroundColor: colors.overlay }]}
-          activeOpacity={1}
-          onPress={() => setShowDatePicker(false)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={[styles.datePickerModal, { backgroundColor: colors.background }]}>
-              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <ThemedText style={[styles.datePickerTitle, { color: colors.text }]}>
-                  Select Date of Birth
-                </ThemedText>
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(false)}
-                  style={styles.datePickerCloseButton}
-                  {...getButtonAccessibilityProps('Close', 'Double tap to close date picker')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="xmark" size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Month/Year Navigation */}
-              <View style={[styles.calendarHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity
-                  style={styles.calendarNavButton}
-                  onPress={() => navigateMonth('prev')}
-                  {...getButtonAccessibilityProps('Previous month', 'Double tap to go to previous month')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="chevron.left" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.calendarMonthYear}
-                  onPress={() => setShowYearMonthPicker(true)}
-                  {...getButtonAccessibilityProps('Select month and year', 'Double tap to select a different month and year')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <ThemedText style={[styles.calendarMonthYearText, { color: colors.text }]}>
-                    {calendarViewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                  </ThemedText>
-                  <IconSymbol name="chevron.down" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.calendarNavButton}
-                  onPress={() => navigateMonth('next')}
-                  disabled={(() => {
-                    const nextMonth = new Date(calendarViewMonth);
-                    nextMonth.setMonth(nextMonth.getMonth() + 1);
-                    const today = new Date();
-                    return nextMonth > today;
-                  })()}
-                  {...getButtonAccessibilityProps('Next month', 'Double tap to go to next month')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol 
-                    name="chevron.right" 
-                    size={24} 
-                    color={(() => {
-                      const nextMonth = new Date(calendarViewMonth);
-                      nextMonth.setMonth(nextMonth.getMonth() + 1);
-                      const today = new Date();
-                      return nextMonth > today ? colors.textSecondary : colors.text;
-                    })()} 
-                  />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Calendar Grid */}
-              <View style={styles.calendarBody}>
-                {/* Day Headers */}
-                <View style={styles.calendarWeekHeader}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                    <View key={index} style={styles.calendarDayHeader}>
-                      <ThemedText style={[styles.calendarDayHeaderText, { color: colors.textSecondary }]}>
-                        {day}
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-                
-                {/* Calendar Days */}
-                <View style={styles.calendarDays}>
-                  {(() => {
-                    const daysInMonth = getDaysInMonth(calendarViewMonth);
-                    const firstDay = getFirstDayOfMonth(calendarViewMonth);
-                    const days: JSX.Element[] = [];
-                    
-                    // Empty cells for days before the first day of the month
-                    for (let i = 0; i < firstDay; i++) {
-                      days.push(
-                        <View key={`empty-${i}`} style={styles.calendarDayCell} />
-                      );
-                    }
-                    
-                    // Days of the month
-                    for (let day = 1; day <= daysInMonth; day++) {
-                      const isSelected = isDateSelected(day);
-                      const isDisabled = isDateDisabled(day);
-                      const date = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
-                      const isToday = (() => {
-                        const today = new Date();
-                        return (
-                          date.getDate() === today.getDate() &&
-                          date.getMonth() === today.getMonth() &&
-                          date.getFullYear() === today.getFullYear()
-                        );
-                      })();
-                      
-                      days.push(
-                        <TouchableOpacity
-                          key={day}
-                          style={[
-                            styles.calendarDayCell,
-                            isSelected && { backgroundColor: colors.tint },
-                            isDisabled && styles.calendarDayDisabled,
-                          ]}
-                          onPress={() => !isDisabled && handleDateSelect(day)}
-                          disabled={isDisabled}
-                          {...getButtonAccessibilityProps(
-                            `Select ${day}`,
-                            `Double tap to select ${day}`,
-                            isDisabled
-                          )}
-                          {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.calendarDayText,
-                              {
-                                color: isSelected
-                                  ? '#fff'
-                                  : isDisabled
-                                  ? colors.textSecondary
-                                  : isToday
-                                  ? colors.tint
-                                  : colors.text,
-                                fontWeight: isToday ? '600' : '400',
-                              },
-                            ]}
-                          >
-                            {day}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    }
-                    
-                    return days;
-                  })()}
-                </View>
-              </View>
-              
-              <View style={[styles.datePickerFooter, { borderTopColor: colors.border }]}>
-                <TouchableOpacity
-                  style={[styles.datePickerDoneButton, { backgroundColor: colors.tint }]}
-                  onPress={() => setShowDatePicker(false)}
-                  {...getButtonAccessibilityProps('Done', 'Double tap to confirm date selection')}
-                  {...(Platform.OS === 'web' ? getFocusStyle('#fff') : {})}
-                >
-                  <Text style={styles.datePickerDoneButtonText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-      
-      {/* Year/Month Picker Modal */}
-      <Modal
-        visible={showYearMonthPicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowYearMonthPicker(false)}
-      >
-        <TouchableOpacity
-          style={[styles.datePickerOverlay, { backgroundColor: colors.overlay }]}
-          activeOpacity={1}
-          onPress={() => setShowYearMonthPicker(false)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={[styles.yearMonthPickerModal, { backgroundColor: colors.background }]}>
-              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <ThemedText style={[styles.datePickerTitle, { color: colors.text }]}>
-                  Select Year and Month
-                </ThemedText>
-                <TouchableOpacity
-                  onPress={() => setShowYearMonthPicker(false)}
-                  style={styles.datePickerCloseButton}
-                  {...getButtonAccessibilityProps('Close', 'Double tap to close year and month picker')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="xmark" size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.yearMonthPickerBody}>
-                {/* Year Picker */}
-                <View style={styles.yearMonthPickerColumn}>
-                  <ThemedText style={[styles.yearMonthPickerLabel, { color: colors.textSecondary }]}>
-                    Year
-                  </ThemedText>
-                  <ScrollView 
-                    ref={yearScrollViewRef}
-                    style={styles.yearMonthPickerScrollView} 
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={styles.yearMonthPickerScrollContent}
-                  >
-                    {Array.from({ length: 150 }, (_, i) => {
-                      const year = new Date().getFullYear() - i;
-                      const maxYear = new Date().getFullYear();
-                      if (year > maxYear) return null;
-                      const isSelected = calendarViewMonth.getFullYear() === year;
-                      return (
-                        <TouchableOpacity
-                          key={year}
-                          style={[
-                            styles.yearMonthPickerOption,
-                            isSelected && { backgroundColor: colors.tint, borderColor: colors.tint },
-                            !isSelected && { borderColor: colors.border },
-                          ]}
-                          onPress={() => {
-                            const newDate = new Date(calendarViewMonth);
-                            newDate.setFullYear(year);
-                            const today = new Date();
-                            if (newDate > today) {
-                              newDate.setTime(today.getTime());
-                            }
-                            setCalendarViewMonth(newDate);
-                          }}
-                          {...getButtonAccessibilityProps(
-                            `Select year ${year}`,
-                            `Double tap to select year ${year}`,
-                            false
-                          )}
-                          {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.yearMonthPickerOptionText,
-                              { color: isSelected ? '#fff' : colors.text },
-                            ]}
-                          >
-                            {year}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    }).filter(Boolean)}
-                  </ScrollView>
-                </View>
-                
-                {/* Month Picker */}
-                <View style={styles.yearMonthPickerColumn}>
-                  <ThemedText style={[styles.yearMonthPickerLabel, { color: colors.textSecondary }]}>
-                    Month
-                  </ThemedText>
-                  <ScrollView 
-                    ref={monthScrollViewRef}
-                    style={styles.yearMonthPickerScrollView} 
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={styles.yearMonthPickerScrollContent}
-                  >
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const month = i + 1;
-                      const monthName = new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'long' });
-                      const isSelected = calendarViewMonth.getMonth() + 1 === month;
-                      const testDate = new Date(calendarViewMonth.getFullYear(), i, 1);
-                      const today = new Date();
-                      const isDisabled = testDate > today;
-                      
-                      return (
-                        <TouchableOpacity
-                          key={month}
-                          style={[
-                            styles.yearMonthPickerOption,
-                            isSelected && !isDisabled && { backgroundColor: colors.tint, borderColor: colors.tint },
-                            !isSelected && { borderColor: colors.border },
-                            isDisabled && { opacity: 0.4 },
-                          ]}
-                          onPress={() => {
-                            if (isDisabled) return;
-                            const newDate = new Date(calendarViewMonth);
-                            newDate.setMonth(i);
-                            const today = new Date();
-                            if (newDate > today) {
-                              newDate.setTime(today.getTime());
-                            }
-                            setCalendarViewMonth(newDate);
-                          }}
-                          disabled={isDisabled}
-                          {...getButtonAccessibilityProps(
-                            `Select ${monthName}`,
-                            `Double tap to select ${monthName}`,
-                            isDisabled
-                          )}
-                          {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.yearMonthPickerOptionText,
-                              { color: isSelected && !isDisabled ? '#fff' : colors.text },
-                            ]}
-                          >
-                            {monthName}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              </View>
-              
-              <View style={[styles.datePickerFooter, { borderTopColor: colors.border }]}>
-                <TouchableOpacity
-                  style={[styles.datePickerDoneButton, { backgroundColor: colors.tint }]}
-                  onPress={() => setShowYearMonthPicker(false)}
-                  {...getButtonAccessibilityProps('Done', 'Double tap to confirm year and month selection')}
-                  {...(Platform.OS === 'web' ? getFocusStyle('#fff') : {})}
-                >
-                  <Text style={styles.datePickerDoneButtonText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
     </ThemedView>
   );
 }

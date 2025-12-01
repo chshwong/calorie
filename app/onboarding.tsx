@@ -12,6 +12,7 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
@@ -60,12 +61,19 @@ function StepIndicator({ currentStep, totalSteps, colors }: { currentStep: numbe
   );
 }
 
+type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
+
 export default function OnboardingScreen() {
+  const { t } = useTranslation();
   const { user, refreshProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 2; // Only Personal Info and Physical Info
+  const totalSteps = 3; // Goal, Personal Info, and Physical Info
   
-  // Step 1: Personal Info (was Step 2 in register)
+  // Step 1: Goal (new step)
+  const [goal, setGoal] = useState<GoalType | ''>('');
+  const [showAdvancedGoals, setShowAdvancedGoals] = useState(false);
+  
+  // Step 2: Personal Info
   const [firstName, setFirstName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState<Gender>('male');
@@ -96,7 +104,7 @@ export default function OnboardingScreen() {
     }
   }, [showYearMonthPicker, calendarViewMonth]);
   
-  // Step 2: Physical Info (was Step 3 in register)
+  // Step 3: Physical Info
   const [heightCm, setHeightCm] = useState('');
   const [heightFt, setHeightFt] = useState('');
   const [heightIn, setHeightIn] = useState('');
@@ -303,16 +311,67 @@ export default function OnboardingScreen() {
     return null;
   };
   
+  const validateGoal = (): string | null => {
+    if (!goal || goal.trim().length === 0) {
+      return t('onboarding.goal.error_select_goal');
+    }
+    return null;
+  };
+  
+  const handleGoalNext = async () => {
+    setError(null);
+    
+    // Validate Goal step
+    const validationError = validateGoal();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    
+    if (!user) {
+      setError(t('onboarding.error_no_session'));
+      router.replace('/login');
+      return;
+    }
+    
+    // Save goal to profile
+    setLoading(true);
+    try {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ goal_type: goal })
+        .eq('user_id', user.id);
+      
+      if (updateError) {
+        throw new Error(updateError.message || 'Failed to save goal');
+      }
+      
+      // Refresh profile to get updated data
+      await refreshProfile();
+      
+      // Move to next step
+      setCurrentStep(2);
+    } catch (error: any) {
+      setError(error.message || 'Failed to save goal. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const handleNext = () => {
     setError(null);
     
     if (currentStep === 1) {
+      // Goal step - handle separately to save goal_type
+      handleGoalNext();
+    } else if (currentStep === 2) {
+      // Validate Personal Info step
       const validationError = validateStep1();
       if (validationError) {
         setError(validationError);
         return;
       }
-      setCurrentStep(2);
+      setCurrentStep(3);
     }
   };
   
@@ -326,6 +385,7 @@ export default function OnboardingScreen() {
   const handleCompleteOnboarding = async () => {
     setError(null);
     
+    // Validate Step 3 (Physical Info)
     const validationError = validateStep2();
     if (validationError) {
       setError(validationError);
@@ -363,7 +423,7 @@ export default function OnboardingScreen() {
           p_weight_lb: weightLbValue,
           p_height_unit: heightUnit,
           p_weight_unit: weightUnit,
-          p_onboarding_complete: true,
+          p_onboarding_complete: true, // Complete onboarding
         });
         
         if (functionError) {
@@ -389,7 +449,7 @@ export default function OnboardingScreen() {
           height_unit: heightUnit,
           weight_unit: weightUnit,
           is_active: true,
-          onboarding_complete: true,
+          onboarding_complete: true, // Complete onboarding
         };
         
         const { error: upsertError } = await supabase
@@ -417,7 +477,130 @@ export default function OnboardingScreen() {
     }
   };
   
-  const renderStep1 = () => (
+  const renderGoalStep = () => {
+    const basicGoals: Array<{ value: GoalType; labelKey: string; descriptionKey: string }> = [
+      {
+        value: 'lose',
+        labelKey: 'onboarding.goal.lose_weight.label',
+        descriptionKey: 'onboarding.goal.lose_weight.description',
+      },
+      {
+        value: 'maintain',
+        labelKey: 'onboarding.goal.maintain_weight.label',
+        descriptionKey: 'onboarding.goal.maintain_weight.description',
+      },
+      {
+        value: 'gain',
+        labelKey: 'onboarding.goal.gain_weight.label',
+        descriptionKey: 'onboarding.goal.gain_weight.description',
+      },
+    ];
+    
+    const advancedGoals: Array<{ value: GoalType; labelKey: string; descriptionKey: string }> = [
+      {
+        value: 'recomp',
+        labelKey: 'onboarding.goal.recomp.label',
+        descriptionKey: 'onboarding.goal.recomp.description',
+      },
+    ];
+    
+    const allGoals = showAdvancedGoals ? [...basicGoals, ...advancedGoals] : basicGoals;
+    
+    return (
+      <View style={styles.stepContent}>
+        <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
+          {t('onboarding.goal.title')}
+        </ThemedText>
+        <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
+          {t('onboarding.goal.subtitle')}
+        </ThemedText>
+        
+        <View style={styles.goalContainer}>
+          {allGoals.map((goalOption) => (
+            <TouchableOpacity
+              key={goalOption.value}
+              style={[
+                styles.goalCard,
+                { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+                goal === goalOption.value && { 
+                  backgroundColor: colors.tint, 
+                  borderColor: colors.tint,
+                  ...Platform.select({
+                    web: {
+                      boxShadow: `0 4px 12px ${colors.tint}40`,
+                    },
+                    default: {
+                      shadowColor: colors.tint,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 8,
+                      elevation: 4,
+                    },
+                  }),
+                },
+              ]}
+              onPress={() => {
+                setGoal(goalOption.value);
+                setError(null);
+              }}
+              disabled={loading}
+              {...getButtonAccessibilityProps(
+                `${t(goalOption.labelKey)}${goal === goalOption.value ? ' selected' : ''}`,
+                `Double tap to select ${t(goalOption.labelKey)}`,
+                loading
+              )}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: goal === goalOption.value }}
+            >
+              <Text
+                style={[
+                  styles.goalCardTitle,
+                  { color: goal === goalOption.value ? '#fff' : colors.text },
+                ]}
+              >
+                {t(goalOption.labelKey)}
+              </Text>
+              <Text
+                style={[
+                  styles.goalCardDescription,
+                  { 
+                    color: goal === goalOption.value 
+                      ? 'rgba(255, 255, 255, 0.9)' 
+                      : colors.textSecondary 
+                  },
+                ]}
+              >
+                {t(goalOption.descriptionKey)}
+              </Text>
+              {goal === goalOption.value && (
+                <View style={styles.goalCardCheckmark}>
+                  <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+        
+        {!showAdvancedGoals && (
+          <TouchableOpacity
+            style={styles.advancedGoalLink}
+            onPress={() => setShowAdvancedGoals(true)}
+            disabled={loading}
+            {...getButtonAccessibilityProps(
+              t('onboarding.goal.advanced_goal'),
+              'Double tap to show advanced goal options'
+            )}
+          >
+            <ThemedText style={[styles.advancedGoalLinkText, { color: colors.tint }]}>
+              {t('onboarding.goal.advanced_goal')}
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+  
+  const renderStep2 = () => (
     <View style={styles.stepContent}>
       <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
         Personal Information
@@ -527,7 +710,7 @@ export default function OnboardingScreen() {
     </View>
   );
   
-  const renderStep2 = () => (
+  const renderStep3 = () => (
     <View style={styles.stepContent}>
       <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
         Physical Information
@@ -763,7 +946,7 @@ export default function OnboardingScreen() {
                 <View style={styles.backButton} />
               )}
               <ThemedText type="title" style={[styles.headerTitle, { color: colors.text }]}>
-                Complete Setup
+                {t('onboarding.title')}
               </ThemedText>
               <View style={styles.backButton} />
             </View>
@@ -771,8 +954,9 @@ export default function OnboardingScreen() {
             <StepIndicator currentStep={currentStep} totalSteps={totalSteps} colors={colors} />
             
             <View style={styles.cardContent}>
-              {currentStep === 1 && renderStep1()}
+              {currentStep === 1 && renderGoalStep()}
               {currentStep === 2 && renderStep2()}
+              {currentStep === 3 && renderStep3()}
               
               {error && (
                 <View
@@ -793,15 +977,26 @@ export default function OnboardingScreen() {
                       getMinTouchTargetStyle(),
                       {
                         backgroundColor: colors.tint,
-                        opacity: loading ? 0.6 : 1,
+                        opacity: (loading || (currentStep === 1 && !goal)) ? 0.6 : 1,
                         ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
                       },
                     ]}
                     onPress={handleNext}
-                    disabled={loading}
-                    {...getButtonAccessibilityProps('Next', 'Double tap to continue to next step', loading)}
+                    disabled={loading || (currentStep === 1 && !goal)}
+                    {...getButtonAccessibilityProps(
+                      t('common.next'),
+                      'Double tap to continue to next step',
+                      loading || (currentStep === 1 && !goal)
+                    )}
                   >
-                    <Text style={styles.buttonText}>Next</Text>
+                    {loading && currentStep === 1 ? (
+                      <View style={styles.buttonLoading}>
+                        <ActivityIndicator color="#fff" size="small" />
+                        <Text style={styles.buttonText}>{t('common.loading')}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.buttonText}>{t('common.next')}</Text>
+                    )}
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
@@ -816,15 +1011,19 @@ export default function OnboardingScreen() {
                     ]}
                     onPress={handleCompleteOnboarding}
                     disabled={loading}
-                    {...getButtonAccessibilityProps(loading ? 'Completing setup' : 'Complete Setup', 'Double tap to complete your profile setup', loading)}
+                    {...getButtonAccessibilityProps(
+                      loading ? t('onboarding.saving') : t('onboarding.complete_button'),
+                      'Double tap to complete your profile setup',
+                      loading
+                    )}
                   >
                     {loading ? (
                       <View style={styles.buttonLoading}>
                         <ActivityIndicator color="#fff" size="small" />
-                        <Text style={styles.buttonText}>Saving...</Text>
+                        <Text style={styles.buttonText}>{t('onboarding.saving')}</Text>
                       </View>
                     ) : (
-                      <Text style={styles.buttonText}>Complete Setup</Text>
+                      <Text style={styles.buttonText}>{t('onboarding.complete_button')}</Text>
                     )}
                   </TouchableOpacity>
                 )}
@@ -1315,6 +1514,48 @@ const styles = StyleSheet.create({
   genderButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  goalContainer: {
+    gap: 12,
+    marginTop: 8,
+  },
+  goalCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    position: 'relative',
+    minHeight: 80,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+      },
+      default: {},
+    }),
+  },
+  goalCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  goalCardDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  goalCardCheckmark: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+  },
+  advancedGoalLink: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    alignSelf: 'flex-start',
+  },
+  advancedGoalLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   measurementSection: {
     marginBottom: 20,

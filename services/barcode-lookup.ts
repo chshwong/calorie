@@ -33,6 +33,7 @@ export type FoodMasterMatch = {
   fat_g: number;
   fiber_g: number | null;
   saturated_fat_g: number | null;
+  trans_fat_g: number | null;
   sugar_g: number | null;
   sodium_mg: number | null;
   serving_size: number;
@@ -55,6 +56,7 @@ export type ExternalFoodCacheRow = {
   carbs_100g: number | null;
   fat_100g: number | null;
   saturated_fat_100g: number | null;
+  trans_fat_100g: number | null;
   sugars_100g: number | null;
   fiber_100g: number | null;
   sodium_100g: number | null;
@@ -238,6 +240,7 @@ async function lookupFoodMaster(
       fat_g,
       fiber_g,
       saturated_fat_g,
+      trans_fat_g,
       sugar_g,
       sodium_mg,
       serving_size,
@@ -402,6 +405,7 @@ async function upsertExternalCache(
     carbs_100g: product.carbs100g,
     fat_100g: product.fat100g,
     saturated_fat_100g: product.saturatedFat100g,
+    trans_fat_100g: product.transFat100g,
     sugars_100g: product.sugars100g,
     fiber_100g: product.fiber100g,
     sodium_100g: product.sodium100g,
@@ -474,6 +478,7 @@ export async function promoteToFoodMaster(
       fat_g: cacheRow.fat_100g ?? 0,
       fiber_g: cacheRow.fiber_100g,
       saturated_fat_g: cacheRow.saturated_fat_100g,
+      trans_fat_g: cacheRow.trans_fat_100g,
       sugar_g: cacheRow.sugars_100g,
       sodium_mg: cacheRow.sodium_100g ? sodiumGramsToMg(cacheRow.sodium_100g) : null,
       serving_size: servingSize,
@@ -521,6 +526,8 @@ export function calculateNutritionForServing(
   carbs: number;
   fat: number;
   fiber: number | null;
+  saturated_fat: number | null;
+  trans_fat: number | null;
   sugar: number | null;
   sodium_mg: number | null;
 } {
@@ -532,6 +539,8 @@ export function calculateNutritionForServing(
     carbs: Math.round((cache.carbs_100g ?? 0) * factor * 10) / 10,
     fat: Math.round((cache.fat_100g ?? 0) * factor * 10) / 10,
     fiber: cache.fiber_100g ? Math.round(cache.fiber_100g * factor * 10) / 10 : null,
+    saturated_fat: cache.saturated_fat_100g ? Math.round(cache.saturated_fat_100g * factor * 10) / 10 : null,
+    trans_fat: cache.trans_fat_100g ? Math.round(cache.trans_fat_100g * factor * 10) / 10 : null,
     sugar: cache.sugars_100g ? Math.round(cache.sugars_100g * factor * 10) / 10 : null,
     sodium_mg: cache.sodium_100g ? Math.round(cache.sodium_100g * 1000 * factor) : null,
   };

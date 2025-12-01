@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Platform } from 'react-native';
 import { setLanguage, isLanguageSupported } from '@/i18n';
+import { ensureProfileExists } from '@/lib/services/profileService';
 
 type AuthContextType = {
   session: Session | null;
@@ -65,11 +66,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) {
-        // If profile doesn't exist (404/406), that's okay - user might need to register
+        // If profile doesn't exist (404/406), create it with onboarding_complete = false
         if (error.code === 'PGRST116' || error.message.includes('No rows')) {
-          setProfile(null);
-          setRetrying(false);
-          setLoading(false);
+          // Profile doesn't exist, create it
+          const newProfile = await ensureProfileExists(userId);
+          if (newProfile) {
+            setProfile(newProfile);
+            profileFetchRetryCount.current = 0;
+            setRetrying(false);
+            setLoading(false);
+          } else {
+            // Failed to create profile
+            setProfile(null);
+            setRetrying(false);
+            setLoading(false);
+          }
         } else {
           // Don't clear profile immediately on error - keep last known profile if user is still logged in
           // Only clear if this is the initial load

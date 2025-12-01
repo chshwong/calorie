@@ -12,12 +12,16 @@ export type MedPreferences = {
   primarySection?: 'med' | 'supp';
   hideMedWhenEmpty?: boolean;
   hideSuppWhenEmpty?: boolean;
+  collapsedMedSection?: boolean;
+  collapsedSuppSection?: boolean;
 };
 
 const DEFAULT_PREFS: MedPreferences = {
   primarySection: 'med',
   hideMedWhenEmpty: false,
   hideSuppWhenEmpty: false,
+  collapsedMedSection: false, // Default to expanded
+  collapsedSuppSection: false, // Default to expanded
 };
 
 /**

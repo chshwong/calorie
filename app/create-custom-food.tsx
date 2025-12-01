@@ -94,6 +94,7 @@ export default function CreateCustomFoodScreen() {
   const [weightFat, setWeightFat] = useState('');
   const [weightFiber, setWeightFiber] = useState('');
   const [weightSaturatedFat, setWeightSaturatedFat] = useState('');
+  const [weightTransFat, setWeightTransFat] = useState('');
   const [weightSugar, setWeightSugar] = useState('');
   const [weightSodium, setWeightSodium] = useState('');
 
@@ -202,6 +203,9 @@ export default function CreateCustomFoodScreen() {
       const satFatForServing = foodData.saturated_fat_g || 0;
       setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
 
+      const transFatForServing = foodData.trans_fat_g || 0;
+      setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
+
       const sugarForServing = foodData.sugar_g || 0;
       setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
 
@@ -295,6 +299,9 @@ export default function CreateCustomFoodScreen() {
         const satFatForServing = foodData.saturated_fat_g ? (foodData.saturated_fat_g / 100) * servingGrams : 0;
         setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
 
+        const transFatForServing = foodData.trans_fat_g ? (foodData.trans_fat_g / 100) * servingGrams : 0;
+        setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
+
         const sugarForServing = foodData.sugar_g ? (foodData.sugar_g / 100) * servingGrams : 0;
         setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
 
@@ -337,6 +344,9 @@ export default function CreateCustomFoodScreen() {
 
         const satFatForServing = foodData.saturated_fat_g || 0;
         setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
+
+        const transFatForServing = foodData.trans_fat_g || 0;
+        setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
 
         const sugarForServing = foodData.sugar_g || 0;
         setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
@@ -468,6 +478,14 @@ export default function CreateCustomFoodScreen() {
         newErrors.weightSaturatedFat = t('create_custom_food.validation.saturated_fat_exceeds_limit', { max: MAX_MACRO.toLocaleString() });
       }
     }
+    if (weightTransFat) {
+      const parsedTransFat = parseFloat(weightTransFat);
+      if (isNaN(parsedTransFat) || !isFinite(parsedTransFat)) {
+        newErrors.weightTransFat = t('create_custom_food.validation.trans_fat_invalid');
+      } else if (parsedTransFat > MAX_MACRO) {
+        newErrors.weightTransFat = t('create_custom_food.validation.trans_fat_exceeds_limit', { max: MAX_MACRO.toLocaleString() });
+      }
+    }
     
     if (weightSugar) {
       const parsedSugar = parseFloat(weightSugar);
@@ -494,7 +512,7 @@ export default function CreateCustomFoodScreen() {
   // Run validation whenever values change (excluding foodName to avoid showing errors initially)
   useEffect(() => {
     validateFields();
-  }, [brand, weightQuantity, weightCalories, volumeQuantity, volumeCalories, weightProtein, weightCarbs, weightFat, weightFiber, weightSaturatedFat, weightSugar, weightSodium, isWeightBased]);
+  }, [brand, weightQuantity, weightCalories, volumeQuantity, volumeCalories, weightProtein, weightCarbs, weightFat, weightFiber, weightSaturatedFat, weightTransFat, weightSugar, weightSodium, isWeightBased]);
   
   // Check if form is valid (for Save button) - don't call validateFields to avoid infinite loop
   const isFormValid = () => {
@@ -540,6 +558,10 @@ export default function CreateCustomFoodScreen() {
     if (weightSaturatedFat) {
       const parsedSaturatedFat = parseFloat(weightSaturatedFat);
       if (isNaN(parsedSaturatedFat) || !isFinite(parsedSaturatedFat) || parsedSaturatedFat > MAX_MACRO) return false;
+    }
+    if (weightTransFat) {
+      const parsedTransFat = parseFloat(weightTransFat);
+      if (isNaN(parsedTransFat) || !isFinite(parsedTransFat) || parsedTransFat > MAX_MACRO) return false;
     }
     if (weightSugar) {
       const parsedSugar = parseFloat(weightSugar);
@@ -695,6 +717,7 @@ export default function CreateCustomFoodScreen() {
         fat_g: weightFat ? parseFloat(weightFat) : null,
         fiber_g: weightFiber ? parseFloat(weightFiber) : null,
         saturated_fat_g: weightSaturatedFat ? parseFloat(weightSaturatedFat) : null,
+        trans_fat_g: weightTransFat ? parseFloat(weightTransFat) : null,
         sugar_g: weightSugar ? parseFloat(weightSugar) : null,
         sodium_mg: weightSodium ? parseFloat(weightSodium) : null,
       };
@@ -875,7 +898,7 @@ export default function CreateCustomFoodScreen() {
                   { borderColor: errors.foodName ? '#EF4444' : colors.icon + '30', color: colors.text }
                 ]}
                 placeholder={t('create_custom_food.required_section.food_name_placeholder')}
-                placeholderTextColor={colors.icon}
+                placeholderTextColor={colors.textSecondary}
                 value={foodName}
                 onChangeText={(text) => {
                   if (text.length <= MAX_NAME_LENGTH) {
@@ -896,7 +919,7 @@ export default function CreateCustomFoodScreen() {
               {errors.foodName ? (
                 <Text style={styles.errorText}>{errors.foodName}</Text>
               ) : (
-                <ThemedText style={[styles.helperText, { color: colors.icon }]}>
+                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
                   {t('create_custom_food.characters_count', { count: foodName.length, max: MAX_NAME_LENGTH })}
                 </ThemedText>
               )}
@@ -926,7 +949,7 @@ export default function CreateCustomFoodScreen() {
                         { borderColor: errors.weightQuantity ? '#EF4444' : colors.icon + '30', color: colors.text }
                       ]}
                       placeholder={t('create_custom_food.weight_serving.quantity_placeholder')}
-                      placeholderTextColor={colors.icon}
+                      placeholderTextColor={colors.textSecondary}
                       value={weightQuantity}
                       onChangeText={(text) => {
                         setWeightQuantity(validateNumericInput(text));
@@ -958,7 +981,7 @@ export default function CreateCustomFoodScreen() {
                         <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
                           {WEIGHT_UNITS.find(u => u.value === weightUnit)?.label || weightUnit}
                         </ThemedText>
-                        <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
+                        <ThemedText style={[styles.dropdownArrow, { color: colors.textSecondary }]}>▼</ThemedText>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -970,7 +993,7 @@ export default function CreateCustomFoodScreen() {
                         { borderColor: errors.weightCalories ? '#EF4444' : colors.icon + '30', color: colors.text }
                       ]}
                       placeholder={t('create_custom_food.weight_serving.calories_placeholder')}
-                      placeholderTextColor={colors.icon}
+                      placeholderTextColor={colors.textSecondary}
                       value={weightCalories}
                       onChangeText={(text) => {
                         setWeightCalories(validateNumericInput(text));
@@ -995,7 +1018,7 @@ export default function CreateCustomFoodScreen() {
                         { borderColor: errors.volumeQuantity ? '#EF4444' : colors.icon + '30', color: colors.text }
                       ]}
                       placeholder={t('create_custom_food.volume_serving.quantity_placeholder')}
-                      placeholderTextColor={colors.icon}
+                      placeholderTextColor={colors.textSecondary}
                       value={volumeQuantity}
                       onChangeText={(text) => {
                         setVolumeQuantity(validateNumericInput(text));
@@ -1027,7 +1050,7 @@ export default function CreateCustomFoodScreen() {
                         <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
                           {VOLUME_UNITS.find(u => u.value === volumeUnit)?.label || volumeUnit}
                         </ThemedText>
-                        <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>▼</ThemedText>
+                        <ThemedText style={[styles.dropdownArrow, { color: colors.textSecondary }]}>▼</ThemedText>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1039,7 +1062,7 @@ export default function CreateCustomFoodScreen() {
                         { borderColor: errors.volumeCalories ? '#EF4444' : colors.icon + '30', color: colors.text }
                       ]}
                       placeholder={t('create_custom_food.volume_serving.calories_placeholder')}
-                      placeholderTextColor={colors.icon}
+                      placeholderTextColor={colors.textSecondary}
                       value={volumeCalories}
                       onChangeText={(text) => {
                         setVolumeCalories(validateNumericInput(text));
@@ -1061,7 +1084,7 @@ export default function CreateCustomFoodScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightProtein ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightProtein}
                     onChangeText={(text) => setWeightProtein(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1073,7 +1096,7 @@ export default function CreateCustomFoodScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightCarbs ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightCarbs}
                     onChangeText={(text) => setWeightCarbs(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1085,7 +1108,7 @@ export default function CreateCustomFoodScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightFat}
                     onChangeText={(text) => setWeightFat(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1097,7 +1120,7 @@ export default function CreateCustomFoodScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightFiber ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightFiber}
                     onChangeText={(text) => setWeightFiber(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1116,7 +1139,7 @@ export default function CreateCustomFoodScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightSaturatedFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightSaturatedFat}
                     onChangeText={(text) => setWeightSaturatedFat(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1124,11 +1147,23 @@ export default function CreateCustomFoodScreen() {
                   {errors.weightSaturatedFat && <Text style={styles.errorText}>{errors.weightSaturatedFat}</Text>}
                 </View>
                 <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                  <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.trans_fat')}</ThemedText>
+                  <TextInput
+                    style={[styles.input, { borderColor: errors.weightTransFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                    placeholder={t('create_custom_food.other_nutrients.placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    value={weightTransFat}
+                    onChangeText={(text) => setWeightTransFat(validateNumericInput(text))}
+                    keyboardType="decimal-pad"
+                  />
+                  {errors.weightTransFat && <Text style={styles.errorText}>{errors.weightTransFat}</Text>}
+                </View>
+                <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
                   <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.sugar')}</ThemedText>
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightSugar ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightSugar}
                     onChangeText={(text) => setWeightSugar(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1140,7 +1175,7 @@ export default function CreateCustomFoodScreen() {
                   <TextInput
                     style={[styles.input, { borderColor: errors.weightSodium ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.icon}
+                    placeholderTextColor={colors.textSecondary}
                     value={weightSodium}
                     onChangeText={(text) => setWeightSodium(validateNumericInput(text))}
                     keyboardType="decimal-pad"
@@ -1156,7 +1191,7 @@ export default function CreateCustomFoodScreen() {
               <TextInput
                 style={[styles.input, { borderColor: errors.brand ? '#EF4444' : colors.icon + '30', color: colors.text }]}
                 placeholder={t('create_custom_food.optional_section.brand_placeholder')}
-                placeholderTextColor={colors.icon}
+                placeholderTextColor={colors.textSecondary}
                 value={brand}
                 onChangeText={setBrand}
                 maxLength={MAX_BRAND_LENGTH}

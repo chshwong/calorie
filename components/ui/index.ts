@@ -22,4 +22,5 @@ export { TabButton } from './tab-button';
 export { TabBar } from './tab-bar';
 export { SegmentedToggle, type SegmentedOption, type SegmentedToggleProps } from './segmented-toggle';
 export { ToastProvider, useAppToast, showAppToast } from './app-toast';
+export { CollapsibleSection, type CollapsibleSectionProps } from './collapsible-section';
 

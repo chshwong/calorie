@@ -38,6 +38,7 @@ export interface FoodSearchBarProps {
   /** Theme colors */
   colors: {
     text: string;
+    textSecondary: string;
     background: string;
     icon: string;
     tint: string;
@@ -92,7 +93,7 @@ export function FoodSearchBar({
             },
           ]}
           placeholder={placeholder}
-          placeholderTextColor={colors.icon}
+          placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={onSearchChange}
           autoCapitalize="none"
@@ -164,7 +165,7 @@ export function FoodSearchBar({
                     </View>
                     {food.brand && (
                       <ThemedText
-                        style={[styles.searchResultBrand, { color: colors.icon }]}
+                        style={[styles.searchResultBrand, { color: colors.textSecondary }]}
                       >
                         {food.brand}
                       </ThemedText>
@@ -172,7 +173,7 @@ export function FoodSearchBar({
                     <ThemedText
                       style={[
                         styles.searchResultNutrition,
-                        { color: colors.icon },
+                        { color: colors.textSecondary },
                       ]}
                     >
                       {food.serving_size} {food.serving_unit} •{' '}
