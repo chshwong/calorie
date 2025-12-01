@@ -15,6 +15,24 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloneDayEntries, type CloneEntityType } from '@/lib/services/cloneDayEntries';
 
+/**
+ * Helper to get query key for entity type
+ */
+function getQueryKeyForEntityType(entityType: CloneEntityType, userId: string | undefined, dateString: string): any[] {
+  if (!userId) return [];
+  
+  switch (entityType) {
+    case 'pill_intake':
+      return ['medLogs', userId, dateString];
+    case 'exercise_log':
+      return ['exerciseLogs', userId, dateString];
+    case 'food_log':
+      return ['dailyEntries', userId, dateString];
+    default:
+      return [];
+  }
+}
+
 export interface CloneFromPreviousDayOptions {
   /**
    * Type of entity to clone ('pill_intake', 'food_log', 'exercise_log')
@@ -65,6 +83,15 @@ export function useCloneFromPreviousDay(options: CloneFromPreviousDayOptions) {
       const sourceDate = previousDay.toISOString().split('T')[0];
       const targetDate = currentDate.toISOString().split('T')[0];
 
+      // Check cache first - if no entries exist, throw special error
+      const sourceQueryKey = getQueryKeyForEntityType(entityType, userId, sourceDate);
+      const cachedData = queryClient.getQueryData<any[]>(sourceQueryKey);
+      
+      // If cache exists and is empty, don't call DB
+      if (cachedData !== undefined && (cachedData === null || cachedData.length === 0)) {
+        throw new Error('NOTHING_TO_COPY');
+      }
+
       // Use the shared cloneDayEntries service
       return cloneDayEntries(entityType, userId, sourceDate, targetDate);
     },
@@ -78,8 +105,9 @@ export function useCloneFromPreviousDay(options: CloneFromPreviousDayOptions) {
         // TODO: Invalidate food log queries when food_log cloning is implemented
         queryClient.invalidateQueries({ queryKey: ['dailyEntries', userId] });
       } else if (entityType === 'exercise_log') {
-        // TODO: Invalidate exercise log queries when exercise_log cloning is implemented
         queryClient.invalidateQueries({ queryKey: ['exerciseLogs', userId] });
+        queryClient.invalidateQueries({ queryKey: ['exerciseSummary', userId] });
+        queryClient.invalidateQueries({ queryKey: ['recentAndFrequentExercises', userId] });
       }
 
       // Call user-provided success callback

@@ -41,8 +41,9 @@ export function useCloneDayEntriesMutation(entityType: CloneEntityType) {
         // TODO: Invalidate food log queries when food_log cloning is implemented
         queryClient.invalidateQueries({ queryKey: ['dailyEntries', userId] });
       } else if (entityType === 'exercise_log') {
-        // TODO: Invalidate exercise log queries when exercise_log cloning is implemented
         queryClient.invalidateQueries({ queryKey: ['exerciseLogs', userId] });
+        queryClient.invalidateQueries({ queryKey: ['exerciseSummary', userId] });
+        queryClient.invalidateQueries({ queryKey: ['recentAndFrequentExercises', userId] });
       }
     },
   });

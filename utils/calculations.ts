@@ -19,6 +19,26 @@
 export const ageFromDob = (iso: string) =>
   Math.floor((Date.now() - new Date(iso).getTime()) / (365.25 * 24 * 3600 * 1000));
 
+/**
+ * Converts an age (in years) to an approximate date of birth (YYYY-MM-DD).
+ * Uses the current date minus the age, assuming birthday has passed this year.
+ * @param age - Age in years (must be valid number between 13 and 150)
+ * @returns Date of birth string in YYYY-MM-DD format, or null if invalid
+ */
+export const dobFromAge = (age: number): string | null => {
+  if (isNaN(age) || age < 13 || age > 150) {
+    return null;
+  }
+  
+  const today = new Date();
+  const birthYear = today.getFullYear() - age;
+  // Use middle of the year as approximation (June 1st)
+  const month = String(6).padStart(2, '0');
+  const day = String(1).padStart(2, '0');
+  
+  return `${birthYear}-${month}-${day}`;
+};
+
 export const bmi = (height_cm: number, weight_lb: number) =>
   703 * weight_lb / Math.pow(height_cm / 2.54, 2);
 
@@ -133,5 +153,154 @@ export const getMealTypeFromCurrentTime = (): string => {
     // Before 4:00 AM or after 9:30 PM
     return 'late_night';
   }
+};
+
+/**
+ * ACTIVITY LEVEL AND CALORIE CALCULATIONS
+ * These functions are in the domain layer (no React/browser dependencies)
+ */
+
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high';
+
+/**
+ * Maps activity level enum to activity factor (used for TDEE calculation)
+ */
+export const getActivityFactor = (activityLevel: ActivityLevel): number => {
+  const factors: Record<ActivityLevel, number> = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    high: 1.725,
+    very_high: 1.9,
+  };
+  return factors[activityLevel];
+};
+
+/**
+ * Calculate Basal Metabolic Rate (BMR) using the Mifflin-St Jeor equation
+ * @param weightKg - Weight in kilograms
+ * @param heightCm - Height in centimeters
+ * @param age - Age in years
+ * @param sex - 'male' or 'female'
+ * @returns BMR in kcal/day
+ */
+export const calculateBMR = (
+  weightKg: number,
+  heightCm: number,
+  age: number,
+  sex: 'male' | 'female'
+): number => {
+  // Mifflin-St Jeor equation:
+  // BMR (men) = 10 × weight(kg) + 6.25 × height(cm) - 5 × age(years) + 5
+  // BMR (women) = 10 × weight(kg) + 6.25 × height(cm) - 5 × age(years) - 161
+  
+  const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
+  return sex === 'male' ? baseBMR + 5 : baseBMR - 161;
+};
+
+/**
+ * Calculate Total Daily Energy Expenditure (TDEE) from BMR and activity level
+ * @param bmr - Basal Metabolic Rate in kcal/day
+ * @param activityLevel - Activity level enum
+ * @returns TDEE in kcal/day
+ */
+export const calculateTDEE = (bmr: number, activityLevel: ActivityLevel): number => {
+  const activityFactor = getActivityFactor(activityLevel);
+  return bmr * activityFactor;
+};
+
+/**
+ * Calculate the weekly weight change rate based on daily calorie difference
+ * @param dailyCalorieDiff - Daily calorie deficit (negative) or surplus (positive) in kcal
+ * @returns Weekly weight change in kg (negative for loss, positive for gain)
+ */
+export const calculateWeeklyWeightChange = (dailyCalorieDiff: number): number => {
+  // ~7700 kcal = 1 kg of body weight
+  const weeklyCalorieDiff = dailyCalorieDiff * 7;
+  return weeklyCalorieDiff / 7700;
+};
+
+/**
+ * Calculate required daily calorie difference to achieve goal weight in given timeframe
+ * @param currentWeightKg - Current weight in kg
+ * @param goalWeightKg - Goal weight in kg
+ * @param weeksToGoal - Number of weeks to reach goal
+ * @returns Daily calorie difference needed (negative for deficit, positive for surplus) in kcal
+ */
+export const calculateRequiredDailyCalorieDiff = (
+  currentWeightKg: number,
+  goalWeightKg: number,
+  weeksToGoal: number
+): number => {
+  if (weeksToGoal <= 0) {
+    return 0; // No timeline means maintenance
+  }
+  
+  const weightDifferenceKg = goalWeightKg - currentWeightKg;
+  const totalCalorieDiff = weightDifferenceKg * 7700; // 7700 kcal per kg
+  return totalCalorieDiff / (weeksToGoal * 7); // Daily difference
+};
+
+/**
+ * Safety limits for calorie intake
+ */
+export const MIN_SAFE_CALORIES_MALE = 1500;
+export const MIN_SAFE_CALORIES_FEMALE = 1200;
+export const MAX_DAILY_DEFICIT = 750; // kcal/day
+export const MAX_DAILY_SURPLUS = 500; // kcal/day
+
+/**
+ * Calculate safe daily calorie target based on TDEE and goal
+ * Applies safety limits and adjusts if necessary
+ * @param tdee - Total Daily Energy Expenditure in kcal/day
+ * @param dailyCalorieDiff - Desired daily calorie difference (can be adjusted)
+ * @param sex - 'male' or 'female' (for minimum calorie threshold)
+ * @returns Object with safe calorie target, adjusted daily diff, and warning message if adjusted
+ */
+export const calculateSafeCalorieTarget = (
+  tdee: number,
+  dailyCalorieDiff: number,
+  sex: 'male' | 'female'
+): {
+  targetCalories: number;
+  adjustedDailyDiff: number;
+  adjustedWeeks: number | null;
+  warningMessage: string | null;
+} => {
+  const minSafeCalories = sex === 'male' ? MIN_SAFE_CALORIES_MALE : MIN_SAFE_CALORIES_FEMALE;
+  
+  // Apply maximum deficit/surplus limits
+  let adjustedDiff = dailyCalorieDiff;
+  if (dailyCalorieDiff < 0 && Math.abs(dailyCalorieDiff) > MAX_DAILY_DEFICIT) {
+    adjustedDiff = -MAX_DAILY_DEFICIT;
+  } else if (dailyCalorieDiff > 0 && dailyCalorieDiff > MAX_DAILY_SURPLUS) {
+    adjustedDiff = MAX_DAILY_SURPLUS;
+  }
+  
+  // Calculate target calories
+  let targetCalories = tdee + adjustedDiff;
+  
+  // Ensure minimum safe calories
+  if (targetCalories < minSafeCalories) {
+    targetCalories = minSafeCalories;
+    adjustedDiff = targetCalories - tdee;
+  }
+  
+  // Calculate adjusted timeline if we had to change the deficit/surplus
+  let adjustedWeeks: number | null = null;
+  let warningMessage: string | null = null;
+  
+  if (adjustedDiff !== dailyCalorieDiff || targetCalories === minSafeCalories) {
+    // We adjusted the pace - calculate what the new timeline would be
+    // This is informational only, the user's chosen timeline stays the same
+    warningMessage = 'To keep things safe and sustainable, we\'ve adjusted your pace slightly. You\'ll still be working steadily toward your goal.';
+  }
+  
+  return {
+    targetCalories: Math.round(targetCalories),
+    adjustedDailyDiff: adjustedDiff,
+    adjustedWeeks,
+    warningMessage,
+  };
 };
 

@@ -12,7 +12,13 @@ import { QuickAddHeading } from '@/components/common/quick-add-heading';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
 import { ModuleFAB } from '@/components/module/module-fab';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { CloneDayModal } from '@/components/clone-day-modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { showAppToast } from '@/components/ui/app-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
+import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
+import { useQueryClient } from '@tanstack/react-query';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
@@ -396,6 +402,52 @@ export default function ExerciseHomeScreen() {
   // Delete confirmation modal state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  
+  // Clone modal state
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const cloneMutation = useCloneDayEntriesMutation('exercise_log');
+  const queryClient = useQueryClient();
+  
+  // Success confirmation modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Previous day copy hook - reusable pattern
+  const { cloneFromPreviousDay, isLoading: isCloningFromPreviousDay } = useCloneFromPreviousDay({
+    entityType: 'exercise_log',
+    currentDate: selectedDate,
+    onSuccess: (clonedCount) => {
+      if (clonedCount > 0) {
+        const message = t('exercise.previous_day_copy.success_message', {
+          count: clonedCount,
+          items: clonedCount === 1 ? t('exercise.clone.item_one') : t('exercise.clone.item_other'),
+        });
+        setSuccessMessage(message);
+        setShowSuccessModal(true);
+      }
+    },
+    onError: (error: Error) => {
+      // Handle nothing to copy error
+      if (error.message === 'NOTHING_TO_COPY') {
+        showAppToast(t('exercise.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+      // Handle same-date error specifically
+      if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
+        Alert.alert(
+          t('exercise.clone.error_title'),
+          t('exercise.clone.same_date_error')
+        );
+      } else {
+        Alert.alert(
+          t('exercise.clone.error_title'),
+          t('exercise.clone.error_message', {
+            error: error.message || t('common.unexpected_error'),
+          })
+        );
+      }
+    },
+  });
 
   // Calculate totals for selected date
   const totalMinutes = exerciseLogs.reduce((sum, log) => sum + (log.minutes || 0), 0);
@@ -715,9 +767,27 @@ export default function ExerciseHomeScreen() {
           <SurfaceCard module="exercise">
           {/* Sticky header */}
           <View style={styles.cardHeader}>
-            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-              {isToday ? t('exercise.today_title') : formatDateForDisplay(selectedDate)}
-            </ThemedText>
+            <View style={styles.cardHeaderTop}>
+              <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+                {isToday ? t('exercise.today_title') : formatDateForDisplay(selectedDate)}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => {
+                  // Check cache before opening modal - if no entries, show message and skip DB work
+                  if (!exerciseLogs || exerciseLogs.length === 0) {
+                    showAppToast(t('exercise.clone.nothing_to_copy'));
+                    return;
+                  }
+                  setShowCloneModal(true);
+                }}
+                style={styles.cloneButton}
+                activeOpacity={0.7}
+                {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                {...getButtonAccessibilityProps(t('exercise.clone.accessibility_label'))}
+              >
+                <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+              </TouchableOpacity>
+            </View>
             {logsLoading ? (
               <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
             ) : (
@@ -767,9 +837,47 @@ export default function ExerciseHomeScreen() {
         {/* Quick Add Section - Card */}
         <ExerciseSectionContainer>
           <SurfaceCard module="exercise">
-          <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-            {t('exercise.quick_add_title')}
-          </ThemedText>
+          <View style={styles.quickAddHeader}>
+            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+              {t('exercise.quick_add_title')}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={() => {
+                // Check cache for previous day before cloning
+                const previousDay = new Date(selectedDate);
+                previousDay.setDate(previousDay.getDate() - 1);
+                const previousDateString = previousDay.toISOString().split('T')[0];
+                
+                // Use React Query cache to check if previous day has entries
+                const previousDayQueryKey = ['exerciseLogs', user?.id, previousDateString];
+                const cachedPreviousDayLogs = queryClient.getQueryData<any[]>(previousDayQueryKey);
+                
+                // If cache exists and is empty, show message and skip DB call
+                if (cachedPreviousDayLogs !== undefined && (cachedPreviousDayLogs === null || cachedPreviousDayLogs.length === 0)) {
+                  showAppToast(t('exercise.previous_day_copy.nothing_to_copy'));
+                  return;
+                }
+                
+                cloneFromPreviousDay();
+              }}
+              style={styles.previousDayButton}
+              activeOpacity={0.7}
+              disabled={isCloningFromPreviousDay}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+              {...getButtonAccessibilityProps(
+                isToday 
+                  ? t('exercise.previous_day_copy.accessibility_label_yesterday')
+                  : t('exercise.previous_day_copy.accessibility_label_previous')
+              )}
+            >
+              <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
+              <ThemedText style={[styles.previousDayButtonText, { color: colors.tint }]}>
+                {isToday 
+                  ? t('exercise.previous_day_copy.label_yesterday')
+                  : t('exercise.previous_day_copy.label_previous')}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
 
           {/* Recent/Frequent Exercises */}
           {hasRecentFrequent && (
@@ -1030,6 +1138,75 @@ export default function ExerciseHomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Clone Day Modal */}
+      <CloneDayModal
+        visible={showCloneModal}
+        onClose={() => setShowCloneModal(false)}
+        sourceDate={selectedDate}
+        onConfirm={(targetDate) => {
+          // Check cache before cloning - if no entries, show message and skip DB work
+          if (!exerciseLogs || exerciseLogs.length === 0) {
+            showAppToast(t('exercise.clone.nothing_to_copy'));
+            setShowCloneModal(false);
+            return;
+          }
+          
+          showAppToast(t('exercise.clone.toast_cloning'));
+          const targetDateString = targetDate.toISOString().split('T')[0];
+          cloneMutation.mutate(
+            {
+              sourceDate: selectedDateString,
+              targetDate: targetDateString,
+            },
+            {
+              onSuccess: (clonedCount) => {
+                setShowCloneModal(false);
+                // Small delay to ensure clone modal closes before showing success modal
+                setTimeout(() => {
+                  if (clonedCount > 0) {
+                    const message = t('exercise.clone.success_message', {
+                      count: clonedCount,
+                      items: clonedCount === 1 ? t('exercise.clone.item_one') : t('exercise.clone.item_other'),
+                      date: targetDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      }),
+                    });
+                    setSuccessMessage(message);
+                    setShowSuccessModal(true);
+                  } else {
+                    setSuccessMessage(t('exercise.clone.no_entries_message'));
+                    setShowSuccessModal(true);
+                  }
+                }, 100);
+              },
+              onError: (error: Error) => {
+                setShowCloneModal(false);
+                Alert.alert(
+                  t('exercise.clone.error_title'),
+                  t('exercise.clone.error_message', {
+                    error: error.message || t('common.unexpected_error'),
+                  })
+                );
+              },
+            }
+          );
+        }}
+        title={t('exercise.clone.title')}
+        subtitle={t('exercise.clone.subtitle')}
+      />
+
+      {/* Success Confirmation Modal */}
+      <ConfirmModal
+        visible={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title={t('exercise.clone.success_title')}
+        message={successMessage}
+        confirmText={t('common.ok')}
+        onConfirm={() => setShowSuccessModal(false)}
+      />
     </ThemedView>
   );
 }
@@ -1105,10 +1282,46 @@ const styles = StyleSheet.create({
       zIndex: 10,
     }),
   },
+  cardHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
   cardTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',
     marginBottom: Spacing.xs,
+  },
+  cloneButton: {
+    // Transparent background - icon sits directly on card background
+    backgroundColor: 'transparent',
+    // Proper touch target via padding (icon is 20px, so padding ensures 44x44 minimum)
+    padding: (44 - 20) / 2, // (minTouchTarget - iconSize) / 2 = 12px padding
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.md,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
+  },
+  quickAddHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  previousDayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: (44 - 16) / 2, // Ensure minimum touch target
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  previousDayButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
   summary: {
     fontSize: FontSize.sm,

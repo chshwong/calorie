@@ -13,6 +13,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { getMedLogsForDate, createMedLog, type MedLog } from './medLogs';
+import { getExerciseLogsForDate, createExerciseLog, type ExerciseLog } from './exerciseLogs';
 
 /**
  * Entity types that can be cloned
@@ -61,8 +62,7 @@ export async function cloneDayEntries(
       // TODO: implement 'food_log' cloning here
       throw new Error('food_log cloning not yet implemented');
     case 'exercise_log':
-      // TODO: implement 'exercise_log' cloning here
-      throw new Error('exercise_log cloning not yet implemented');
+      return cloneExerciseLogForDate(userId, normalizedSource, normalizedTarget);
     default:
       throw new Error(`Unknown entity type: ${entityType}`);
   }
@@ -114,6 +114,54 @@ async function clonePillIntakeForDate(
     return clonedCount;
   } catch (error) {
     console.error('Exception cloning pill intake:', error);
+    return 0;
+  }
+}
+
+/**
+ * Clone exercise log entries from one date to another
+ * 
+ * @param userId - The user's ID
+ * @param sourceDate - Source date in YYYY-MM-DD format
+ * @param targetDate - Target date in YYYY-MM-DD format
+ * @returns Number of entries cloned, or 0 on error
+ */
+async function cloneExerciseLogForDate(
+  userId: string,
+  sourceDate: string,
+  targetDate: string
+): Promise<number> {
+  try {
+    // Fetch all entries for the source date
+    const sourceEntries = await getExerciseLogsForDate(userId, sourceDate);
+
+    if (!sourceEntries || sourceEntries.length === 0) {
+      return 0; // No entries to clone
+    }
+
+    // Clone each entry to the target date
+    let clonedCount = 0;
+    for (const entry of sourceEntries) {
+      // Create new entry with same data but new date
+      const newEntry: Omit<ExerciseLog, 'id' | 'created_at'> = {
+        user_id: entry.user_id,
+        date: targetDate,
+        name: entry.name,
+        minutes: entry.minutes,
+        notes: entry.notes,
+      };
+
+      const created = await createExerciseLog(newEntry);
+      if (created) {
+        clonedCount++;
+      } else {
+        console.error(`Failed to clone exercise log entry: ${entry.name}`);
+      }
+    }
+
+    return clonedCount;
+  } catch (error) {
+    console.error('Exception cloning exercise log:', error);
     return 0;
   }
 }

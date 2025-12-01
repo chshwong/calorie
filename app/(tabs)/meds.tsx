@@ -32,6 +32,7 @@ import {
   useDeleteMedLog,
 } from '@/hooks/use-med-logs';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -447,6 +448,7 @@ export default function MedsHomeScreen() {
   };
 
   // Data fetching hooks
+  const queryClient = useQueryClient();
   const { data: medLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useMedLogsForDate(selectedDateString);
   const { data: recentDaysSummary = [] } = useMedSummaryForRecentDays(7);
   const { data: recentAndFrequentMeds = [], isLoading: isLoadingRecentFrequent } = useMedRecentAndFrequent(60);
@@ -522,6 +524,11 @@ export default function MedsHomeScreen() {
       }
     },
     onError: (error: Error) => {
+      // Handle nothing to copy error
+      if (error.message === 'NOTHING_TO_COPY') {
+        showAppToast(t('meds.previous_day_copy.nothing_to_copy'));
+        return;
+      }
       // Handle same-date error specifically
       if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
         Alert.alert(
@@ -874,7 +881,11 @@ export default function MedsHomeScreen() {
               </ThemedText>
               <TouchableOpacity
                 onPress={() => {
-                  showAppToast(t('meds.clone.toast_cloning'));
+                  // Check cache before opening modal - if no entries, show message and skip DB work
+                  if (!medLogs || medLogs.length === 0) {
+                    showAppToast(t('meds.clone.nothing_to_copy'));
+                    return;
+                  }
                   setShowCloneModal(true);
                 }}
                 style={styles.cloneButton}
@@ -1095,7 +1106,21 @@ export default function MedsHomeScreen() {
             </ThemedText>
             <TouchableOpacity
               onPress={() => {
-                showAppToast(t('meds.clone.toast_cloning'));
+                // Check cache for previous day before cloning
+                const previousDay = new Date(selectedDate);
+                previousDay.setDate(previousDay.getDate() - 1);
+                const previousDateString = previousDay.toISOString().split('T')[0];
+                
+                // Use React Query cache to check if previous day has entries
+                const previousDayQueryKey = ['medLogs', user?.id, previousDateString];
+                const cachedPreviousDayLogs = queryClient.getQueryData<any[]>(previousDayQueryKey);
+                
+                // If cache exists and is empty, show message and skip DB call
+                if (cachedPreviousDayLogs !== undefined && (cachedPreviousDayLogs === null || cachedPreviousDayLogs.length === 0)) {
+                  showAppToast(t('meds.previous_day_copy.nothing_to_copy'));
+                  return;
+                }
+                
                 cloneFromPreviousDay();
               }}
               style={styles.previousDayButton}
@@ -1434,6 +1459,13 @@ export default function MedsHomeScreen() {
         visible={showCloneModal}
         onClose={() => setShowCloneModal(false)}
         onConfirm={(targetDate) => {
+          // Check cache before cloning - if no entries, show message and skip DB work
+          if (!medLogs || medLogs.length === 0) {
+            showAppToast(t('meds.clone.nothing_to_copy'));
+            setShowCloneModal(false);
+            return;
+          }
+          
           showAppToast(t('meds.clone.toast_cloning'));
           const targetDateString = targetDate.toISOString().split('T')[0];
           cloneMutation.mutate(

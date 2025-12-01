@@ -238,26 +238,118 @@
   "onboarding": {
     "title": "Complete Setup",
     "goal": {
+      "header": "A clear goal leads to real progress.",
       "title": "What's your goal?",
-      "subtitle": "This helps us set up a personalized plan for you.",
+      "subtitle": "This helps us set your daily targets correctly.",
       "lose_weight": {
-        "label": "Lose Weight",
-        "description": "Burn fat and slim down."
+        "label": "Lose Body Fat",
+        "description": "Focus on fat loss while keeping or building some muscle."
       },
       "maintain_weight": {
-        "label": "Maintain Weight",
-        "description": "Stay where you feel comfortable."
+        "label": "Maintain & Improve",
+        "description": "Stay at your current weight while improving your fitness."
       },
       "gain_weight": {
-        "label": "Gain Weight",
-        "description": "Build size or strength."
+        "label": "Gain Healthy Weight",
+        "description": "Build muscle and increase strength with a controlled surplus."
       },
       "recomp": {
-        "label": "Recomp",
+        "label": "Body Recomposition (Advanced)",
         "description": "Lose fat and gain muscle at about the same weight."
       },
       "advanced_goal": "Advanced goal",
       "error_select_goal": "Please select your goal"
+    },
+    "name_age": {
+      "title": "Tell us a bit about you.",
+      "subtitle": "Your date of birth helps us calculate your calorie needs accurately.",
+      "preferred_name_label": "Preferred Name",
+      "preferred_name_placeholder": "Enter your preferred name (optional)",
+      "dob_label": "Date of birth",
+      "dob_placeholder": "Select your date of birth",
+      "age_display": "Age: {{age}} years old",
+      "error_dob_required": "Date of birth is required",
+      "error_dob_format": "Please enter a valid date of birth",
+      "error_dob_future": "Date of birth cannot be in the future",
+      "error_age_minimum": "You must be at least 18 years old",
+      "error_age_maximum": "Please enter a valid date of birth",
+      "error_name_too_long": "Preferred name must be 40 characters or less"
+    },
+    "sex": {
+      "title": "What's your sex?",
+      "subtitle": "We use this to calculate your calorie needs.",
+      "male": "Male",
+      "female": "Female",
+      "error_select_sex": "Please select your sex"
+    },
+    "height": {
+      "title": "What's your height?",
+      "subtitle": "We'll use this to fine-tune your daily targets.",
+      "height_label": "Height",
+      "height_cm_placeholder": "120-230",
+      "height_ft_placeholder": "ft",
+      "height_in_placeholder": "in",
+      "error_height_required": "Height is required",
+      "error_height_invalid": "Height must be between 120 cm and 230 cm (approximately 3'11\" to 7'7\")"
+    },
+    "activity": {
+      "title": "How active are you on a typical day?",
+      "subtitle": "This includes your job, daily movement, and usual routine.",
+      "sedentary": {
+        "label": "Mostly Sitting",
+        "description": "Desk job, little walking or movement"
+      },
+      "light": {
+        "label": "Lightly Active",
+        "description": "Some walking, light movement throughout the day"
+      },
+      "moderate": {
+        "label": "Moderately Active",
+        "description": "On your feet most of the day, regular movement"
+      },
+      "high": {
+        "label": "Very Active",
+        "description": "Manual work or lots of daily movement and exercise"
+      },
+      "very_high": {
+        "label": "Athlete Level",
+        "description": "Intense daily training and physical activity"
+      },
+      "error_select_activity": "Please select your activity level"
+    },
+    "current_weight": {
+      "title": "What's your current weight?",
+      "subtitle": "This is your starting point today.",
+      "weight_label": "Weight",
+      "weight_kg_placeholder": "35-250",
+      "weight_lb_placeholder": "77-550",
+      "error_weight_required": "Weight is required",
+      "error_weight_invalid": "Weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)"
+    },
+    "goal_weight": {
+      "title": "What's your goal weight?",
+      "subtitle": "We'll use this with your timeline to set safe, realistic targets.",
+      "weight_label": "Goal Weight",
+      "weight_kg_placeholder": "35-250",
+      "weight_lb_placeholder": "77-550",
+      "error_weight_required": "Goal weight is required",
+      "error_weight_invalid": "Goal weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)",
+      "error_lose_too_high": "For a fat-loss goal, your goal weight should be lower than your current weight.",
+      "error_gain_too_low": "For a weight-gain goal, your goal weight should be higher than your current weight.",
+      "error_maintain_too_different": "For maintaining weight, your goal weight should be very close to your current weight. Consider adjusting your goal type."
+    },
+    "timeline": {
+      "title": "When do you want to reach this goal?",
+      "subtitle": "We'll use this to estimate a safe and realistic pace.",
+      "summary_label": "Trajectory",
+      "three_months": "3 months",
+      "six_months": "6 months",
+      "twelve_months": "12 months",
+      "no_deadline": "No deadline / Just tracking",
+      "custom_date": "Choose a date",
+      "error_select_timeline": "Please select a timeline option",
+      "pace_adjusted": "To keep things safe and sustainable, we've adjusted your pace slightly. You'll still be working steadily toward your goal.",
+      "estimated_completion": "Estimated: about {months} months"
     },
     "step1_title": "Personal Information",
     "step1_subtitle": "Tell us a bit about yourself",
@@ -1264,7 +1356,32 @@
       "no_exercises": "No exercises logged today",
       "main": "Main",
       "chart_7d": "7d min",
-      "streak": "Ex streak"
+      "streak": "Ex streak",
+      "clone": {
+        "title": "Clone today's exercises",
+        "subtitle": "Choose a date to copy today's exercises to.",
+        "confirm": "Clone",
+        "accessibility_label": "Clone today's exercises to another date",
+        "toast_cloning": "Cloning…",
+        "success_title": "Cloned",
+        "success_message": "{{count}} {{items}} added to {{date}}",
+        "item_one": "activity",
+        "item_other": "activities",
+        "no_entries_title": "No Entries",
+        "no_entries_message": "There are no entries to clone for this date.",
+        "nothing_to_copy": "Nothing to copy for this day.",
+        "error_title": "Clone Failed",
+        "error_message": "Failed to clone entries: {{error}}",
+        "same_date_error": "You cannot clone to the same date."
+      },
+      "previous_day_copy": {
+        "label_yesterday": "From Yesterday",
+        "label_previous": "From Previous Day",
+        "accessibility_label_yesterday": "Copy yesterday's exercises to today",
+        "accessibility_label_previous": "Copy previous day's exercises to current day",
+        "success_message": "{{count}} {{items}} copied over from previous day.",
+        "nothing_to_copy": "Nothing to copy for this day."
+      }
     },
     "loading": "Loading...",
     "meds": {
@@ -1410,6 +1527,7 @@
       "item_other": "items",
       "no_entries_title": "No Entries",
       "no_entries_message": "There are no entries to clone for this date.",
+      "nothing_to_copy": "Nothing to copy for this day.",
       "error_title": "Clone Failed",
       "error_message": "Failed to clone entries: {{error}}",
       "same_date_error": "You cannot clone to the same date."
@@ -1419,7 +1537,8 @@
       "label_previous": "From Previous Day",
       "accessibility_label_yesterday": "Copy yesterday's intake to today",
       "accessibility_label_previous": "Copy previous day's intake to current day",
-      "success_message": "{{count}} {{items}} copied over from previous day."
+      "success_message": "{{count}} {{items}} copied over from previous day.",
+      "nothing_to_copy": "Nothing to copy for this day."
     }
   },
 

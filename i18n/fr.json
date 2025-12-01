@@ -237,26 +237,118 @@
   "onboarding": {
     "title": "Terminer la configuration",
     "goal": {
+      "header": "Un objectif clair mène à de vrais progrès.",
       "title": "Quel est votre objectif?",
-      "subtitle": "Cela nous aide à établir un plan personnalisé pour vous.",
+      "subtitle": "Cela nous aide à définir correctement vos objectifs quotidiens.",
       "lose_weight": {
-        "label": "Perdre du poids",
-        "description": "Brûler les graisses et mincir."
+        "label": "Perdre de la graisse corporelle",
+        "description": "Se concentrer sur la perte de graisse tout en conservant ou en développant du muscle."
       },
       "maintain_weight": {
-        "label": "Maintenir le poids",
-        "description": "Rester où vous vous sentez à l'aise."
+        "label": "Maintenir et améliorer",
+        "description": "Rester à votre poids actuel tout en améliorant votre condition physique."
       },
       "gain_weight": {
-        "label": "Prendre du poids",
-        "description": "Augmenter la taille ou la force."
+        "label": "Prendre du poids sainement",
+        "description": "Développer du muscle et augmenter la force avec un surplus contrôlé."
       },
       "recomp": {
-        "label": "Recomp",
+        "label": "Recomposition corporelle (Avancé)",
         "description": "Perdre de la graisse et gagner du muscle à peu près au même poids."
       },
       "advanced_goal": "Objectif avancé",
       "error_select_goal": "Veuillez sélectionner votre objectif"
+    },
+    "name_age": {
+      "title": "Parlez-nous un peu de vous.",
+      "subtitle": "Votre date de naissance nous aide à calculer vos besoins caloriques avec précision.",
+      "preferred_name_label": "Nom préféré",
+      "preferred_name_placeholder": "Entrez votre nom préféré (facultatif)",
+      "dob_label": "Date de naissance",
+      "dob_placeholder": "Sélectionnez votre date de naissance",
+      "age_display": "Âge : {{age}} ans",
+      "error_dob_required": "La date de naissance est requise",
+      "error_dob_format": "Veuillez entrer une date de naissance valide",
+      "error_dob_future": "La date de naissance ne peut pas être dans le futur",
+      "error_age_minimum": "Vous devez avoir au moins 18 ans",
+      "error_age_maximum": "Veuillez entrer une date de naissance valide",
+      "error_name_too_long": "Le nom préféré ne doit pas dépasser 40 caractères"
+    },
+    "sex": {
+      "title": "Quel est votre sexe?",
+      "subtitle": "Nous utilisons cela pour calculer vos besoins caloriques.",
+      "male": "Homme",
+      "female": "Femme",
+      "error_select_sex": "Veuillez sélectionner votre sexe"
+    },
+    "height": {
+      "title": "Quelle est votre taille?",
+      "subtitle": "Nous l'utiliserons pour affiner vos objectifs quotidiens.",
+      "height_label": "Taille",
+      "height_cm_placeholder": "120-230",
+      "height_ft_placeholder": "pieds",
+      "height_in_placeholder": "pouces",
+      "error_height_required": "La taille est requise",
+      "error_height_invalid": "La taille doit être entre 120 cm et 230 cm (environ 3'11\" à 7'7\")"
+    },
+    "activity": {
+      "title": "Quel est votre niveau d'activité en journée?",
+      "subtitle": "Cela inclut votre travail, vos déplacements quotidiens et votre routine habituelle.",
+      "sedentary": {
+        "label": "Principalement assis",
+        "description": "Travail de bureau, peu de marche ou de mouvement"
+      },
+      "light": {
+        "label": "Légèrement actif",
+        "description": "Quelques marches, légers mouvements tout au long de la journée"
+      },
+      "moderate": {
+        "label": "Modérément actif",
+        "description": "Sur vos pieds la plupart de la journée, mouvements réguliers"
+      },
+      "high": {
+        "label": "Très actif",
+        "description": "Travail manuel ou beaucoup de mouvements quotidiens et d'exercices"
+      },
+      "very_high": {
+        "label": "Niveau athlète",
+        "description": "Entraînement intensif quotidien et activité physique"
+      },
+      "error_select_activity": "Veuillez sélectionner votre niveau d'activité"
+    },
+    "current_weight": {
+      "title": "Quel est votre poids actuel?",
+      "subtitle": "C'est votre point de départ aujourd'hui.",
+      "weight_label": "Poids",
+      "weight_kg_placeholder": "35-250",
+      "weight_lb_placeholder": "77-550",
+      "error_weight_required": "Le poids est requis",
+      "error_weight_invalid": "Le poids doit être entre 35 kg et 250 kg (environ 77 lb à 550 lb)"
+    },
+    "goal_weight": {
+      "title": "Quel est votre poids objectif?",
+      "subtitle": "Nous l'utiliserons avec votre calendrier pour définir des objectifs sûrs et réalistes.",
+      "weight_label": "Poids objectif",
+      "weight_kg_placeholder": "35-250",
+      "weight_lb_placeholder": "77-550",
+      "error_weight_required": "Le poids objectif est requis",
+      "error_weight_invalid": "Le poids objectif doit être entre 35 kg et 250 kg (environ 77 lb à 550 lb)",
+      "error_lose_too_high": "Pour un objectif de perte de graisse, votre poids objectif doit être inférieur à votre poids actuel.",
+      "error_gain_too_low": "Pour un objectif de prise de poids, votre poids objectif doit être supérieur à votre poids actuel.",
+      "error_maintain_too_different": "Pour maintenir le poids, votre poids objectif doit être très proche de votre poids actuel. Envisagez d'ajuster votre type d'objectif."
+    },
+    "timeline": {
+      "title": "Quand souhaitez-vous atteindre cet objectif?",
+      "subtitle": "Nous l'utiliserons pour estimer un rythme sûr et réaliste.",
+      "summary_label": "Trajectoire",
+      "three_months": "3 mois",
+      "six_months": "6 mois",
+      "twelve_months": "12 mois",
+      "no_deadline": "Pas de date limite / Juste suivre",
+      "custom_date": "Choisir une date",
+      "error_select_timeline": "Veuillez sélectionner une option de calendrier",
+      "pace_adjusted": "Pour que tout reste sûr et durable, nous avons légèrement ajusté votre rythme. Vous continuerez à progresser régulièrement vers votre objectif.",
+      "estimated_completion": "Estimation: environ {months} mois"
     },
     "step1_title": "Informations personnelles",
     "step1_subtitle": "Parlez-nous un peu de vous",

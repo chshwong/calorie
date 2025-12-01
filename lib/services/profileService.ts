@@ -1,6 +1,54 @@
 import { supabase } from '@/lib/supabase';
 
 /**
+ * Updates a user's profile with the provided fields.
+ * Only updates the fields that are provided (partial update).
+ * Returns the updated profile or null on error.
+ */
+export async function updateProfile(
+  userId: string,
+  updates: {
+    first_name?: string | null;
+    date_of_birth?: string | null;
+    gender?: 'male' | 'female' | 'not_telling' | null;
+    height_cm?: number | null;
+    weight_lb?: number | null;
+    height_unit?: 'cm' | 'ft' | null;
+    weight_unit?: 'lbs' | 'kg' | null;
+    goal_type?: 'lose' | 'maintain' | 'gain' | 'recomp' | null;
+    onboarding_complete?: boolean | null;
+    [key: string]: any;
+  }
+): Promise<any | null> {
+  try {
+    // Filter out undefined values to allow partial updates
+    const cleanUpdates: Record<string, any> = {};
+    Object.keys(updates).forEach(key => {
+      if (updates[key] !== undefined) {
+        cleanUpdates[key] = updates[key];
+      }
+    });
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(cleanUpdates)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating profile:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error('Exception in updateProfile:', error);
+    return null;
+  }
+}
+
+/**
  * Ensures a profile exists for the given user ID.
  * If the profile doesn't exist, creates one with onboarding_complete = false.
  * Returns the profile (existing or newly created).
