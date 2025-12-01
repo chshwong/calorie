@@ -3520,7 +3520,8 @@ export default function LogFoodScreen() {
                                 >
                                   {recentFoods.map((food) => {
                                     const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                    // Use latest entry serving info if available, otherwise fall back to default
+                                    // Recent tab: Always use latest entry serving info for display
+                                    // Fallback to default only in edge case where latestEntry is missing
                                     const servingQty = food.latestEntry ? food.latestServingQty : food.defaultServingQty;
                                     const servingUnit = food.latestEntry ? food.latestServingUnit : food.defaultServingUnit;
                                     const servingCalories = food.latestEntry ? food.latestServingCalories : food.defaultServingCalories;

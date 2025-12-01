@@ -27,6 +27,7 @@ export type CloneEntityType = 'pill_intake' | 'food_log' | 'exercise_log';
  * @param userId - The user's ID
  * @param sourceDate - Source date in YYYY-MM-DD format
  * @param targetDate - Target date in YYYY-MM-DD format
+ * @param entryIds - Optional: Array of entry IDs to clone. If provided, only these entries will be cloned. If omitted, all entries for the source date will be cloned.
  * @returns Number of entries cloned
  * @throws Error if sourceDate equals targetDate or if validation fails
  */
@@ -34,7 +35,8 @@ export async function cloneDayEntries(
   entityType: CloneEntityType,
   userId: string,
   sourceDate: string,
-  targetDate: string
+  targetDate: string,
+  entryIds?: string[]
 ): Promise<number> {
   if (!userId || !sourceDate || !targetDate) {
     throw new Error('Missing required parameters');
@@ -57,12 +59,12 @@ export async function cloneDayEntries(
 
   switch (entityType) {
     case 'pill_intake':
-      return clonePillIntakeForDate(userId, normalizedSource, normalizedTarget);
+      return clonePillIntakeForDate(userId, normalizedSource, normalizedTarget, entryIds);
     case 'food_log':
       // TODO: implement 'food_log' cloning here
       throw new Error('food_log cloning not yet implemented');
     case 'exercise_log':
-      return cloneExerciseLogForDate(userId, normalizedSource, normalizedTarget);
+      return cloneExerciseLogForDate(userId, normalizedSource, normalizedTarget, entryIds);
     default:
       throw new Error(`Unknown entity type: ${entityType}`);
   }
@@ -74,12 +76,14 @@ export async function cloneDayEntries(
  * @param userId - The user's ID
  * @param sourceDate - Source date in YYYY-MM-DD format
  * @param targetDate - Target date in YYYY-MM-DD format
+ * @param entryIds - Optional: Array of entry IDs to clone. If provided, only these entries will be cloned.
  * @returns Number of entries cloned, or 0 on error
  */
 async function clonePillIntakeForDate(
   userId: string,
   sourceDate: string,
-  targetDate: string
+  targetDate: string,
+  entryIds?: string[]
 ): Promise<number> {
   try {
     // Fetch all entries for the source date
@@ -89,9 +93,18 @@ async function clonePillIntakeForDate(
       return 0; // No entries to clone
     }
 
+    // Filter entries if entryIds is provided
+    const entriesToClone = entryIds 
+      ? sourceEntries.filter(entry => entryIds.includes(entry.id))
+      : sourceEntries;
+
+    if (entriesToClone.length === 0) {
+      return 0; // No matching entries to clone
+    }
+
     // Clone each entry to the target date
     let clonedCount = 0;
-    for (const entry of sourceEntries) {
+    for (const entry of entriesToClone) {
       // Create new entry with same data but new date
       const newEntry: Omit<MedLog, 'id' | 'created_at'> = {
         user_id: entry.user_id,
@@ -124,12 +137,14 @@ async function clonePillIntakeForDate(
  * @param userId - The user's ID
  * @param sourceDate - Source date in YYYY-MM-DD format
  * @param targetDate - Target date in YYYY-MM-DD format
+ * @param entryIds - Optional: Array of entry IDs to clone. If provided, only these entries will be cloned.
  * @returns Number of entries cloned, or 0 on error
  */
 async function cloneExerciseLogForDate(
   userId: string,
   sourceDate: string,
-  targetDate: string
+  targetDate: string,
+  entryIds?: string[]
 ): Promise<number> {
   try {
     // Fetch all entries for the source date
@@ -139,9 +154,18 @@ async function cloneExerciseLogForDate(
       return 0; // No entries to clone
     }
 
+    // Filter entries if entryIds is provided
+    const entriesToClone = entryIds 
+      ? sourceEntries.filter(entry => entryIds.includes(entry.id))
+      : sourceEntries;
+
+    if (entriesToClone.length === 0) {
+      return 0; // No matching entries to clone
+    }
+
     // Clone each entry to the target date
     let clonedCount = 0;
-    for (const entry of sourceEntries) {
+    for (const entry of entriesToClone) {
       // Create new entry with same data but new date
       const newEntry: Omit<ExerciseLog, 'id' | 'created_at'> = {
         user_id: entry.user_id,

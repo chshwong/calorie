@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions, ViewStyle } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -15,11 +16,14 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { showAppToast } from '@/components/ui/app-toast';
+import { MultiSelectItem } from '@/components/multi-select-item';
+import { useMultiSelect } from '@/hooks/use-multi-select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
+import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import {
@@ -69,7 +73,7 @@ type ExerciseRowProps = {
   animationValue?: Animated.Value;
 };
 
-function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, animationValue }: ExerciseRowProps) {
+function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, animationValue, disabled = false }: ExerciseRowProps) {
   const [deleteHovered, setDeleteHovered] = useState(false);
   const [isEditingMinutes, setIsEditingMinutes] = useState(false);
   const [minutesInput, setMinutesInput] = useState(log.minutes?.toString() || '');
@@ -205,9 +209,10 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
         ]}
       >
         <TouchableOpacity
-          style={[styles.exerciseRowContent, Platform.OS === 'web' && getFocusStyle(colors.tint)]}
+          style={[styles.exerciseRowContent, Platform.OS === 'web' && getFocusStyle(colors.tint), disabled && { opacity: 0.6 }]}
           onPress={onEdit}
           activeOpacity={0.6}
+          disabled={disabled}
           {...getButtonAccessibilityProps('Edit exercise')}
         >
           <View style={styles.exerciseRowLeft}>
@@ -225,84 +230,89 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
           </View>
         </TouchableOpacity>
 
-        {/* Minutes badge or inline editor */}
-        {isEditingMinutes ? (
-          <Animated.View
-            style={[
-              styles.minutesEditorContainer,
-              {
-                opacity: opacityAnim,
-                transform: [{ scale: scaleAnim }],
-              },
-            ]}
-          >
-            <TextInput
-              ref={minutesInputRef}
+        {/* Right side: Minutes badge and Delete button */}
+        <View style={styles.exerciseRowRight}>
+          {/* Minutes badge or inline editor */}
+          {isEditingMinutes ? (
+            <Animated.View
               style={[
-                styles.minutesEditorInput,
+                styles.minutesEditorContainer,
                 {
-                  backgroundColor: colors.card,
-                  color: colors.text,
-                  borderColor: minutesInputError ? colors.error : colors.border,
+                  opacity: opacityAnim,
+                  transform: [{ scale: scaleAnim }],
                 },
               ]}
-              value={minutesInput}
-              onChangeText={handleMinutesInputChange}
-              onBlur={saveMinutes}
-              onSubmitEditing={saveMinutes}
-              keyboardType="number-pad"
-              maxLength={3}
-              selectTextOnFocus
-            />
-            <TouchableOpacity
-              onPress={saveMinutes}
-              style={[styles.minutesEditorButton, { backgroundColor: colors.tint, marginLeft: Spacing.xs }]}
-              {...getButtonAccessibilityProps('Save minutes')}
             >
-              <IconSymbol name="checkmark" size={14} color={colors.textInverse} />
-            </TouchableOpacity>
+              <TextInput
+                ref={minutesInputRef}
+                style={[
+                  styles.minutesEditorInput,
+                  {
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: minutesInputError ? colors.error : colors.border,
+                  },
+                ]}
+                value={minutesInput}
+                onChangeText={handleMinutesInputChange}
+                onBlur={saveMinutes}
+                onSubmitEditing={saveMinutes}
+                keyboardType="number-pad"
+                maxLength={3}
+                selectTextOnFocus
+              />
+              <TouchableOpacity
+                onPress={saveMinutes}
+                style={[styles.minutesEditorButton, { backgroundColor: colors.tint, marginLeft: Spacing.xs }]}
+                {...getButtonAccessibilityProps('Save minutes')}
+              >
+                <IconSymbol name="checkmark" size={14} color={colors.textInverse} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={cancelMinutesEdit}
+                style={[styles.minutesEditorButton, { backgroundColor: colors.backgroundSecondary, marginLeft: Spacing.xs }]}
+                {...getButtonAccessibilityProps('Cancel')}
+              >
+                <IconSymbol name="xmark" size={14} color={colors.text} />
+              </TouchableOpacity>
+            </Animated.View>
+          ) : (
             <TouchableOpacity
-              onPress={cancelMinutesEdit}
-              style={[styles.minutesEditorButton, { backgroundColor: colors.backgroundSecondary, marginLeft: Spacing.xs }]}
-              {...getButtonAccessibilityProps('Cancel')}
+              onPress={startEditingMinutes}
+              style={[styles.minutesBadge, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps('Edit minutes')}
             >
-              <IconSymbol name="xmark" size={14} color={colors.text} />
+              <ThemedText style={[styles.minutesBadgeText, { color: colors.info }]}>
+                {log.minutes !== null ? `${log.minutes} min` : 'Add min'}
+              </ThemedText>
             </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          <TouchableOpacity
-            onPress={startEditingMinutes}
-            style={[styles.minutesBadge, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps('Edit minutes')}
-          >
-            <ThemedText style={[styles.minutesBadgeText, { color: colors.info }]}>
-              {log.minutes !== null ? `${log.minutes} min` : 'Add min'}
-            </ThemedText>
-          </TouchableOpacity>
-        )}
+          )}
 
-        {/* Delete button */}
-        <TouchableOpacity
-          onPress={onDelete}
-          style={[
-            styles.deleteButtonGhost,
-            {
-              borderColor: colors.separator,
-              backgroundColor: deleteHovered ? colors.errorLight : 'transparent',
-            },
-          ]}
-          activeOpacity={0.7}
-          onPressIn={() => setDeleteHovered(true)}
-          onPressOut={() => setDeleteHovered(false)}
-          {...(Platform.OS === 'web' && {
-            onMouseEnter: () => setDeleteHovered(true),
-            onMouseLeave: () => setDeleteHovered(false),
-          })}
-          {...getButtonAccessibilityProps('Delete exercise')}
-        >
-          <IconSymbol name="trash.fill" size={16} color={colors.error} />
-        </TouchableOpacity>
+          {/* Delete button */}
+          <TouchableOpacity
+            onPress={onDelete}
+            disabled={disabled}
+            style={[
+              styles.deleteButtonGhost,
+              {
+                borderColor: colors.separator,
+                backgroundColor: deleteHovered ? colors.errorLight : 'transparent',
+                opacity: disabled ? 0.4 : 1,
+              },
+            ]}
+            activeOpacity={0.7}
+            onPressIn={() => setDeleteHovered(true)}
+            onPressOut={() => setDeleteHovered(false)}
+            {...(Platform.OS === 'web' && {
+              onMouseEnter: () => setDeleteHovered(true),
+              onMouseLeave: () => setDeleteHovered(false),
+            })}
+            {...getButtonAccessibilityProps('Delete exercise')}
+          >
+            <IconSymbol name="trash.fill" size={16} color={colors.error} />
+          </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -406,11 +416,91 @@ export default function ExerciseHomeScreen() {
   // Clone modal state
   const [showCloneModal, setShowCloneModal] = useState(false);
   const cloneMutation = useCloneDayEntriesMutation('exercise_log');
+  const massDeleteMutation = useMassDeleteEntriesMutation('exercise_log');
   const queryClient = useQueryClient();
   
-  // Success confirmation modal state
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  // Mass delete confirmation modal state
+  const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
+  
+  // Shared edit mode state (for both clone and delete)
+  const [editMode, setEditMode] = useState(false);
+  
+  // Multi-select for edit mode
+  const {
+    isSelected: isEntrySelected,
+    toggleSelection: toggleEntrySelection,
+    selectAll: selectAllEntries,
+    deselectAll: deselectAllEntries,
+    areAllSelected: areAllEntriesSelected,
+    selectedIds: selectedEntryIds,
+    hasSelection: hasEntrySelection,
+    clearSelection: clearEntrySelection,
+  } = useMultiSelect<{ id: string }>({ enabled: editMode });
+  
+  // Initialize all entries as selected when entering edit mode
+  useEffect(() => {
+    if (editMode && exerciseLogs.length > 0) {
+      selectAllEntries(exerciseLogs, (log) => log.id);
+    } else if (!editMode) {
+      clearEntrySelection();
+    }
+  }, [editMode]); // Only trigger when edit mode changes
+  
+  // Reset selection when entries change while in edit mode
+  useEffect(() => {
+    if (editMode && exerciseLogs.length > 0) {
+      selectAllEntries(exerciseLogs, (log) => log.id);
+    }
+  }, [exerciseLogs.length]); // Only depend on length to avoid re-running on every render
+  
+  // Reset edit mode when date changes
+  useEffect(() => {
+    setEditMode(false);
+    clearEntrySelection();
+  }, [selectedDateString]);
+  
+  // Mass delete handlers
+  const handleMassDelete = useCallback(() => {
+    if (hasEntrySelection && selectedEntryIds.size > 0) {
+      setShowMassDeleteConfirm(true);
+    }
+  }, [hasEntrySelection, selectedEntryIds.size]);
+  
+  const handleMassDeleteConfirm = useCallback(async () => {
+    setShowMassDeleteConfirm(false);
+    if (selectedEntryIds.size === 0) return;
+    
+    const entryIdsArray = Array.from(selectedEntryIds);
+    massDeleteMutation.mutate(
+      { entryIds: entryIdsArray },
+      {
+        onSuccess: (deletedCount) => {
+          // Exit edit mode after successful delete
+          setEditMode(false);
+          clearEntrySelection();
+          
+          if (deletedCount > 0) {
+            showAppToast(t('exercise.clone.mass_delete.success_message', {
+              count: deletedCount,
+              items: deletedCount === 1 ? t('exercise.clone.mass_delete.item_one') : t('exercise.clone.mass_delete.item_other'),
+            }));
+          }
+        },
+        onError: (error: Error) => {
+          Alert.alert(
+            t('exercise.clone.mass_delete.error_title'),
+            t('exercise.clone.mass_delete.error_message', {
+              error: error.message || t('common.unexpected_error'),
+            })
+          );
+        },
+      }
+    );
+  }, [selectedEntryIds, massDeleteMutation, t, setEditMode, clearEntrySelection]);
+  
+  const handleMassDeleteCancel = useCallback(() => {
+    setShowMassDeleteConfirm(false);
+  }, []);
   
   // Previous day copy hook - reusable pattern
   const { cloneFromPreviousDay, isLoading: isCloningFromPreviousDay } = useCloneFromPreviousDay({
@@ -418,12 +508,10 @@ export default function ExerciseHomeScreen() {
     currentDate: selectedDate,
     onSuccess: (clonedCount) => {
       if (clonedCount > 0) {
-        const message = t('exercise.previous_day_copy.success_message', {
+        showAppToast(t('exercise.previous_day_copy.success_message', {
           count: clonedCount,
           items: clonedCount === 1 ? t('exercise.clone.item_one') : t('exercise.clone.item_other'),
-        });
-        setSuccessMessage(message);
-        setShowSuccessModal(true);
+        }));
       }
     },
     onError: (error: Error) => {
@@ -622,7 +710,9 @@ export default function ExerciseHomeScreen() {
     deleteMutation.mutate(deleteTarget.id, {
       onSuccess: () => {
         setShowDeleteConfirm(false);
+        const deletedName = deleteTarget.name;
         setDeleteTarget(null);
+        showAppToast(t('exercise.delete.success_single', { name: deletedName }));
       },
       onError: (error: Error) => {
         setShowDeleteConfirm(false);
@@ -768,25 +858,91 @@ export default function ExerciseHomeScreen() {
           {/* Sticky header */}
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderTop}>
-              <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-                {isToday ? t('exercise.today_title') : formatDateForDisplay(selectedDate)}
-              </ThemedText>
-              <TouchableOpacity
-                onPress={() => {
-                  // Check cache before opening modal - if no entries, show message and skip DB work
-                  if (!exerciseLogs || exerciseLogs.length === 0) {
-                    showAppToast(t('exercise.clone.nothing_to_copy'));
-                    return;
-                  }
-                  setShowCloneModal(true);
-                }}
-                style={styles.cloneButton}
-                activeOpacity={0.7}
-                {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-                {...getButtonAccessibilityProps(t('exercise.clone.accessibility_label'))}
-              >
-                <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+                  {(() => {
+                    const todayDate = new Date();
+                    todayDate.setHours(0, 0, 0, 0);
+                    const yesterday = new Date(todayDate);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    
+                    if (isToday) {
+                      return t('exercise.today_title').replace(' Exercise', '');
+                    } else if (selectedDate.getTime() === yesterday.getTime()) {
+                      return t('common.yesterday') + "'s";
+                    } else {
+                      return formatDateForDisplay(selectedDate);
+                    }
+                  })()}
+                </ThemedText>
+                <MaterialCommunityIcons name="heart-pulse" size={20} color={ModuleThemes.exercise.accent} />
+              </View>
+              <View style={styles.headerButtons}>
+                {!editMode ? (
+                  <>
+                    {/* Clone button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (!exerciseLogs || exerciseLogs.length === 0) {
+                          showAppToast(t('exercise.clone.nothing_to_copy'));
+                          return;
+                        }
+                        setEditMode(true);
+                      }}
+                      disabled={!exerciseLogs || exerciseLogs.length === 0}
+                      style={[
+                        styles.cloneButton,
+                        (!exerciseLogs || exerciseLogs.length === 0) && { opacity: 0.4 },
+                      ]}
+                      activeOpacity={0.7}
+                      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                      {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.enter_edit_mode'))}
+                    >
+                      <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+                    </TouchableOpacity>
+                    
+                    {/* Delete button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (!exerciseLogs || exerciseLogs.length === 0) {
+                          return;
+                        }
+                        setEditMode(true);
+                      }}
+                      disabled={!exerciseLogs || exerciseLogs.length === 0}
+                      style={[
+                        styles.deleteButton,
+                        (!exerciseLogs || exerciseLogs.length === 0) && { opacity: 0.4 },
+                      ]}
+                      activeOpacity={0.7}
+                      {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
+                      {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.enter_edit_mode'))}
+                    >
+                      <IconSymbol name="trash.fill" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  /* Exit edit mode button */
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditMode(false);
+                      clearEntrySelection();
+                    }}
+                    style={[
+                      styles.cloneButton,
+                      {
+                        backgroundColor: '#10B981' + '20',
+                        borderColor: '#10B981' + '40',
+                      },
+                    ]}
+                    activeOpacity={0.7}
+                    {...(Platform.OS === 'web' && getFocusStyle('#10B981'))}
+                    {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.exit_edit_mode'))}
+                  >
+                    <IconSymbol name="checkmark" size={20} color="#10B981" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {logsLoading ? (
               <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
@@ -815,18 +971,103 @@ export default function ExerciseHomeScreen() {
                 </ThemedText>
               ) : (
                 <View style={styles.exerciseList}>
-                  {exerciseLogs.map((log, index) => (
-                    <ExerciseRow
-                      key={log.id}
-                      log={log}
-                      colors={colors}
-                      onEdit={() => openEditForm({ id: log.id, name: log.name, minutes: log.minutes, notes: log.notes })}
-                      onDelete={() => handleDelete(log.id, log.name)}
-                      onMinutesUpdate={handleMinutesUpdate}
-                      isLast={index === exerciseLogs.length - 1}
-                      animationValue={animationRefs.current.get(log.id)}
-                    />
-                  ))}
+                  {/* Select All Row - Only shown in edit mode */}
+                  {editMode && exerciseLogs.length > 0 && (
+                    <View style={[styles.selectAllRow, { backgroundColor: colors.background, borderBottomColor: colors.separator }]}>
+                      <MultiSelectItem
+                        isSelected={areAllEntriesSelected(exerciseLogs, (log) => log.id)}
+                        onToggle={() => {
+                          if (areAllEntriesSelected(exerciseLogs, (log) => log.id)) {
+                            deselectAllEntries();
+                          } else {
+                            selectAllEntries(exerciseLogs, (log) => log.id);
+                          }
+                        }}
+                        style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+                      >
+                        <View style={styles.selectAllRowContent}>
+                          <ThemedText style={[styles.selectAllText, { color: colors.text }]}>
+                            {t('exercise.clone.edit_mode.select_all')}
+                          </ThemedText>
+                          <View style={styles.selectAllActions}>
+                            <TouchableOpacity
+                              onPress={() => {
+                                const selectedIds = Array.from(selectedEntryIds);
+                                if (selectedIds.length === 0) {
+                                  showAppToast(t('exercise.clone.nothing_to_copy'));
+                                  return;
+                                }
+                                setShowCloneModal(true);
+                              }}
+                              disabled={!hasEntrySelection}
+                              style={[
+                                styles.iconButtonInRow,
+                                { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', borderWidth: 1 },
+                                !hasEntrySelection && { opacity: 0.5 },
+                              ]}
+                              activeOpacity={0.7}
+                              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                              {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.clone_button'))}
+                            >
+                              <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={handleMassDelete}
+                              disabled={!hasEntrySelection}
+                              style={[
+                                styles.iconButtonInRow,
+                                { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', borderWidth: 1 },
+                                !hasEntrySelection && { opacity: 0.5 },
+                              ]}
+                              activeOpacity={0.7}
+                              {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
+                              {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.delete_button'))}
+                            >
+                              <IconSymbol name="trash.fill" size={20} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </MultiSelectItem>
+                    </View>
+                  )}
+                  
+                  {exerciseLogs.map((log, index) => {
+                    const rowContent = (
+                      <ExerciseRow
+                        key={log.id}
+                        log={log}
+                        colors={colors}
+                        onEdit={() => {
+                          if (!editMode) {
+                            openEditForm({ id: log.id, name: log.name, minutes: log.minutes, notes: log.notes });
+                          }
+                        }}
+                        onDelete={() => {
+                          if (!editMode) {
+                            handleDelete(log.id, log.name);
+                          }
+                        }}
+                        onMinutesUpdate={handleMinutesUpdate}
+                        isLast={index === exerciseLogs.length - 1}
+                        animationValue={animationRefs.current.get(log.id)}
+                        disabled={editMode}
+                      />
+                    );
+                    
+                    if (editMode) {
+                      return (
+                        <MultiSelectItem
+                          key={log.id}
+                          isSelected={isEntrySelected(log.id)}
+                          onToggle={() => toggleEntrySelection(log.id)}
+                        >
+                          {rowContent}
+                        </MultiSelectItem>
+                      );
+                    }
+                    
+                    return rowContent;
+                  })}
                 </View>
               )}
             </>
@@ -909,6 +1150,19 @@ export default function ExerciseHomeScreen() {
             </>
           )}
 
+          {/* Custom Exercise Button */}
+          <TouchableOpacity
+            style={[styles.customButton, { backgroundColor: colors.tintLight, borderColor: colors.tint }]}
+            onPress={openCustomForm}
+            activeOpacity={0.7}
+            {...getButtonAccessibilityProps(t('exercise.quick_add.add_custom'))}
+          >
+            <IconSymbol name="plus.circle.fill" size={18} color={colors.tint} />
+            <ThemedText style={[styles.customButtonText, { color: colors.tint }]}>
+              {t('exercise.quick_add.add_custom')}
+            </ThemedText>
+          </TouchableOpacity>
+
           {/* Static Default Exercises */}
           <QuickAddHeading 
             labelKey="exercise.quick_add.common_exercises"
@@ -927,26 +1181,12 @@ export default function ExerciseHomeScreen() {
                 <QuickAddChip
                   key={`default-${exercise.i18nKey}`}
                   label={translatedName}
-                  icon={exercise.icon}
                   colors={colors}
                   onPress={() => handleQuickAdd(translatedName, null)}
                 />
               );
             })}
           </ScrollView>
-
-          {/* Custom Exercise Button */}
-          <TouchableOpacity
-            style={[styles.customButton, { backgroundColor: colors.tintLight, borderColor: colors.tint }]}
-            onPress={openCustomForm}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps(t('exercise.quick_add.add_custom'))}
-          >
-            <IconSymbol name="plus.circle.fill" size={18} color={colors.tint} />
-            <ThemedText style={[styles.customButtonText, { color: colors.tint }]}>
-              {t('exercise.quick_add.add_custom')}
-            </ThemedText>
-            </TouchableOpacity>
           </SurfaceCard>
         </ExerciseSectionContainer>
 
@@ -1145,11 +1385,22 @@ export default function ExerciseHomeScreen() {
         onClose={() => setShowCloneModal(false)}
         sourceDate={selectedDate}
         onConfirm={(targetDate) => {
-          // Check cache before cloning - if no entries, show message and skip DB work
-          if (!exerciseLogs || exerciseLogs.length === 0) {
-            showAppToast(t('exercise.clone.nothing_to_copy'));
-            setShowCloneModal(false);
-            return;
+          // Get selected entry IDs if in edit mode, otherwise clone all
+          const entryIdsToClone = editMode ? Array.from(selectedEntryIds) : undefined;
+          
+          // Check cache before cloning - if no entries selected, show message and skip DB work
+          if (editMode) {
+            if (entryIdsToClone && entryIdsToClone.length === 0) {
+              showAppToast(t('exercise.clone.nothing_to_copy'));
+              setShowCloneModal(false);
+              return;
+            }
+          } else {
+            if (!exerciseLogs || exerciseLogs.length === 0) {
+              showAppToast(t('exercise.clone.nothing_to_copy'));
+              setShowCloneModal(false);
+              return;
+            }
           }
           
           showAppToast(t('exercise.clone.toast_cloning'));
@@ -1158,29 +1409,28 @@ export default function ExerciseHomeScreen() {
             {
               sourceDate: selectedDateString,
               targetDate: targetDateString,
+              entryIds: entryIdsToClone,
             },
             {
               onSuccess: (clonedCount) => {
                 setShowCloneModal(false);
-                // Small delay to ensure clone modal closes before showing success modal
-                setTimeout(() => {
-                  if (clonedCount > 0) {
-                    const message = t('exercise.clone.success_message', {
-                      count: clonedCount,
-                      items: clonedCount === 1 ? t('exercise.clone.item_one') : t('exercise.clone.item_other'),
-                      date: targetDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      }),
-                    });
-                    setSuccessMessage(message);
-                    setShowSuccessModal(true);
-                  } else {
-                    setSuccessMessage(t('exercise.clone.no_entries_message'));
-                    setShowSuccessModal(true);
-                  }
-                }, 100);
+                // Exit edit mode after successful clone
+                if (editMode) {
+                  setEditMode(false);
+                  clearEntrySelection();
+                }
+                if (clonedCount > 0) {
+                  const formattedDate = targetDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  });
+                  showAppToast(t('exercise.clone.success_toast', {
+                    count: clonedCount,
+                    items: clonedCount === 1 ? t('exercise.clone.item_one') : t('exercise.clone.item_other'),
+                    date: formattedDate,
+                  }));
+                }
               },
               onError: (error: Error) => {
                 setShowCloneModal(false);
@@ -1198,14 +1448,19 @@ export default function ExerciseHomeScreen() {
         subtitle={t('exercise.clone.subtitle')}
       />
 
-      {/* Success Confirmation Modal */}
+      {/* Mass Delete Confirmation Modal */}
       <ConfirmModal
-        visible={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        title={t('exercise.clone.success_title')}
-        message={successMessage}
-        confirmText={t('common.ok')}
-        onConfirm={() => setShowSuccessModal(false)}
+        visible={showMassDeleteConfirm}
+        title={t('exercise.clone.mass_delete.title')}
+        message={t('exercise.clone.mass_delete.message', {
+          count: selectedEntryIds.size,
+          items: selectedEntryIds.size === 1 ? t('exercise.clone.mass_delete.item_one') : t('exercise.clone.mass_delete.item_other'),
+        })}
+        confirmText={t('exercise.clone.mass_delete.confirm')}
+        cancelText={t('exercise.clone.mass_delete.cancel')}
+        onConfirm={handleMassDeleteConfirm}
+        onCancel={handleMassDeleteCancel}
+        confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
     </ThemedView>
   );
@@ -1359,6 +1614,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Spacing.sm,
   },
+  exerciseRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   exerciseName: {
     fontSize: FontSize.md,
     fontWeight: '600',
@@ -1373,7 +1633,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    marginLeft: Spacing.sm,
     minWidth: 60,
     alignItems: 'center',
   },
@@ -1385,7 +1644,6 @@ const styles = StyleSheet.create({
   minutesEditorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: Spacing.sm,
   },
   minutesEditorInput: {
     width: 50,
@@ -1412,7 +1670,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: Spacing.sm,
     backgroundColor: 'transparent',
     ...getMinTouchTargetStyle(),
   },
@@ -1457,6 +1714,50 @@ const styles = StyleSheet.create({
   customButtonText: {
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  // Clone edit mode styles
+  selectAllRow: {
+    borderBottomWidth: 1,
+    paddingVertical: 0,
+  },
+  selectAllRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  selectAllText: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderColor: '#EF4444' + '40',
+    ...getMinTouchTargetStyle(),
+  },
+  iconButtonInRow: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  selectAllActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   // Recent Days styles
   recentDaysCard: {

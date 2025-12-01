@@ -5,12 +5,16 @@
  * Provides centralized styling, animations, and behavior that can be updated
  * in one place to affect all screens.
  * 
+ * Features:
+ * - Horizontally centered on screen
+ * - Queue system: only one toast visible at a time, others queued (FIFO)
+ * - Standardized 3-second duration with smooth fade-out
+ * - Auto-advances to next toast in queue after fade completes
+ * 
  * Per engineering guidelines:
  * - Uses shared theme tokens (Colors, Spacing, BorderRadius, etc.)
  * - AODA-compliant touch targets and accessibility
  * - Smooth fade animations
- * - Auto-dismiss with configurable timing
- * - Prevents stacking/overlapping
  * - Platform-aware styling
  */
 
@@ -20,9 +24,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-// Toast configuration
-const TOAST_DURATION = 1750; // 1.75 seconds
-const ANIMATION_DURATION = 250; // Fade in/out duration
+// Toast configuration - standardized duration
+const TOAST_DURATION = 3000; // 3 seconds (standardized)
+const ANIMATION_DURATION = 300; // Fade in/out duration (smooth)
 
 interface ToastContextType {
   showToast: (message: string) => void;
@@ -70,39 +74,63 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const queueRef = useRef<string[]>([]);
+  const isShowingRef = useRef(false);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
 
+  // Process next toast in queue
+  const processNextToast = useCallback(() => {
+    if (queueRef.current.length === 0) {
+      isShowingRef.current = false;
+      return;
+    }
+
+    const nextMessage = queueRef.current.shift();
+    if (!nextMessage) {
+      isShowingRef.current = false;
+      return;
+    }
+
+    isShowingRef.current = true;
+    setMessage(nextMessage);
+
+    // Fade in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: ANIMATION_DURATION,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+
+    // Auto-dismiss after standardized duration
+    timeoutRef.current = setTimeout(() => {
+      // Fade out smoothly
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: ANIMATION_DURATION,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start(() => {
+        setMessage(null);
+        // Process next toast in queue after fade completes
+        setTimeout(() => {
+          processNextToast();
+        }, 50); // Small delay to ensure clean transition
+      });
+    }, TOAST_DURATION);
+  }, [fadeAnim]);
+
   // Expose showToast function globally
   useEffect(() => {
     showToastRef = (msg: string) => {
-      // Clear any existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      // Add to queue
+      queueRef.current.push(msg);
+
+      // If no toast is currently showing, process immediately
+      if (!isShowingRef.current) {
+        processNextToast();
       }
-
-      // Set new message
-      setMessage(msg);
-
-      // Fade in
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: ANIMATION_DURATION,
-        useNativeDriver: Platform.OS !== 'web',
-      }).start();
-
-      // Auto-dismiss after duration
-      timeoutRef.current = setTimeout(() => {
-        // Fade out
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: Platform.OS !== 'web',
-        }).start(() => {
-          setMessage(null);
-        });
-      }, TOAST_DURATION);
+      // Otherwise, it will be processed after current toast finishes
     };
 
     return () => {
@@ -110,8 +138,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      queueRef.current = [];
+      isShowingRef.current = false;
     };
-  }, [fadeAnim]);
+  }, [processNextToast]);
 
   const showToast = useCallback((msg: string) => {
     showAppToast(msg);
@@ -121,39 +151,46 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {message && (
-        <Animated.View
-          style={[
-            styles.toastContainer,
-            {
-              opacity: fadeAnim,
-              top: insets.top + Spacing.md,
-              backgroundColor: colors.card,
-              ...Shadows.lg,
-            },
-          ]}
-          pointerEvents="none"
-          accessibilityLiveRegion="polite"
-          accessibilityRole="alert"
-        >
-          <Text style={[styles.toastText, { color: colors.text }]}>{message}</Text>
-        </Animated.View>
+        <View style={styles.toastWrapper} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.toastContainer,
+              {
+                opacity: fadeAnim,
+                top: insets.top + Spacing.md,
+                backgroundColor: colors.card,
+                ...Shadows.lg,
+              },
+            ]}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+          >
+            <Text style={[styles.toastText, { color: colors.text }]}>{message}</Text>
+          </Animated.View>
+        </View>
       )}
     </ToastContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
-  toastContainer: {
+  toastWrapper: {
     position: 'absolute',
-    left: Spacing.lg,
-    right: Spacing.lg,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    zIndex: 9999,
+    pointerEvents: 'none',
+  },
+  toastContainer: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 9999,
     ...Platform.select({
       web: {
         maxWidth: 400,

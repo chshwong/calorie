@@ -23,12 +23,12 @@ export function useCloneDayEntriesMutation(entityType: CloneEntityType) {
   const userId = user?.id;
 
   return useMutation({
-    mutationFn: ({ sourceDate, targetDate }: { sourceDate: string; targetDate: string }) => {
+    mutationFn: ({ sourceDate, targetDate, entryIds }: { sourceDate: string; targetDate: string; entryIds?: string[] }) => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
       // cloneDayEntries throws errors that will be caught by React Query
-      return cloneDayEntries(entityType, userId, sourceDate, targetDate);
+      return cloneDayEntries(entityType, userId, sourceDate, targetDate, entryIds);
     },
     onSuccess: (clonedCount, variables) => {
       // Invalidate relevant queries based on entity type

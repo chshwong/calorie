@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -16,11 +17,16 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { MultiSelectItem } from '@/components/multi-select-item';
+import { useMultiSelect } from '@/hooks/use-multi-select';
 import { showAppToast } from '@/components/ui/app-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
+import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
+import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import {
@@ -31,8 +37,6 @@ import {
   useUpdateMedLog,
   useDeleteMedLog,
 } from '@/hooks/use-med-logs';
-import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -75,7 +79,7 @@ type MedRowProps = {
   t: (key: string) => string;
 };
 
-function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animationValue, t }: MedRowProps) {
+function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animationValue, t, disabled = false }: MedRowProps) {
   const [deleteHovered, setDeleteHovered] = useState(false);
   const [isEditingDose, setIsEditingDose] = useState(false);
   const [doseAmountInput, setDoseAmountInput] = useState(log.dose_amount?.toString() || '');
@@ -253,9 +257,10 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
         ]}
       >
         <TouchableOpacity
-          style={[styles.medRowContent, Platform.OS === 'web' && getFocusStyle(colors.tint)]}
+          style={[styles.medRowContent, Platform.OS === 'web' && getFocusStyle(colors.tint), disabled && { opacity: 0.6 }]}
           onPress={onEdit}
           activeOpacity={0.6}
+          disabled={disabled}
           {...getButtonAccessibilityProps('Edit med')}
         >
           <View style={styles.medRowLeft}>
@@ -273,104 +278,109 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
           </View>
         </TouchableOpacity>
 
-        {/* Dose badge or inline editor */}
-        {isEditingDose ? (
-          <Animated.View
+        {/* Right side: Dose badge and Delete button */}
+        <View style={styles.medRowRight}>
+          {/* Dose badge or inline editor */}
+          {isEditingDose ? (
+            <Animated.View
+              style={[
+                styles.doseEditorContainer,
+                {
+                  opacity: opacityAnim,
+                  transform: [{ scale: scaleAnim }],
+                },
+              ]}
+            >
+              <TextInput
+                ref={doseAmountInputRef}
+                style={[
+                  styles.doseEditorInput,
+                  {
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: doseInputError ? colors.error : colors.border,
+                  },
+                ]}
+                value={doseAmountInput}
+                onChangeText={handleDoseAmountInputChange}
+                onBlur={handleAmountBlur}
+                onSubmitEditing={() => {
+                  doseUnitInputRef.current?.focus();
+                }}
+                keyboardType="number-pad"
+                maxLength={4}
+                selectTextOnFocus
+                placeholder={t('meds.form.dose_amount_placeholder')}
+              />
+              <TextInput
+                ref={doseUnitInputRef}
+                style={[
+                  styles.doseEditorUnitInput,
+                  {
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: colors.border,
+                  },
+                ]}
+                value={doseUnitInput}
+                onChangeText={setDoseUnitInput}
+                onBlur={handleUnitBlur}
+                onSubmitEditing={saveDose}
+                placeholder={t('meds.form.dose_unit_placeholder')}
+                maxLength={10}
+              />
+              <TouchableOpacity
+                onPress={saveDose}
+                style={[styles.doseEditorButton, { backgroundColor: colors.tint, marginLeft: Spacing.xs }]}
+                {...getButtonAccessibilityProps('Save dose')}
+              >
+                <IconSymbol name="checkmark" size={14} color={colors.textInverse} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={cancelDoseEdit}
+                style={[styles.doseEditorButton, { backgroundColor: colors.backgroundSecondary, marginLeft: Spacing.xs }]}
+                {...getButtonAccessibilityProps('Cancel')}
+              >
+                <IconSymbol name="xmark" size={14} color={colors.text} />
+              </TouchableOpacity>
+            </Animated.View>
+          ) : (
+            <TouchableOpacity
+              onPress={startEditingDose}
+              style={[styles.doseBadge, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps('Edit dose')}
+            >
+              <ThemedText style={[styles.doseBadgeText, { color: colors.info }]}>
+                {doseText || t('meds.form.dose_add')}
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+
+          {/* Delete button */}
+          <TouchableOpacity
+            onPress={onDelete}
+            disabled={disabled}
             style={[
-              styles.doseEditorContainer,
+              styles.deleteButtonGhost,
               {
-                opacity: opacityAnim,
-                transform: [{ scale: scaleAnim }],
+                borderColor: colors.separator,
+                backgroundColor: deleteHovered ? colors.errorLight : 'transparent',
+                opacity: disabled ? 0.4 : 1,
               },
             ]}
-          >
-            <TextInput
-              ref={doseAmountInputRef}
-              style={[
-                styles.doseEditorInput,
-                {
-                  backgroundColor: colors.card,
-                  color: colors.text,
-                  borderColor: doseInputError ? colors.error : colors.border,
-                },
-              ]}
-              value={doseAmountInput}
-              onChangeText={handleDoseAmountInputChange}
-              onBlur={handleAmountBlur}
-              onSubmitEditing={() => {
-                doseUnitInputRef.current?.focus();
-              }}
-              keyboardType="number-pad"
-              maxLength={4}
-              selectTextOnFocus
-              placeholder={t('meds.form.dose_amount_placeholder')}
-            />
-            <TextInput
-              ref={doseUnitInputRef}
-              style={[
-                styles.doseEditorUnitInput,
-                {
-                  backgroundColor: colors.card,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              value={doseUnitInput}
-              onChangeText={setDoseUnitInput}
-              onBlur={handleUnitBlur}
-              onSubmitEditing={saveDose}
-              placeholder={t('meds.form.dose_unit_placeholder')}
-              maxLength={10}
-            />
-            <TouchableOpacity
-              onPress={saveDose}
-              style={[styles.doseEditorButton, { backgroundColor: colors.tint, marginLeft: Spacing.xs }]}
-              {...getButtonAccessibilityProps('Save dose')}
-            >
-              <IconSymbol name="checkmark" size={14} color={colors.textInverse} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={cancelDoseEdit}
-              style={[styles.doseEditorButton, { backgroundColor: colors.backgroundSecondary, marginLeft: Spacing.xs }]}
-              {...getButtonAccessibilityProps('Cancel')}
-            >
-              <IconSymbol name="xmark" size={14} color={colors.text} />
-            </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          <TouchableOpacity
-            onPress={startEditingDose}
-            style={[styles.doseBadge, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
             activeOpacity={0.7}
-            {...getButtonAccessibilityProps('Edit dose')}
+            onPressIn={() => setDeleteHovered(true)}
+            onPressOut={() => setDeleteHovered(false)}
+            {...(Platform.OS === 'web' && {
+              onMouseEnter: () => setDeleteHovered(true),
+              onMouseLeave: () => setDeleteHovered(false),
+            })}
+            {...getButtonAccessibilityProps('Delete med')}
           >
-            <ThemedText style={[styles.doseBadgeText, { color: colors.info }]}>
-              {doseText || t('meds.form.dose_add')}
-            </ThemedText>
+            <IconSymbol name="trash.fill" size={16} color={colors.error} />
           </TouchableOpacity>
-        )}
-
-        {/* Delete button */}
-        <TouchableOpacity
-          onPress={onDelete}
-          style={[
-            styles.deleteButtonGhost,
-            {
-              borderColor: colors.separator,
-              backgroundColor: deleteHovered ? colors.errorLight : 'transparent',
-            },
-          ]}
-          activeOpacity={0.7}
-          onPressIn={() => setDeleteHovered(true)}
-          onPressOut={() => setDeleteHovered(false)}
-          {...(Platform.OS === 'web' && {
-            onMouseEnter: () => setDeleteHovered(true),
-            onMouseLeave: () => setDeleteHovered(false),
-          })}
-          {...getButtonAccessibilityProps('Delete med')}
-        >
-          <IconSymbol name="trash.fill" size={16} color={colors.error} />
-        </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -504,10 +514,93 @@ export default function MedsHomeScreen() {
   // Clone modal state
   const [showCloneModal, setShowCloneModal] = useState(false);
   const cloneMutation = useCloneDayEntriesMutation('pill_intake');
+  const massDeleteMutation = useMassDeleteEntriesMutation('pill_intake');
   
-  // Success confirmation modal state
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  // Mass delete confirmation modal state
+  const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
+  
+  // Shared edit mode state (for both clone and delete)
+  const [editMode, setEditMode] = useState(false);
+  
+  // Multi-select for edit mode
+  const {
+    isSelected: isEntrySelected,
+    toggleSelection: toggleEntrySelection,
+    selectAll: selectAllEntries,
+    deselectAll: deselectAllEntries,
+    areAllSelected: areAllEntriesSelected,
+    selectedIds: selectedEntryIds,
+    hasSelection: hasEntrySelection,
+    clearSelection: clearEntrySelection,
+  } = useMultiSelect<{ id: string }>({ enabled: editMode });
+  
+  // Initialize all entries as selected when entering edit mode
+  useEffect(() => {
+    if (editMode && medLogs.length > 0) {
+      // Select all entries when entering edit mode
+      selectAllEntries(medLogs, (log) => log.id);
+    } else if (!editMode) {
+      // Clear selection when exiting edit mode
+      clearEntrySelection();
+    }
+  }, [editMode]); // Only trigger when edit mode changes
+  
+  // Reset selection when entries change while in edit mode
+  useEffect(() => {
+    if (editMode && medLogs.length > 0) {
+      // Re-select all entries if we're in edit mode and entries changed
+      selectAllEntries(medLogs, (log) => log.id);
+    }
+  }, [medLogs.length]); // Only depend on length to avoid re-running on every render
+  
+  // Reset edit mode when date changes
+  useEffect(() => {
+    setEditMode(false);
+    clearEntrySelection();
+  }, [selectedDateString]);
+  
+  // Mass delete handlers
+  const handleMassDelete = useCallback(() => {
+    if (hasEntrySelection && selectedEntryIds.size > 0) {
+      setShowMassDeleteConfirm(true);
+    }
+  }, [hasEntrySelection, selectedEntryIds.size]);
+  
+  const handleMassDeleteConfirm = useCallback(async () => {
+    setShowMassDeleteConfirm(false);
+    if (selectedEntryIds.size === 0) return;
+    
+    const entryIdsArray = Array.from(selectedEntryIds);
+    massDeleteMutation.mutate(
+      { entryIds: entryIdsArray },
+      {
+        onSuccess: (deletedCount) => {
+          // Exit edit mode after successful delete
+          setEditMode(false);
+          clearEntrySelection();
+          
+          if (deletedCount > 0) {
+            showAppToast(t('meds.clone.mass_delete.success_message', {
+              count: deletedCount,
+              items: deletedCount === 1 ? t('meds.clone.mass_delete.item_one') : t('meds.clone.mass_delete.item_other'),
+            }));
+          }
+        },
+        onError: (error: Error) => {
+          Alert.alert(
+            t('meds.clone.mass_delete.error_title'),
+            t('meds.clone.mass_delete.error_message', {
+              error: error.message || t('common.unexpected_error'),
+            })
+          );
+        },
+      }
+    );
+  }, [selectedEntryIds, massDeleteMutation, t]);
+  
+  const handleMassDeleteCancel = useCallback(() => {
+    setShowMassDeleteConfirm(false);
+  }, []);
   
   // Previous day copy hook - reusable pattern
   const { cloneFromPreviousDay, isLoading: isCloningFromPreviousDay } = useCloneFromPreviousDay({
@@ -515,12 +608,10 @@ export default function MedsHomeScreen() {
     currentDate: selectedDate,
     onSuccess: (clonedCount) => {
       if (clonedCount > 0) {
-        const message = t('meds.previous_day_copy.success_message', {
+        showAppToast(t('meds.previous_day_copy.success_message', {
           count: clonedCount,
           items: clonedCount === 1 ? t('meds.clone.item_one') : t('meds.clone.item_other'),
-        });
-        setSuccessMessage(message);
-        setShowSuccessModal(true);
+        }));
       }
     },
     onError: (error: Error) => {
@@ -726,7 +817,9 @@ export default function MedsHomeScreen() {
     deleteMutation.mutate(deleteTarget.id, {
       onSuccess: () => {
         setShowDeleteConfirm(false);
+        const deletedName = deleteTarget.name;
         setDeleteTarget(null);
+        showAppToast(t('meds.delete.success_single', { name: deletedName }));
       },
       onError: (error: any) => {
         setShowDeleteConfirm(false);
@@ -876,25 +969,91 @@ export default function MedsHomeScreen() {
           {/* Header */}
           <View style={[styles.cardHeader, { borderBottomColor: colors.separator }]}>
             <View style={styles.cardHeaderTop}>
-              <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-                {isToday ? t('meds.today_title') : formatDateForDisplay(selectedDate)}
-              </ThemedText>
-              <TouchableOpacity
-                onPress={() => {
-                  // Check cache before opening modal - if no entries, show message and skip DB work
-                  if (!medLogs || medLogs.length === 0) {
-                    showAppToast(t('meds.clone.nothing_to_copy'));
-                    return;
-                  }
-                  setShowCloneModal(true);
-                }}
-                style={styles.cloneButton}
-                activeOpacity={0.7}
-                {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-                {...getButtonAccessibilityProps(t('meds.clone.accessibility_label'))}
-              >
-                <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+                  {(() => {
+                    const todayDate = new Date();
+                    todayDate.setHours(0, 0, 0, 0);
+                    const yesterday = new Date(todayDate);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    
+                    if (isToday) {
+                      return t('meds.today_title').replace(' 💊', '').trim();
+                    } else if (selectedDate.getTime() === yesterday.getTime()) {
+                      return t('common.yesterday') + "'s";
+                    } else {
+                      return formatDateForDisplay(selectedDate);
+                    }
+                  })()}
+                </ThemedText>
+                <MaterialCommunityIcons name="pill" size={20} color={ModuleThemes.meds.accent} />
+              </View>
+              <View style={styles.headerButtons}>
+                {!editMode ? (
+                  <>
+                    {/* Clone button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (!medLogs || medLogs.length === 0) {
+                          showAppToast(t('meds.clone.nothing_to_copy'));
+                          return;
+                        }
+                        setEditMode(true);
+                      }}
+                      disabled={!medLogs || medLogs.length === 0}
+                      style={[
+                        styles.cloneButton,
+                        (!medLogs || medLogs.length === 0) && { opacity: 0.4 },
+                      ]}
+                      activeOpacity={0.7}
+                      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                      {...getButtonAccessibilityProps(t('meds.clone.edit_mode.enter_edit_mode'))}
+                    >
+                      <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+                    </TouchableOpacity>
+                    
+                    {/* Delete button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (!medLogs || medLogs.length === 0) {
+                          return;
+                        }
+                        setEditMode(true);
+                      }}
+                      disabled={!medLogs || medLogs.length === 0}
+                      style={[
+                        styles.deleteButton,
+                        (!medLogs || medLogs.length === 0) && { opacity: 0.4 },
+                      ]}
+                      activeOpacity={0.7}
+                      {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
+                      {...getButtonAccessibilityProps(t('meds.clone.edit_mode.enter_edit_mode'))}
+                    >
+                      <IconSymbol name="trash.fill" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  /* Exit edit mode button */
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditMode(false);
+                      clearEntrySelection();
+                    }}
+                    style={[
+                      styles.cloneButton,
+                      {
+                        backgroundColor: '#10B981' + '20',
+                        borderColor: '#10B981' + '40',
+                      },
+                    ]}
+                    activeOpacity={0.7}
+                    {...(Platform.OS === 'web' && getFocusStyle('#10B981'))}
+                    {...getButtonAccessibilityProps(t('meds.clone.edit_mode.exit_edit_mode'))}
+                  >
+                    <IconSymbol name="checkmark" size={20} color="#10B981" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {logsLoading ? (
               <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
@@ -926,6 +1085,66 @@ export default function MedsHomeScreen() {
                 </ThemedText>
               ) : (
                 <View style={styles.sectionsContainer}>
+                  {/* Select All Row - Only shown in edit mode */}
+                  {editMode && medLogs.length > 0 && (
+                    <View style={[styles.selectAllRow, { backgroundColor: colors.background, borderBottomColor: colors.separator }]}>
+                      <MultiSelectItem
+                        isSelected={areAllEntriesSelected(medLogs, (log) => log.id)}
+                        onToggle={() => {
+                          if (areAllEntriesSelected(medLogs, (log) => log.id)) {
+                            deselectAllEntries();
+                          } else {
+                            selectAllEntries(medLogs, (log) => log.id);
+                          }
+                        }}
+                        style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+                      >
+                        <View style={styles.selectAllRowContent}>
+                          <ThemedText style={[styles.selectAllText, { color: colors.text }]}>
+                            {t('meds.clone.edit_mode.select_all')}
+                          </ThemedText>
+                          <View style={styles.selectAllActions}>
+                            <TouchableOpacity
+                              onPress={() => {
+                                const selectedIds = Array.from(selectedEntryIds);
+                                if (selectedIds.length === 0) {
+                                  showAppToast(t('meds.clone.nothing_to_copy'));
+                                  return;
+                                }
+                                setShowCloneModal(true);
+                              }}
+                              disabled={!hasEntrySelection}
+                              style={[
+                                styles.iconButtonInRow,
+                                { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', borderWidth: 1 },
+                                !hasEntrySelection && { opacity: 0.5 },
+                              ]}
+                              activeOpacity={0.7}
+                              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                              {...getButtonAccessibilityProps(t('meds.clone.edit_mode.clone_button'))}
+                            >
+                              <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={handleMassDelete}
+                              disabled={!hasEntrySelection}
+                              style={[
+                                styles.iconButtonInRow,
+                                { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', borderWidth: 1 },
+                                !hasEntrySelection && { opacity: 0.5 },
+                              ]}
+                              activeOpacity={0.7}
+                              {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
+                              {...getButtonAccessibilityProps(t('meds.clone.edit_mode.delete_button'))}
+                            >
+                              <IconSymbol name="trash.fill" size={20} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </MultiSelectItem>
+                    </View>
+                  )}
+                  
                   {/* Render sections based on primarySection preference */}
                   {primarySection === 'med' ? (
                     <>
@@ -944,19 +1163,44 @@ export default function MedsHomeScreen() {
                         >
                           {medCount > 0 ? (
                             <View style={styles.medList}>
-                              {medLogsFiltered.map((log, index) => (
-                                <MedRow
-                                  key={log.id}
-                                  log={log}
-                                  colors={colors}
-                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
-                                  onDelete={() => handleDelete(log.id, log.name)}
-                                  onDoseUpdate={handleDoseUpdate}
-                                  isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
-                                  animationValue={animationRefs.current.get(log.id)}
-                                  t={t}
-                                />
-                              ))}
+                              {medLogsFiltered.map((log, index) => {
+                                const rowContent = (
+                                  <MedRow
+                                    key={log.id}
+                                    log={log}
+                                    colors={colors}
+                                    onEdit={() => {
+                                      if (!editMode) {
+                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                      }
+                                    }}
+                                    onDelete={() => {
+                                      if (!editMode) {
+                                        handleDelete(log.id, log.name);
+                                      }
+                                    }}
+                                    onDoseUpdate={handleDoseUpdate}
+                                    isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
+                                    animationValue={animationRefs.current.get(log.id)}
+                                    t={t}
+                                    disabled={editMode}
+                                  />
+                                );
+                                
+                                if (editMode) {
+                                  return (
+                                    <MultiSelectItem
+                                      key={log.id}
+                                      isSelected={isEntrySelected(log.id)}
+                                      onToggle={() => toggleEntrySelection(log.id)}
+                                    >
+                                      {rowContent}
+                                    </MultiSelectItem>
+                                  );
+                                }
+                                
+                                return rowContent;
+                              })}
                             </View>
                           ) : (
                             <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
@@ -986,19 +1230,44 @@ export default function MedsHomeScreen() {
                         >
                           {suppCount > 0 ? (
                             <View style={styles.medList}>
-                              {suppLogsFiltered.map((log, index) => (
-                                <MedRow
-                                  key={log.id}
-                                  log={log}
-                                  colors={colors}
-                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
-                                  onDelete={() => handleDelete(log.id, log.name)}
-                                  onDoseUpdate={handleDoseUpdate}
-                                  isLast={index === suppLogsFiltered.length - 1}
-                                  animationValue={animationRefs.current.get(log.id)}
-                                  t={t}
-                                />
-                              ))}
+                              {suppLogsFiltered.map((log, index) => {
+                                const rowContent = (
+                                  <MedRow
+                                    key={log.id}
+                                    log={log}
+                                    colors={colors}
+                                    onEdit={() => {
+                                      if (!editMode) {
+                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                      }
+                                    }}
+                                    onDelete={() => {
+                                      if (!editMode) {
+                                        handleDelete(log.id, log.name);
+                                      }
+                                    }}
+                                    onDoseUpdate={handleDoseUpdate}
+                                    isLast={index === suppLogsFiltered.length - 1}
+                                    animationValue={animationRefs.current.get(log.id)}
+                                    t={t}
+                                    disabled={editMode}
+                                  />
+                                );
+                                
+                                if (editMode) {
+                                  return (
+                                    <MultiSelectItem
+                                      key={log.id}
+                                      isSelected={isEntrySelected(log.id)}
+                                      onToggle={() => toggleEntrySelection(log.id)}
+                                    >
+                                      {rowContent}
+                                    </MultiSelectItem>
+                                  );
+                                }
+                                
+                                return rowContent;
+                              })}
                             </View>
                           ) : (
                             <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
@@ -1025,19 +1294,44 @@ export default function MedsHomeScreen() {
                         >
                           {suppCount > 0 ? (
                             <View style={styles.medList}>
-                              {suppLogsFiltered.map((log, index) => (
-                                <MedRow
-                                  key={log.id}
-                                  log={log}
-                                  colors={colors}
-                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
-                                  onDelete={() => handleDelete(log.id, log.name)}
-                                  onDoseUpdate={handleDoseUpdate}
-                                  isLast={index === suppLogsFiltered.length - 1 && (!showMedSection || medCount === 0)}
-                                  animationValue={animationRefs.current.get(log.id)}
-                                  t={t}
-                                />
-                              ))}
+                              {suppLogsFiltered.map((log, index) => {
+                                const rowContent = (
+                                  <MedRow
+                                    key={log.id}
+                                    log={log}
+                                    colors={colors}
+                                    onEdit={() => {
+                                      if (!editMode) {
+                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                      }
+                                    }}
+                                    onDelete={() => {
+                                      if (!editMode) {
+                                        handleDelete(log.id, log.name);
+                                      }
+                                    }}
+                                    onDoseUpdate={handleDoseUpdate}
+                                    isLast={index === suppLogsFiltered.length - 1 && (!showMedSection || medCount === 0)}
+                                    animationValue={animationRefs.current.get(log.id)}
+                                    t={t}
+                                    disabled={editMode}
+                                  />
+                                );
+                                
+                                if (editMode) {
+                                  return (
+                                    <MultiSelectItem
+                                      key={log.id}
+                                      isSelected={isEntrySelected(log.id)}
+                                      onToggle={() => toggleEntrySelection(log.id)}
+                                    >
+                                      {rowContent}
+                                    </MultiSelectItem>
+                                  );
+                                }
+                                
+                                return rowContent;
+                              })}
                             </View>
                           ) : (
                             <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
@@ -1067,19 +1361,44 @@ export default function MedsHomeScreen() {
                         >
                           {medCount > 0 ? (
                             <View style={styles.medList}>
-                              {medLogsFiltered.map((log, index) => (
-                                <MedRow
-                                  key={log.id}
-                                  log={log}
-                                  colors={colors}
-                                  onEdit={() => openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes })}
-                                  onDelete={() => handleDelete(log.id, log.name)}
-                                  onDoseUpdate={handleDoseUpdate}
-                                  isLast={index === medLogsFiltered.length - 1}
-                                  animationValue={animationRefs.current.get(log.id)}
-                                  t={t}
-                                />
-                              ))}
+                              {medLogsFiltered.map((log, index) => {
+                                const rowContent = (
+                                  <MedRow
+                                    key={log.id}
+                                    log={log}
+                                    colors={colors}
+                                    onEdit={() => {
+                                      if (!editMode) {
+                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                      }
+                                    }}
+                                    onDelete={() => {
+                                      if (!editMode) {
+                                        handleDelete(log.id, log.name);
+                                      }
+                                    }}
+                                    onDoseUpdate={handleDoseUpdate}
+                                    isLast={index === medLogsFiltered.length - 1}
+                                    animationValue={animationRefs.current.get(log.id)}
+                                    t={t}
+                                    disabled={editMode}
+                                  />
+                                );
+                                
+                                if (editMode) {
+                                  return (
+                                    <MultiSelectItem
+                                      key={log.id}
+                                      isSelected={isEntrySelected(log.id)}
+                                      onToggle={() => toggleEntrySelection(log.id)}
+                                    >
+                                      {rowContent}
+                                    </MultiSelectItem>
+                                  );
+                                }
+                                
+                                return rowContent;
+                              })}
                             </View>
                           ) : (
                             <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
@@ -1172,6 +1491,19 @@ export default function MedsHomeScreen() {
             </>
           )}
 
+          {/* Custom Med Button */}
+          <TouchableOpacity
+            style={[styles.customButton, { backgroundColor: colors.tintLight, borderColor: colors.tint }]}
+            onPress={openCustomForm}
+            activeOpacity={0.7}
+            {...getButtonAccessibilityProps(t('meds.quick_add.add_custom'))}
+          >
+            <IconSymbol name="plus.circle.fill" size={18} color={colors.tint} />
+            <ThemedText style={[styles.customButtonText, { color: colors.tint }]}>
+              {t('meds.quick_add.add_custom')}
+            </ThemedText>
+          </TouchableOpacity>
+
           {/* Static Common Meds */}
           <QuickAddHeading 
             labelKey="meds.quick_add.common"
@@ -1210,19 +1542,6 @@ export default function MedsHomeScreen() {
               );
             })}
           </ScrollView>
-
-          {/* Custom Med Button */}
-          <TouchableOpacity
-            style={[styles.customButton, { backgroundColor: colors.tintLight, borderColor: colors.tint }]}
-            onPress={openCustomForm}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps(t('meds.quick_add.add_custom'))}
-          >
-            <IconSymbol name="plus.circle.fill" size={18} color={colors.tint} />
-            <ThemedText style={[styles.customButtonText, { color: colors.tint }]}>
-              {t('meds.quick_add.add_custom')}
-            </ThemedText>
-          </TouchableOpacity>
           </SurfaceCard>
         </MedSectionContainer>
 
@@ -1458,12 +1777,26 @@ export default function MedsHomeScreen() {
       <CloneDayModal
         visible={showCloneModal}
         onClose={() => setShowCloneModal(false)}
+        sourceDate={selectedDate}
+        title={t('meds.clone.title')}
+        subtitle={t('meds.clone.subtitle')}
         onConfirm={(targetDate) => {
-          // Check cache before cloning - if no entries, show message and skip DB work
-          if (!medLogs || medLogs.length === 0) {
-            showAppToast(t('meds.clone.nothing_to_copy'));
-            setShowCloneModal(false);
-            return;
+          // Get selected entry IDs if in edit mode, otherwise clone all
+          const entryIdsToClone = editMode ? Array.from(selectedEntryIds) : undefined;
+          
+          // Check cache before cloning - if no entries selected, show message and skip DB work
+          if (editMode) {
+            if (entryIdsToClone && entryIdsToClone.length === 0) {
+              showAppToast(t('meds.clone.nothing_to_copy'));
+              setShowCloneModal(false);
+              return;
+            }
+          } else {
+            if (!medLogs || medLogs.length === 0) {
+              showAppToast(t('meds.clone.nothing_to_copy'));
+              setShowCloneModal(false);
+              return;
+            }
           }
           
           showAppToast(t('meds.clone.toast_cloning'));
@@ -1472,30 +1805,28 @@ export default function MedsHomeScreen() {
             {
               sourceDate: selectedDateString,
               targetDate: targetDateString,
+              entryIds: entryIdsToClone,
             },
             {
               onSuccess: (clonedCount) => {
                 setShowCloneModal(false);
-                // Small delay to ensure clone modal closes before showing success modal
-                setTimeout(() => {
-                  if (clonedCount > 0) {
-                    const message = t('meds.clone.success_message', {
-                      count: clonedCount,
-                      items: clonedCount === 1 ? t('meds.clone.item_one') : t('meds.clone.item_other'),
-                      date: targetDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      }),
-                    });
-                    setSuccessMessage(message);
-                    setShowSuccessModal(true);
-                    // If viewing the target date, refresh will happen automatically via query invalidation
-                  } else {
-                    setSuccessMessage(t('meds.clone.no_entries_message'));
-                    setShowSuccessModal(true);
-                  }
-                }, 100);
+                // Exit edit mode after successful clone
+                if (editMode) {
+                  setEditMode(false);
+                  clearEntrySelection();
+                }
+                if (clonedCount > 0) {
+                  const formattedDate = targetDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  });
+                  showAppToast(t('meds.clone.success_toast', {
+                    count: clonedCount,
+                    items: clonedCount === 1 ? t('meds.clone.item_one') : t('meds.clone.item_other'),
+                    date: formattedDate,
+                  }));
+                }
               },
               onError: (error: any) => {
                 // Handle same-date error specifically
@@ -1516,19 +1847,22 @@ export default function MedsHomeScreen() {
             }
           );
         }}
-        sourceDate={selectedDate}
         isLoading={cloneMutation.isPending}
       />
 
-      {/* Success Confirmation Modal */}
+      {/* Mass Delete Confirmation Modal */}
       <ConfirmModal
-        visible={showSuccessModal}
-        title=""
-        message={successMessage}
-        confirmText={t('common.ok')}
-        cancelText={null}
-        onConfirm={() => setShowSuccessModal(false)}
-        onCancel={() => setShowSuccessModal(false)}
+        visible={showMassDeleteConfirm}
+        title={t('meds.clone.mass_delete.title')}
+        message={t('meds.clone.mass_delete.message', {
+          count: selectedEntryIds.size,
+          items: selectedEntryIds.size === 1 ? t('meds.clone.mass_delete.item_one') : t('meds.clone.mass_delete.item_other'),
+        })}
+        confirmText={t('meds.clone.mass_delete.confirm')}
+        cancelText={t('meds.clone.mass_delete.cancel')}
+        onConfirm={handleMassDeleteConfirm}
+        onCancel={handleMassDeleteCancel}
+        confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
       
       {/* Module-specific FAB */}
@@ -1693,6 +2027,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Spacing.sm,
   },
+  medRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   medName: {
     fontSize: FontSize.md,
     fontWeight: '600',
@@ -1799,6 +2138,56 @@ const styles = StyleSheet.create({
   customButtonText: {
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  // Clone edit mode styles
+  selectAllRow: {
+    borderBottomWidth: 1,
+    paddingVertical: 0,
+  },
+  selectAllRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  selectAllText: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderColor: '#EF4444' + '40',
+    ...getMinTouchTargetStyle(),
+  },
+  actionButtonInRow: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    ...getMinTouchTargetStyle(),
+  },
+  iconButtonInRow: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  selectAllActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   // Recent Days styles
   recentDaysCard: {

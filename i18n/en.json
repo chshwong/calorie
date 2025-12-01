@@ -1244,29 +1244,29 @@
       "error_save_failed": "Failed to save exercise: {{error}}"
     },
     "quick_add": {
-      "add_custom": "+ Add custom exercise",
+      "add_custom": "Add custom exercise",
       "add_custom_hint": "Double tap to add a custom exercise",
       "your_recent_frequent": "Your recent & frequent",
       "common_exercises": "Common exercises",
       "common_exercises_list": {
-        "walking": "Walking",
-        "running": "Running",
-        "jogging": "Jogging",
-        "gym_workout": "Gym Workout",
-        "cycling": "Cycling",
-        "swimming": "Swimming",
-        "yoga": "Yoga",
-        "stretching": "Stretching",
-        "hiit": "HIIT",
-        "barbell_row": "Barbell Row",
-        "bench_press": "Bench Press",
-        "biceps": "Biceps",
-        "chest": "Chest",
-        "deadlift": "Deadlift",
-        "lat_pulldown": "Lat Pulldown",
-        "overhead_press": "Overhead Press",
-        "squat": "Squat",
-        "triceps": "Triceps"
+        "walking": "🚶‍♂️ Walking",
+        "running": "🏃‍♂️ Running",
+        "jogging": "🏃‍♂️ Jogging",
+        "gym_workout": "🏋️‍♂️ Gym Workout",
+        "cycling": "🚴‍♂️ Cycling",
+        "swimming": "🏊‍♂️ Swimming",
+        "yoga": "🧘‍♂️ Yoga",
+        "stretching": "🤸‍♂️ Stretching",
+        "hiit": "⚡ HIIT",
+        "barbell_row": "🏋️‍♂️ Barbell Row",
+        "bench_press": "🏋️‍♂️ Bench Press",
+        "biceps": "💪 Biceps",
+        "chest": "💪 Chest",
+        "deadlift": "🏋️‍♂️ Deadlift",
+        "lat_pulldown": "⬇️ Lat Pulldown",
+        "overhead_press": "⬆️ Overhead Press",
+        "squat": "🏋️‍♂️ Squat",
+        "triceps": "💪 Triceps"
       }
     },
     "delete": {
@@ -1276,6 +1276,7 @@
       "confirm": "Delete",
       "cancel": "Cancel",
       "success": "Exercise deleted successfully",
+      "success_single": "{{name}} removed.",
       "error": "Failed to delete exercise: {{error}}"
     },
     "edit": {
@@ -1285,7 +1286,49 @@
       "hint": "Double tap to delete this exercise"
     },
     "loading": "Loading exercises...",
-    "error": "Failed to load exercises"
+    "error": "Failed to load exercises",
+    "clone": {
+      "title": "Clone today's exercises",
+      "subtitle": "Choose a date to copy today's exercises to.",
+      "confirm": "Clone",
+      "accessibility_label": "Clone today's exercises to another date",
+      "toast_cloning": "Cloning…",
+      "success_title": "Cloned",
+      "success_message": "{{count}} {{items}} added to {{date}}",
+      "success_toast": "{{count}} {{items}} cloned to {{date}}.",
+      "item_one": "exercise",
+      "item_other": "exercises",
+      "no_entries_title": "No Entries",
+      "no_entries_message": "There are no entries to clone for this date.",
+      "nothing_to_copy": "Nothing to copy for this day.",
+      "error_title": "Clone Failed",
+      "error_message": "Failed to clone entries: {{error}}",
+      "same_date_error": "You cannot clone to the same date.",
+      "edit_mode": {
+        "select_all": "Select all",
+        "exit_edit_mode": "Exit clone edit mode",
+        "enter_edit_mode": "Enter clone edit mode"
+      },
+      "mass_delete": {
+        "title": "Delete Selected",
+        "message": "Are you sure you want to delete {{count}} {{items}}?",
+        "item_one": "exercise",
+        "item_other": "exercises",
+        "confirm": "Delete",
+        "cancel": "Cancel",
+        "success_message": "{{count}} {{items}} removed.",
+        "error_title": "Delete Failed",
+        "error_message": "Failed to delete entries: {{error}}"
+      }
+    },
+    "previous_day_copy": {
+      "label_yesterday": "From Yesterday",
+      "label_previous": "From Previous Day",
+      "accessibility_label_yesterday": "Copy yesterday's exercises to today",
+      "accessibility_label_previous": "Copy previous day's exercises to current day",
+      "success_message": "{{count}} {{items}} copied over from previous day.",
+      "nothing_to_copy": "Nothing to copy for this day."
+    }
   },
 
   "dashboard": {
@@ -1356,32 +1399,7 @@
       "no_exercises": "No exercises logged today",
       "main": "Main",
       "chart_7d": "7d min",
-      "streak": "Ex streak",
-      "clone": {
-        "title": "Clone today's exercises",
-        "subtitle": "Choose a date to copy today's exercises to.",
-        "confirm": "Clone",
-        "accessibility_label": "Clone today's exercises to another date",
-        "toast_cloning": "Cloning…",
-        "success_title": "Cloned",
-        "success_message": "{{count}} {{items}} added to {{date}}",
-        "item_one": "activity",
-        "item_other": "activities",
-        "no_entries_title": "No Entries",
-        "no_entries_message": "There are no entries to clone for this date.",
-        "nothing_to_copy": "Nothing to copy for this day.",
-        "error_title": "Clone Failed",
-        "error_message": "Failed to clone entries: {{error}}",
-        "same_date_error": "You cannot clone to the same date."
-      },
-      "previous_day_copy": {
-        "label_yesterday": "From Yesterday",
-        "label_previous": "From Previous Day",
-        "accessibility_label_yesterday": "Copy yesterday's exercises to today",
-        "accessibility_label_previous": "Copy previous day's exercises to current day",
-        "success_message": "{{count}} {{items}} copied over from previous day.",
-        "nothing_to_copy": "Nothing to copy for this day."
-      }
+      "streak": "Ex streak"
     },
     "loading": "Loading...",
     "meds": {
@@ -1471,7 +1489,7 @@
       "error_save_failed": "Failed to save med: {{error}}"
     },
     "quick_add": {
-      "add_custom": "+ Add custom",
+      "add_custom": "Add custom",
       "add_custom_hint": "Double tap to add a custom med",
       "recent_freq": "RECENT & FREQ",
       "common": "COMMON",
@@ -1502,7 +1520,8 @@
       "confirm": "Delete",
       "cancel": "Cancel",
       "success": "Med deleted successfully",
-      "error": "Failed to delete med: {{error}}"
+      "success_single": "{{name}} removed.",
+      "error": "Failed to delete item: {{error}}"
     },
     "preferences": {
       "title": "Meds Preferences",
@@ -1522,7 +1541,9 @@
       "confirm": "Clone",
       "accessibility_label": "Clone today's intake to another date",
       "toast_cloning": "Cloning…",
+      "success_title": "Cloned",
       "success_message": "{{count}} {{items}} added to {{date}}",
+      "success_toast": "{{count}} {{items}} cloned to {{date}}.",
       "item_one": "item",
       "item_other": "items",
       "no_entries_title": "No Entries",
@@ -1530,7 +1551,25 @@
       "nothing_to_copy": "Nothing to copy for this day.",
       "error_title": "Clone Failed",
       "error_message": "Failed to clone entries: {{error}}",
-      "same_date_error": "You cannot clone to the same date."
+      "same_date_error": "You cannot clone to the same date.",
+      "edit_mode": {
+        "select_all": "Select all",
+        "exit_edit_mode": "Exit edit mode",
+        "enter_edit_mode": "Enter edit mode",
+        "clone_button": "Clone",
+        "delete_button": "Delete"
+      },
+      "mass_delete": {
+        "title": "Delete Selected",
+        "message": "Are you sure you want to delete {{count}} {{items}}?",
+        "item_one": "item",
+        "item_other": "items",
+        "confirm": "Delete",
+        "cancel": "Cancel",
+        "success_message": "{{count}} {{items}} removed.",
+        "error_title": "Delete Failed",
+        "error_message": "Failed to delete entries: {{error}}"
+      }
     },
     "previous_day_copy": {
       "label_yesterday": "From Yesterday",

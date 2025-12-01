@@ -63,6 +63,7 @@ export async function fetchRecentFoods(
     }
 
     // Process entries to get unique food_ids with their most recent entry
+    // De-duplication: Map ensures only one row per food_master.id in Recent tab
     // Store the full entry data for the latest entry per food
     const foodMap = new Map<string, { foodId: string; lastUsedAt: string; latestEntryId: string }>();
     const entryIdMap = new Map<string, typeof entriesData[0]>();
@@ -74,15 +75,18 @@ export async function fetchRecentFoods(
       }
     }
     
+    // Iterate through entries (already sorted by created_at DESC) and get unique foods
+    // Since entries are sorted most recent first, first occurrence per food_id is the latest
     for (const entry of entriesData) {
       if (entry.food_id && !foodMap.has(entry.food_id)) {
+        // First time seeing this food_id - this is the most recent entry for this food
         foodMap.set(entry.food_id, {
           foodId: entry.food_id,
           lastUsedAt: entry.created_at,
           latestEntryId: entry.id || '',
         });
         
-        // Stop once we have 50 unique foods
+        // Stop once we have 50 unique foods (Recent tab limit)
         if (foodMap.size >= 50) {
           break;
         }
@@ -107,6 +111,7 @@ export async function fetchRecentFoods(
     }
 
     // Fetch the latest full entry data for each food
+    // Recent tab requires the latest entry for each food to determine serving info
     const latestEntryIds = uniqueFoods.map(f => f.latestEntryId).filter(Boolean);
     const { data: latestEntriesData, error: latestEntriesError } = await supabase
       .from('calorie_entries')
@@ -118,15 +123,28 @@ export async function fetchRecentFoods(
     }
 
     // Create a map of food_id -> latest entry
+    // For Recent tab: each food must have a latest entry (they've been logged before)
+    // This map ensures we can quickly look up the latest entry's serving info
     const latestEntryMap = new Map<string, CalorieEntry>();
     if (latestEntriesData) {
       for (const entry of latestEntriesData) {
         if (entry.food_id) {
-          // Only store if this is the most recent entry for this food
+          // Store the latest entry for this food_id
+          // Since we already sorted by created_at DESC and took first per food, this should be the latest
           const existing = latestEntryMap.get(entry.food_id);
           if (!existing || new Date(entry.created_at) > new Date(existing.created_at)) {
             latestEntryMap.set(entry.food_id, entry as CalorieEntry);
           }
+        }
+      }
+    }
+    
+    // Also create a map by entry ID for direct lookup (in case we need it)
+    const entryByIdMap = new Map<string, CalorieEntry>();
+    if (latestEntriesData) {
+      for (const entry of latestEntriesData) {
+        if (entry.id) {
+          entryByIdMap.set(entry.id, entry as CalorieEntry);
         }
       }
     }
@@ -135,20 +153,28 @@ export async function fetchRecentFoods(
     const servingsMap = await getServingsForFoods(foodIds);
 
     // Combine food details with lastUsedAt, default serving info, and latest entry info
+    // For Recent tab: prioritize latest entry serving over default serving for display and Quick-add
     const foodsMap = new Map((foodsData || []).map(food => [food.id, food]));
     const recentFoodsList: RecentFood[] = uniqueFoods
       .map(({ foodId, lastUsedAt, latestEntryId }) => {
         const food = foodsMap.get(foodId);
         if (!food) return null;
         
-        // Get servings for this food and compute default serving
+        // Get latest entry for this food (should always exist for Recent foods)
+        // Try both food_id lookup and entry ID lookup for robustness
+        let latestEntry = latestEntryMap.get(foodId) || null;
+        if (!latestEntry && latestEntryId && entryByIdMap) {
+          // Fallback: lookup by entry ID if food_id lookup failed
+          latestEntry = entryByIdMap.get(latestEntryId) || null;
+        }
+        
+        // Get servings for this food and compute default serving (for fallback only)
         const foodServings = servingsMap.get(foodId) || [];
         const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
         
-        // Get latest entry for this food
-        const latestEntry = latestEntryMap.get(foodId) || null;
-        
-        // Use latest entry serving info if available, otherwise use default
+        // For Recent tab: always use latest entry serving info if available
+        // This ensures display and Quick-add use the same serving as last logged
+        // Fallback to default only in edge case where entry data is missing
         const latestServingQty = latestEntry ? latestEntry.quantity : defaultServing.quantity;
         const latestServingUnit = latestEntry ? latestEntry.unit : defaultServing.unit;
         const latestServingCalories = latestEntry ? Math.round(latestEntry.calories_kcal) : Math.round(nutrients.calories_kcal);
