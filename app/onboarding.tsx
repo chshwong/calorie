@@ -24,7 +24,30 @@ import { onboardingColors } from '@/theme/onboardingTheme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { ageFromDob, dobFromAge, ActivityLevel, calculateBMR, calculateTDEE, calculateRequiredDailyCalorieDiff, calculateSafeCalorieTarget } from '@/utils/calculations';
-import { validatePreferredName } from '@/utils/validation';
+import { 
+  validatePreferredName, 
+  validateDateOfBirth, 
+  validateHeightCm as validateHeightCmUtil, 
+  validateActivityLevel as validateActivityLevelUtil, 
+  validateWeightKg as validateWeightKgUtil, 
+  validateGoalWeight as validateGoalWeightUtil, 
+  validateTimeline as validateTimelineUtil, 
+  validateSex as validateSexUtil, 
+  validateGoal as validateGoalUtil 
+} from '@/utils/validation';
+import { 
+  convertHeightToCm, 
+  convertWeightToKg, 
+  ftInToCm, 
+  cmToFtIn, 
+  kgToLbs, 
+  lbsToKg 
+} from '@/utils/bodyMetrics';
+import { 
+  filterNumericInput, 
+  filterPreferredNameInput, 
+  normalizeSpaces 
+} from '@/utils/inputFilters';
 import { updateProfile } from '@/lib/services/profileService';
 import { checkProfanity } from '@/utils/profanity';
 import {
@@ -39,32 +62,47 @@ type Gender = 'male' | 'female' | 'not_telling';
 function StepIndicator({ currentStep, totalSteps, colors }: { currentStep: number; totalSteps: number; colors: any }) {
   const screenWidth = Dimensions.get('window').width;
   
-  // Calculate responsive sizing based on screen width
-  // On narrow screens (below 375px), use tighter spacing
-  const isNarrow = screenWidth < 375;
-  const isVeryNarrow = screenWidth < 320;
+  // Mobile-responsive logic: scale down on narrow screens
+  const isMobile = screenWidth < 600;
+  const isVeryNarrow = screenWidth < 480;
+  const scaleFactor = isVeryNarrow ? 0.65 : isMobile ? 0.75 : 1;
   
+  // Calculate responsive sizing based on screen width
+  const isNarrow = screenWidth < 375;
   const dotSize = isVeryNarrow ? 8 : isNarrow ? 10 : 12;
   const lineWidth = isVeryNarrow ? 20 : isNarrow ? 28 : 40;
   const lineMargin = isVeryNarrow ? 2 : isNarrow ? 3 : 4;
   const containerPadding = isVeryNarrow ? 8 : isNarrow ? 16 : 40;
   
   return (
-    <View style={[
-      styles.stepIndicatorContainer,
-      { paddingHorizontal: containerPadding }
-    ]}>
+    <View style={styles.stepIndicatorWrapper}>
+      <View
+        style={[
+          styles.stepIndicatorContainer,
+          {
+            paddingHorizontal: containerPadding,
+            transform: [{ scale: scaleFactor }],
+            transformOrigin: 'center',
+          },
+          Platform.select({
+            web: {
+              transformOrigin: 'center',
+            },
+            default: {},
+          }),
+        ]}
+      >
       {Array.from({ length: totalSteps }, (_, i) => (
         <View key={i} style={styles.stepIndicatorRow}>
           <View
             style={[
               styles.stepDot,
               {
-                width: dotSize,
-                height: dotSize,
-                borderRadius: dotSize / 2,
-                backgroundColor: i < currentStep ? onboardingColors.primary : colors.border,
-                borderColor: i === currentStep ? onboardingColors.primary : colors.border,
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: dotSize / 2,
+                  backgroundColor: i < currentStep ? onboardingColors.primary : colors.border,
+                  borderColor: i === currentStep ? onboardingColors.primary : colors.border,
               },
             ]}
           />
@@ -73,16 +111,17 @@ function StepIndicator({ currentStep, totalSteps, colors }: { currentStep: numbe
               style={[
                 styles.stepLine,
                 {
-                  width: lineWidth,
-                  height: isVeryNarrow ? 1.5 : 2,
-                  marginHorizontal: lineMargin,
-                  backgroundColor: i < currentStep ? onboardingColors.primary : colors.border,
+                    width: lineWidth,
+                    height: isVeryNarrow ? 1.5 : 2,
+                    marginHorizontal: lineMargin,
+                    backgroundColor: i < currentStep ? onboardingColors.primary : colors.border,
                 },
               ]}
             />
           )}
         </View>
       ))}
+      </View>
     </View>
   );
 }
@@ -115,7 +154,7 @@ export default function OnboardingScreen() {
   const [heightCm, setHeightCm] = useState('');
   const [heightFt, setHeightFt] = useState('');
   const [heightIn, setHeightIn] = useState('');
-  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm');
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft/in'>('cm');
   
   // Legacy state for old steps (will be reorganized into Steps 5+ later)
   const [firstName, setFirstName] = useState('');
@@ -232,7 +271,7 @@ export default function OnboardingScreen() {
     if (profile?.height_cm && !heightCm) {
       setHeightCm(profile.height_cm.toString());
       if (profile.height_unit === 'ft') {
-        setHeightUnit('ft');
+        setHeightUnit('ft/in');
         const totalInches = profile.height_cm / 2.54;
         const feet = Math.floor(totalInches / 12);
         const inches = Math.round(totalInches % 12);
@@ -313,38 +352,19 @@ export default function OnboardingScreen() {
     return date > today;
   };
   
-  // Filter numeric input
-  const filterNumericInput = (text: string): string => {
-    let filtered = text.replace(/[^0-9.]/g, '');
-    const parts = filtered.split('.');
-    if (parts.length > 2) {
-      filtered = parts[0] + '.' + parts.slice(1).join('');
-    }
-    return filtered;
+  // Conversion helper functions using utilities
+  const getHeightInCm = (): number | null => {
+    return convertHeightToCm(heightUnit, heightCm, heightFt, heightIn);
   };
   
-  // Conversion functions
-  const convertHeightToCm = (): number | null => {
-    if (heightUnit === 'cm') {
-      const cm = parseFloat(heightCm);
-      return isNaN(cm) ? null : cm;
-    } else {
-      const ft = parseFloat(heightFt);
-      const inches = parseFloat(heightIn);
-      if (isNaN(ft) || isNaN(inches)) return null;
-      const totalInches = ft * 12 + inches;
-      return totalInches * 2.54;
-    }
+  const getWeightInKg = (unit: 'kg' | 'lbs', kgValue: string, lbsValue: string): number | null => {
+    return convertWeightToKg(unit, kgValue, lbsValue);
   };
   
-  const convertWeightToLb = (): number | null => {
-    if (weightUnit === 'lbs') {
-      const lbs = parseFloat(weightLb);
-      return isNaN(lbs) ? null : lbs;
-    } else {
-      const kg = parseFloat(weightKg);
-      return isNaN(kg) ? null : kg * 2.20462;
-    }
+  const getWeightInLbs = (unit: 'kg' | 'lbs', kgValue: string, lbsValue: string): number | null => {
+    const kg = convertWeightToKg(unit, kgValue, lbsValue);
+    if (kg === null) return null;
+    return kgToLbs(kg);
   };
   
   const validateStep1 = (): string | null => {
@@ -387,108 +407,21 @@ export default function OnboardingScreen() {
   };
   
   const validateStep2 = (): string | null => {
-    const heightCmValue = convertHeightToCm();
-    if (!heightCmValue) {
-      return 'Height is required';
+    const heightCmValue = getHeightInCm();
+    const heightError = validateHeightCmUtil(heightCmValue);
+    if (heightError) {
+      return t(heightError);
     }
     
-    const weightLbValue = convertWeightToLb();
-    if (!weightLbValue) {
-      return 'Weight is required';
-    }
-    
-    if (heightCmValue < 50 || heightCmValue > 304.8) {
-      return 'Height must be between 50 cm and 304.8 cm (approximately 1\'8" to 10\'0")';
-    }
-    
-    if (weightLbValue < 45 || weightLbValue > 1200) {
-      return 'Weight must be between 45 and 1200 lbs (approximately 20 to 544 kg)';
+    const weightKgValue = getWeightInKg(weightUnit, weightKg, weightLb);
+    const weightError = validateWeightKgUtil(weightKgValue);
+    if (weightError) {
+      return t(weightError);
     }
     
     return null;
   };
   
-  const validateGoal = (): string | null => {
-    if (!goal || goal.trim().length === 0) {
-      return t('onboarding.goal.error_select_goal');
-    }
-    return null;
-  };
-  
-  // Space normalization function
-  const normalizeSpaces = (raw: string): string => {
-    return raw.replace(/\s+/g, " ").trim();
-  };
-  
-  // Silent filtering function for preferred name input
-  // Preserves existing valid emojis, only filters new characters being added
-  const filterPreferredNameInput = (currentValue: string, newText: string): string => {
-    // Enforce maxLength 30
-    if (newText.length > 30) {
-      return currentValue;
-    }
-    
-    // If new text is shorter or equal, it's deletion/editing - allow it (will be validated later)
-    if (newText.length <= currentValue.length) {
-      return newText;
-    }
-    
-    // Extract existing emojis from current value to preserve them
-    const currentChars = Array.from(currentValue);
-    const existingEmojis = new Set<string>();
-    for (const ch of currentChars) {
-      const codePoint = ch.codePointAt(0);
-      if (codePoint && codePoint >= 0x1F000) {
-        existingEmojis.add(ch);
-      }
-    }
-    const hasExistingEmoji = existingEmojis.size > 0;
-    
-    // Process new text character by character, preserving existing valid content
-    const newChars = Array.from(newText);
-    const BANNED = new Set(["🤬", "🖕", "💀", "⚰️"]);
-    const filteredChars: string[] = [];
-    let newEmojiAdded = false;
-    
-    for (const ch of newChars) {
-      const codePoint = ch.codePointAt(0);
-      const isLetter = /\p{L}/u.test(ch);
-      const isDigit = /\p{N}/u.test(ch);
-      const isSpace = ch === " ";
-      const isPunctuation = ch === "'" || ch === "-" || ch === ".";
-      const isEmoji = codePoint && codePoint >= 0x1F000;
-      
-      // Check if character is valid
-      if (isLetter || isDigit || isSpace || isPunctuation || isEmoji) {
-        // Check for banned emojis
-        if (isEmoji && BANNED.has(ch)) {
-          continue; // Skip banned emoji
-        }
-        
-        // Handle emoji logic
-        if (isEmoji) {
-          // If this emoji already exists in current value, always preserve it
-          if (existingEmojis.has(ch)) {
-            filteredChars.push(ch);
-            continue;
-          }
-          
-          // If we already have an emoji (existing or newly added), skip this new one
-          if (hasExistingEmoji || newEmojiAdded) {
-            continue; // Skip second emoji
-          }
-          
-          // This is a new allowed emoji - add it
-          newEmojiAdded = true;
-        }
-        
-        filteredChars.push(ch);
-      }
-      // Invalid characters are silently ignored
-    }
-    
-    return filteredChars.join('');
-  };
   
   const handlePreferredNameChange = (text: string) => {
     const filtered = filterPreferredNameInput(preferredName, text);
@@ -608,144 +541,44 @@ export default function OnboardingScreen() {
     return date;
   };
   
+  // Validation functions using utility modules
   const validateSex = (): string | null => {
-    if (!sex || (sex !== 'male' && sex !== 'female')) {
-      return t('onboarding.sex.error_select_sex');
-    }
-    return null;
+    const errorKey = validateSexUtil(sex);
+    return errorKey ? t(errorKey) : null;
   };
   
   const validateHeight = (): string | null => {
-    let heightCmValue: number | null = null;
-    
-    if (heightUnit === 'cm') {
-      const cm = parseFloat(heightCm);
-      if (isNaN(cm) || cm <= 0) {
-        return t('onboarding.height.error_height_required');
-      }
-      heightCmValue = cm;
-    } else {
-      const ft = parseFloat(heightFt);
-      const inches = parseFloat(heightIn);
-      if (isNaN(ft) || isNaN(inches) || ft <= 0) {
-        return t('onboarding.height.error_height_required');
-      }
-      const totalInches = ft * 12 + inches;
-      heightCmValue = totalInches * 2.54;
-    }
-    
-    if (heightCmValue < 120 || heightCmValue > 230) {
-      return t('onboarding.height.error_height_invalid');
-    }
-    
-    return null;
+    const heightCmValue = getHeightInCm();
+    const errorKey = validateHeightCmUtil(heightCmValue);
+    return errorKey ? t(errorKey) : null;
   };
   
   const validateActivity = (): string | null => {
-    if (!activityLevel || (activityLevel !== 'sedentary' && activityLevel !== 'light' && activityLevel !== 'moderate' && activityLevel !== 'high' && activityLevel !== 'very_high')) {
-      return t('onboarding.activity.error_select_activity');
-    }
-    return null;
+    const errorKey = validateActivityLevelUtil(activityLevel);
+    return errorKey ? t(errorKey) : null;
   };
   
   const validateCurrentWeight = (): string | null => {
-    let weightKgValue: number | null = null;
-    
-    if (currentWeightUnit === 'kg') {
-      const kg = parseFloat(currentWeightKg);
-      if (isNaN(kg) || kg <= 0) {
-        return t('onboarding.current_weight.error_weight_required');
-      }
-      weightKgValue = kg;
-    } else {
-      const lbs = parseFloat(currentWeightLb);
-      if (isNaN(lbs) || lbs <= 0) {
-        return t('onboarding.current_weight.error_weight_required');
-      }
-      weightKgValue = lbs / 2.20462;
-    }
-    
-    if (weightKgValue < 35 || weightKgValue > 250) {
-      return t('onboarding.current_weight.error_weight_invalid');
-    }
-    
-    return null;
+    const weightKgValue = getWeightInKg(currentWeightUnit, currentWeightKg, currentWeightLb);
+    const errorKey = validateWeightKgUtil(weightKgValue);
+    return errorKey ? t(errorKey) : null;
   };
   
   const validateGoalWeight = (): string | null => {
-    let goalWeightKgValue: number | null = null;
-    let currentWeightKgValue: number | null = null;
-    
-    // Get goal weight in kg
-    if (goalWeightUnit === 'kg') {
-      const kg = parseFloat(goalWeightKg);
-      if (isNaN(kg) || kg <= 0) {
-        return t('onboarding.goal_weight.error_weight_required');
-      }
-      goalWeightKgValue = kg;
-    } else {
-      const lbs = parseFloat(goalWeightLb);
-      if (isNaN(lbs) || lbs <= 0) {
-        return t('onboarding.goal_weight.error_weight_required');
-      }
-      goalWeightKgValue = lbs / 2.20462;
-    }
-    
-    // Get current weight in kg
-    if (currentWeightUnit === 'kg') {
-      currentWeightKgValue = parseFloat(currentWeightKg);
-    } else {
-      const lbs = parseFloat(currentWeightLb);
-      currentWeightKgValue = lbs / 2.20462;
-    }
-    
-    // Validate range
-    if (goalWeightKgValue < 35 || goalWeightKgValue > 250) {
-      return t('onboarding.goal_weight.error_weight_invalid');
-    }
-    
-    // Validate based on goal type
-    if (goal === 'lose') {
-      // Goal weight must be lower than current weight (allow 0.5 kg tolerance for rounding)
-      if (goalWeightKgValue >= currentWeightKgValue - 0.5) {
-        return t('onboarding.goal_weight.error_lose_too_high');
-      }
-    } else if (goal === 'gain') {
-      // Goal weight must be higher than current weight (allow 0.5 kg tolerance for rounding)
-      if (goalWeightKgValue <= currentWeightKgValue + 0.5) {
-        return t('onboarding.goal_weight.error_gain_too_low');
-      }
-    } else if (goal === 'maintain' || goal === 'recomp') {
-      // Goal weight should be close to current weight (within 5 kg)
-      const difference = Math.abs(goalWeightKgValue - currentWeightKgValue);
-      if (difference > 5) {
-        return t('onboarding.goal_weight.error_maintain_too_different');
-      }
-    }
-    
-    return null;
+    const goalWeightKgValue = getWeightInKg(goalWeightUnit, goalWeightKg, goalWeightLb);
+    const currentWeightKgValue = getWeightInKg(currentWeightUnit, currentWeightKg, currentWeightLb);
+    const errorKey = validateGoalWeightUtil(goalWeightKgValue, currentWeightKgValue, goal || null);
+    return errorKey ? t(errorKey) : null;
   };
   
   const validateTimeline = (): string | null => {
-    if (!timelineOption || (timelineOption !== '3_months' && timelineOption !== '6_months' && timelineOption !== '12_months' && timelineOption !== 'no_deadline' && timelineOption !== 'custom_date')) {
-      return t('onboarding.timeline.error_select_timeline');
-    }
-    
-    if (timelineOption === 'custom_date' && !customTargetDate) {
-      return t('onboarding.timeline.error_select_timeline');
-    }
-    
-    return null;
+    const errorKey = validateTimelineUtil(timelineOption, customTargetDate || null);
+    return errorKey ? t(errorKey) : null;
   };
   
-  // Filter numeric input for height
-  const filterHeightInput = (text: string): string => {
-    let filtered = text.replace(/[^0-9.]/g, '');
-    const parts = filtered.split('.');
-    if (parts.length > 2) {
-      filtered = parts[0] + '.' + parts.slice(1).join('');
-    }
-    return filtered;
+  const validateGoal = (): string | null => {
+    const errorKey = validateGoalUtil(goal);
+    return errorKey ? t(errorKey) : null;
   };
   
   const handleGoalNext = async () => {
@@ -753,10 +586,10 @@ export default function OnboardingScreen() {
     
     // Validate Goal step
     const validationError = validateGoal();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
     
     if (!user) {
       setError(t('onboarding.error_no_session'));
@@ -901,9 +734,12 @@ export default function OnboardingScreen() {
         heightCmValue = totalInches * 2.54;
       }
       
+      // Convert 'ft/in' to 'ft' for database storage
+      const dbHeightUnit = heightUnit === 'ft/in' ? 'ft' : heightUnit;
+      
       const updatedProfile = await updateProfile(user.id, {
         height_cm: heightCmValue,
-        height_unit: heightUnit,
+        height_unit: dbHeightUnit,
       });
       
       if (!updatedProfile) {
@@ -1295,12 +1131,15 @@ export default function OnboardingScreen() {
     setLoading(true);
     
     try {
-      const heightCmValue = convertHeightToCm();
-      const weightLbValue = convertWeightToLb();
+      const heightCmValue = getHeightInCm();
+      const weightLbValue = getWeightInLbs(weightUnit, weightKg, weightLb);
       
       if (!heightCmValue || !weightLbValue) {
         throw new Error('Height and Weight are required');
       }
+      
+      // Convert 'ft/in' to 'ft' for database storage
+      const dbHeightUnit = heightUnit === 'ft/in' ? 'ft' : heightUnit;
       
       // Try using the database function first
       let profileError = null;
@@ -1314,7 +1153,7 @@ export default function OnboardingScreen() {
           p_gender: gender,
           p_height_cm: heightCmValue,
           p_weight_lb: weightLbValue,
-          p_height_unit: heightUnit,
+          p_height_unit: dbHeightUnit,
           p_weight_unit: weightUnit,
           p_onboarding_complete: true, // Complete onboarding
         });
@@ -1339,7 +1178,7 @@ export default function OnboardingScreen() {
           gender,
           height_cm: heightCmValue,
           weight_lb: weightLbValue,
-          height_unit: heightUnit,
+          height_unit: dbHeightUnit,
           weight_unit: weightUnit,
           is_active: true,
           onboarding_complete: true, // Complete onboarding
@@ -1409,53 +1248,90 @@ export default function OnboardingScreen() {
         </ThemedText>
         
         <View style={styles.goalContainer}>
-          {allGoals.map((goalOption) => (
-            <TouchableOpacity
-              key={goalOption.value}
-              style={[
-                styles.goalCard,
-                { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
-                goal === goalOption.value && { 
-                  backgroundColor: onboardingColors.primary, 
-                  borderColor: onboardingColors.primary,
-                  ...Platform.select({
-                    web: { boxShadow: `0 4px 12px ${onboardingColors.primary}40` },
-                    default: {
-                      shadowColor: onboardingColors.primary,
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 8,
-                      elevation: 4,
-                    },
-                  }),
-                },
-              ]}
-              onPress={() => {
-                setGoal(goalOption.value);
-                setError(null);
-              }}
-              disabled={loading}
-              {...getButtonAccessibilityProps(
-                `${t(goalOption.labelKey)}${goal === goalOption.value ? ' selected' : ''}`,
-                `Double tap to select ${t(goalOption.labelKey)}`,
-                loading
-              )}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: goal === goalOption.value }}
-            >
-              <Text style={[styles.goalCardTitle, { color: goal === goalOption.value ? '#fff' : colors.text }]}>
-                {t(goalOption.labelKey)}
-              </Text>
-              <Text style={[styles.goalCardDescription, { color: goal === goalOption.value ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
-                {t(goalOption.descriptionKey)}
-              </Text>
-              {goal === goalOption.value && (
-                <View style={styles.goalCardCheckmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+          {allGoals.map((goalOption) => {
+            const selected = goal === goalOption.value;
+            const pressed = pressedCard === goalOption.value;
+            
+            return (
+              <TouchableOpacity
+                key={goalOption.value}
+                style={[
+                  styles.goalCard,
+                  {
+                    borderColor: selected ? 'transparent' : colors.border,
+                    backgroundColor: selected ? undefined : colors.background,
+                    borderWidth: selected ? 0 : 1,
+                    borderRadius: 16,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
+                    opacity: pressed ? 0.96 : 1,
+                  },
+                  !selected && {
+                    ...Platform.select({
+                      web: {
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s ease',
+                      },
+                      default: {
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 2,
+                      },
+                    }),
+                  },
+                  selected && {
+                    ...Platform.select({
+                      web: {
+                        background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        transition: 'all 0.2s ease',
+                      },
+                      default: {
+                        backgroundColor: onboardingColors.primary,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.12,
+                        shadowRadius: 12,
+                        elevation: 4,
+                      },
+                    }),
+                  },
+                  Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
+                ]}
+                onPress={() => {
+                  setGoal(goalOption.value);
+                  setError(null);
+                }}
+                onPressIn={() => setPressedCard(goalOption.value)}
+                onPressOut={() => setPressedCard(null)}
+                disabled={loading}
+                {...getButtonAccessibilityProps(
+                  `${t(goalOption.labelKey)}${selected ? ' selected' : ''}`,
+                  `Double tap to select ${t(goalOption.labelKey)}`,
+                  loading
+                )}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
+                  <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
+                    {t(goalOption.labelKey)}
+                  </Text>
+                  <Text style={[styles.goalCardDescription, { color: selected ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
+                    {t(goalOption.descriptionKey)}
+                  </Text>
                 </View>
-              )}
-            </TouchableOpacity>
-          ))}
+                {selected && (
+                  <View style={styles.goalCardCheckmark}>
+                    <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
         
         {!showAdvancedGoals && (
@@ -1613,32 +1489,63 @@ export default function OnboardingScreen() {
             { value: 'female' as const, labelKey: 'onboarding.sex.female' },
           ].map((sexOption) => {
             const selected = isSelected(sexOption.value);
+            const pressed = pressedCard === sexOption.value;
             
             return (
               <TouchableOpacity
                 key={sexOption.value}
                 style={[
                   styles.goalCard,
-                  { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
-                  selected && { 
-                    backgroundColor: onboardingColors.primary, 
-                    borderColor: onboardingColors.primary,
+                  {
+                    borderColor: selected ? 'transparent' : colors.border,
+                    backgroundColor: selected ? undefined : colors.background,
+                    borderWidth: selected ? 0 : 1,
+                    borderRadius: 16,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
+                    opacity: pressed ? 0.96 : 1,
+                  },
+                  !selected && {
                     ...Platform.select({
-                      web: { boxShadow: `0 4px 12px ${onboardingColors.primary}40` },
+                      web: {
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s ease',
+                      },
                       default: {
-                        shadowColor: onboardingColors.primary,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 2,
+                      },
+                    }),
+                  },
+                  selected && {
+                    ...Platform.select({
+                      web: {
+                        background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        transition: 'all 0.2s ease',
+                      },
+                      default: {
+                        backgroundColor: onboardingColors.primary,
+                        shadowColor: '#000',
                         shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
+                        shadowOpacity: 0.12,
+                        shadowRadius: 12,
                         elevation: 4,
                       },
                     }),
                   },
+                  Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
                 ]}
                 onPress={() => {
                   setSex(sexOption.value);
                   setError(null);
                 }}
+                onPressIn={() => setPressedCard(sexOption.value)}
+                onPressOut={() => setPressedCard(null)}
                 disabled={loading}
                 {...getButtonAccessibilityProps(
                   `${t(sexOption.labelKey)}${selected ? ' selected' : ''}`,
@@ -1648,9 +1555,11 @@ export default function OnboardingScreen() {
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
               >
-                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
-                  {t(sexOption.labelKey)}
-                </Text>
+                <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
+                  <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
+                    {t(sexOption.labelKey)}
+                  </Text>
+                </View>
                 {selected && (
                   <View style={styles.goalCardCheckmark}>
                     <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
@@ -1699,7 +1608,7 @@ export default function OnboardingScreen() {
         <View style={styles.unitToggleModern}>
           {[
             { value: 'cm', label: 'cm' },
-            { value: 'ft', label: 'ft/in' },
+            { value: 'ft/in', label: 'ft/in' },
           ].map((unitOption) => {
             const selected = isSelected(unitOption.value);
             
@@ -1755,7 +1664,7 @@ export default function OnboardingScreen() {
                       setHeightCm(cm.toFixed(1));
                     }
                   } else {
-                    setHeightUnit('ft');
+                    setHeightUnit('ft/in');
                     if (heightCm) {
                       const totalInches = parseFloat(heightCm) / 2.54;
                       const feet = Math.floor(totalInches / 12);
@@ -1806,7 +1715,7 @@ export default function OnboardingScreen() {
                 placeholderTextColor={colors.textSecondary}
                 value={heightCm}
                 onChangeText={(text) => {
-                  setHeightCm(filterHeightInput(text));
+                  setHeightCm(filterNumericInput(text));
                   setError(null);
                 }}
                 keyboardType="numeric"
@@ -1837,7 +1746,7 @@ export default function OnboardingScreen() {
                   placeholderTextColor={colors.textSecondary}
                   value={heightFt}
                   onChangeText={(text) => {
-                    setHeightFt(filterHeightInput(text));
+                    setHeightFt(filterNumericInput(text));
                     setError(null);
                   }}
                   keyboardType="numeric"
@@ -1866,7 +1775,7 @@ export default function OnboardingScreen() {
                   placeholderTextColor={colors.textSecondary}
                   value={heightIn}
                   onChangeText={(text) => {
-                    setHeightIn(filterHeightInput(text));
+                    setHeightIn(filterNumericInput(text));
                     setError(null);
                   }}
                   keyboardType="numeric"
@@ -1932,14 +1841,29 @@ export default function OnboardingScreen() {
               style={[
                 styles.goalCard,
                 {
-                  borderColor: selected ? 'transparent' : '#E5E7EB',
-                  backgroundColor: selected ? undefined : '#FFFFFF',
+                  borderColor: selected ? 'transparent' : colors.border,
+                  backgroundColor: selected ? undefined : colors.background,
                   borderWidth: selected ? 0 : 1,
                   borderRadius: 16,
                   paddingVertical: 14,
                   paddingHorizontal: 16,
                   transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
                   opacity: pressed ? 0.96 : 1,
+                },
+                !selected && {
+                  ...Platform.select({
+                    web: {
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      transition: 'all 0.2s ease',
+                    },
+                    default: {
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 3,
+                      elevation: 2,
+                    },
+                  }),
                 },
                 selected && {
                   ...Platform.select({
@@ -1958,12 +1882,6 @@ export default function OnboardingScreen() {
                     },
                   }),
                 },
-                !selected && Platform.select({
-                  web: {
-                    transition: 'all 0.2s ease',
-                  },
-                  default: {},
-                }),
                 Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
               ]}
               onPress={() => {
@@ -1982,10 +1900,10 @@ export default function OnboardingScreen() {
               accessibilityState={{ selected }}
             >
               <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
-                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : '#1F2937' }]}>
+                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
                   {t(activity.labelKey)}
                 </Text>
-                <Text style={[styles.goalCardDescription, { color: selected ? 'rgba(255,255,255,0.9)' : '#6B7280' }]}>
+                <Text style={[styles.goalCardDescription, { color: selected ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
                   {t(activity.descriptionKey)}
                 </Text>
               </View>
@@ -2002,230 +1920,338 @@ export default function OnboardingScreen() {
   );
   
   const renderCurrentWeightStep = () => {
-    // Sync weight units between current and goal weight for consistency
-    const displayUnit = currentWeightUnit;
-    
     return (
-      <View style={styles.stepContent}>
-        <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
+      <View style={styles.stepContentAnimated}>
+        {/* SVG Illustration */}
+        <View style={styles.stepIllustration}>
+          {Platform.OS === 'web' ? (
+            <View
+              style={{
+                width: 48,
+                height: 48,
+              }}
+              // @ts-ignore - web-specific prop
+              dangerouslySetInnerHTML={{
+                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`,
+              }}
+            />
+          ) : (
+            <IconSymbol name="scalemass" size={48} color={onboardingColors.primary} />
+          )}
+        </View>
+        
+        {/* Title */}
+        <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
           {t('onboarding.current_weight.title')}
         </ThemedText>
-        <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
+        <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
           {t('onboarding.current_weight.subtitle')}
         </ThemedText>
         
-        <View style={styles.measurementSection}>
-          <View style={styles.measurementHeader}>
-            <ThemedText style={[styles.label, { color: colors.text }]}>
-              {t('onboarding.current_weight.weight_label')}
-            </ThemedText>
-            <View style={styles.unitToggle}>
+        {/* Unit Toggle - Modern Pill Style */}
+        <View style={styles.unitToggleModern}>
+          {[
+            { value: 'kg', label: 'kg' },
+            { value: 'lbs', label: 'lbs' },
+          ].map((unitOption) => {
+            const selected = currentWeightUnit === unitOption.value;
+            
+            return (
               <TouchableOpacity
+                key={unitOption.value}
                 style={[
-                  styles.unitButton,
-                  { borderColor: colors.border },
-                  currentWeightUnit === 'kg' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
+                  styles.unitPill,
+                  selected ? styles.unitPillSelected : styles.unitPillUnselected,
+                  {
+                    transform: [{ scale: selected ? 1.02 : 1 }],
+                  },
+                  selected && {
+                    ...Platform.select({
+                      web: {
+                        background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                        boxShadow: `0 4px 12px ${onboardingColors.primary}40`,
+                      },
+                      default: {
+                        backgroundColor: onboardingColors.primary,
+                      },
+                    }),
+                  },
+                  Platform.select({
+                    web: {
+                      transition: 'all 0.2s ease',
+                    },
+                    default: {},
+                  }),
                 ]}
                 onPress={() => {
-                  setCurrentWeightUnit('kg');
-                  if (currentWeightLb) {
-                    const kg = parseFloat(currentWeightLb) / 2.20462;
-                    setCurrentWeightKg(kg.toFixed(1));
+                  if (unitOption.value === 'kg') {
+                    setCurrentWeightUnit('kg');
+                    if (currentWeightLb) {
+                      const kg = parseFloat(currentWeightLb) / 2.20462;
+                      setCurrentWeightKg(kg.toFixed(1));
+                    }
+                  } else {
+                    setCurrentWeightUnit('lbs');
+                    if (currentWeightKg) {
+                      const lbs = parseFloat(currentWeightKg) * 2.20462;
+                      setCurrentWeightLb(lbs.toFixed(1));
+                    }
                   }
+                  setError(null);
                 }}
                 disabled={loading}
+                {...getButtonAccessibilityProps(
+                  `${unitOption.label}${selected ? ' selected' : ''}`,
+                  `Double tap to select ${unitOption.label}`,
+                  loading
+                )}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
               >
-                <Text style={[styles.unitButtonText, { color: currentWeightUnit === 'kg' ? '#fff' : colors.text }]}>kg</Text>
+                <Text
+                  style={[
+                    styles.unitPillText,
+                    { color: selected ? '#FFFFFF' : onboardingColors.primary },
+                  ]}
+                >
+                  {unitOption.label}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity
+            );
+          })}
+        </View>
+        
+        {/* Weight Input */}
+        <View style={styles.heightInputContainer}>
+          <View style={styles.inputWrapper}>
+            {currentWeightUnit === 'kg' ? (
+              <TextInput
                 style={[
-                  styles.unitButton,
-                  { borderColor: colors.border },
-                  currentWeightUnit === 'lbs' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
+                  styles.inputModern,
+                  {
+                    borderColor: error && !currentWeightKg ? '#EF4444' : '#E5E7EB',
+                    color: colors.text,
+                    backgroundColor: '#FFFFFF',
+                  },
+                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
                 ]}
-                onPress={() => {
-                  setCurrentWeightUnit('lbs');
-                  if (currentWeightKg) {
-                    const lbs = parseFloat(currentWeightKg) * 2.20462;
-                    setCurrentWeightLb(lbs.toFixed(1));
-                  }
+                placeholder={t('onboarding.current_weight.weight_kg_placeholder')}
+                placeholderTextColor={colors.textSecondary}
+                value={currentWeightKg}
+                onChangeText={(text) => {
+                  setCurrentWeightKg(filterNumericInput(text));
+                  setError(null);
                 }}
-                disabled={loading}
-              >
-                <Text style={[styles.unitButtonText, { color: currentWeightUnit === 'lbs' ? '#fff' : colors.text }]}>lbs</Text>
-              </TouchableOpacity>
-            </View>
+                keyboardType="numeric"
+                editable={!loading}
+                {...getInputAccessibilityProps(
+                  'Current weight in kilograms',
+                  t('onboarding.current_weight.weight_kg_placeholder'),
+                  error && !currentWeightKg ? error : undefined,
+                  true
+                )}
+              />
+            ) : (
+              <TextInput
+                style={[
+                  styles.inputModern,
+                  {
+                    borderColor: error && !currentWeightLb ? '#EF4444' : '#E5E7EB',
+                    color: colors.text,
+                    backgroundColor: '#FFFFFF',
+                  },
+                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
+                ]}
+                placeholder={t('onboarding.current_weight.weight_lb_placeholder')}
+                placeholderTextColor={colors.textSecondary}
+                value={currentWeightLb}
+                onChangeText={(text) => {
+                  setCurrentWeightLb(filterNumericInput(text));
+                  setError(null);
+                }}
+                keyboardType="numeric"
+                editable={!loading}
+                {...getInputAccessibilityProps(
+                  'Current weight in pounds',
+                  t('onboarding.current_weight.weight_lb_placeholder'),
+                  error && !currentWeightLb ? error : undefined,
+                  true
+                )}
+              />
+            )}
+            <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>
+              {currentWeightUnit}
+            </Text>
           </View>
-          {currentWeightUnit === 'kg' ? (
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: error && !currentWeightKg ? '#EF4444' : colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
-                },
-              ]}
-              placeholder={t('onboarding.current_weight.weight_kg_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={currentWeightKg}
-              onChangeText={(text) => {
-                setCurrentWeightKg(filterHeightInput(text));
-                setError(null);
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                'Current weight in kilograms',
-                t('onboarding.current_weight.weight_kg_placeholder'),
-                error && !currentWeightKg ? error : undefined,
-                true
-              )}
-            />
-          ) : (
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: error && !currentWeightLb ? '#EF4444' : colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
-                },
-              ]}
-              placeholder={t('onboarding.current_weight.weight_lb_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={currentWeightLb}
-              onChangeText={(text) => {
-                setCurrentWeightLb(filterHeightInput(text));
-                setError(null);
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                'Current weight in pounds',
-                t('onboarding.current_weight.weight_lb_placeholder'),
-                error && !currentWeightLb ? error : undefined,
-                true
-              )}
-            />
-          )}
         </View>
       </View>
     );
   };
   
   const renderGoalWeightStep = () => {
-    // Sync weight units with current weight step
-    const displayUnit = goalWeightUnit;
-    
     return (
-      <View style={styles.stepContent}>
-        <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
+      <View style={styles.stepContentAnimated}>
+        {/* SVG Illustration */}
+        <View style={styles.stepIllustration}>
+          {Platform.OS === 'web' ? (
+            <View
+              style={{
+                width: 48,
+                height: 48,
+              }}
+              // @ts-ignore - web-specific prop
+              dangerouslySetInnerHTML={{
+                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+              }}
+            />
+          ) : (
+            <IconSymbol name="target" size={48} color={onboardingColors.primary} />
+          )}
+        </View>
+        
+        {/* Title */}
+        <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
           {t('onboarding.goal_weight.title')}
         </ThemedText>
-        <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
+        <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
           {t('onboarding.goal_weight.subtitle')}
         </ThemedText>
         
-        <View style={styles.measurementSection}>
-          <View style={styles.measurementHeader}>
-            <ThemedText style={[styles.label, { color: colors.text }]}>
-              {t('onboarding.goal_weight.weight_label')}
-            </ThemedText>
-            <View style={styles.unitToggle}>
+        {/* Unit Toggle - Modern Pill Style */}
+        <View style={styles.unitToggleModern}>
+          {[
+            { value: 'kg', label: 'kg' },
+            { value: 'lbs', label: 'lbs' },
+          ].map((unitOption) => {
+            const selected = goalWeightUnit === unitOption.value;
+            
+            return (
               <TouchableOpacity
+                key={unitOption.value}
                 style={[
-                  styles.unitButton,
-                  { borderColor: colors.border },
-                  goalWeightUnit === 'kg' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
+                  styles.unitPill,
+                  selected ? styles.unitPillSelected : styles.unitPillUnselected,
+                  {
+                    transform: [{ scale: selected ? 1.02 : 1 }],
+                  },
+                  selected && {
+                    ...Platform.select({
+                      web: {
+                        background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                        boxShadow: `0 4px 12px ${onboardingColors.primary}40`,
+                      },
+                      default: {
+                        backgroundColor: onboardingColors.primary,
+                      },
+                    }),
+                  },
+                  Platform.select({
+                    web: {
+                      transition: 'all 0.2s ease',
+                    },
+                    default: {},
+                  }),
                 ]}
                 onPress={() => {
-                  setGoalWeightUnit('kg');
-                  if (goalWeightLb) {
-                    const kg = parseFloat(goalWeightLb) / 2.20462;
-                    setGoalWeightKg(kg.toFixed(1));
+                  if (unitOption.value === 'kg') {
+                    setGoalWeightUnit('kg');
+                    if (goalWeightLb) {
+                      const kg = parseFloat(goalWeightLb) / 2.20462;
+                      setGoalWeightKg(kg.toFixed(1));
+                    }
+                  } else {
+                    setGoalWeightUnit('lbs');
+                    if (goalWeightKg) {
+                      const lbs = parseFloat(goalWeightKg) * 2.20462;
+                      setGoalWeightLb(lbs.toFixed(1));
+                    }
                   }
+                  setError(null);
                 }}
                 disabled={loading}
+                {...getButtonAccessibilityProps(
+                  `${unitOption.label}${selected ? ' selected' : ''}`,
+                  `Double tap to select ${unitOption.label}`,
+                  loading
+                )}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
               >
-                <Text style={[styles.unitButtonText, { color: goalWeightUnit === 'kg' ? '#fff' : colors.text }]}>kg</Text>
+                <Text
+                  style={[
+                    styles.unitPillText,
+                    { color: selected ? '#FFFFFF' : onboardingColors.primary },
+                  ]}
+                >
+                  {unitOption.label}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity
+            );
+          })}
+        </View>
+        
+        {/* Weight Input */}
+        <View style={styles.heightInputContainer}>
+          <View style={styles.inputWrapper}>
+            {goalWeightUnit === 'kg' ? (
+              <TextInput
                 style={[
-                  styles.unitButton,
-                  { borderColor: colors.border },
-                  goalWeightUnit === 'lbs' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
+                  styles.inputModern,
+                  {
+                    borderColor: error && !goalWeightKg ? '#EF4444' : '#E5E7EB',
+                    color: colors.text,
+                    backgroundColor: '#FFFFFF',
+                  },
+                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
                 ]}
-                onPress={() => {
-                  setGoalWeightUnit('lbs');
-                  if (goalWeightKg) {
-                    const lbs = parseFloat(goalWeightKg) * 2.20462;
-                    setGoalWeightLb(lbs.toFixed(1));
-                  }
+                placeholder={t('onboarding.goal_weight.weight_kg_placeholder')}
+                placeholderTextColor={colors.textSecondary}
+                value={goalWeightKg}
+                onChangeText={(text) => {
+                  setGoalWeightKg(filterNumericInput(text));
+                  setError(null);
                 }}
-                disabled={loading}
-              >
-                <Text style={[styles.unitButtonText, { color: goalWeightUnit === 'lbs' ? '#fff' : colors.text }]}>lbs</Text>
-              </TouchableOpacity>
-            </View>
+                keyboardType="numeric"
+                editable={!loading}
+                {...getInputAccessibilityProps(
+                  'Goal weight in kilograms',
+                  t('onboarding.goal_weight.weight_kg_placeholder'),
+                  error && !goalWeightKg ? error : undefined,
+                  true
+                )}
+              />
+            ) : (
+              <TextInput
+                style={[
+                  styles.inputModern,
+                  {
+                    borderColor: error && !goalWeightLb ? '#EF4444' : '#E5E7EB',
+                    color: colors.text,
+                    backgroundColor: '#FFFFFF',
+                  },
+                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
+                ]}
+                placeholder={t('onboarding.goal_weight.weight_lb_placeholder')}
+                placeholderTextColor={colors.textSecondary}
+                value={goalWeightLb}
+                onChangeText={(text) => {
+                  setGoalWeightLb(filterNumericInput(text));
+                  setError(null);
+                }}
+                keyboardType="numeric"
+                editable={!loading}
+                {...getInputAccessibilityProps(
+                  'Goal weight in pounds',
+                  t('onboarding.goal_weight.weight_lb_placeholder'),
+                  error && !goalWeightLb ? error : undefined,
+                  true
+                )}
+              />
+            )}
+            <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>
+              {goalWeightUnit}
+            </Text>
           </View>
-          {goalWeightUnit === 'kg' ? (
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: error && !goalWeightKg ? '#EF4444' : colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
-                },
-              ]}
-              placeholder={t('onboarding.goal_weight.weight_kg_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={goalWeightKg}
-              onChangeText={(text) => {
-                setGoalWeightKg(filterHeightInput(text));
-                setError(null);
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                'Goal weight in kilograms',
-                t('onboarding.goal_weight.weight_kg_placeholder'),
-                error && !goalWeightKg ? error : undefined,
-                true
-              )}
-            />
-          ) : (
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: error && !goalWeightLb ? '#EF4444' : colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
-                },
-              ]}
-              placeholder={t('onboarding.goal_weight.weight_lb_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={goalWeightLb}
-              onChangeText={(text) => {
-                setGoalWeightLb(filterHeightInput(text));
-                setError(null);
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                'Goal weight in pounds',
-                t('onboarding.goal_weight.weight_lb_placeholder'),
-                error && !goalWeightLb ? error : undefined,
-                true
-              )}
-            />
-          )}
         </View>
       </View>
     );
@@ -2249,76 +2275,134 @@ export default function OnboardingScreen() {
     }
     
     return (
-      <View style={styles.stepContent}>
-        <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
+      <View style={styles.stepContentAnimated}>
+        {/* SVG Illustration */}
+        <View style={styles.stepIllustration}>
+          {Platform.OS === 'web' ? (
+            <View
+              style={{
+                width: 48,
+                height: 48,
+              }}
+              // @ts-ignore - web-specific prop
+              dangerouslySetInnerHTML={{
+                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+              }}
+            />
+          ) : (
+            <IconSymbol name="clock" size={48} color={onboardingColors.primary} />
+          )}
+        </View>
+        
+        {/* Title */}
+        <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
           {t('onboarding.timeline.title')}
         </ThemedText>
-        <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
+        <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
           {t('onboarding.timeline.subtitle')}
         </ThemedText>
         
+        {/* Trajectory Summary Box - Neutral Style */}
         {currentWeightDisplay && goalWeightDisplay && (
-          <View style={[styles.summaryBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-            <ThemedText style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+          <View style={styles.trajectorySummaryBox}>
+            <Text style={styles.trajectorySummaryLabel}>
               {t('onboarding.timeline.summary_label')}
-            </ThemedText>
-            <ThemedText style={[styles.summaryValue, { color: colors.text }]}>
+            </Text>
+            <Text style={styles.trajectorySummaryValue}>
               From {currentWeightDisplay} to {goalWeightDisplay}
-            </ThemedText>
+            </Text>
           </View>
         )}
         
+        {/* Timeline Options */}
         <View style={styles.goalContainer}>
           {[
             { value: '3_months' as const, labelKey: 'onboarding.timeline.three_months' },
             { value: '6_months' as const, labelKey: 'onboarding.timeline.six_months' },
             { value: '12_months' as const, labelKey: 'onboarding.timeline.twelve_months' },
             { value: 'no_deadline' as const, labelKey: 'onboarding.timeline.no_deadline' },
-          ].map((timeline) => (
-            <TouchableOpacity
-              key={timeline.value}
-              style={[
-                styles.goalCard,
-                { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
-                timelineOption === timeline.value && { 
-                  backgroundColor: colors.tint, 
-                  borderColor: colors.tint,
-                  ...Platform.select({
-                    web: { boxShadow: `0 4px 12px ${colors.tint}40` },
-                    default: {
-                      shadowColor: colors.tint,
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 8,
-                      elevation: 4,
-                    },
-                  }),
-                },
-              ]}
-              onPress={() => {
-                setTimelineOption(timeline.value);
-                setCustomTargetDate(null);
-                setError(null);
-              }}
-              disabled={loading}
-              {...getButtonAccessibilityProps(
-                `${t(timeline.labelKey)}${timelineOption === timeline.value ? ' selected' : ''}`,
-                `Double tap to select ${t(timeline.labelKey)}`,
-                loading
-              )}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: timelineOption === timeline.value }}
-            >
-              <Text style={[styles.goalCardTitle, { color: timelineOption === timeline.value ? '#fff' : colors.text }]}>
-                {t(timeline.labelKey)}
-              </Text>
-              {timelineOption === timeline.value && (
-                <View style={styles.goalCardCheckmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+          ].map((timeline) => {
+            const selected = timelineOption === timeline.value;
+            const pressed = pressedCard === timeline.value;
+            
+            return (
+              <TouchableOpacity
+                key={timeline.value}
+                style={[
+                  styles.goalCard,
+                  {
+                    borderColor: selected ? 'transparent' : colors.border,
+                    backgroundColor: selected ? undefined : colors.background,
+                    borderWidth: selected ? 0 : 1,
+                    borderRadius: 16,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
+                    opacity: pressed ? 0.96 : 1,
+                  },
+                  !selected && {
+                    ...Platform.select({
+                      web: {
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s ease',
+                      },
+                      default: {
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 2,
+                      },
+                    }),
+                  },
+                  selected && {
+                    ...Platform.select({
+                      web: {
+                        background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        transition: 'all 0.2s ease',
+                      },
+                      default: {
+                        backgroundColor: onboardingColors.primary,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.12,
+                        shadowRadius: 12,
+                        elevation: 4,
+                      },
+                    }),
+                  },
+                  Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
+                ]}
+                onPress={() => {
+                  setTimelineOption(timeline.value);
+                  setCustomTargetDate(null);
+                  setError(null);
+                }}
+                onPressIn={() => setPressedCard(timeline.value)}
+                onPressOut={() => setPressedCard(null)}
+                disabled={loading}
+                {...getButtonAccessibilityProps(
+                  `${t(timeline.labelKey)}${selected ? ' selected' : ''}`,
+                  `Double tap to select ${t(timeline.labelKey)}`,
+                  loading
+                )}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
+                  <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
+                    {t(timeline.labelKey)}
+                  </Text>
                 </View>
-              )}
-            </TouchableOpacity>
-          ))}
+                {selected && (
+                  <View style={styles.goalCardCheckmark}>
+                    <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     );
@@ -2472,10 +2556,10 @@ export default function OnboardingScreen() {
               style={[
                 styles.unitButton,
                 { borderColor: colors.border },
-                heightUnit === 'ft' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
+                heightUnit === 'ft/in' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
               ]}
               onPress={() => {
-                setHeightUnit('ft');
+                setHeightUnit('ft/in');
                 if (heightCm) {
                   const totalInches = parseFloat(heightCm) / 2.54;
                   const feet = Math.floor(totalInches / 12);
@@ -2486,7 +2570,7 @@ export default function OnboardingScreen() {
               }}
               disabled={loading}
             >
-              <Text style={[styles.unitButtonText, { color: heightUnit === 'ft' ? '#fff' : colors.text }]}>
+              <Text style={[styles.unitButtonText, { color: heightUnit === 'ft/in' ? '#fff' : colors.text }]}>
                 ft/in
               </Text>
             </TouchableOpacity>
@@ -3199,6 +3283,12 @@ const styles = StyleSheet.create({
   cardContent: {
     gap: 20,
   },
+  stepIndicatorWrapper: {
+    width: '100%',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stepIndicatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3422,6 +3512,39 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  trajectorySummaryBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+      },
+    }),
+  },
+  trajectorySummaryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    color: '#6B7280',
+  },
+  trajectorySummaryValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   advancedGoalLink: {
     marginTop: 12,

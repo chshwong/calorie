@@ -35,6 +35,101 @@ export function cmToMeters(cm: number): number {
 }
 
 /**
+ * Convert feet and inches to centimeters
+ * @param feet - Height in feet
+ * @param inches - Height in inches
+ * @returns Height in centimeters
+ */
+export function ftInToCm(feet: number, inches: number): number {
+  const totalInches = feet * 12 + inches;
+  return totalInches * 2.54;
+}
+
+/**
+ * Convert centimeters to feet and inches
+ * @param cm - Height in centimeters
+ * @returns Object with feet and inches, or null if invalid
+ */
+export function cmToFtIn(cm: number): { feet: number; inches: number } | null {
+  if (isNaN(cm) || cm <= 0) return null;
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return { feet, inches };
+}
+
+/**
+ * Convert centimeters to inches
+ * @param cm - Height in centimeters
+ * @returns Height in inches
+ */
+export function cmToInches(cm: number): number {
+  return cm / 2.54;
+}
+
+/**
+ * Convert inches to centimeters
+ * @param inches - Height in inches
+ * @returns Height in centimeters
+ */
+export function inchesToCm(inches: number): number {
+  return inches * 2.54;
+}
+
+/**
+ * Converts height from form inputs to centimeters
+ * Handles both cm and ft/in inputs
+ * @param unit - Unit type: 'cm' or 'ft/in'
+ * @param cmValue - Height in cm as string (for 'cm' unit)
+ * @param ftValue - Height in feet as string (for 'ft/in' unit)
+ * @param inValue - Height in inches as string (for 'ft/in' unit)
+ * @returns Height in centimeters, or null if invalid
+ */
+export function convertHeightToCm(
+  unit: 'cm' | 'ft/in',
+  cmValue?: string,
+  ftValue?: string,
+  inValue?: string
+): number | null {
+  if (unit === 'cm') {
+    const cm = cmValue ? parseFloat(cmValue) : NaN;
+    return isNaN(cm) || cm <= 0 ? null : cm;
+  } else {
+    const ft = ftValue ? parseFloat(ftValue) : NaN;
+    const inches = inValue ? parseFloat(inValue) : NaN;
+    if (isNaN(ft) || isNaN(inches) || ft <= 0) {
+      return null;
+    }
+    return ftInToCm(ft, inches);
+  }
+}
+
+/**
+ * Converts weight from form inputs to kilograms
+ * Handles both kg and lbs inputs
+ * @param unit - Unit type: 'kg' or 'lbs'
+ * @param kgValue - Weight in kg as string (for 'kg' unit)
+ * @param lbsValue - Weight in lbs as string (for 'lbs' unit)
+ * @returns Weight in kilograms, or null if invalid
+ */
+export function convertWeightToKg(
+  unit: 'kg' | 'lbs',
+  kgValue?: string,
+  lbsValue?: string
+): number | null {
+  if (unit === 'kg') {
+    const kg = kgValue ? parseFloat(kgValue) : NaN;
+    return isNaN(kg) || kg <= 0 ? null : kg;
+  } else {
+    const lbs = lbsValue ? parseFloat(lbsValue) : NaN;
+    if (isNaN(lbs) || lbs <= 0) {
+      return null;
+    }
+    return lbsToKg(lbs);
+  }
+}
+
+/**
  * Calculate BMI from weight (kg) and height (cm)
  * Uses metric formula: BMI = weight(kg) / height(m)²
  * 

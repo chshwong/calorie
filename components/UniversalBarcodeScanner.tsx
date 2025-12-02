@@ -135,6 +135,7 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
   const [loading, setLoading] = useState(false);
   const scannerRef = useRef<any | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const isStartingRef = useRef(false);
   const cameraContainerId = "barcode-scanner-container";
 
   // Helper function to stop camera safely
@@ -165,26 +166,13 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
     onDetected(barcodeData);
   }, [onDetected]);
 
-  // Camera scan success callback
-  const onScanSuccess = useCallback(async (decodedText: string) => {
-    if (!decodedText) return;
-    
-    // Stop scanning once we have a good barcode
-    await stopCameraSafely();
-    
-    // Handle the detected barcode
-    handleBarcodeDetected(decodedText);
-  }, [handleBarcodeDetected, stopCameraSafely]);
-
-  // Camera scan failure callback - ignore minor failures
-  const onScanFailure = useCallback((error: any) => {
-    // Silently ignore scan failures - do NOT spam setState here
-    // This callback is called continuously when no barcode is detected
-  }, []);
 
   // Helper function to start camera safely
   const startCameraSafely = useCallback(async () => {
-    if (isCameraActive || !scannerRef.current) return;
+    if (isCameraActive || !scannerRef.current || isStartingRef.current) {
+      console.log("[BarcodeScanner] Skipping start - already active or starting");
+      return;
+    }
 
     try {
       setErrorMessage(null);
@@ -196,22 +184,46 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
         throw new Error("Scanner container not found. Please refresh the page.");
       }
 
+      console.log("[BarcodeScanner] Starting camera...");
+      
+      // Create stable callback functions
+      const scanSuccessCallback = async (decodedText: string, decodedResult: any) => {
+        // This is the success callback - called when a barcode is detected
+        console.log("[BarcodeScanner] Barcode detected:", decodedText, decodedResult);
+        
+        if (!decodedText) return;
+        
+        // Stop scanning once we have a good barcode
+        await stopCameraSafely();
+        
+        // Handle the detected barcode
+        handleBarcodeDetected(decodedText);
+      };
+
+      const scanErrorCallback = (errorMessage: string) => {
+        // This is called continuously when no barcode is detected
+        // We ignore these errors silently - don't log or setState here
+      };
+
       await scannerRef.current.start(
         { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 300, height: 200 },
+          qrbox: { width: 250, height: 250 }, // Square box for better barcode detection
+          aspectRatio: 1.0, // Square aspect ratio
         },
-        onScanSuccess,
-        onScanFailure
+        scanSuccessCallback,
+        scanErrorCallback
       );
       
+      console.log("[BarcodeScanner] Camera started successfully");
       setIsCameraActive(true);
       setLoading(false);
     } catch (err: any) {
-      console.error("Failed to start camera", err);
+      console.error("[BarcodeScanner] Failed to start camera", err);
       setIsCameraActive(false);
       setLoading(false);
+      isStartingRef.current = false;
       
       let errorMsg = "Unable to start camera. On mobile, use HTTPS (not http://IP) and allow camera access, or switch to Upload Photo.";
       if (err?.name === "NotAllowedError") {
@@ -226,18 +238,21 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
       
       setErrorMessage(errorMsg);
     }
-  }, [isCameraActive, onScanSuccess, onScanFailure]);
+  }, [isCameraActive, handleBarcodeDetected, stopCameraSafely]);
 
   // Initialize scanner instance and manage camera lifecycle
   useEffect(() => {
     // Only run on web platform
     if (Platform.OS !== "web") return;
 
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
     // Initialize scanner instance if needed
     const initScanner = async () => {
       if (!scannerRef.current) {
         try {
-          const { Html5Qrcode } = await import("html5-qrcode");
+          const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
           const container = document.getElementById(cameraContainerId);
           
           if (!container) {
@@ -245,10 +260,36 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
             return;
           }
 
-          scannerRef.current = new Html5Qrcode(cameraContainerId);
+          // Configure scanner to support product barcodes (not just QR codes)
+          const formatsToSupport = Html5QrcodeSupportedFormats ? [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.QR_CODE, // Also support QR codes
+          ].filter(Boolean) : undefined;
+
+          const config: any = {
+            verbose: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true, // Use native BarcodeDetector API if available
+            },
+          };
+
+          if (formatsToSupport) {
+            config.formatsToSupport = formatsToSupport;
+          }
+
+          scannerRef.current = new Html5Qrcode(cameraContainerId, config);
         } catch (err) {
           console.error("Failed to initialize scanner", err);
-          setErrorMessage("Failed to load barcode scanner. Please refresh the page.");
+          if (isMounted) {
+            setErrorMessage("Failed to load barcode scanner. Please refresh the page.");
+          }
         }
       }
     };
@@ -257,15 +298,32 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
 
     // Start/stop camera based on active tab
     if (activeTab === "camera") {
-      // Small delay to ensure DOM is ready
-      const timeoutId = setTimeout(() => {
-        if (scannerRef.current && !isCameraActive) {
-          startCameraSafely();
+      // Small delay to ensure DOM is ready and scanner is initialized
+      timeoutId = setTimeout(async () => {
+        if (!isMounted) return;
+        
+        // Wait for scanner to be initialized
+        if (!scannerRef.current) {
+          // Retry after a bit more time
+          setTimeout(async () => {
+            if (!isMounted || !scannerRef.current || isCameraActive || isStartingRef.current) return;
+            isStartingRef.current = true;
+            await startCameraSafely();
+            isStartingRef.current = false;
+          }, 200);
+          return;
         }
-      }, 100);
+
+        if (!isCameraActive && !isStartingRef.current) {
+          isStartingRef.current = true;
+          await startCameraSafely();
+          isStartingRef.current = false;
+        }
+      }, 200);
 
       return () => {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
+        isMounted = false;
         // Stop camera when tab changes away from camera or component unmounts
         stopCameraSafely();
       };
@@ -273,7 +331,7 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
       // When tab changes away from camera, release camera
       stopCameraSafely();
     }
-  }, [activeTab, isCameraActive, startCameraSafely, stopCameraSafely]);
+  }, [activeTab]); // Removed isCameraActive and callbacks from deps to prevent restarts
 
   // Handle file upload - decode barcode from image
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {

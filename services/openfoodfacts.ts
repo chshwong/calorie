@@ -47,8 +47,6 @@ export type OpenFoodFactsProduct = {
   sodium100g: number | null;
   /** Raw serving size text from OFF, e.g., "250 ml" */
   servingSize: string | null;
-  /** Full raw JSON payload for debugging/future use */
-  rawPayload: Record<string, any>;
 };
 
 export type OpenFoodFactsResult = 
@@ -128,7 +126,6 @@ export async function fetchProductByBarcode(
       sodium100g: parseNumericField(nutriments.sodium_100g),
       
       servingSize: product.serving_size || null,
-      rawPayload: data,
     };
     
     return {

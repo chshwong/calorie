@@ -68,13 +68,14 @@ export function FoodSourceBadge({
 const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 1,
     borderRadius: 3,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 20,
-    minWidth: 20,
+    marginVertical: 0,
+    minHeight: 18,
+    minWidth: 18,
   },
   badgeText: {
     fontSize: 9,

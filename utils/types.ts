@@ -192,8 +192,6 @@ export interface ExternalFoodCache {
   sodium_100g: number | null;
   /** Raw serving size text from source, e.g., "250 ml" */
   serving_size: string | null;
-  /** Full original JSON from source API */
-  raw_payload: Record<string, any> | null;
   created_at: string;
   updated_at: string;
   /** Last time we fetched from the external API */
@@ -202,6 +200,8 @@ export interface ExternalFoodCache {
   times_scanned: number;
   /** If promoted to food_master, the ID of that row */
   promoted_food_master_id: string | null;
+  /** Whether this cached food entry has been verified by an admin */
+  is_verified: boolean;
 }
 
 /**

@@ -9,7 +9,8 @@ import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useFoodSearch } from '@/hooks/use-food-search';
+import { useEnhancedFoodSearch } from '@/hooks/use-enhanced-food-search';
+import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
@@ -582,7 +583,7 @@ export default function LogFoodScreen() {
     animationDelay: 150, // Slightly longer delay to ensure render completes
   });
 
-  // Use shared food search hook (per engineering guidelines 5.1)
+  // Use enhanced food search hook (per engineering guidelines 5.1)
   const {
     searchQuery,
     searchResults,
@@ -590,8 +591,15 @@ export default function LogFoodScreen() {
     showSearchResults,
     setShowSearchResults,
     handleSearchChange,
+    handleEnterPress,
     clearSearch,
-  } = useFoodSearch();
+    ensureLocalFoodsLoaded,
+    highlightedIndex,
+    setHighlightedIndex,
+  } = useEnhancedFoodSearch({
+    mealType,
+    maxResults: 20,
+  });
   
   // Barcode scanning state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -2542,9 +2550,10 @@ export default function LogFoodScreen() {
   /**
    * Quick Add - adds food entry with default serving immediately
    * Uses centralized serving logic from lib/servings.ts
-   * For Recent tab: uses latest entry's serving if provided
+   * For Recent items: uses recent_serving if available (from EnhancedFoodItem)
+   * For other items: uses default serving
    */
-  const handleQuickAdd = async (food: FoodMaster, latestEntry?: CalorieEntry) => {
+  const handleQuickAdd = async (food: FoodMaster | EnhancedFoodItem, latestEntry?: CalorieEntry) => {
     if (!user?.id) return;
 
     try {
@@ -2553,22 +2562,44 @@ export default function LogFoodScreen() {
       let servingId: string | null = null;
       let nutrients: Nutrients;
 
-      if (latestEntry) {
-        // Recent tab: use latest entry's serving configuration
+      // Check if this is an EnhancedFoodItem with recent_serving
+      const enhancedFood = food as EnhancedFoodItem;
+      if (enhancedFood.recent_serving) {
+        // Recent item: use recent_serving (last-used serving size)
+        servingQuantity = enhancedFood.recent_serving.quantity;
+        servingUnit = enhancedFood.recent_serving.unit;
+        
+        // Calculate nutrients based on recent serving
+        // Fetch servings to find matching serving if it was a saved serving
+        const servings = await getServingsForFood(food.id);
+        const matchingServing = servings.find(s => 
+          s.serving_name && (
+            s.serving_name.includes(`${servingQuantity} ${servingUnit}`) ||
+            (s.weight_g && servingUnit === 'g' && Math.abs(s.weight_g - servingQuantity) < 0.01) ||
+            (s.volume_ml && servingUnit === 'ml' && Math.abs(s.volume_ml - servingQuantity) < 0.01)
+          )
+        );
+        
+        if (matchingServing) {
+          servingId = matchingServing.id;
+          nutrients = computeNutrientsForFoodServing(food, matchingServing, servingQuantity);
+        } else {
+          // Using raw quantity/unit - calculate from food_master
+          nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
+        }
+      } else if (latestEntry) {
+        // Fallback: Recent tab with latestEntry (for compatibility)
         servingQuantity = latestEntry.quantity;
         servingUnit = latestEntry.unit;
         servingId = latestEntry.serving_id || null;
         
         // Calculate nutrients based on the latest entry's portion
-        // Fetch servings to check if this was a saved serving
         const servings = await getServingsForFood(food.id);
         const savedServing = servingId ? servings.find(s => s.id === servingId) : null;
         
         if (savedServing) {
-          // Use the saved serving for calculation
           nutrients = computeNutrientsForFoodServing(food, savedServing, servingQuantity);
         } else {
-          // Using raw quantity/unit - calculate from food_master
           nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
         }
       } else {
@@ -3115,51 +3146,34 @@ export default function LogFoodScreen() {
         {/* Search Bar - Hide when editing, when food is selected, or when in manual mode */}
         {!editingEntryId && !selectedFood && !isManualMode && (
           <View style={styles.searchContainer}>
-            <View style={[
-              styles.searchInputWrapper,
-              { 
-                borderColor: colors.icon + '20', 
-                backgroundColor: colors.background,
-              }
-            ]}>
-              <IconSymbol
-                name="magnifyingglass"
-                size={18}
-                color={colors.icon}
-                style={styles.searchIconLeft}
-              />
-              <TextInput
-                style={[
-                  styles.searchInput, 
-                  { 
-                    color: colors.text, 
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+            <View style={styles.searchBarWrapper}>
+              <FoodSearchBar
+                searchQuery={searchQuery}
+                onSearchChange={handleSearchChange}
+                onEnterPress={() => {
+                  const selected = handleEnterPress();
+                  if (selected) {
+                    handleFoodSelect(selected);
                   }
-                ]}
+                  return selected;
+                }}
+                onClearSearch={clearSearch}
+                onSetShowSearchResults={setShowSearchResults}
+                onEnsureLocalFoodsLoaded={ensureLocalFoodsLoaded}
+                searchResults={searchResults}
+                searchLoading={searchLoading}
+                showSearchResults={showSearchResults}
+                onSelectFood={handleFoodSelect}
                 placeholder={t('mealtype_log.search_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={searchQuery}
-                onChangeText={handleSearchChange}
-                autoCapitalize="none"
-                autoCorrect={false}
-                {...getInputAccessibilityProps(
-                  'Search for food',
-                  'Type to search for food items to add to your meal'
-                )}
-                {...getWebAccessibilityProps(
-                  'searchbox',
-                  'Search for food'
-                )}
+                colors={colors}
+                onQuickAdd={(food) => {
+                  const enhancedFood = food as EnhancedFoodItem;
+                  handleQuickAdd(enhancedFood);
+                }}
+                quickAddLabel={t('mealtype_log.quick_add')}
+                highlightedIndex={highlightedIndex}
+                onHighlightChange={setHighlightedIndex}
               />
-              {searchLoading && (
-                <ActivityIndicator 
-                  size="small" 
-                  color={colors.tint} 
-                  style={styles.searchLoader}
-                  accessible={true}
-                  accessibilityLabel={t('mealtype_log.accessibility.searching')}
-                />
-              )}
             </View>
             <TouchableOpacity
               style={[styles.barcodeButton, { 
@@ -3183,73 +3197,6 @@ export default function LogFoodScreen() {
                 accessibilityLabel={t('mealtype_log.accessibility.scan_barcode')}
               />
             </TouchableOpacity>
-
-            {/* Floating Search Results Overlay - positioned above tabs */}
-            {showSearchResults && searchResults.length > 0 && (
-              <View
-                style={[
-                  styles.searchResultsOverlay,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.tint + '40',
-                  },
-                ]}
-              >
-                <ScrollView
-                  style={styles.searchResultsList}
-                  nestedScrollEnabled
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {searchResults.map((food, index) => (
-                    <View
-                      key={food.id}
-                      style={[
-                        styles.searchResultItemRow,
-                        { 
-                          borderBottomColor: colors.icon + '15',
-                          backgroundColor: colors.background,
-                        },
-                        index === searchResults.length - 1 && { borderBottomWidth: 0 },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        style={styles.searchResultTouchable}
-                        onPress={() => handleFoodSelect(food)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.searchResultContent}>
-                          <ThemedText style={[styles.searchResultName, { color: colors.text }]}>
-                            {food.name}
-                          </ThemedText>
-                          {food.brand && (
-                            <ThemedText style={[styles.searchResultBrand, { color: colors.textSecondary }]}>
-                              {food.brand}
-                            </ThemedText>
-                          )}
-                          <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary }]}>
-                            {food.defaultServingQty} {food.defaultServingUnit} • {food.defaultServingCalories} kcal
-                          </ThemedText>
-                        </View>
-                      </TouchableOpacity>
-                      {/* Quick Add Button */}
-                      <TouchableOpacity
-                        style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                        onPress={() => handleQuickAdd(food)}
-                        activeOpacity={0.7}
-                        accessibilityLabel={t('mealtype_log.quick_add')}
-                        accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
-                      >
-                        <IconSymbol
-                          name="plus.circle.fill"
-                          size={22}
-                          color={colors.tint}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
         )}
 
@@ -5771,6 +5718,10 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: 16,
+  },
+  searchBarWrapper: {
+    flex: 1,
+    marginRight: 8,
   },
   searchContainer: {
     flexDirection: 'row',

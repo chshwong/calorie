@@ -137,6 +137,31 @@ export default function AdminPage() {
               <Text style={styles.mergeFoodButtonText}>User 360</Text>
             </View>
           </TouchableOpacity>
+
+          {/* External Cache Food Promotion Button */}
+          <TouchableOpacity
+            style={[
+              styles.mergeFoodButton,
+              getMinTouchTargetStyle(),
+              {
+                backgroundColor: colors.tint,
+                ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
+              },
+            ]}
+            onPress={() => {
+              router.push('/external-cache-food-promotion');
+            }}
+            activeOpacity={0.8}
+            {...getButtonAccessibilityProps(
+              'External Cache Food Promotion',
+              'Double tap to promote external cache food items'
+            )}
+          >
+            <View style={styles.buttonContent}>
+              <IconSymbol name="arrow.up.circle.fill" size={20} color="#fff" decorative={true} />
+              <Text style={styles.mergeFoodButtonText}>External Cache Food Promotion</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </ThemedView>

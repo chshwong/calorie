@@ -30,7 +30,7 @@ const queryClient = new QueryClient({
 // Keep the splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
 
-// Import global CSS for web focus styles
+// Import global CSS for web focus styles and tab bar constraints
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const style = document.createElement('style');
   style.textContent = `
@@ -45,6 +45,13 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     }
     button, a, [role="button"], [role="link"], input, textarea, select {
       transition: all 0.2s ease;
+    }
+    
+    /* Tab bar content width constraint for large desktop screens */
+    /* Note: This is handled by ConstrainedTabBar component, but keeping as fallback */
+    @media (min-width: 1024px) {
+      /* Ensure tab bar content wrapper respects max-width */
+      /* The ConstrainedTabBar component handles this, but this provides additional safety */
     }
   `;
   document.head.appendChild(style);

@@ -17,6 +17,7 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeBarcode, BarcodeError } from '@/lib/barcode';
 import { fetchProductByBarcode, OpenFoodFactsProduct, sodiumGramsToMg } from './openfoodfacts';
+import { mapExternalFoodToBase } from '@/lib/food/mapExternalFoodToBase';
 
 // ============================================================================
 // Types
@@ -61,12 +62,12 @@ export type ExternalFoodCacheRow = {
   fiber_100g: number | null;
   sodium_100g: number | null;
   serving_size: string | null;
-  raw_payload: Record<string, any> | null;
   created_at: string;
   updated_at: string;
   last_fetched_at: string | null;
   times_scanned: number;
   promoted_food_master_id: string | null;
+  is_verified: boolean;
 };
 
 /** Result types for barcode lookup */
@@ -410,7 +411,6 @@ async function upsertExternalCache(
     fiber_100g: product.fiber100g,
     sodium_100g: product.sodium100g,
     serving_size: product.servingSize,
-    raw_payload: product.rawPayload,
     last_fetched_at: now,
     times_scanned: existingRow ? (existingRow.times_scanned || 0) + 1 : 1,
   };
@@ -432,6 +432,7 @@ async function upsertExternalCache(
       created_at: existingRow?.created_at || now,
       updated_at: now,
       promoted_food_master_id: existingRow?.promoted_food_master_id || null,
+      is_verified: existingRow?.is_verified ?? false,
     } as ExternalFoodCacheRow;
   }
   
@@ -465,25 +466,33 @@ export async function promoteToFoodMaster(
   const servingSize = overrides?.serving_size ?? 100;
   const servingUnit = overrides?.serving_unit ?? 'g';
   
-  // Create food_master entry
+  // Use shared mapping helper to convert external food to base format
+  const base = mapExternalFoodToBase({
+    externalFood: cacheRow,
+    servingSize,
+    servingUnit,
+  });
+  
+  // Create food_master entry using the mapped values
   const { data: newFood, error: insertError } = await supabase
     .from('food_master')
     .insert({
-      name: overrides?.name ?? cacheRow.product_name ?? 'Unknown Product',
-      brand: overrides?.brand ?? cacheRow.brand,
-      barcode: cacheRow.barcode,
-      calories_kcal: cacheRow.energy_kcal_100g ?? 0,
-      protein_g: cacheRow.protein_100g ?? 0,
-      carbs_g: cacheRow.carbs_100g ?? 0,
-      fat_g: cacheRow.fat_100g ?? 0,
-      fiber_g: cacheRow.fiber_100g,
-      saturated_fat_g: cacheRow.saturated_fat_100g,
-      trans_fat_g: cacheRow.trans_fat_100g,
-      sugar_g: cacheRow.sugars_100g,
-      sodium_mg: cacheRow.sodium_100g ? sodiumGramsToMg(cacheRow.sodium_100g) : null,
-      serving_size: servingSize,
-      serving_unit: servingUnit,
-      source: 'openfoodfacts',
+      name: overrides?.name ?? base.name ?? 'Unknown Product',
+      brand: overrides?.brand ?? base.brand,
+      barcode: base.barcode,
+      calories_kcal: base.calories_kcal ?? 0,
+      protein_g: base.protein_g ?? 0,
+      carbs_g: base.carbs_g ?? 0,
+      fat_g: base.fat_g ?? 0,
+      fiber_g: base.fiber_g,
+      saturated_fat_g: base.saturated_fat_g,
+      unsaturated_fat_g: base.unsaturated_fat_g,
+      trans_fat_g: base.trans_fat_g,
+      sugar_g: base.sugar_g,
+      sodium_mg: base.sodium_mg,
+      serving_size: base.serving_size,
+      serving_unit: base.serving_unit,
+      source: base.source || 'openfoodfacts',
       is_custom: true,
       owner_user_id: userId,
     })
@@ -498,11 +507,9 @@ export async function promoteToFoodMaster(
     };
   }
   
-  // Update cache with promoted_food_master_id
-  await supabase
-    .from('external_food_cache')
-    .update({ promoted_food_master_id: newFood.id })
-    .eq('id', cacheRow.id);
+  // Note: We do NOT update promoted_food_master_id here.
+  // This field is only set during admin promotion on the admin-only page.
+  // Regular users creating custom foods should not populate this field.
   
   return {
     success: true,
