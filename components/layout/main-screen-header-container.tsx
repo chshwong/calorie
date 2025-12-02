@@ -26,7 +26,7 @@ export function MainScreenHeaderContainer({ children, style }: MainScreenHeaderC
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: Spacing.lg,
+    paddingTop: 0, // Minimal top margin to match Dashboard
     paddingHorizontal: Spacing.lg,
     marginBottom: 0, // No spacing - Summary card sits directly below date row
   },
