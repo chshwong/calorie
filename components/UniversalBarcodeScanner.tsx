@@ -56,7 +56,7 @@ export default function UniversalBarcodeScanner({ onDetected }: UniversalBarcode
   }
 
   if (mode === "web") {
-    return <WebScanner onDetected={onDetected} />;
+    return <BarcodeScannerModal onDetected={onDetected} />;
   }
 
   return (
@@ -126,148 +126,192 @@ function NativeScanner({ onDetected }: UniversalBarcodeScannerProps) {
 }
 
 /**
- * Unified web scanner with camera + file upload options
+ * Barcode Scanner Modal - Unified web scanner with camera + file upload options
+ * This component handles both camera scanning and file upload for barcode detection.
  */
-function WebScanner({ onDetected }: UniversalBarcodeScannerProps) {
-  const [subMode, setSubMode] = useState<"camera" | "file">("camera");
-  const [error, setError] = useState<string | null>(null);
+function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
+  const [activeTab, setActiveTab] = useState<"camera" | "file">("camera");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const html5QrcodeRef = useRef<any | null>(null);
-  const cameraContainerId = "html5-qrcode-web-camera";
+  const scannerRef = useRef<any | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const cameraContainerId = "barcode-scanner-container";
 
-  // Start/stop camera when subMode changes
-  useEffect(() => {
-    if (subMode !== "camera") {
-      // Stop camera if it was running
-      if (html5QrcodeRef.current) {
-        html5QrcodeRef.current
-          .stop()
-          .then(() => html5QrcodeRef.current?.clear())
-          .catch(() => {});
-        html5QrcodeRef.current = null;
-      }
-      setLoading(false);
-      setError(null);
+  // Helper function to stop camera safely
+  const stopCameraSafely = useCallback(async () => {
+    if (!scannerRef.current || !isCameraActive) return;
+
+    try {
+      await scannerRef.current.stop();
+      await scannerRef.current.clear();
+    } catch (err) {
+      console.warn("Error stopping camera", err);
+    } finally {
+      setIsCameraActive(false);
+    }
+  }, [isCameraActive]);
+
+  // Extract post-barcode logic into a single helper function
+  // This ensures both camera and file upload follow the exact same flow
+  const handleBarcodeDetected = useCallback(async (barcode: string) => {
+    const barcodeData = barcode?.trim();
+    if (!barcodeData) {
+      setErrorMessage("No barcode detected. Please try again.");
       return;
     }
 
-    let isMounted = true;
-    let timeoutId: any;
-    let initTimeout: any;
+    // Call the parent's onDetected callback
+    // This will trigger the OpenFoodFacts lookup and navigation flow
+    onDetected(barcodeData);
+  }, [onDetected]);
 
-    async function startCamera() {
-      setError(null);
+  // Camera scan success callback
+  const onScanSuccess = useCallback(async (decodedText: string) => {
+    if (!decodedText) return;
+    
+    // Stop scanning once we have a good barcode
+    await stopCameraSafely();
+    
+    // Handle the detected barcode
+    handleBarcodeDetected(decodedText);
+  }, [handleBarcodeDetected, stopCameraSafely]);
+
+  // Camera scan failure callback - ignore minor failures
+  const onScanFailure = useCallback((error: any) => {
+    // Silently ignore scan failures - do NOT spam setState here
+    // This callback is called continuously when no barcode is detected
+  }, []);
+
+  // Helper function to start camera safely
+  const startCameraSafely = useCallback(async () => {
+    if (isCameraActive || !scannerRef.current) return;
+
+    try {
+      setErrorMessage(null);
       setLoading(true);
-
-      try {
-        // Wait a bit for the DOM to be ready
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        if (!isMounted) return;
-
-        // Ensure container exists before creating scanner
-        const container = document.getElementById(cameraContainerId);
-        if (!container) {
-          throw new Error("Scanner container not found. Please refresh the page.");
-        }
-
-        const { Html5Qrcode } = await import("html5-qrcode");
-
-        if (!isMounted) return;
-
-        html5QrcodeRef.current = new Html5Qrcode(cameraContainerId);
-
-        timeoutId = setTimeout(() => {
-          if (!isMounted) return;
-          setLoading(false);
-          setError(
-            "Unable to start camera. On mobile, use HTTPS (not http://IP) and allow camera access, or switch to Upload Photo."
-          );
-        }, 8000);
-
-        await html5QrcodeRef.current.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          (decodedText: string) => {
-            if (!decodedText) return;
-
-            clearTimeout(timeoutId);
-            setLoading(false);
-            onDetected(decodedText);
-          },
-          () => {
-            // onScanFailure: ignore minor failures
-          }
-        );
-
-        // Clear loading state on success
-        if (isMounted) {
-          setLoading(false);
-        }
-      } catch (e: any) {
-        console.error("Web camera error (html5-qrcode):", e);
-        if (!isMounted) return;
-        setLoading(false);
-
-        let errorMsg = "Unable to access camera. Make sure you're on HTTPS and have granted camera permission, or switch to Upload Photo.";
-        if (e?.message?.includes("container not found")) {
-          errorMsg = e.message;
-        } else if (e?.name === "NotAllowedError") {
-          errorMsg = "Camera permission denied. Please allow camera access in your browser settings, or switch to Upload Photo.";
-        } else if (e?.name === "NotFoundError") {
-          errorMsg = "No camera found on this device. Please use Upload Photo instead.";
-        } else if (e?.name === "NotReadableError") {
-          errorMsg = "Camera is in use by another app. Please close other apps using the camera, or switch to Upload Photo.";
-        } else if (!window.isSecureContext && window.location.protocol !== "https:" && !window.location.hostname.includes("localhost")) {
-          errorMsg = "Camera requires HTTPS. Please use HTTPS or localhost, or switch to Upload Photo.";
-        }
-
-        setError(errorMsg);
+      
+      // Ensure container exists
+      const container = document.getElementById(cameraContainerId);
+      if (!container) {
+        throw new Error("Scanner container not found. Please refresh the page.");
       }
+
+      await scannerRef.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 300, height: 200 },
+        },
+        onScanSuccess,
+        onScanFailure
+      );
+      
+      setIsCameraActive(true);
+      setLoading(false);
+    } catch (err: any) {
+      console.error("Failed to start camera", err);
+      setIsCameraActive(false);
+      setLoading(false);
+      
+      let errorMsg = "Unable to start camera. On mobile, use HTTPS (not http://IP) and allow camera access, or switch to Upload Photo.";
+      if (err?.name === "NotAllowedError") {
+        errorMsg = "Camera permission denied. Please allow camera access in your browser settings, or switch to Upload Photo.";
+      } else if (err?.name === "NotFoundError") {
+        errorMsg = "No camera found on this device. Please use Upload Photo instead.";
+      } else if (err?.name === "NotReadableError") {
+        errorMsg = "Camera is in use by another app. Please close other apps using the camera, or switch to Upload Photo.";
+      } else if (!window.isSecureContext && window.location.protocol !== "https:" && !window.location.hostname.includes("localhost")) {
+        errorMsg = "Camera requires HTTPS. Please use HTTPS or localhost, or switch to Upload Photo.";
+      }
+      
+      setErrorMessage(errorMsg);
     }
+  }, [isCameraActive, onScanSuccess, onScanFailure]);
 
-    // Start camera after a small delay to ensure DOM is ready
-    initTimeout = setTimeout(() => {
-      startCamera();
-    }, 100);
+  // Initialize scanner instance and manage camera lifecycle
+  useEffect(() => {
+    // Only run on web platform
+    if (Platform.OS !== "web") return;
 
-    return () => {
-      isMounted = false;
-      if (initTimeout) clearTimeout(initTimeout);
-      if (timeoutId) clearTimeout(timeoutId);
-      if (html5QrcodeRef.current) {
-        html5QrcodeRef.current
-          .stop()
-          .then(() => html5QrcodeRef.current?.clear())
-          .catch(() => {});
-        html5QrcodeRef.current = null;
+    // Initialize scanner instance if needed
+    const initScanner = async () => {
+      if (!scannerRef.current) {
+        try {
+          const { Html5Qrcode } = await import("html5-qrcode");
+          const container = document.getElementById(cameraContainerId);
+          
+          if (!container) {
+            console.error("Scanner container not found");
+            return;
+          }
+
+          scannerRef.current = new Html5Qrcode(cameraContainerId);
+        } catch (err) {
+          console.error("Failed to initialize scanner", err);
+          setErrorMessage("Failed to load barcode scanner. Please refresh the page.");
+        }
       }
     };
-  }, [subMode, onDetected]);
 
+    initScanner();
+
+    // Start/stop camera based on active tab
+    if (activeTab === "camera") {
+      // Small delay to ensure DOM is ready
+      const timeoutId = setTimeout(() => {
+        if (scannerRef.current && !isCameraActive) {
+          startCameraSafely();
+        }
+      }, 100);
+
+      return () => {
+        clearTimeout(timeoutId);
+        // Stop camera when tab changes away from camera or component unmounts
+        stopCameraSafely();
+      };
+    } else {
+      // When tab changes away from camera, release camera
+      stopCameraSafely();
+    }
+  }, [activeTab, isCameraActive, startCameraSafely, stopCameraSafely]);
+
+  // Handle file upload - decode barcode from image
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setError(null);
+    setErrorMessage(null);
+    setLoading(true);
 
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
 
+      // Create a temporary scanner instance for file decoding
       const html5QrCode = new Html5Qrcode("html5-qrcode-web-file");
 
+      // Decode the barcode from the image file
       const result: any = await html5QrCode.scanFile(file, true);
+
+      // Clean up temporary scanner
+      try {
+        html5QrCode.clear();
+      } catch (cleanupErr) {
+        // Ignore cleanup errors
+      }
 
       const decoded = result?.decodedText ?? result;
 
       if (decoded) {
-        onDetected(String(decoded));
+        // Use the same helper function as camera scanning
+        handleBarcodeDetected(String(decoded));
       } else {
-        setError("Unable to read barcode from this image. Try a clearer, well-lit photo.");
+        setErrorMessage("Unable to read barcode from this image. Try a clearer, well-lit photo.");
       }
     } catch (err: any) {
-      console.error("Desktop web scanFile error (html5-qrcode):", err);
-      setError("Unable to read barcode from this image. Try a clearer, well-lit photo.");
+      console.error("File upload scan error (html5-qrcode):", err);
+      setErrorMessage("Unable to read barcode from this image. Try a clearer, well-lit photo.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -277,16 +321,16 @@ function WebScanner({ onDetected }: UniversalBarcodeScannerProps) {
       <View style={{ flexDirection: "row", marginBottom: 12, gap: 8 }}>
         <button
           type="button"
-          onClick={() => setSubMode("camera")}
+          onClick={() => setActiveTab("camera")}
           style={{
             padding: "8px 16px",
             borderRadius: 4,
             borderWidth: 1,
             borderStyle: "solid",
-            borderColor: subMode === "camera" ? "#007AFF" : "#ccc",
-            backgroundColor: subMode === "camera" ? "#007AFF" : "#fff",
-            color: subMode === "camera" ? "#fff" : "#000",
-            fontWeight: subMode === "camera" ? "bold" : "normal",
+            borderColor: activeTab === "camera" ? "#007AFF" : "#ccc",
+            backgroundColor: activeTab === "camera" ? "#007AFF" : "#fff",
+            color: activeTab === "camera" ? "#fff" : "#000",
+            fontWeight: activeTab === "camera" ? "bold" : "normal",
             cursor: "pointer",
           }}
         >
@@ -294,16 +338,16 @@ function WebScanner({ onDetected }: UniversalBarcodeScannerProps) {
         </button>
         <button
           type="button"
-          onClick={() => setSubMode("file")}
+          onClick={() => setActiveTab("file")}
           style={{
             padding: "8px 16px",
             borderRadius: 4,
             borderWidth: 1,
             borderStyle: "solid",
-            borderColor: subMode === "file" ? "#007AFF" : "#ccc",
-            backgroundColor: subMode === "file" ? "#007AFF" : "#fff",
-            color: subMode === "file" ? "#fff" : "#000",
-            fontWeight: subMode === "file" ? "bold" : "normal",
+            borderColor: activeTab === "file" ? "#007AFF" : "#ccc",
+            backgroundColor: activeTab === "file" ? "#007AFF" : "#fff",
+            color: activeTab === "file" ? "#fff" : "#000",
+            fontWeight: activeTab === "file" ? "bold" : "normal",
             cursor: "pointer",
           }}
         >
@@ -311,20 +355,20 @@ function WebScanner({ onDetected }: UniversalBarcodeScannerProps) {
         </button>
       </View>
 
-      {loading && subMode === "camera" && (
+      {loading && activeTab === "camera" && (
         <View style={{ alignItems: "center", justifyContent: "center", marginBottom: 12, padding: 16 }}>
           <ActivityIndicator />
           <Text style={{ marginTop: 8 }}>Starting camera…</Text>
         </View>
       )}
 
-      {error && (
+      {errorMessage && (
         <View style={{ marginBottom: 12, padding: 12, backgroundColor: "#ffebee", borderRadius: 4 }}>
-          <Text style={{ color: "#c62828" }}>{error}</Text>
+          <Text style={{ color: "#c62828" }}>{errorMessage}</Text>
         </View>
       )}
 
-      {subMode === "camera" && (
+      {activeTab === "camera" && (
         <>
           {/* html5-qrcode will render the video feed into this div */}
           <div 
@@ -333,14 +377,14 @@ function WebScanner({ onDetected }: UniversalBarcodeScannerProps) {
               width: "100%", 
               height: 400,
               backgroundColor: "#000",
-              visibility: loading || error ? "hidden" : "visible",
-              position: loading || error ? "absolute" : "relative",
+              visibility: loading || errorMessage ? "hidden" : "visible",
+              position: loading || errorMessage ? "absolute" : "relative",
             }} 
           />
         </>
       )}
 
-      {subMode === "file" && (
+      {activeTab === "file" && (
         <View>
           <Text style={{ marginBottom: 8, fontSize: 16 }}>Upload a photo of a barcode to scan:</Text>
           <input 
