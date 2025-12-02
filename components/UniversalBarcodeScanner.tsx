@@ -176,14 +176,33 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
 
     try {
       setErrorMessage(null);
-      setLoading(true);
       
-      // Ensure container exists
+      // Ensure container exists and is visible BEFORE starting camera
       const container = document.getElementById(cameraContainerId);
       if (!container) {
         throw new Error("Scanner container not found. Please refresh the page.");
       }
 
+      // Make container visible and set explicit dimensions (required for mobile web browsers)
+      container.style.display = "block";
+      container.style.visibility = "visible";
+      container.style.width = "100%";
+      container.style.height = "400px"; // Fixed height for mobile
+      container.style.position = "relative";
+      container.style.backgroundColor = "#000";
+      
+      // Wait for container to be fully rendered and in viewport (critical for mobile)
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Double-check container is visible
+      const computedStyle = window.getComputedStyle(container);
+      if (computedStyle.display === "none" || computedStyle.visibility === "hidden") {
+        console.warn("[BarcodeScanner] Container is hidden, forcing visibility");
+        container.style.display = "block";
+        container.style.visibility = "visible";
+      }
+
+      setLoading(true);
       console.log("[BarcodeScanner] Starting camera...");
       
       // Create stable callback functions
@@ -217,6 +236,19 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
       );
       
       console.log("[BarcodeScanner] Camera started successfully");
+      
+      // Verify video element was created
+      const videoElement = container.querySelector('video');
+      if (videoElement) {
+        console.log("[BarcodeScanner] Video element found, dimensions:", videoElement.videoWidth, videoElement.videoHeight);
+        // Ensure video is visible
+        videoElement.style.display = "block";
+        videoElement.style.width = "100%";
+        videoElement.style.height = "auto";
+      } else {
+        console.warn("[BarcodeScanner] Video element not found after start");
+      }
+      
       setIsCameraActive(true);
       setLoading(false);
     } catch (err: any) {
@@ -302,11 +334,17 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
       timeoutId = setTimeout(async () => {
         if (!isMounted) return;
         
-        // Ensure container is visible before starting
+        // Ensure container is visible and has proper dimensions before starting (critical for mobile web)
         const container = document.getElementById(cameraContainerId);
         if (container) {
           container.style.display = "block";
           container.style.visibility = "visible";
+          container.style.width = "100%";
+          container.style.height = "400px"; // Fixed height for mobile web browsers
+          container.style.minHeight = "400px";
+          container.style.position = "relative";
+          container.style.backgroundColor = "#000";
+          container.style.overflow = "hidden";
         }
         
         // Wait for scanner to be initialized
@@ -318,11 +356,16 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
             if (retryContainer) {
               retryContainer.style.display = "block";
               retryContainer.style.visibility = "visible";
+              retryContainer.style.width = "100%";
+              retryContainer.style.height = "400px";
+              retryContainer.style.minHeight = "400px";
+              retryContainer.style.position = "relative";
+              retryContainer.style.backgroundColor = "#000";
             }
             isStartingRef.current = true;
             await startCameraSafely();
             isStartingRef.current = false;
-          }, 200);
+          }, 300);
           return;
         }
 
@@ -331,7 +374,7 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
           await startCameraSafely();
           isStartingRef.current = false;
         }
-      }, 200);
+      }, 300);
 
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
@@ -441,26 +484,42 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
       {activeTab === "camera" && (
         <>
           {/* html5-qrcode will render the video feed into this div */}
+          {/* Container must be visible and have fixed dimensions for mobile web browsers */}
           <div 
             id={cameraContainerId} 
             style={{ 
               width: "100%", 
-              minHeight: 400,
-              height: "auto",
+              height: "400px", // Fixed height for mobile web browsers
               backgroundColor: "#000",
-              display: loading || errorMessage ? "none" : "block",
+              display: errorMessage ? "none" : "block",
               position: "relative",
+              overflow: "hidden",
             }} 
           />
-          {/* Add CSS to ensure video fills container */}
+          {/* Add CSS to ensure video fills container and is visible on mobile */}
           <style dangerouslySetInnerHTML={{ __html: `
+            #${cameraContainerId} {
+              width: 100% !important;
+              height: 400px !important;
+              position: relative !important;
+              background-color: #000 !important;
+            }
             #${cameraContainerId} video {
               width: 100% !important;
-              height: auto !important;
+              height: 100% !important;
               object-fit: cover !important;
+              display: block !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
             }
             #${cameraContainerId} > div {
               width: 100% !important;
+              height: 100% !important;
+              position: relative !important;
+            }
+            #${cameraContainerId} canvas {
+              display: none !important;
             }
           `}} />
         </>
