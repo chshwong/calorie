@@ -7,7 +7,7 @@
 
 import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing, FontSize, BorderRadius, ModuleThemes } from '@/constants/theme';
+import { Colors, Spacing, FontSize, FontWeight, BorderRadius, ModuleThemes } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Animated } from 'react-native';
 import { useEffect, useRef } from 'react';
@@ -28,6 +28,7 @@ type BarChartProps = {
   goalValue?: number;
   goalDisplayValue?: string; // Formatted goal value for label (e.g., "Goal 2000 ml")
   selectedDate?: string;
+  todayDateString?: string; // Date string for today (YYYY-MM-DD format) to show "Today" label
   onBarPress?: (date: string) => void;
   colorScale?: (value: number, maxValue: number) => string;
   height?: number;
@@ -42,6 +43,7 @@ export function BarChart({
   goalValue,
   goalDisplayValue,
   selectedDate,
+  todayDateString,
   onBarPress,
   colorScale,
   height = 120,
@@ -55,8 +57,11 @@ export function BarChart({
   const waterTheme = ModuleThemes.water;
   
   // Calculate max value if not provided
+  // Use provided maxValue (which should already include padding) or compute from data
   const calculatedMax = maxValue || Math.max(...data.map(d => d.value), goalValue || 0, 1);
-  const chartMax = Math.max(calculatedMax * 1.1, 100); // Add 10% padding
+  // If maxValue was provided, use it directly (it already has padding from parent)
+  // Otherwise, add 15% padding for headroom
+  const chartMax = maxValue ? maxValue : Math.max(calculatedMax * 1.15, 100);
   
   // Check if all data is empty (all values are 0)
   const hasData = data.some(d => d.value > 0);
@@ -111,8 +116,12 @@ export function BarChart({
     }
   }, [data, animated]);
 
-  // Format date for label (short day name)
+  // Format date for label (short day name, or "Today" in bold if it's today)
   const formatDateLabel = (dateString: string) => {
+    // Check if this date is today
+    if (todayDateString && dateString === todayDateString) {
+      return 'Today';
+    }
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short' });
   };
@@ -123,7 +132,10 @@ export function BarChart({
     : null;
   
   // Minimum bar height for value labels (if bar is too short, show value above)
-  const MIN_BAR_HEIGHT_FOR_LABEL = 20;
+  const MIN_BAR_HEIGHT_FOR_LABEL = 24;
+  
+  // Top padding for inside labels to prevent cutoff (12% of chart height or minimum spacing)
+  const TOP_PADDING_FOR_LABELS = Math.max(height * 0.12, Spacing.md + FontSize.xs);
 
   return (
     <View style={styles.container}>
@@ -140,13 +152,13 @@ export function BarChart({
                 },
               ]}
             />
-            {/* Goal label */}
+            {/* Goal label - positioned above the line to avoid overlap with bar labels */}
             {goalDisplayValue && (
               <View
                 style={[
                   styles.goalLabelContainer,
                   {
-                    bottom: goalLineBottom - 8,
+                    bottom: goalLineBottom + 4, // Position above the line
                     left: Spacing.sm,
                     backgroundColor: colors.background,
                   },
@@ -209,8 +221,18 @@ export function BarChart({
                   />
                   
                   {/* Value label inside bar (if bar is tall enough) */}
+                  {/* Positioned with top padding to ensure it stays inside even for tallest bars */}
                   {!showValueAbove && item.displayValue && barHeight >= MIN_BAR_HEIGHT_FOR_LABEL && (
-                    <View style={styles.barValueContainer}>
+                    <View 
+                      style={[
+                        styles.barValueContainer,
+                        { 
+                          top: Math.min(TOP_PADDING_FOR_LABELS, barHeight * 0.15),
+                          // Ensure label doesn't go beyond bar top
+                          maxHeight: barHeight - Spacing.xs,
+                        }
+                      ]}
+                    >
                       <ThemedText 
                         style={[
                           styles.barValueLabel, 
@@ -225,7 +247,13 @@ export function BarChart({
                 </View>
                 
                 {showLabels && (
-                  <ThemedText style={[styles.barLabel, { color: colors.textSecondary }]}>
+                  <ThemedText 
+                    style={[
+                      styles.barLabel, 
+                      { color: colors.textSecondary },
+                      todayDateString && item.date === todayDateString && styles.barLabelToday
+                    ]}
+                  >
                     {formatDateLabel(item.date)}
                   </ThemedText>
                 )}
@@ -294,17 +322,20 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     textAlign: 'center',
   },
+  barLabelToday: {
+    fontWeight: FontWeight.bold,
+  },
   barValueLabel: {
     fontSize: FontSize.xxs,
     fontWeight: '600',
   },
   barValueLabelAbove: {
-    marginBottom: Spacing.xxs,
+    marginBottom: Spacing.xs,
     textAlign: 'center',
   },
   barValueLabelInside: {
     position: 'absolute',
-    top: Spacing.xxs,
+    top: 0, // Will be overridden by container positioning
     left: 0,
     right: 0,
     textAlign: 'center',

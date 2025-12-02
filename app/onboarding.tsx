@@ -18,11 +18,15 @@ import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { Colors } from '@/constants/theme';
+import { onboardingColors } from '@/theme/onboardingTheme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { ageFromDob, dobFromAge, ActivityLevel, calculateBMR, calculateTDEE, calculateRequiredDailyCalorieDiff, calculateSafeCalorieTarget } from '@/utils/calculations';
+import { validatePreferredName } from '@/utils/validation';
 import { updateProfile } from '@/lib/services/profileService';
+import { checkProfanity } from '@/utils/profanity';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -33,16 +37,34 @@ import {
 type Gender = 'male' | 'female' | 'not_telling';
 
 function StepIndicator({ currentStep, totalSteps, colors }: { currentStep: number; totalSteps: number; colors: any }) {
+  const screenWidth = Dimensions.get('window').width;
+  
+  // Calculate responsive sizing based on screen width
+  // On narrow screens (below 375px), use tighter spacing
+  const isNarrow = screenWidth < 375;
+  const isVeryNarrow = screenWidth < 320;
+  
+  const dotSize = isVeryNarrow ? 8 : isNarrow ? 10 : 12;
+  const lineWidth = isVeryNarrow ? 20 : isNarrow ? 28 : 40;
+  const lineMargin = isVeryNarrow ? 2 : isNarrow ? 3 : 4;
+  const containerPadding = isVeryNarrow ? 8 : isNarrow ? 16 : 40;
+  
   return (
-    <View style={styles.stepIndicatorContainer}>
+    <View style={[
+      styles.stepIndicatorContainer,
+      { paddingHorizontal: containerPadding }
+    ]}>
       {Array.from({ length: totalSteps }, (_, i) => (
         <View key={i} style={styles.stepIndicatorRow}>
           <View
             style={[
               styles.stepDot,
               {
-                backgroundColor: i < currentStep ? colors.tint : colors.border,
-                borderColor: i === currentStep ? colors.tint : colors.border,
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                backgroundColor: i < currentStep ? onboardingColors.primary : colors.border,
+                borderColor: i === currentStep ? onboardingColors.primary : colors.border,
               },
             ]}
           />
@@ -51,7 +73,10 @@ function StepIndicator({ currentStep, totalSteps, colors }: { currentStep: numbe
               style={[
                 styles.stepLine,
                 {
-                  backgroundColor: i < currentStep ? colors.tint : colors.border,
+                  width: lineWidth,
+                  height: isVeryNarrow ? 1.5 : 2,
+                  marginHorizontal: lineMargin,
+                  backgroundColor: i < currentStep ? onboardingColors.primary : colors.border,
                 },
               ]}
             />
@@ -68,31 +93,25 @@ export default function OnboardingScreen() {
   const { t } = useTranslation();
   const { user, refreshProfile, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 8; // Step 1: Goal, Step 2: Name & Age, Step 3: Sex, Step 4: Height, Step 5: Activity, Step 6: Weight, Step 7: Goal Weight, Step 8: Timeline (more steps coming later)
+  const totalSteps = 8; // Step 1: Name & Age, Step 2: Sex, Step 3: Height, Step 4: Activity, Step 5: Current Weight, Step 6: Goal, Step 7: Goal Weight, Step 8: Timeline (more steps coming later)
   
-  // Step 1: Goal
+  // Step 6: Goal
   const [goal, setGoal] = useState<GoalType | ''>('');
   const [showAdvancedGoals, setShowAdvancedGoals] = useState(false);
   
-  // Step 2: Preferred Name and Date of Birth
+  // Step 1: Preferred Name and Date of Birth
   const [preferredName, setPreferredName] = useState('');
   const [dateOfBirthStep2, setDateOfBirthStep2] = useState('');
   const [showDatePickerStep2, setShowDatePickerStep2] = useState(false);
   const [selectedDateStep2, setSelectedDateStep2] = useState<Date>(() => {
-    const defaultDate = new Date();
-    defaultDate.setFullYear(defaultDate.getFullYear() - 25);
-    return defaultDate;
-  });
-  const [calendarViewMonthStep2, setCalendarViewMonthStep2] = useState<Date>(() => {
-    const defaultDate = new Date();
-    defaultDate.setFullYear(defaultDate.getFullYear() - 25);
-    return defaultDate;
+    // Default to June 4, 1983
+    return new Date(1983, 5, 4); // Month is 0-indexed, so 5 = June
   });
   
-  // Step 3: Sex
+  // Step 2: Sex
   const [sex, setSex] = useState<'male' | 'female' | ''>('');
   
-  // Step 4: Height
+  // Step 3: Height
   const [heightCm, setHeightCm] = useState('');
   const [heightFt, setHeightFt] = useState('');
   const [heightIn, setHeightIn] = useState('');
@@ -129,10 +148,10 @@ export default function OnboardingScreen() {
     }
   }, [showYearMonthPicker, calendarViewMonth]);
   
-  // Step 5: Activity Level
+  // Step 4: Activity Level
   const [activityLevel, setActivityLevel] = useState<'sedentary' | 'light' | 'moderate' | 'high' | 'very_high' | ''>('');
   
-  // Step 6: Current Weight
+  // Step 5: Current Weight
   const [currentWeightKg, setCurrentWeightKg] = useState('');
   const [currentWeightLb, setCurrentWeightLb] = useState('');
   const [currentWeightUnit, setCurrentWeightUnit] = useState<'kg' | 'lbs'>('kg');
@@ -195,7 +214,6 @@ export default function OnboardingScreen() {
       const dobDate = new Date(profile.date_of_birth + 'T00:00:00');
       if (!isNaN(dobDate.getTime())) {
         setSelectedDateStep2(dobDate);
-        setCalendarViewMonthStep2(new Date(dobDate));
       }
     }
   }, [profile]);
@@ -397,10 +415,126 @@ export default function OnboardingScreen() {
     return null;
   };
   
+  // Space normalization function
+  const normalizeSpaces = (raw: string): string => {
+    return raw.replace(/\s+/g, " ").trim();
+  };
+  
+  // Silent filtering function for preferred name input
+  // Preserves existing valid emojis, only filters new characters being added
+  const filterPreferredNameInput = (currentValue: string, newText: string): string => {
+    // Enforce maxLength 30
+    if (newText.length > 30) {
+      return currentValue;
+    }
+    
+    // If new text is shorter or equal, it's deletion/editing - allow it (will be validated later)
+    if (newText.length <= currentValue.length) {
+      return newText;
+    }
+    
+    // Extract existing emojis from current value to preserve them
+    const currentChars = Array.from(currentValue);
+    const existingEmojis = new Set<string>();
+    for (const ch of currentChars) {
+      const codePoint = ch.codePointAt(0);
+      if (codePoint && codePoint >= 0x1F000) {
+        existingEmojis.add(ch);
+      }
+    }
+    const hasExistingEmoji = existingEmojis.size > 0;
+    
+    // Process new text character by character, preserving existing valid content
+    const newChars = Array.from(newText);
+    const BANNED = new Set(["🤬", "🖕", "💀", "⚰️"]);
+    const filteredChars: string[] = [];
+    let newEmojiAdded = false;
+    
+    for (const ch of newChars) {
+      const codePoint = ch.codePointAt(0);
+      const isLetter = /\p{L}/u.test(ch);
+      const isDigit = /\p{N}/u.test(ch);
+      const isSpace = ch === " ";
+      const isPunctuation = ch === "'" || ch === "-" || ch === ".";
+      const isEmoji = codePoint && codePoint >= 0x1F000;
+      
+      // Check if character is valid
+      if (isLetter || isDigit || isSpace || isPunctuation || isEmoji) {
+        // Check for banned emojis
+        if (isEmoji && BANNED.has(ch)) {
+          continue; // Skip banned emoji
+        }
+        
+        // Handle emoji logic
+        if (isEmoji) {
+          // If this emoji already exists in current value, always preserve it
+          if (existingEmojis.has(ch)) {
+            filteredChars.push(ch);
+            continue;
+          }
+          
+          // If we already have an emoji (existing or newly added), skip this new one
+          if (hasExistingEmoji || newEmojiAdded) {
+            continue; // Skip second emoji
+          }
+          
+          // This is a new allowed emoji - add it
+          newEmojiAdded = true;
+        }
+        
+        filteredChars.push(ch);
+      }
+      // Invalid characters are silently ignored
+    }
+    
+    return filteredChars.join('');
+  };
+  
+  const handlePreferredNameChange = (text: string) => {
+    const filtered = filterPreferredNameInput(preferredName, text);
+    setPreferredName(filtered);
+    // Clear error when user types (errors only show on submit)
+    if (error && (error.includes('name') || error.includes('Name'))) {
+      setError(null);
+    }
+  };
+  
+  const handlePreferredNameBlur = () => {
+    // Normalize spaces: remove leading/trailing, collapse multiple spaces
+    const normalized = normalizeSpaces(preferredName);
+    if (normalized !== preferredName) {
+      setPreferredName(normalized);
+    }
+  };
+  
   const validateNameAge = (): string | null => {
-    // Preferred Name is optional but check length if provided
-    if (preferredName && preferredName.trim().length > 40) {
-      return t('onboarding.name_age.error_name_too_long');
+    // Preferred Name validation using strict rules
+    // Normalize spaces before validation
+    if (preferredName) {
+      const normalized = normalizeSpaces(preferredName);
+      
+      // Profanity check (after normalization, before minimum-letter validation)
+      if (checkProfanity(normalized)) {
+        return "Please choose a different name.";
+      }
+      
+      // Check emoji count (must be 1 or less)
+      const chars = Array.from(normalized);
+      let emojiCount = 0;
+      for (const ch of chars) {
+        const codePoint = ch.codePointAt(0);
+        if (codePoint && codePoint >= 0x1F000) {
+          emojiCount += 1;
+        }
+      }
+      if (emojiCount > 1) {
+        return 'Only 1 emoji max';
+      }
+      
+      const nameValidation = validatePreferredName(normalized);
+      if (!nameValidation.valid) {
+        return nameValidation.error || t('onboarding.name_age.error_name_invalid');
+      }
     }
     
     // Date of Birth is required
@@ -446,63 +580,32 @@ export default function OnboardingScreen() {
   // Handle opening date picker for Step 2
   const handleOpenDatePickerStep2 = () => {
     if (!dateOfBirthStep2) {
-      const defaultDate = new Date();
-      defaultDate.setFullYear(defaultDate.getFullYear() - 25);
-      setCalendarViewMonthStep2(new Date(defaultDate));
-      setSelectedDateStep2(defaultDate);
+      // Default to June 4, 1983
+      setSelectedDateStep2(new Date(1983, 5, 4)); // Month is 0-indexed, so 5 = June
     } else {
       const existingDate = new Date(dateOfBirthStep2 + 'T00:00:00');
-      setCalendarViewMonthStep2(new Date(existingDate));
       setSelectedDateStep2(existingDate);
     }
     setShowDatePickerStep2(true);
   };
   
-  const navigateMonthStep2 = (direction: 'prev' | 'next') => {
-    const newMonth = new Date(calendarViewMonthStep2);
-    if (direction === 'prev') {
-      newMonth.setMonth(newMonth.getMonth() - 1);
-    } else {
-      newMonth.setMonth(newMonth.getMonth() + 1);
-    }
-    setCalendarViewMonthStep2(newMonth);
+  // Handle date change from AppDatePicker
+  const handleDateOfBirthChange = (date: Date) => {
+    updateDateOfBirthStep2(date);
+    setShowDatePickerStep2(false);
   };
   
-  const handleDateSelectStep2 = (day: number) => {
-    const newDate = new Date(calendarViewMonthStep2.getFullYear(), calendarViewMonthStep2.getMonth(), day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (newDate > today) {
-      return;
-    }
-    
-    updateDateOfBirthStep2(newDate);
+  // Calculate min/max dates for DOB (18-100 years old)
+  const getDOBMinDate = () => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 100);
+    return date;
   };
   
-  const isDateSelectedStep2 = (day: number) => {
-    if (!selectedDateStep2) return false;
-    return (
-      selectedDateStep2.getDate() === day &&
-      selectedDateStep2.getMonth() === calendarViewMonthStep2.getMonth() &&
-      selectedDateStep2.getFullYear() === calendarViewMonthStep2.getFullYear()
-    );
-  };
-  
-  const isDateDisabledStep2 = (day: number) => {
-    const date = new Date(calendarViewMonthStep2.getFullYear(), calendarViewMonthStep2.getMonth(), day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date > today;
-  };
-  
-  const getDaysInMonthStep2 = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-  
-  const getFirstDayOfMonthStep2 = (date: Date) => {
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
-    return firstDay.getDay();
+  const getDOBMaxDate = () => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18);
+    return date;
   };
   
   const validateSex = (): string | null => {
@@ -674,7 +777,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       
       // Move to next step
-      setCurrentStep(2);
+      setCurrentStep(7);
     } catch (error: any) {
       setError(error.message || 'Failed to save goal. Please try again.');
     } finally {
@@ -702,8 +805,12 @@ export default function OnboardingScreen() {
     setLoading(true);
     try {
       const updateData: any = {};
-      if (preferredName.trim()) {
-        updateData.first_name = preferredName.trim();
+      if (preferredName) {
+        // Normalize spaces before saving
+        const normalized = normalizeSpaces(preferredName);
+        if (normalized) {
+          updateData.first_name = normalized;
+        }
       }
       if (dateOfBirthStep2) {
         updateData.date_of_birth = dateOfBirthStep2;
@@ -719,7 +826,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       
       // Move to next step
-      setCurrentStep(3);
+      setCurrentStep(2);
     } catch (error: any) {
       setError(error.message || 'Failed to save. Please try again.');
     } finally {
@@ -756,7 +863,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       
       // Move to next step
-      setCurrentStep(4);
+      setCurrentStep(3);
     } catch (error: any) {
       setError(error.message || 'Failed to save. Please try again.');
     } finally {
@@ -807,7 +914,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       
       // Move to next step
-      setCurrentStep(5);
+      setCurrentStep(4);
     } catch (error: any) {
       setError(error.message || 'Failed to save. Please try again.');
     } finally {
@@ -844,7 +951,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       
       // Move to next step
-      setCurrentStep(6);
+      setCurrentStep(5);
     } catch (error: any) {
       setError(error.message || 'Failed to save. Please try again.');
     } finally {
@@ -894,7 +1001,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       
       // Move to next step
-      setCurrentStep(7);
+      setCurrentStep(6);
     } catch (error: any) {
       setError(error.message || 'Failed to save. Please try again.');
     } finally {
@@ -955,23 +1062,23 @@ export default function OnboardingScreen() {
     setError(null);
     
     if (currentStep === 1) {
-      // Goal step - handle separately to save goal_type
-      handleGoalNext();
-    } else if (currentStep === 2) {
       // Name & Age step
       handleNameAgeNext();
-    } else if (currentStep === 3) {
+    } else if (currentStep === 2) {
       // Sex step
       handleSexNext();
-    } else if (currentStep === 4) {
+    } else if (currentStep === 3) {
       // Height step
       handleHeightNext();
-    } else if (currentStep === 5) {
+    } else if (currentStep === 4) {
       // Activity level step
       handleActivityNext();
-    } else if (currentStep === 6) {
+    } else if (currentStep === 5) {
       // Current weight step
       handleCurrentWeightNext();
+    } else if (currentStep === 6) {
+      // Goal step - handle separately to save goal_type
+      handleGoalNext();
     } else if (currentStep === 7) {
       // Goal weight step
       handleGoalWeightNext();
@@ -983,12 +1090,10 @@ export default function OnboardingScreen() {
   
   const shouldDisableNext = (): boolean => {
     if (currentStep === 1) {
-      return !goal;
-    } else if (currentStep === 2) {
       return !dateOfBirthStep2 || dateOfBirthStep2.trim().length === 0;
-    } else if (currentStep === 3) {
+    } else if (currentStep === 2) {
       return !sex || (sex !== 'male' && sex !== 'female');
-    } else if (currentStep === 4) {
+    } else if (currentStep === 3) {
       // Check if height is valid
       if (heightUnit === 'cm') {
         const cm = parseFloat(heightCm);
@@ -1001,9 +1106,9 @@ export default function OnboardingScreen() {
         const cmValue = totalInches * 2.54;
         return cmValue < 120 || cmValue > 230;
       }
-    } else if (currentStep === 5) {
+    } else if (currentStep === 4) {
       return !activityLevel || (activityLevel !== 'sedentary' && activityLevel !== 'light' && activityLevel !== 'moderate' && activityLevel !== 'high' && activityLevel !== 'very_high');
-    } else if (currentStep === 6) {
+    } else if (currentStep === 5) {
       // Check if current weight is valid
       if (currentWeightUnit === 'kg') {
         const kg = parseFloat(currentWeightKg);
@@ -1014,6 +1119,8 @@ export default function OnboardingScreen() {
         const kgValue = lbs / 2.20462;
         return kgValue < 35 || kgValue > 250;
       }
+    } else if (currentStep === 6) {
+      return !goal;
     } else if (currentStep === 7) {
       // Check if goal weight is valid (basic validation, detailed validation happens on submit)
       if (goalWeightUnit === 'kg') {
@@ -1309,14 +1416,12 @@ export default function OnboardingScreen() {
                 styles.goalCard,
                 { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
                 goal === goalOption.value && { 
-                  backgroundColor: colors.tint, 
-                  borderColor: colors.tint,
+                  backgroundColor: onboardingColors.primary, 
+                  borderColor: onboardingColors.primary,
                   ...Platform.select({
-                    web: {
-                      boxShadow: `0 4px 12px ${colors.tint}40`,
-                    },
+                    web: { boxShadow: `0 4px 12px ${onboardingColors.primary}40` },
                     default: {
-                      shadowColor: colors.tint,
+                      shadowColor: onboardingColors.primary,
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.3,
                       shadowRadius: 8,
@@ -1338,24 +1443,10 @@ export default function OnboardingScreen() {
               accessibilityRole="radio"
               accessibilityState={{ selected: goal === goalOption.value }}
             >
-              <Text
-                style={[
-                  styles.goalCardTitle,
-                  { color: goal === goalOption.value ? '#fff' : colors.text },
-                ]}
-              >
+              <Text style={[styles.goalCardTitle, { color: goal === goalOption.value ? '#fff' : colors.text }]}>
                 {t(goalOption.labelKey)}
               </Text>
-              <Text
-                style={[
-                  styles.goalCardDescription,
-                  { 
-                    color: goal === goalOption.value 
-                      ? 'rgba(255, 255, 255, 0.9)' 
-                      : colors.textSecondary 
-                  },
-                ]}
-              >
+              <Text style={[styles.goalCardDescription, { color: goal === goalOption.value ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
                 {t(goalOption.descriptionKey)}
               </Text>
               {goal === goalOption.value && (
@@ -1377,7 +1468,7 @@ export default function OnboardingScreen() {
               'Double tap to show advanced goal options'
             )}
           >
-            <ThemedText style={[styles.advancedGoalLinkText, { color: colors.tint }]}>
+            <ThemedText style={[styles.advancedGoalLinkText, { color: onboardingColors.primary }]}>
               {t('onboarding.goal.advanced_goal')}
             </ThemedText>
           </TouchableOpacity>
@@ -1391,9 +1482,6 @@ export default function OnboardingScreen() {
       <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
         {t('onboarding.name_age.title')}
       </ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        {t('onboarding.name_age.subtitle')}
-      </ThemedText>
       
       <View style={styles.inputContainer}>
         <ThemedText style={[styles.label, { color: colors.text }]}>
@@ -1403,32 +1491,36 @@ export default function OnboardingScreen() {
           style={[
             styles.input,
             {
-              borderColor: error && preferredName && preferredName.length > 40 ? '#EF4444' : colors.border,
+              borderColor: error && (error.includes('name') || error.includes('Name') || error.includes('emoji') || error.includes('different name')) ? '#EF4444' : colors.border,
               color: colors.text,
               backgroundColor: colors.backgroundSecondary,
-              ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+              ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
             },
           ]}
           placeholder={t('onboarding.name_age.preferred_name_placeholder')}
           placeholderTextColor={colors.textSecondary}
           value={preferredName}
-          onChangeText={(text) => {
-            if (text.length <= 40) {
-              setPreferredName(text);
-              setError(null);
-            }
-          }}
-          maxLength={40}
+          onChangeText={handlePreferredNameChange}
+          onBlur={handlePreferredNameBlur}
+          maxLength={30}
           autoCapitalize="words"
           autoComplete="given-name"
           editable={!loading}
           {...getInputAccessibilityProps(
             t('onboarding.name_age.preferred_name_label'),
             t('onboarding.name_age.preferred_name_placeholder'),
-            error && preferredName && preferredName.length > 40 ? error : undefined,
+            error && (error.includes('name') || error.includes('Name') || error.includes('emoji') || error.includes('different name')) ? error : undefined,
             false
           )}
         />
+        <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+          Allowed: letters, numbers, spaces, and ' - . One emoji max.
+        </ThemedText>
+        {error && (error.includes('name') || error.includes('Name') || error.includes('emoji') || error.includes('different name')) && (
+          <ThemedText style={[styles.errorText, { color: '#EF4444' }]}>
+            {error}
+          </ThemedText>
+        )}
       </View>
       
       <View style={styles.inputContainer}>
@@ -1463,236 +1555,363 @@ export default function OnboardingScreen() {
             </ThemedText>
           </View>
         )}
+        
+        <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary, marginTop: 8 }]}>
+          {t('onboarding.name_age.subtitle')}
+        </ThemedText>
+        
+        {/* Shared AppDatePicker for DOB */}
+        <AppDatePicker
+          value={selectedDateStep2}
+          onChange={handleDateOfBirthChange}
+          minimumDate={getDOBMinDate()}
+          maximumDate={getDOBMaxDate()}
+          visible={showDatePickerStep2}
+          onClose={() => setShowDatePickerStep2(false)}
+          title={t('date_picker.select_date_of_birth')}
+        />
       </View>
     </View>
   );
   
-  const renderSexStep = () => (
-    <View style={styles.stepContent}>
-      <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
-        {t('onboarding.sex.title')}
-      </ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        {t('onboarding.sex.subtitle')}
-      </ThemedText>
-      
-      <View style={styles.goalContainer}>
-        {[
-          { value: 'male' as const, labelKey: 'onboarding.sex.male' },
-          { value: 'female' as const, labelKey: 'onboarding.sex.female' },
-        ].map((sexOption) => (
-          <TouchableOpacity
-            key={sexOption.value}
-            style={[
-              styles.goalCard,
-              { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
-              sex === sexOption.value && { 
-                backgroundColor: colors.tint, 
-                borderColor: colors.tint,
-                ...Platform.select({
-                  web: {
-                    boxShadow: `0 4px 12px ${colors.tint}40`,
-                  },
-                  default: {
-                    shadowColor: colors.tint,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 4,
-                  },
-                }),
-              },
-            ]}
-            onPress={() => {
-              setSex(sexOption.value);
-              setError(null);
-            }}
-            disabled={loading}
-            {...getButtonAccessibilityProps(
-              `${t(sexOption.labelKey)}${sex === sexOption.value ? ' selected' : ''}`,
-              `Double tap to select ${t(sexOption.labelKey)}`,
-              loading
-            )}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: sex === sexOption.value }}
-          >
-            <Text
-              style={[
-                styles.goalCardTitle,
-                { color: sex === sexOption.value ? '#fff' : colors.text },
-              ]}
-            >
-              {t(sexOption.labelKey)}
-            </Text>
-            {sex === sexOption.value && (
-              <View style={styles.goalCardCheckmark}>
-                <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
+  const [pressedCard, setPressedCard] = useState<string | null>(null);
   
-  const renderHeightStep = () => (
-    <View style={styles.stepContent}>
-      <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
-        {t('onboarding.height.title')}
-      </ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        {t('onboarding.height.subtitle')}
-      </ThemedText>
-      
-      <View style={styles.measurementSection}>
-        <View style={styles.measurementHeader}>
-          <ThemedText style={[styles.label, { color: colors.text }]}>
-            {t('onboarding.height.height_label')}
-          </ThemedText>
-          <View style={styles.unitToggle}>
-            <TouchableOpacity
-              style={[
-                styles.unitButton,
-                { borderColor: colors.border },
-                heightUnit === 'cm' && { backgroundColor: colors.tint, borderColor: colors.tint },
-              ]}
-              onPress={() => {
-                setHeightUnit('cm');
-                if (heightFt && heightIn) {
-                  const totalInches = parseFloat(heightFt) * 12 + parseFloat(heightIn);
-                  const cm = totalInches * 2.54;
-                  setHeightCm(cm.toFixed(1));
-                }
+  const renderSexStep = () => {
+    const isSelected = (value: string) => sex === value;
+    
+    return (
+      <View style={styles.stepContentAnimated}>
+        {/* SVG Illustration */}
+        <View style={styles.stepIllustration}>
+          {Platform.OS === 'web' ? (
+              <View
+              style={{
+                width: 48,
+                height: 48,
               }}
-              disabled={loading}
-            >
-              <Text style={[styles.unitButtonText, { color: heightUnit === 'cm' ? '#fff' : colors.text }]}>
-                cm
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.unitButton,
-                { borderColor: colors.border },
-                heightUnit === 'ft' && { backgroundColor: colors.tint, borderColor: colors.tint },
-              ]}
-              onPress={() => {
-                setHeightUnit('ft');
-                if (heightCm) {
-                  const totalInches = parseFloat(heightCm) / 2.54;
-                  const feet = Math.floor(totalInches / 12);
-                  const inches = Math.round(totalInches % 12);
-                  setHeightFt(feet.toString());
-                  setHeightIn(inches.toString());
-                }
+              // @ts-ignore - web-specific prop
+              dangerouslySetInnerHTML={{
+                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><circle cx="17" cy="7" r="4"/><path d="M5 21v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/><path d="M13 21v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>`,
               }}
-              disabled={loading}
-            >
-              <Text style={[styles.unitButtonText, { color: heightUnit === 'ft' ? '#fff' : colors.text }]}>
-                ft/in
-              </Text>
-            </TouchableOpacity>
-          </View>
+            />
+          ) : (
+            <IconSymbol name="person.2.fill" size={48} color={onboardingColors.primary} />
+          )}
         </View>
-        {heightUnit === 'cm' ? (
-          <TextInput
-            style={[
-              styles.input,
-              {
-                borderColor: error && !heightCm ? '#EF4444' : colors.border,
-                color: colors.text,
-                backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-              },
-            ]}
-            placeholder={t('onboarding.height.height_cm_placeholder')}
-            placeholderTextColor={colors.textSecondary}
-            value={heightCm}
-            onChangeText={(text) => {
-              setHeightCm(filterHeightInput(text));
-              setError(null);
-            }}
-            keyboardType="numeric"
-            editable={!loading}
-            {...getInputAccessibilityProps(
-              'Height in centimeters',
-              t('onboarding.height.height_cm_placeholder'),
-              error && !heightCm ? error : undefined,
-              true
-            )}
-          />
-        ) : (
-          <View style={styles.dualInputRow}>
-            <View style={styles.dualInputContainer}>
-              <TextInput
+        
+        {/* Title */}
+        <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
+          {t('onboarding.sex.title')}
+        </ThemedText>
+        <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
+          {t('onboarding.sex.subtitle')}
+        </ThemedText>
+        
+        <View style={styles.goalContainer}>
+          {[
+            { value: 'male' as const, labelKey: 'onboarding.sex.male' },
+            { value: 'female' as const, labelKey: 'onboarding.sex.female' },
+          ].map((sexOption) => {
+            const selected = isSelected(sexOption.value);
+            
+            return (
+              <TouchableOpacity
+                key={sexOption.value}
                 style={[
-                  styles.input,
-                  {
-                    borderColor: error && !heightFt ? '#EF4444' : colors.border,
-                    color: colors.text,
-                    backgroundColor: colors.backgroundSecondary,
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                  styles.goalCard,
+                  { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+                  selected && { 
+                    backgroundColor: onboardingColors.primary, 
+                    borderColor: onboardingColors.primary,
+                    ...Platform.select({
+                      web: { boxShadow: `0 4px 12px ${onboardingColors.primary}40` },
+                      default: {
+                        shadowColor: onboardingColors.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 4,
+                      },
+                    }),
                   },
                 ]}
-                placeholder={t('onboarding.height.height_ft_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={heightFt}
-                onChangeText={(text) => {
-                  setHeightFt(filterHeightInput(text));
+                onPress={() => {
+                  setSex(sexOption.value);
                   setError(null);
                 }}
-                keyboardType="numeric"
-                editable={!loading}
-                {...getInputAccessibilityProps(
-                  'Height in feet',
-                  t('onboarding.height.height_ft_placeholder'),
-                  error && !heightFt ? error : undefined,
-                  true
+                disabled={loading}
+                {...getButtonAccessibilityProps(
+                  `${t(sexOption.labelKey)}${selected ? ' selected' : ''}`,
+                  `Double tap to select ${t(sexOption.labelKey)}`,
+                  loading
                 )}
-              />
-              <Text style={[styles.unitLabel, { color: colors.textSecondary }]}>ft</Text>
-            </View>
-            <View style={styles.dualInputContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    borderColor: error && !heightIn ? '#EF4444' : colors.border,
-                    color: colors.text,
-                    backgroundColor: colors.backgroundSecondary,
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                  },
-                ]}
-                placeholder={t('onboarding.height.height_in_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={heightIn}
-                onChangeText={(text) => {
-                  setHeightIn(filterHeightInput(text));
-                  setError(null);
-                }}
-                keyboardType="numeric"
-                editable={!loading}
-                {...getInputAccessibilityProps(
-                  'Height in inches',
-                  t('onboarding.height.height_in_placeholder'),
-                  error && !heightIn ? error : undefined,
-                  true
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
+                  {t(sexOption.labelKey)}
+                </Text>
+                {selected && (
+                  <View style={styles.goalCardCheckmark}>
+                    <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                  </View>
                 )}
-              />
-              <Text style={[styles.unitLabel, { color: colors.textSecondary }]}>in</Text>
-            </View>
-          </View>
-        )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+  
+  const renderHeightStep = () => {
+    const isSelected = (value: string) => heightUnit === value;
+    
+    return (
+      <View style={styles.stepContentAnimated}>
+        {/* SVG Illustration */}
+        <View style={styles.stepIllustration}>
+          {Platform.OS === 'web' ? (
+            <View
+              style={{
+                width: 48,
+                height: 48,
+              }}
+              // @ts-ignore - web-specific prop
+              dangerouslySetInnerHTML={{
+                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18V3z"/><path d="M3 8h18"/><path d="M3 12h18"/><path d="M3 16h18"/><path d="M8 3v18M16 3v18"/></svg>`,
+              }}
+            />
+          ) : (
+            <IconSymbol name="ruler.fill" size={48} color={onboardingColors.primary} />
+          )}
+        </View>
+        
+        {/* Title */}
+        <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
+          {t('onboarding.height.title')}
+        </ThemedText>
+        <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
+          {t('onboarding.height.subtitle')}
+        </ThemedText>
+        
+        {/* Unit Toggle - Modern Pill Style */}
+        <View style={styles.unitToggleModern}>
+          {[
+            { value: 'cm', label: 'cm' },
+            { value: 'ft', label: 'ft/in' },
+          ].map((unitOption) => {
+            const selected = isSelected(unitOption.value);
+            
+            return (
+              <TouchableOpacity
+                key={unitOption.value}
+                style={[
+                  styles.unitPill,
+                  selected ? styles.unitPillSelected : styles.unitPillUnselected,
+                  {
+                    transform: [{ scale: selected ? 1.02 : 1 }],
+                  },
+                  selected && {
+                    ...Platform.select({
+                      web: {
+                        background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                        boxShadow: `0 4px 12px ${onboardingColors.primary}40`,
+                      },
+                      default: {
+                        backgroundColor: onboardingColors.primary,
+                        shadowColor: onboardingColors.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 12,
+                        elevation: 4,
+                      },
+                    }),
+                  },
+                  !selected && Platform.select({
+                    web: {
+                      background: '#FFFFFF',
+                      borderColor: '#E5E7EB',
+                      boxShadow: 'none',
+                    },
+                    default: {
+                      backgroundColor: '#FFFFFF',
+                      borderColor: '#E5E7EB',
+                    },
+                  }),
+                  Platform.select({
+                    web: {
+                      transition: 'all 0.2s ease',
+                    },
+                    default: {},
+                  }),
+                ]}
+                onPress={() => {
+                  if (unitOption.value === 'cm') {
+                    setHeightUnit('cm');
+                    if (heightFt && heightIn) {
+                      const totalInches = parseFloat(heightFt) * 12 + parseFloat(heightIn);
+                      const cm = totalInches * 2.54;
+                      setHeightCm(cm.toFixed(1));
+                    }
+                  } else {
+                    setHeightUnit('ft');
+                    if (heightCm) {
+                      const totalInches = parseFloat(heightCm) / 2.54;
+                      const feet = Math.floor(totalInches / 12);
+                      const inches = Math.round(totalInches % 12);
+                      setHeightFt(feet.toString());
+                      setHeightIn(inches.toString());
+                    }
+                  }
+                  setError(null);
+                }}
+                disabled={loading}
+                {...getButtonAccessibilityProps(
+                  `${unitOption.label}${selected ? ' selected' : ''}`,
+                  `Double tap to select ${unitOption.label}`,
+                  loading
+                )}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <Text
+                  style={[
+                    styles.unitPillText,
+                    { color: selected ? '#FFFFFF' : onboardingColors.primary },
+                  ]}
+                >
+                  {unitOption.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        
+        {/* Height Inputs */}
+        <View style={styles.heightInputContainer}>
+          {heightUnit === 'cm' ? (
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={[
+                  styles.inputModern,
+                  {
+                    borderColor: error && !heightCm ? '#EF4444' : '#E5E7EB',
+                    color: colors.text,
+                    backgroundColor: '#FFFFFF',
+                  },
+                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
+                ]}
+                placeholder={t('onboarding.height.height_cm_placeholder')}
+                placeholderTextColor={colors.textSecondary}
+                value={heightCm}
+                onChangeText={(text) => {
+                  setHeightCm(filterHeightInput(text));
+                  setError(null);
+                }}
+                keyboardType="numeric"
+                editable={!loading}
+                {...getInputAccessibilityProps(
+                  'Height in centimeters',
+                  t('onboarding.height.height_cm_placeholder'),
+                  error && !heightCm ? error : undefined,
+                  true
+                )}
+              />
+              <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>cm</Text>
+            </View>
+          ) : (
+            <View style={styles.dualInputRowModern}>
+              <View style={[styles.inputWrapper, { flex: 1 }]}>
+                <TextInput
+                  style={[
+                    styles.inputModern,
+                    {
+                      borderColor: error && !heightFt ? '#EF4444' : '#E5E7EB',
+                      color: colors.text,
+                      backgroundColor: '#FFFFFF',
+                    },
+                    Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
+                  ]}
+                  placeholder={t('onboarding.height.height_ft_placeholder')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={heightFt}
+                  onChangeText={(text) => {
+                    setHeightFt(filterHeightInput(text));
+                    setError(null);
+                  }}
+                  keyboardType="numeric"
+                  editable={!loading}
+                  {...getInputAccessibilityProps(
+                    'Height in feet',
+                    t('onboarding.height.height_ft_placeholder'),
+                    error && !heightFt ? error : undefined,
+                    true
+                  )}
+                />
+                <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>ft</Text>
+              </View>
+              <View style={[styles.inputWrapper, { flex: 1 }]}>
+                <TextInput
+                  style={[
+                    styles.inputModern,
+                    {
+                      borderColor: error && !heightIn ? '#EF4444' : '#E5E7EB',
+                      color: colors.text,
+                      backgroundColor: '#FFFFFF',
+                    },
+                    Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
+                  ]}
+                  placeholder={t('onboarding.height.height_in_placeholder')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={heightIn}
+                  onChangeText={(text) => {
+                    setHeightIn(filterHeightInput(text));
+                    setError(null);
+                  }}
+                  keyboardType="numeric"
+                  editable={!loading}
+                  {...getInputAccessibilityProps(
+                    'Height in inches',
+                    t('onboarding.height.height_in_placeholder'),
+                    error && !heightIn ? error : undefined,
+                    true
+                  )}
+                />
+                <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>in</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
   
   const renderActivityStep = () => (
-    <View style={styles.stepContent}>
-      <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
+    <View style={styles.stepContentAnimated}>
+      {/* SVG Illustration */}
+      <View style={styles.stepIllustration}>
+        {Platform.OS === 'web' ? (
+          <View
+            style={{
+              width: 48,
+              height: 48,
+            }}
+            // @ts-ignore - web-specific prop
+            dangerouslySetInnerHTML={{
+              __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+            }}
+          />
+        ) : (
+          <IconSymbol name="bolt.fill" size={48} color={onboardingColors.primary} />
+        )}
+      </View>
+      
+      {/* Title */}
+      <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
         {t('onboarding.activity.title')}
       </ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
+      <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
         {t('onboarding.activity.subtitle')}
       </ThemedText>
       
@@ -1703,53 +1922,81 @@ export default function OnboardingScreen() {
           { value: 'moderate' as const, labelKey: 'onboarding.activity.moderate.label', descriptionKey: 'onboarding.activity.moderate.description' },
           { value: 'high' as const, labelKey: 'onboarding.activity.high.label', descriptionKey: 'onboarding.activity.high.description' },
           { value: 'very_high' as const, labelKey: 'onboarding.activity.very_high.label', descriptionKey: 'onboarding.activity.very_high.description' },
-        ].map((activity) => (
-          <TouchableOpacity
-            key={activity.value}
-            style={[
-              styles.goalCard,
-              { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
-              activityLevel === activity.value && { 
-                backgroundColor: colors.tint, 
-                borderColor: colors.tint,
-                ...Platform.select({
-                  web: { boxShadow: `0 4px 12px ${colors.tint}40` },
-                  default: {
-                    shadowColor: colors.tint,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 4,
+        ].map((activity) => {
+          const selected = activityLevel === activity.value;
+          const pressed = pressedCard === activity.value;
+          
+          return (
+            <TouchableOpacity
+              key={activity.value}
+              style={[
+                styles.goalCard,
+                {
+                  borderColor: selected ? 'transparent' : '#E5E7EB',
+                  backgroundColor: selected ? undefined : '#FFFFFF',
+                  borderWidth: selected ? 0 : 1,
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
+                  opacity: pressed ? 0.96 : 1,
+                },
+                selected && {
+                  ...Platform.select({
+                    web: {
+                      background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      transition: 'all 0.2s ease',
+                    },
+                    default: {
+                      backgroundColor: onboardingColors.primary,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.12,
+                      shadowRadius: 12,
+                      elevation: 4,
+                    },
+                  }),
+                },
+                !selected && Platform.select({
+                  web: {
+                    transition: 'all 0.2s ease',
                   },
+                  default: {},
                 }),
-              },
-            ]}
-            onPress={() => {
-              setActivityLevel(activity.value);
-              setError(null);
-            }}
-            disabled={loading}
-            {...getButtonAccessibilityProps(
-              `${t(activity.labelKey)}${activityLevel === activity.value ? ' selected' : ''}`,
-              `Double tap to select ${t(activity.labelKey)}`,
-              loading
-            )}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: activityLevel === activity.value }}
-          >
-            <Text style={[styles.goalCardTitle, { color: activityLevel === activity.value ? '#fff' : colors.text }]}>
-              {t(activity.labelKey)}
-            </Text>
-            <Text style={[styles.goalCardDescription, { color: activityLevel === activity.value ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
-              {t(activity.descriptionKey)}
-            </Text>
-            {activityLevel === activity.value && (
-              <View style={styles.goalCardCheckmark}>
-                <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
+              ]}
+              onPress={() => {
+                setActivityLevel(activity.value);
+                setError(null);
+              }}
+              onPressIn={() => setPressedCard(activity.value)}
+              onPressOut={() => setPressedCard(null)}
+              disabled={loading}
+              {...getButtonAccessibilityProps(
+                `${t(activity.labelKey)}${selected ? ' selected' : ''}`,
+                `Double tap to select ${t(activity.labelKey)}`,
+                loading
+              )}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+            >
+              <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
+                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : '#1F2937' }]}>
+                  {t(activity.labelKey)}
+                </Text>
+                <Text style={[styles.goalCardDescription, { color: selected ? 'rgba(255,255,255,0.9)' : '#6B7280' }]}>
+                  {t(activity.descriptionKey)}
+                </Text>
               </View>
-            )}
-          </TouchableOpacity>
-        ))}
+              {selected && (
+                <View style={styles.goalCardCheckmark}>
+                  <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -1777,7 +2024,7 @@ export default function OnboardingScreen() {
                 style={[
                   styles.unitButton,
                   { borderColor: colors.border },
-                  currentWeightUnit === 'kg' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                  currentWeightUnit === 'kg' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                 ]}
                 onPress={() => {
                   setCurrentWeightUnit('kg');
@@ -1794,7 +2041,7 @@ export default function OnboardingScreen() {
                 style={[
                   styles.unitButton,
                   { borderColor: colors.border },
-                  currentWeightUnit === 'lbs' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                  currentWeightUnit === 'lbs' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                 ]}
                 onPress={() => {
                   setCurrentWeightUnit('lbs');
@@ -1817,7 +2064,7 @@ export default function OnboardingScreen() {
                   borderColor: error && !currentWeightKg ? '#EF4444' : colors.border,
                   color: colors.text,
                   backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
                 },
               ]}
               placeholder={t('onboarding.current_weight.weight_kg_placeholder')}
@@ -1844,7 +2091,7 @@ export default function OnboardingScreen() {
                   borderColor: error && !currentWeightLb ? '#EF4444' : colors.border,
                   color: colors.text,
                   backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
                 },
               ]}
               placeholder={t('onboarding.current_weight.weight_lb_placeholder')}
@@ -1892,7 +2139,7 @@ export default function OnboardingScreen() {
                 style={[
                   styles.unitButton,
                   { borderColor: colors.border },
-                  goalWeightUnit === 'kg' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                  goalWeightUnit === 'kg' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                 ]}
                 onPress={() => {
                   setGoalWeightUnit('kg');
@@ -1909,7 +2156,7 @@ export default function OnboardingScreen() {
                 style={[
                   styles.unitButton,
                   { borderColor: colors.border },
-                  goalWeightUnit === 'lbs' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                  goalWeightUnit === 'lbs' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                 ]}
                 onPress={() => {
                   setGoalWeightUnit('lbs');
@@ -1932,7 +2179,7 @@ export default function OnboardingScreen() {
                   borderColor: error && !goalWeightKg ? '#EF4444' : colors.border,
                   color: colors.text,
                   backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
                 },
               ]}
               placeholder={t('onboarding.goal_weight.weight_kg_placeholder')}
@@ -1959,7 +2206,7 @@ export default function OnboardingScreen() {
                   borderColor: error && !goalWeightLb ? '#EF4444' : colors.border,
                   color: colors.text,
                   backgroundColor: colors.backgroundSecondary,
-                  ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                  ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
                 },
               ]}
               placeholder={t('onboarding.goal_weight.weight_lb_placeholder')}
@@ -2096,7 +2343,7 @@ export default function OnboardingScreen() {
               borderColor: error && !firstName ? '#EF4444' : colors.border,
               color: colors.text,
               backgroundColor: colors.background,
-              ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+              ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
             },
           ]}
           placeholder="Enter your preferred name"
@@ -2159,7 +2406,7 @@ export default function OnboardingScreen() {
                 style={[
                   styles.genderButton,
                   { borderColor: colors.border },
-                  gender === g && { backgroundColor: colors.tint, borderColor: colors.tint },
+                  gender === g && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                 ]}
                 onPress={() => setGender(g)}
                 disabled={loading}
@@ -2205,7 +2452,7 @@ export default function OnboardingScreen() {
               style={[
                 styles.unitButton,
                 { borderColor: colors.border },
-                heightUnit === 'cm' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                heightUnit === 'cm' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
               ]}
               onPress={() => {
                 setHeightUnit('cm');
@@ -2225,7 +2472,7 @@ export default function OnboardingScreen() {
               style={[
                 styles.unitButton,
                 { borderColor: colors.border },
-                heightUnit === 'ft' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                heightUnit === 'ft' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
               ]}
               onPress={() => {
                 setHeightUnit('ft');
@@ -2253,7 +2500,7 @@ export default function OnboardingScreen() {
                 borderColor: error && !heightCm ? '#EF4444' : colors.border,
                 color: colors.text,
                 backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
               },
             ]}
             placeholder="50 to 304.8"
@@ -2274,7 +2521,7 @@ export default function OnboardingScreen() {
                     borderColor: error && !heightFt ? '#EF4444' : colors.border,
                     color: colors.text,
                     backgroundColor: colors.backgroundSecondary,
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                    ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
                   },
                 ]}
                 placeholder="ft (max 10)"
@@ -2295,7 +2542,7 @@ export default function OnboardingScreen() {
                     borderColor: error && !heightIn ? '#EF4444' : colors.border,
                     color: colors.text,
                     backgroundColor: colors.backgroundSecondary,
-                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                    ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
                   },
                 ]}
                 placeholder="in"
@@ -2320,7 +2567,7 @@ export default function OnboardingScreen() {
               style={[
                 styles.unitButton,
                 { borderColor: colors.border },
-                weightUnit === 'lbs' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                weightUnit === 'lbs' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
               ]}
               onPress={() => {
                 setWeightUnit('lbs');
@@ -2339,7 +2586,7 @@ export default function OnboardingScreen() {
               style={[
                 styles.unitButton,
                 { borderColor: colors.border },
-                weightUnit === 'kg' && { backgroundColor: colors.tint, borderColor: colors.tint },
+                weightUnit === 'kg' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
               ]}
               onPress={() => {
                 setWeightUnit('kg');
@@ -2364,7 +2611,7 @@ export default function OnboardingScreen() {
                 borderColor: error && !weightLb ? '#EF4444' : colors.border,
                 color: colors.text,
                 backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
               },
             ]}
             placeholder="45 to 1200"
@@ -2383,7 +2630,7 @@ export default function OnboardingScreen() {
                 borderColor: error && !weightKg ? '#EF4444' : colors.border,
                 color: colors.text,
                 backgroundColor: colors.backgroundSecondary,
-                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                ...(Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {}),
               },
             ]}
             placeholder="20 to 544"
@@ -2400,14 +2647,28 @@ export default function OnboardingScreen() {
   );
   
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[
+      styles.container,
+      Platform.select({
+        web: {
+          background: `radial-gradient(circle at top right, ${onboardingColors.primary}1F, transparent 60%)`,
+        },
+        default: {
+          backgroundColor: colors.background,
+        },
+      }),
+    ]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.cardContainer, { maxWidth: isDesktop ? 520 : '100%' }]}>
-          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[
+            styles.card,
+            styles.cardModern,
+            { backgroundColor: colors.background, borderColor: colors.border },
+          ]}>
             {/* Header */}
             <View style={styles.cardHeader}>
               {currentStep > 1 ? (
@@ -2424,7 +2685,7 @@ export default function OnboardingScreen() {
                 <View style={styles.backButton} />
               )}
               <ThemedText type="title" style={[styles.headerTitle, { color: colors.text }]}>
-                {currentStep === 1 ? t('onboarding.goal.header') : t('onboarding.title')}
+                {t('onboarding.title')}
               </ThemedText>
               <View style={styles.backButton} />
             </View>
@@ -2432,12 +2693,12 @@ export default function OnboardingScreen() {
             <StepIndicator currentStep={currentStep} totalSteps={totalSteps} colors={colors} />
             
             <View style={styles.cardContent}>
-              {currentStep === 1 && renderGoalStep()}
-              {currentStep === 2 && renderNameAgeStep()}
-              {currentStep === 3 && renderSexStep()}
-              {currentStep === 4 && renderHeightStep()}
-              {currentStep === 5 && renderActivityStep()}
-              {currentStep === 6 && renderCurrentWeightStep()}
+              {currentStep === 1 && renderNameAgeStep()}
+              {currentStep === 2 && renderSexStep()}
+              {currentStep === 3 && renderHeightStep()}
+              {currentStep === 4 && renderActivityStep()}
+              {currentStep === 5 && renderCurrentWeightStep()}
+              {currentStep === 6 && renderGoalStep()}
               {currentStep === 7 && renderGoalWeightStep()}
               {currentStep === 8 && renderTimelineStep()}
               
@@ -2452,16 +2713,29 @@ export default function OnboardingScreen() {
                 </View>
               )}
               
-              <View style={styles.buttonContainer}>
+              <View style={styles.buttonContainerModern}>
                 {currentStep < totalSteps ? (
                   <TouchableOpacity
                     style={[
-                      styles.button,
+                      styles.buttonModern,
                       getMinTouchTargetStyle(),
                       {
-                        backgroundColor: colors.tint,
                         opacity: (loading || shouldDisableNext()) ? 0.6 : 1,
                         ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
+                        ...Platform.select({
+                          web: {
+                            background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(22, 161, 184, 0.3)',
+                          },
+                          default: {
+                            backgroundColor: onboardingColors.primary,
+                            shadowColor: onboardingColors.primary,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 12,
+                            elevation: 4,
+                          },
+                        }),
                       },
                     ]}
                     onPress={handleNext}
@@ -2487,7 +2761,7 @@ export default function OnboardingScreen() {
                       styles.button,
                       getMinTouchTargetStyle(),
                       {
-                        backgroundColor: colors.tint,
+                        backgroundColor: onboardingColors.primary,
                         opacity: loading ? 0.6 : 1,
                         ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
                       },
@@ -2677,7 +2951,7 @@ export default function OnboardingScreen() {
               
               <View style={[styles.datePickerFooter, { borderTopColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.datePickerDoneButton, { backgroundColor: colors.tint }]}
+                  style={[styles.datePickerDoneButton, { backgroundColor: onboardingColors.primary }]}
                   onPress={() => setShowDatePicker(false)}
                   {...getButtonAccessibilityProps('Done', 'Double tap to confirm date selection')}
                   {...(Platform.OS === 'web' ? getFocusStyle('#fff') : {})}
@@ -2743,7 +3017,7 @@ export default function OnboardingScreen() {
                           key={year}
                           style={[
                             styles.yearMonthPickerOption,
-                            isSelected && { backgroundColor: colors.tint, borderColor: colors.tint },
+                            isSelected && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                             !isSelected && { borderColor: colors.border },
                           ]}
                           onPress={() => {
@@ -2800,7 +3074,7 @@ export default function OnboardingScreen() {
                           key={month}
                           style={[
                             styles.yearMonthPickerOption,
-                            isSelected && !isDisabled && { backgroundColor: colors.tint, borderColor: colors.tint },
+                            isSelected && !isDisabled && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
                             !isSelected && { borderColor: colors.border },
                             isDisabled && { opacity: 0.4 },
                           ]}
@@ -2839,7 +3113,7 @@ export default function OnboardingScreen() {
               
               <View style={[styles.datePickerFooter, { borderTopColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.datePickerDoneButton, { backgroundColor: colors.tint }]}
+                  style={[styles.datePickerDoneButton, { backgroundColor: onboardingColors.primary }]}
                   onPress={() => setShowYearMonthPicker(false)}
                   {...getButtonAccessibilityProps('Done', 'Double tap to confirm year and month selection')}
                   {...(Platform.OS === 'web' ? getFocusStyle('#fff') : {})}
@@ -2852,171 +3126,6 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
       </Modal>
       
-      {/* Date Picker Modal for Step 2 */}
-      <Modal
-        visible={showDatePickerStep2}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePickerStep2(false)}
-      >
-        <TouchableOpacity
-          style={[styles.datePickerOverlay, { backgroundColor: colors.overlay }]}
-          activeOpacity={1}
-          onPress={() => setShowDatePickerStep2(false)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={[styles.datePickerModal, { backgroundColor: colors.background }]}>
-              <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
-                <ThemedText style={[styles.datePickerTitle, { color: colors.text }]}>
-                  {t('date_picker.select_date_of_birth')}
-                </ThemedText>
-                <TouchableOpacity
-                  onPress={() => setShowDatePickerStep2(false)}
-                  style={styles.datePickerCloseButton}
-                  {...getButtonAccessibilityProps('Close', 'Double tap to close date picker')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="xmark" size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Month/Year Navigation */}
-              <View style={[styles.calendarHeader, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity
-                  style={styles.calendarNavButton}
-                  onPress={() => navigateMonthStep2('prev')}
-                  {...getButtonAccessibilityProps('Previous month', 'Double tap to go to previous month')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol name="chevron.left" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <ThemedText style={[styles.calendarMonthYearText, { color: colors.text }]}>
-                  {calendarViewMonthStep2.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </ThemedText>
-                <TouchableOpacity
-                  style={styles.calendarNavButton}
-                  onPress={() => navigateMonthStep2('next')}
-                  disabled={(() => {
-                    const nextMonth = new Date(calendarViewMonthStep2);
-                    nextMonth.setMonth(nextMonth.getMonth() + 1);
-                    const today = new Date();
-                    return nextMonth > today;
-                  })()}
-                  {...getButtonAccessibilityProps('Next month', 'Double tap to go to next month')}
-                  {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                >
-                  <IconSymbol 
-                    name="chevron.right" 
-                    size={24} 
-                    color={(() => {
-                      const nextMonth = new Date(calendarViewMonthStep2);
-                      nextMonth.setMonth(nextMonth.getMonth() + 1);
-                      const today = new Date();
-                      return nextMonth > today ? colors.textSecondary : colors.text;
-                    })()} 
-                  />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Calendar Grid */}
-              <View style={styles.calendarBody}>
-                {/* Day Headers */}
-                <View style={styles.calendarWeekHeader}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                    <View key={index} style={styles.calendarDayHeader}>
-                      <ThemedText style={[styles.calendarDayHeaderText, { color: colors.textSecondary }]}>
-                        {day}
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-                
-                {/* Calendar Days */}
-                <View style={styles.calendarDays}>
-                  {(() => {
-                    const daysInMonth = getDaysInMonthStep2(calendarViewMonthStep2);
-                    const firstDay = getFirstDayOfMonthStep2(calendarViewMonthStep2);
-                    const days: JSX.Element[] = [];
-                    
-                    for (let i = 0; i < firstDay; i++) {
-                      days.push(
-                        <View key={`empty-${i}`} style={styles.calendarDayCell} />
-                      );
-                    }
-                    
-                    for (let day = 1; day <= daysInMonth; day++) {
-                      const isSelected = isDateSelectedStep2(day);
-                      const isDisabled = isDateDisabledStep2(day);
-                      const date = new Date(calendarViewMonthStep2.getFullYear(), calendarViewMonthStep2.getMonth(), day);
-                      const isToday = (() => {
-                        const today = new Date();
-                        return (
-                          date.getDate() === today.getDate() &&
-                          date.getMonth() === today.getMonth() &&
-                          date.getFullYear() === today.getFullYear()
-                        );
-                      })();
-                      
-                      days.push(
-                        <TouchableOpacity
-                          key={day}
-                          style={[
-                            styles.calendarDayCell,
-                            isSelected && { backgroundColor: colors.tint },
-                            isDisabled && styles.calendarDayDisabled,
-                          ]}
-                          onPress={() => !isDisabled && handleDateSelectStep2(day)}
-                          disabled={isDisabled}
-                          {...getButtonAccessibilityProps(
-                            `Select ${day}`,
-                            `Double tap to select ${day}`,
-                            isDisabled
-                          )}
-                          {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.calendarDayText,
-                              {
-                                color: isSelected
-                                  ? '#fff'
-                                  : isDisabled
-                                  ? colors.textSecondary
-                                  : isToday
-                                  ? colors.tint
-                                  : colors.text,
-                                fontWeight: isToday ? '600' : '400',
-                              },
-                            ]}
-                          >
-                            {day}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    }
-                    
-                    return days;
-                  })()}
-                </View>
-              </View>
-              
-              <View style={[styles.datePickerFooter, { borderTopColor: colors.border }]}>
-                <TouchableOpacity
-                  style={[styles.datePickerDoneButton, { backgroundColor: colors.tint }]}
-                  onPress={() => setShowDatePickerStep2(false)}
-                  {...getButtonAccessibilityProps('Done', 'Double tap to confirm date selection')}
-                  {...(Platform.OS === 'web' ? getFocusStyle('#fff') : {})}
-                >
-                  <Text style={styles.datePickerDoneButtonText}>{t('common.done')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
     </ThemedView>
   );
 }
@@ -3052,6 +3161,21 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  cardModern: {
+    borderRadius: 20,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        elevation: 6,
+      },
+    }),
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3080,7 +3204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
-    paddingHorizontal: 40,
+    // paddingHorizontal is now set dynamically in the component
   },
   stepIndicatorRow: {
     flexDirection: 'row',
@@ -3100,14 +3224,55 @@ const styles = StyleSheet.create({
   stepContent: {
     gap: 20,
   },
+  stepContentAnimated: {
+    gap: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    ...Platform.select({
+      web: {
+        animation: 'fadeUp 0.3s ease',
+        '@keyframes fadeUp': {
+          from: { opacity: 0, transform: 'translateY(12px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
+      },
+      default: {
+        opacity: 1,
+      },
+    }),
+  },
+  stepIllustration: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   stepTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
   },
+  stepTitleModern: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  stepCaption: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 8,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
   stepSubtitle: {
     fontSize: 16,
     marginBottom: 8,
+  },
+  stepSubtitleModern: {
+    fontSize: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   inputContainer: {
     marginBottom: 20,
@@ -3182,10 +3347,46 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
+  goalCardModern: {
+    padding: 20,
+    borderRadius: 14,
+    borderWidth: 2,
+    position: 'relative',
+    minHeight: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+      },
+      default: {},
+    }),
+  },
+  goalCardSelected: {
+    borderWidth: 3,
+  },
+  goalCardUnselected: {
+    borderWidth: 2,
+  },
+  goalCardPressed: {
+    ...Platform.select({
+      web: {
+        transition: 'transform 0.15s ease, opacity 0.15s ease',
+      },
+      default: {},
+    }),
+  },
   goalCardTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 6,
+  },
+  goalCardTitleModern: {
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
   },
   goalCardDescription: {
     fontSize: 14,
@@ -3195,6 +3396,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
+  },
+  goalCardCheckmarkModern: {
+    marginLeft: 12,
+    ...Platform.select({
+      web: {
+        transition: 'opacity 0.15s ease',
+      },
+      default: {},
+    }),
   },
   summaryBox: {
     padding: 16,
@@ -3236,6 +3446,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  unitToggleModern: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   unitButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -3249,9 +3466,80 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  unitPill: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 9999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+      default: {},
+    }),
+  },
+  unitPillSelected: {
+    borderWidth: 0,
+  },
+  unitPillUnselected: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  unitPillText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  heightInputContainer: {
+    marginTop: 12,
+    gap: 12,
+    width: '100%',
+    maxWidth: '100%',
+  },
+  inputWrapper: {
+    position: 'relative',
+    width: '100%',
+    minWidth: 0, // Allow flex items to shrink below their content size
+    flexShrink: 1, // Allow shrinking in flex containers
+  },
+  inputModern: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 16,
+    minHeight: 52,
+    width: '100%',
+    maxWidth: '100%', // Prevent overflow
+    ...Platform.select({
+      web: {
+        outline: 'none',
+        boxSizing: 'border-box', // Include padding in width calculation
+      },
+      default: {},
+    }),
+  },
+  inputUnitLabel: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    fontSize: 14,
+    fontWeight: '600',
+  },
   dualInputRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  dualInputRowModern: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    minWidth: 0, // Allow flex items to shrink
+    alignItems: 'stretch',
+    flexShrink: 1, // Allow the row to shrink if needed
+    maxWidth: '100%', // Prevent overflow
   },
   dualInputContainer: {
     flex: 1,
@@ -3272,12 +3560,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  helperText: {
+    fontSize: 12,
+    marginTop: 4,
+    paddingLeft: 4,
+  },
   buttonContainer: {
     marginTop: 20,
+  },
+  buttonContainerModern: {
+    marginTop: 16,
+    gap: 12,
   },
   button: {
     padding: 16,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  buttonModern: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,

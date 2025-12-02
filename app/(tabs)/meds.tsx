@@ -8,12 +8,12 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
-import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
-import { ModuleFAB } from '@/components/module/module-fab';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -913,13 +913,8 @@ export default function MedsHomeScreen() {
   // Recent and frequent meds (already combined and limited to 10)
   const hasRecentFrequent = recentAndFrequentMeds.length > 0;
 
-  // Background gradient colors
-  const backgroundGradient = colorScheme === 'dark'
-    ? { from: colors.background, to: colors.backgroundSecondary }
-    : { from: '#FFFFFF', to: '#F8FAFC' };
-
   return (
-    <ThemedView style={[styles.container, { backgroundColor: backgroundGradient.from }]}>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
         showsVerticalScrollIndicator={false}
@@ -927,160 +922,144 @@ export default function MedsHomeScreen() {
       >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
-          {/* Module Identity Bar */}
-          <ModuleIdentityBar module="meds" />
+          {/* Standardized Header Container */}
+          <MainScreenHeaderContainer>
+            {/* Date Header with Greeting and Navigation */}
+            <DateHeader 
+              showGreeting={true}
+              module="meds"
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              selectedDateString={selectedDateString}
+              isToday={isToday}
+              getDisplayDate={(t) => {
+                const todayDate = new Date();
+                todayDate.setHours(0, 0, 0, 0);
+                const yesterday = new Date(todayDate);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const formattedDate = selectedDate.toLocaleDateString('en-US', {
+                  ...(selectedDate.getTime() === todayDate.getTime() || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+                  month: 'short',
+                  day: 'numeric',
+                });
+                if (selectedDate.getTime() === todayDate.getTime()) {
+                  return `${t('common.today')}, ${formattedDate}`;
+                } else if (selectedDate.getTime() === yesterday.getTime()) {
+                  return `${t('common.yesterday')}, ${formattedDate}`;
+                }
+                return formattedDate;
+              }}
+              goBackOneDay={() => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() - 1);
+                setSelectedDate(newDate);
+              }}
+              goForwardOneDay={() => {
+                if (!isToday) {
+                  const newDate = new Date(selectedDate);
+                  newDate.setDate(newDate.getDate() + 1);
+                  setSelectedDate(newDate);
+                }
+              }}
+              calendarViewMonth={calendarViewMonth}
+              setCalendarViewMonth={setCalendarViewMonth}
+              today={today}
+            />
+          </MainScreenHeaderContainer>
 
-          {/* Date Header with Greeting and Navigation */}
-          <DateHeader 
-          showGreeting={true}
-          module="meds"
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          selectedDateString={selectedDateString}
-          isToday={isToday}
-          getDisplayDate={(t) => {
-            const todayDate = new Date();
-            todayDate.setHours(0, 0, 0, 0);
-            const yesterday = new Date(todayDate);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const formattedDate = selectedDate.toLocaleDateString('en-US', {
-              ...(selectedDate.getTime() === todayDate.getTime() || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
-              month: 'short',
-              day: 'numeric',
-            });
-            if (selectedDate.getTime() === todayDate.getTime()) {
-              return `${t('common.today')}, ${formattedDate}`;
-            } else if (selectedDate.getTime() === yesterday.getTime()) {
-              return `${t('common.yesterday')}, ${formattedDate}`;
-            }
-            return formattedDate;
-          }}
-          goBackOneDay={() => {
-            const newDate = new Date(selectedDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setSelectedDate(newDate);
-          }}
-          goForwardOneDay={() => {
-            if (!isToday) {
-              const newDate = new Date(selectedDate);
-              newDate.setDate(newDate.getDate() + 1);
-              setSelectedDate(newDate);
-            }
-          }}
-          calendarViewMonth={calendarViewMonth}
-          setCalendarViewMonth={setCalendarViewMonth}
-          today={today}
-        />
-
-        {/* Today's Meds Section - Card */}
-        <MedSectionContainer>
-          <SurfaceCard module="meds">
-          {/* Header */}
-          <View style={[styles.cardHeader, { borderBottomColor: colors.separator }]}>
-            <View style={styles.cardHeaderTop}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-                  {(() => {
-                    const todayDate = new Date();
-                    todayDate.setHours(0, 0, 0, 0);
-                    const yesterday = new Date(todayDate);
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    
-                    if (isToday) {
-                      return t('meds.today_title').replace(' 💊', '').trim();
-                    } else if (selectedDate.getTime() === yesterday.getTime()) {
-                      return t('common.yesterday') + "'s";
-                    } else {
-                      return formatDateForDisplay(selectedDate);
-                    }
-                  })()}
-                </ThemedText>
-                <MaterialCommunityIcons name="pill" size={20} color={ModuleThemes.meds.accent} />
-              </View>
-              <View style={styles.headerButtons}>
-                {!editMode ? (
-                  <>
-                    {/* Clone button */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (!medLogs || medLogs.length === 0) {
-                          showAppToast(t('meds.clone.nothing_to_copy'));
-                          return;
-                        }
-                        setEditMode(true);
-                      }}
-                      disabled={!medLogs || medLogs.length === 0}
-                      style={[
-                        styles.cloneButton,
-                        (!medLogs || medLogs.length === 0) && { opacity: 0.4 },
-                      ]}
-                      activeOpacity={0.7}
-                      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-                      {...getButtonAccessibilityProps(t('meds.clone.edit_mode.enter_edit_mode'))}
-                    >
-                      <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
-                    </TouchableOpacity>
-                    
-                    {/* Delete button */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (!medLogs || medLogs.length === 0) {
-                          return;
-                        }
-                        setEditMode(true);
-                      }}
-                      disabled={!medLogs || medLogs.length === 0}
-                      style={[
-                        styles.deleteButton,
-                        (!medLogs || medLogs.length === 0) && { opacity: 0.4 },
-                      ]}
-                      activeOpacity={0.7}
-                      {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
-                      {...getButtonAccessibilityProps(t('meds.clone.edit_mode.enter_edit_mode'))}
-                    >
-                      <IconSymbol name="trash.fill" size={20} color="#EF4444" />
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  /* Exit edit mode button */
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEditMode(false);
-                      clearEntrySelection();
-                    }}
-                    style={[
-                      styles.cloneButton,
-                      {
-                        backgroundColor: '#10B981' + '20',
-                        borderColor: '#10B981' + '40',
-                      },
-                    ]}
-                    activeOpacity={0.7}
-                    {...(Platform.OS === 'web' && getFocusStyle('#10B981'))}
-                    {...getButtonAccessibilityProps(t('meds.clone.edit_mode.exit_edit_mode'))}
-                  >
-                    <IconSymbol name="checkmark" size={20} color="#10B981" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            {logsLoading ? (
-              <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
-            ) : (
-              totalItems > 0 && (
-                <ThemedText style={[styles.summary, { color: colors.textSecondary }]}>
-                  {t('meds.summary.total', {
-                    count: totalItems,
-                    items: totalItems === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other'),
-                    med_count: medCount,
-                    med: medCount === 1 ? t('meds.summary.med_one') : t('meds.summary.med_other'),
-                    supp_count: suppCount,
-                    supp: suppCount === 1 ? t('meds.summary.supp_one') : t('meds.summary.supp_other'),
-                  })}
-                </ThemedText>
-              )
-            )}
-          </View>
+          {/* Today's Meds Section - Card */}
+          <MedSectionContainer>
+            <SurfaceCard module="meds">
+              {/* Standardized Summary Card Header */}
+              <SummaryCardHeader
+                titleKey="home.summary.title_other"
+                materialIcon="pill"
+                module="meds"
+                isLoading={logsLoading}
+                subtitle={
+                  !logsLoading && totalItems > 0
+                    ? t('meds.summary.total', {
+                        count: totalItems,
+                        items: totalItems === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other'),
+                        med_count: medCount,
+                        med: medCount === 1 ? t('meds.summary.med_one') : t('meds.summary.med_other'),
+                        supp_count: suppCount,
+                        supp: suppCount === 1 ? t('meds.summary.supp_one') : t('meds.summary.supp_other'),
+                      })
+                    : undefined
+                }
+                rightContent={
+                  !logsLoading && (
+                    <View style={styles.headerButtons}>
+                      {!editMode ? (
+                        <>
+                          {/* Clone button */}
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (!medLogs || medLogs.length === 0) {
+                                showAppToast(t('meds.clone.nothing_to_copy'));
+                                return;
+                              }
+                              setEditMode(true);
+                            }}
+                            disabled={!medLogs || medLogs.length === 0}
+                            style={[
+                              styles.cloneButton,
+                              (!medLogs || medLogs.length === 0) && { opacity: 0.4 },
+                            ]}
+                            activeOpacity={0.7}
+                            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                            {...getButtonAccessibilityProps(t('meds.clone.edit_mode.enter_edit_mode'))}
+                          >
+                            <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+                          </TouchableOpacity>
+                          
+                          {/* Delete button */}
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (!medLogs || medLogs.length === 0) {
+                                return;
+                              }
+                              setEditMode(true);
+                            }}
+                            disabled={!medLogs || medLogs.length === 0}
+                            style={[
+                              styles.deleteButton,
+                              (!medLogs || medLogs.length === 0) && { opacity: 0.4 },
+                            ]}
+                            activeOpacity={0.7}
+                            {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
+                            {...getButtonAccessibilityProps(t('meds.clone.edit_mode.enter_edit_mode'))}
+                          >
+                            <IconSymbol name="trash.fill" size={20} color="#EF4444" />
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        /* Exit edit mode button */
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditMode(false);
+                            clearEntrySelection();
+                          }}
+                          style={[
+                            styles.cloneButton,
+                            {
+                              backgroundColor: '#10B981' + '20',
+                              borderColor: '#10B981' + '40',
+                            },
+                          ]}
+                          activeOpacity={0.7}
+                          {...(Platform.OS === 'web' && getFocusStyle('#10B981'))}
+                          {...getButtonAccessibilityProps(t('meds.clone.edit_mode.exit_edit_mode'))}
+                        >
+                          <IconSymbol name="checkmark" size={20} color="#10B981" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )
+                }
+                style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
+              />
 
           {logsLoading ? (
             <View style={styles.loadingContainer}>
@@ -1886,8 +1865,6 @@ export default function MedsHomeScreen() {
         confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
       
-      {/* Module-specific FAB */}
-      <ModuleFAB module="meds" icon="plus" />
     </ThemedView>
   );
 }

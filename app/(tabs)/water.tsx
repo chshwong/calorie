@@ -8,6 +8,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { BarChart } from '@/components/charts/bar-chart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +19,8 @@ import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useWaterDaily } from '@/hooks/use-water-logs';
 import type { WaterDaily } from '@/lib/services/waterLogs';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal } from '@/utils/waterUnits';
+import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal, WATER_LIMITS } from '@/utils/waterUnits';
+import { getLastNDays, addDays, formatDateForDisplay, getDateString } from '@/utils/calculations';
 import { useWaterQuickAddPresets } from '@/hooks/use-water-quick-add-presets';
 import { AnimatedWaterIcon } from '@/components/water/animated-water-icon';
 import {
@@ -106,13 +109,13 @@ export default function WaterScreen() {
     // Convert amount from preset unit to ml for internal storage
     const deltaMl = toMl(amount, unit);
     
-    // Check if adding would exceed 6000ml total
+    // Check if adding would exceed max total
     // Use totalMl which is already calculated correctly from todayWater.water_unit
     const newTotalMl = totalMl + deltaMl;
     
-    if (newTotalMl > 6000) {
+    if (newTotalMl > WATER_LIMITS.MAX_TOTAL_ML) {
       setErrorModalTitle(t('water.error.max_total_exceeded_title'));
-      setErrorModalMessage(t('water.error.max_total_exceeded_message', { max: 6000 }));
+      setErrorModalMessage(t('water.error.max_total_exceeded_message', { max: WATER_LIMITS.MAX_TOTAL_ML }));
       setShowErrorModal(true);
       return;
     }
@@ -129,7 +132,7 @@ export default function WaterScreen() {
     if (addWaterError) {
       const errorMessage = addWaterError instanceof Error 
         ? addWaterError.message 
-        : t('water.error.max_total_exceeded_message', { max: 6000 });
+        : t('water.error.max_total_exceeded_message', { max: WATER_LIMITS.MAX_TOTAL_ML });
       setErrorModalTitle(t('water.error.max_total_exceeded_title'));
       setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
@@ -152,21 +155,21 @@ export default function WaterScreen() {
     // Convert to ml for validation
     const inputMl = toMl(numericValue, activeWaterUnit);
     
-    // Validate input amount is 0-5000ml
-    if (inputMl < 0 || inputMl > 5000) {
+    // Validate input amount is 0-MAX_SINGLE_ADD_ML
+    if (inputMl < 0 || inputMl > WATER_LIMITS.MAX_SINGLE_ADD_ML) {
       // Convert max to user's active unit for friendly error message
-      const maxInActiveUnit = fromMl(5000, activeWaterUnit);
+      const maxInActiveUnit = fromMl(WATER_LIMITS.MAX_SINGLE_ADD_ML, activeWaterUnit);
       const unitLabel = activeWaterUnit === 'floz' ? t('water.floz') : activeWaterUnit === 'cup' ? t('water.cup') : t('water.ml');
       setCustomInputError(t('water.custom_input_error_range', { max: Math.round(maxInActiveUnit), unit: unitLabel }));
       return;
     }
     
-    // Check if adding would exceed 6000ml total
+    // Check if adding would exceed max total
     // Use totalMl which is already calculated correctly
     const newTotalMl = totalMl + inputMl;
     
-    if (newTotalMl > 6000) {
-      setCustomInputError(t('water.error.max_total_exceeded_message', { max: 6000 }));
+    if (newTotalMl > WATER_LIMITS.MAX_TOTAL_ML) {
+      setCustomInputError(t('water.error.max_total_exceeded_message', { max: WATER_LIMITS.MAX_TOTAL_ML }));
       return;
     }
     
@@ -190,9 +193,9 @@ export default function WaterScreen() {
     // Convert to ml for validation
     const inputMl = toMl(numericValue, activeWaterUnit);
 
-    // Validate limits (0-5000ml)
-    if (inputMl > 5000) {
-      setEditTotalError(t('water.edit_total.max_limit', { max: 5000 }));
+    // Validate limits (0-MAX_SINGLE_ADD_ML)
+    if (inputMl > WATER_LIMITS.MAX_SINGLE_ADD_ML) {
+      setEditTotalError(t('water.edit_total.max_limit', { max: WATER_LIMITS.MAX_SINGLE_ADD_ML }));
       return;
     }
 
@@ -234,9 +237,9 @@ export default function WaterScreen() {
     // Convert to ml for validation
     const goalMl = toMl(goalValue, settingsWaterUnit);
 
-    // Validate goal limits (480-5000ml)
-    if (goalMl < 480 || goalMl > 5000) {
-      setSettingsGoalError(t('water.settings.goal_out_of_range', { min: 480, max: 5000 }));
+    // Validate goal limits
+    if (goalMl < WATER_LIMITS.MIN_GOAL_ML || goalMl > WATER_LIMITS.MAX_GOAL_ML) {
+      setSettingsGoalError(t('water.settings.goal_out_of_range', { min: WATER_LIMITS.MIN_GOAL_ML, max: WATER_LIMITS.MAX_GOAL_ML }));
       return;
     }
 
@@ -252,16 +255,17 @@ export default function WaterScreen() {
 
   // Prepare history data for chart (last 7 calendar days including today)
   // Generate exactly 7 days, ordered oldest to newest (left to right)
-  const last7Days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateString = date.toISOString().split('T')[0];
-    last7Days.push(dateString);
-  }
+  // Use the same date logic as the main "Today's Water" card (local date, not UTC)
+  const last7Days = getLastNDays(today, 7);
 
   // Create a map of existing water data by date for quick lookup
+  // IMPORTANT: Include todayWater in the map so today's value is always included
   const waterDataMap = new Map<string, WaterDaily>();
+  // First add today's water (from the same source as the droplet card)
+  if (todayWater) {
+    waterDataMap.set(todayWater.date, todayWater);
+  }
+  // Then add history entries
   history.forEach((water) => {
     waterDataMap.set(water.date, water);
   });
@@ -290,6 +294,10 @@ export default function WaterScreen() {
     }
   });
 
+  // Calculate dynamic y-axis max: max of all daily totals and goal, with 15% headroom
+  const maxDailyValue = Math.max(...historyData.map(d => d.value), 0);
+  const chartMax = Math.max(maxDailyValue, goalMl) * 1.15; // 15% padding above tallest bar/goal
+
   // Calculate goal display value in active unit for reference line label
   const goalInActiveUnit = fromMl(goalMl, activeWaterUnit);
   const goalDisplayValue = t('water.chart.goal_label', { 
@@ -312,68 +320,55 @@ export default function WaterScreen() {
       >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
-          {/* Date Header */}
-          <DateHeader
-          showGreeting={true}
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          selectedDateString={selectedDateString}
-          isToday={isToday}
-          getDisplayDate={(t) => {
-            const todayDate = new Date();
-            todayDate.setHours(0, 0, 0, 0);
-            const yesterday = new Date(todayDate);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const formattedDate = selectedDate.toLocaleDateString('en-US', {
-              ...(selectedDate.getTime() === todayDate.getTime() || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
-              month: 'short',
-              day: 'numeric',
-            });
-            if (selectedDate.getTime() === todayDate.getTime()) {
-              return `${t('common.today')}, ${formattedDate}`;
-            } else if (selectedDate.getTime() === yesterday.getTime()) {
-              return `${t('common.yesterday')}, ${formattedDate}`;
-            }
-            return formattedDate;
-          }}
-          goBackOneDay={() => {
-            const newDate = new Date(selectedDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setSelectedDate(newDate);
-          }}
-          goForwardOneDay={() => {
-            if (!isToday) {
-              const newDate = new Date(selectedDate);
-              newDate.setDate(newDate.getDate() + 1);
-              setSelectedDate(newDate);
-            }
-          }}
-          calendarViewMonth={calendarViewMonth}
-          setCalendarViewMonth={setCalendarViewMonth}
-          today={today}
-        />
+          {/* Standardized Header Container */}
+          <MainScreenHeaderContainer>
+            {/* Date Header */}
+            <DateHeader
+              showGreeting={true}
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              selectedDateString={selectedDateString}
+              isToday={isToday}
+              getDisplayDate={(t) => {
+                const todayDate = new Date();
+                todayDate.setHours(0, 0, 0, 0);
+                const selectedDateNormalized = new Date(selectedDate);
+                selectedDateNormalized.setHours(0, 0, 0, 0);
+                const yesterday = addDays(todayDate, -1);
+                
+                const formattedDate = formatDateForDisplay(selectedDate, today);
+                
+                if (selectedDateNormalized.getTime() === todayDate.getTime()) {
+                  return `${t('common.today')}, ${formattedDate}`;
+                } else if (selectedDateNormalized.getTime() === yesterday.getTime()) {
+                  return `${t('common.yesterday')}, ${formattedDate}`;
+                }
+                return formattedDate;
+              }}
+              goBackOneDay={() => {
+                setSelectedDate(addDays(selectedDate, -1));
+              }}
+              goForwardOneDay={() => {
+                if (!isToday) {
+                  setSelectedDate(addDays(selectedDate, 1));
+                }
+              }}
+              calendarViewMonth={calendarViewMonth}
+              setCalendarViewMonth={setCalendarViewMonth}
+              today={today}
+            />
+          </MainScreenHeaderContainer>
 
-        {/* Today's Water Section - Card */}
-        <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
-          <View style={[styles.cardHeader, { borderBottomColor: colors.separator }]}>
-            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-              {isToday ? t('water.today_title') : selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </ThemedText>
-            <View style={styles.headerRight}>
-              {isLoading && (
-                <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
-              )}
-              {isToday && (
-                <TouchableOpacity
-                  onPress={handleOpenSettings}
-                  style={[styles.gearButton, { backgroundColor: colors.backgroundSecondary }]}
-                  {...getButtonAccessibilityProps(t('water.settings.title'))}
-                >
-                  <IconSymbol name="gearshape" size={FontSize.lg} color={colors.text} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+          {/* Today's Water Section - Card */}
+          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
+            <SummaryCardHeader
+              titleKey="home.summary.title_other"
+              icon="cup.water.fill"
+              module="water"
+              isLoading={isLoading}
+              onPressSettings={isToday ? handleOpenSettings : undefined}
+              style={{ borderBottomWidth: 1, borderBottomColor: colors.separator, marginTop: -6 }}
+            />
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
@@ -386,7 +381,7 @@ export default function WaterScreen() {
                 {/* Edit Total + Custom buttons - stacked vertically on left */}
                 <View style={styles.editTotalButtonContainer}>
                   <TouchableOpacity
-                    style={[styles.editTotalCompactButton, { 
+                    style={[styles.editTotalButton, { 
                       backgroundColor: colors.backgroundSecondary,
                       borderColor: colors.border,
                     }]}
@@ -398,9 +393,16 @@ export default function WaterScreen() {
                     activeOpacity={0.7}
                     {...getButtonAccessibilityProps(t('water.edit_total.button'))}
                   >
-                    <ThemedText style={[styles.editTotalCompactButtonText, { color: colors.text }]}>
-                      {t('water.edit_total.button')}
-                    </ThemedText>
+                    <View style={styles.editTotalButtonContent}>
+                      <IconSymbol
+                        name="drop.fill"
+                        size={Math.round(FontSize['4xl'] * 1.175)}
+                        color={waterTheme.accent}
+                      />
+                      <ThemedText style={[styles.editTotalButtonText, { color: colors.text }]}>
+                        {t('water.edit_total.button')}
+                      </ThemedText>
+                    </View>
                   </TouchableOpacity>
                   
                   {/* Custom button - directly under Edit Total */}
@@ -419,12 +421,12 @@ export default function WaterScreen() {
                       <View style={styles.customButtonIconRow}>
                         <IconSymbol
                           name="plus"
-                          size={FontSize.md} // Reduced by 1 step for proportion (was lg)
+                          size={Math.round(FontSize.sm * 0.7)} // Reduced by 30%
                           color={colors.tint}
                         />
                         <IconSymbol
                           name="drop.fill"
-                          size={Math.round(FontSize['4xl'] * 1.175)} // Increased by ~17.5% (36 * 1.175 = 42.3 → 42dp)
+                          size={Math.round(FontSize['4xl'] * 1.175 * 0.7)} // Reduced by 30% (42 * 0.7 = 29.4 → 29dp)
                           color={waterTheme.accent}
                           style={{ marginLeft: 0 }} // No spacing - icons touching
                         />
@@ -553,17 +555,18 @@ export default function WaterScreen() {
           <View style={styles.chartWrapper}>
             <BarChart
               data={historyData}
-              maxValue={goalMl}
+              maxValue={chartMax}
               goalValue={goalMl}
               goalDisplayValue={goalDisplayValue}
               selectedDate={selectedDateString}
+              todayDateString={getDateString(today)}
               colorScale={(value, max) => {
                 const ratio = value / max;
                 if (ratio < 0.5) return colors.infoLight;
                 if (ratio < 0.8) return colors.info;
                 return accentColor;
               }}
-              height={140}
+              height={Platform.OS === 'web' ? 260 : 180}
               showLabels={true}
               emptyMessage={t('water.chart.empty_message')}
             />
@@ -706,7 +709,7 @@ export default function WaterScreen() {
                 </ThemedText>
               )}
               <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
-                {t('water.edit_total.helper', { max: 5000 })}
+                {t('water.edit_total.helper', { max: WATER_LIMITS.MAX_SINGLE_ADD_ML })}
               </ThemedText>
 
               <View style={styles.modalButtons}>
@@ -895,18 +898,10 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: BorderRadius.xl,
-    padding: Spacing.md, // Reduced from lg to tighten spacing
+    padding: Spacing.lg, // Match Exercise/Meds for consistent left margin
     marginBottom: Spacing.lg,
     overflow: 'hidden',
     width: '100%',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs, // Reduced from sm to tighten spacing
-    paddingBottom: Spacing.xs,
-    borderBottomWidth: 1,
   },
   headerRight: {
     flexDirection: 'row',
@@ -923,7 +918,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: FontSize.lg,
-    fontWeight: '700',
+    fontWeight: FontWeight.bold,
     marginBottom: Spacing.xs,
   },
   chartWrapper: {
@@ -955,24 +950,30 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.xs,
   },
-  editTotalCompactButton: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
+  editTotalButton: {
+    paddingHorizontal: Spacing.md, // Increased from sm (~25% larger)
+    paddingVertical: Spacing.sm, // Increased from xs (~25% larger)
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
     ...getMinTouchTargetStyle(),
   },
-  editTotalCompactButtonText: {
-    fontSize: FontSize.xs,
+  editTotalButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  editTotalButtonText: {
+    fontSize: FontSize.sm, // Increased from xs (~25% larger)
     fontWeight: FontWeight.medium,
     textAlign: 'center',
-    lineHeight: FontSize.xs * 1.5, // Use theme line height
+    lineHeight: FontSize.sm * 1.5, // Use theme line height
   },
   customButton: {
-    paddingHorizontal: Spacing.xs, // Reduced by one size step (was sm)
-    paddingVertical: Spacing.xs / 4, // Reduced vertical padding further
+    paddingHorizontal: Math.round(Spacing.xs * 0.7), // Reduced by 30%
+    paddingVertical: Math.round((Spacing.xs / 4) * 0.7), // Reduced by 30%
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     justifyContent: 'center',
@@ -983,7 +984,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs / 4, // Minimal gap between graphic and text - maintained for consistency
+    gap: Math.round((Spacing.xs / 4) * 0.7), // Reduced by 30% to match button size
   },
   customButtonIconRow: {
     flexDirection: 'row',
@@ -994,10 +995,10 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   customButtonText: {
-    fontSize: FontSize.xs,
+    fontSize: Math.round(FontSize.xs * 0.9), // Slightly reduced to match 30% smaller button
     fontWeight: FontWeight.medium,
     textAlign: 'center',
-    lineHeight: FontSize.xs * 1.5, // Use theme line height
+    lineHeight: Math.round(FontSize.xs * 0.9 * 1.5), // Use theme line height
   },
   dropletContainer: {
     alignItems: 'center',
@@ -1089,7 +1090,7 @@ const styles = StyleSheet.create({
   },
   customButtonText: {
     fontSize: FontSize.sm,
-    fontWeight: '600',
+    fontWeight: FontWeight.semibold,
   },
   modalOverlay: {
     flex: 1,
@@ -1119,7 +1120,7 @@ const styles = StyleSheet.create({
   },
   formLabel: {
     fontSize: FontSize.sm,
-    fontWeight: '600',
+    fontWeight: FontWeight.semibold,
     marginBottom: Spacing.xs,
   },
   formInput: {
@@ -1152,7 +1153,7 @@ const styles = StyleSheet.create({
     // backgroundColor set inline
   },
   saveButtonText: {
-    fontWeight: '600',
+    fontWeight: FontWeight.semibold,
   },
   settingsRow: {
     marginBottom: Spacing.md,
@@ -1171,7 +1172,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     fontSize: FontSize.base,
-    fontWeight: '500',
+    fontWeight: FontWeight.medium,
   },
 });
 

@@ -7,8 +7,10 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
@@ -341,127 +343,71 @@ export default function FoodLogHomeScreen() {
         <View style={styles.scrollContent}>
           {/* Desktop Container for Header and Content */}
           <DesktopPageContainer>
-            {/* Date Header with Greeting and Navigation */}
-            <DateHeader
-            showGreeting={true}
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-            selectedDateString={selectedDateString}
-            isToday={isToday}
-            getDisplayDate={(t) => {
-              const todayDate = new Date();
-              todayDate.setHours(0, 0, 0, 0);
-              const yesterday = new Date(todayDate);
-              yesterday.setDate(yesterday.getDate() - 1);
-              const currentYear = todayDate.getFullYear();
-              const selectedYear = selectedDate.getFullYear();
-              const isCurrentYear = selectedYear === currentYear;
-              const dateOptions: Intl.DateTimeFormatOptions = { 
-                ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
-                month: 'short', 
-                day: 'numeric',
-                ...(isCurrentYear ? {} : { year: 'numeric' })
-              };
-              const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
-              if (isToday) {
-                return `${t('common.today')}, ${formattedDate}`;
-              } else if (selectedDate.getTime() === yesterday.getTime()) {
-                return `${t('common.yesterday')}, ${formattedDate}`;
-              }
-              return formattedDate;
-            }}
-            goBackOneDay={() => {
-              const newDate = new Date(selectedDate);
-              newDate.setDate(newDate.getDate() - 1);
-              setSelectedDate(newDate);
-            }}
-            goForwardOneDay={() => {
-              if (!isToday) {
-                const newDate = new Date(selectedDate);
-                newDate.setDate(newDate.getDate() + 1);
-                setSelectedDate(newDate);
-              }
-            }}
-            calendarViewMonth={calendarViewMonth}
-            setCalendarViewMonth={setCalendarViewMonth}
-            today={today}
-            rightActions={
-              <>
-                {/* Manual Refresh Button for Web */}
-                {Platform.OS === 'web' && (
-                  <TouchableOpacity
-                    style={[
-                      styles.refreshButton, 
-                      getMinTouchTargetStyle(),
-                      { 
-                        backgroundColor: colors.tint + '12',
-                        ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                      }
-                    ]}
-                    onPress={onRefresh}
-                    disabled={refreshing}
-                    activeOpacity={0.6}
-                    {...getButtonAccessibilityProps(
-                      t('home.accessibility.refresh_entries'),
-                      t('home.accessibility.refresh_hint')
-                    )}
-                  >
-                    <View 
-                      style={[styles.refreshIconContainer, { backgroundColor: 'transparent' }]}
-                      accessibilityElementsHidden={true}
-                      importantForAccessibility="no-hide-descendants"
-                    >
-                      {refreshing ? (
-                        <ActivityIndicator size="small" color={colors.tint} />
-                      ) : (
-                        <IconSymbol name="arrow.clockwise" size={20} color={colors.tint} decorative={true} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[
-                    styles.profileButton, 
-                    getMinTouchTargetStyle(),
-                    { 
-                      backgroundColor: colors.tint + '12',
-                      ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                    }
-                  ]}
-                  onPress={() => router.push('/settings')}
-                  activeOpacity={0.6}
-                  testID="profile-button"
-                  {...getButtonAccessibilityProps(
-                    t('home.accessibility.profile_settings'),
-                    t('home.accessibility.profile_hint')
-                  )}
-                >
-                  <View 
-                    style={[styles.profileIconContainer, { backgroundColor: 'transparent' }]}
-                    accessibilityElementsHidden={true}
-                    importantForAccessibility="no-hide-descendants"
-                  >
-                    <IconSymbol name="person.fill" size={20} color={colors.tint} decorative={true} />
-                  </View>
-                </TouchableOpacity>
-              </>
-            }
-          />
+            {/* Standardized Header Container */}
+            <MainScreenHeaderContainer>
+              {/* Date Header with Greeting and Navigation */}
+              <DateHeader
+                showGreeting={true}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                selectedDateString={selectedDateString}
+                isToday={isToday}
+                getDisplayDate={(t) => {
+                  const todayDate = new Date();
+                  todayDate.setHours(0, 0, 0, 0);
+                  const yesterday = new Date(todayDate);
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  const currentYear = todayDate.getFullYear();
+                  const selectedYear = selectedDate.getFullYear();
+                  const isCurrentYear = selectedYear === currentYear;
+                  const dateOptions: Intl.DateTimeFormatOptions = { 
+                    ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+                    month: 'short', 
+                    day: 'numeric',
+                    ...(isCurrentYear ? {} : { year: 'numeric' })
+                  };
+                  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
+                  if (isToday) {
+                    return `${t('common.today')}, ${formattedDate}`;
+                  } else if (selectedDate.getTime() === yesterday.getTime()) {
+                    return `${t('common.yesterday')}, ${formattedDate}`;
+                  }
+                  return formattedDate;
+                }}
+                goBackOneDay={() => {
+                  const newDate = new Date(selectedDate);
+                  newDate.setDate(newDate.getDate() - 1);
+                  setSelectedDate(newDate);
+                }}
+                goForwardOneDay={() => {
+                  if (!isToday) {
+                    const newDate = new Date(selectedDate);
+                    newDate.setDate(newDate.getDate() + 1);
+                    setSelectedDate(newDate);
+                  }
+                }}
+                calendarViewMonth={calendarViewMonth}
+                setCalendarViewMonth={setCalendarViewMonth}
+                today={today}
+              />
+            </MainScreenHeaderContainer>
 
-          {/* Daily Totals Summary */}
-          <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>
-            <View style={[styles.dailyTotalsHeader, { borderBottomColor: colors.separator }]}>
-              <ThemedText style={[styles.dailyTotalsTitle, { color: colors.textSecondary }]}>
-                {isToday ? t('home.summary.title_today') : t('home.summary.title_other')}
-              </ThemedText>
-              {entriesLoading ? (
-                <ActivityIndicator size="small" color={colors.tint} />
-              ) : (
-                <ThemedText style={[styles.entryCount, { color: colors.textSecondary }]}>
-                  {t('home.summary.entry', { count: calorieEntries.length })}
-                </ThemedText>
-              )}
-            </View>
+            {/* Daily Totals Summary */}
+            <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>
+              <SummaryCardHeader
+                titleKey="home.summary.title_other"
+                icon="fork.knife"
+                module="food"
+                isLoading={entriesLoading}
+                rightContent={
+                  !entriesLoading ? (
+                    <ThemedText style={[styles.entryCount, { color: colors.textSecondary }]}>
+                      {t('home.summary.entry', { count: calorieEntries.length })}
+                    </ThemedText>
+                  ) : undefined
+                }
+                style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
+              />
             
             {!entriesLoading && (
               <View style={styles.dailyTotalsContent}>
@@ -790,18 +736,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     width: '100%',
-    ...Platform.select({
-      web: {
-        padding: 16,
-        paddingTop: 30,
-        paddingBottom: 16,
-        paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
-      },
-      default: {
-        padding: 16,
-        paddingTop: Platform.OS === 'ios' ? 50 : 30,
-        paddingBottom: 100, // Extra padding for FAB
-      },
+    padding: Layout.screenPadding,
+    ...(Platform.OS === 'web' && {
+      paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
+    }),
+    ...(Platform.OS !== 'web' && {
+      paddingBottom: 100, // Extra padding for FAB on mobile
     }),
   },
   centerContent: {
@@ -1000,7 +940,7 @@ const styles = StyleSheet.create({
   },
   dailyTotalsCard: {
     paddingVertical: Platform.select({ web: 14, default: 12 }),
-    paddingHorizontal: Platform.select({ web: 24, default: 20 }),
+    paddingHorizontal: Spacing.lg, // Match Exercise/Meds for consistent left margin (16px)
     borderRadius: Platform.select({ web: 16, default: 14 }),
     marginBottom: 16,
     ...Platform.select({
@@ -1015,23 +955,6 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
     }),
-  },
-  dailyTotalsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-  },
-  dailyTotalsHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dailyTotalsTitle: {
-    fontSize: Platform.select({ web: 16, default: 18 }),
-    fontWeight: 'bold',
-    letterSpacing: -0.2,
   },
   dailyTotalsContent: {
     gap: 0,

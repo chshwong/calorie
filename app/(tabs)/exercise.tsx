@@ -7,12 +7,12 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
-import { ModuleIdentityBar } from '@/components/module/module-identity-bar';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
-import { ModuleFAB } from '@/components/module/module-fab';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -794,25 +794,8 @@ export default function ExerciseHomeScreen() {
   // Recent and frequent exercises (already combined and limited to 10)
   const hasRecentFrequent = recentAndFrequentExercises.length > 0;
 
-  // Background gradient colors
-  const backgroundGradient = colorScheme === 'dark'
-    ? { from: colors.background, to: colors.backgroundSecondary }
-    : { from: colors.background, to: colors.backgroundSecondary };
-
   return (
-    <ThemedView style={[styles.container, { backgroundColor: backgroundGradient.from }]}>
-      {/* Subtle background gradient effect for web */}
-      {Platform.OS === 'web' && (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              background: `linear-gradient(to bottom, ${backgroundGradient.from}, ${backgroundGradient.to})`,
-              pointerEvents: 'none',
-            },
-          ]}
-        />
-      )}
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
         showsVerticalScrollIndicator={false}
@@ -820,157 +803,140 @@ export default function ExerciseHomeScreen() {
       >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
-          {/* Module Identity Bar */}
-          <ModuleIdentityBar module="exercise" />
+          {/* Standardized Header Container */}
+          <MainScreenHeaderContainer>
+            {/* Date Header with Greeting and Navigation */}
+            <DateHeader
+              showGreeting={true}
+              module="exercise"
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              selectedDateString={selectedDateString}
+              isToday={isToday}
+              getDisplayDate={(t) => {
+                const todayDate = new Date();
+                todayDate.setHours(0, 0, 0, 0);
+                const yesterday = new Date(todayDate);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const formattedDate = selectedDate.toLocaleDateString('en-US', {
+                  ...(selectedDate.getTime() === todayDate.getTime() || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+                  month: 'short',
+                  day: 'numeric',
+                });
+                if (selectedDate.getTime() === todayDate.getTime()) {
+                  return `${t('common.today')}, ${formattedDate}`;
+                } else if (selectedDate.getTime() === yesterday.getTime()) {
+                  return `${t('common.yesterday')}, ${formattedDate}`;
+                }
+                return formattedDate;
+              }}
+              goBackOneDay={() => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() - 1);
+                setSelectedDate(newDate);
+              }}
+              goForwardOneDay={() => {
+                if (!isToday) {
+                  const newDate = new Date(selectedDate);
+                  newDate.setDate(newDate.getDate() + 1);
+                  setSelectedDate(newDate);
+                }
+              }}
+              calendarViewMonth={calendarViewMonth}
+              setCalendarViewMonth={setCalendarViewMonth}
+              today={today}
+            />
+          </MainScreenHeaderContainer>
 
-          {/* Date Header with Greeting and Navigation */}
-          <DateHeader
-          showGreeting={true}
-          module="exercise"
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          selectedDateString={selectedDateString}
-          isToday={isToday}
-          getDisplayDate={(t) => {
-            const todayDate = new Date();
-            todayDate.setHours(0, 0, 0, 0);
-            const yesterday = new Date(todayDate);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const formattedDate = selectedDate.toLocaleDateString('en-US', {
-              ...(selectedDate.getTime() === todayDate.getTime() || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
-              month: 'short',
-              day: 'numeric',
-            });
-            if (selectedDate.getTime() === todayDate.getTime()) {
-              return `${t('common.today')}, ${formattedDate}`;
-            } else if (selectedDate.getTime() === yesterday.getTime()) {
-              return `${t('common.yesterday')}, ${formattedDate}`;
-            }
-            return formattedDate;
-          }}
-          goBackOneDay={() => {
-            const newDate = new Date(selectedDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setSelectedDate(newDate);
-          }}
-          goForwardOneDay={() => {
-            if (!isToday) {
-              const newDate = new Date(selectedDate);
-              newDate.setDate(newDate.getDate() + 1);
-              setSelectedDate(newDate);
-            }
-          }}
-          calendarViewMonth={calendarViewMonth}
-          setCalendarViewMonth={setCalendarViewMonth}
-          today={today}
-        />
-
-        {/* Today's Exercise Section - Card */}
-        <ExerciseSectionContainer>
-          <SurfaceCard module="exercise">
-          {/* Sticky header */}
-          <View style={styles.cardHeader}>
-            <View style={styles.cardHeaderTop}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-                  {(() => {
-                    const todayDate = new Date();
-                    todayDate.setHours(0, 0, 0, 0);
-                    const yesterday = new Date(todayDate);
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    
-                    if (isToday) {
-                      return t('exercise.today_title').replace(' Exercise', '');
-                    } else if (selectedDate.getTime() === yesterday.getTime()) {
-                      return t('common.yesterday') + "'s";
-                    } else {
-                      return formatDateForDisplay(selectedDate);
-                    }
-                  })()}
-                </ThemedText>
-                <MaterialCommunityIcons name="heart-pulse" size={20} color={ModuleThemes.exercise.accent} />
-              </View>
-              <View style={styles.headerButtons}>
-                {!editMode ? (
-                  <>
-                    {/* Clone button */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (!exerciseLogs || exerciseLogs.length === 0) {
-                          showAppToast(t('exercise.clone.nothing_to_copy'));
-                          return;
-                        }
-                        setEditMode(true);
-                      }}
-                      disabled={!exerciseLogs || exerciseLogs.length === 0}
-                      style={[
-                        styles.cloneButton,
-                        (!exerciseLogs || exerciseLogs.length === 0) && { opacity: 0.4 },
-                      ]}
-                      activeOpacity={0.7}
-                      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-                      {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.enter_edit_mode'))}
-                    >
-                      <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
-                    </TouchableOpacity>
-                    
-                    {/* Delete button */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (!exerciseLogs || exerciseLogs.length === 0) {
-                          return;
-                        }
-                        setEditMode(true);
-                      }}
-                      disabled={!exerciseLogs || exerciseLogs.length === 0}
-                      style={[
-                        styles.deleteButton,
-                        (!exerciseLogs || exerciseLogs.length === 0) && { opacity: 0.4 },
-                      ]}
-                      activeOpacity={0.7}
-                      {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
-                      {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.enter_edit_mode'))}
-                    >
-                      <IconSymbol name="trash.fill" size={20} color="#EF4444" />
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  /* Exit edit mode button */
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEditMode(false);
-                      clearEntrySelection();
-                    }}
-                    style={[
-                      styles.cloneButton,
-                      {
-                        backgroundColor: '#10B981' + '20',
-                        borderColor: '#10B981' + '40',
-                      },
-                    ]}
-                    activeOpacity={0.7}
-                    {...(Platform.OS === 'web' && getFocusStyle('#10B981'))}
-                    {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.exit_edit_mode'))}
-                  >
-                    <IconSymbol name="checkmark" size={20} color="#10B981" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            {logsLoading ? (
-              <ActivityIndicator size="small" color={colors.tint} style={styles.loadingIndicator} />
-            ) : (
-              activityCount > 0 && (
-                <ThemedText style={[styles.summary, { color: colors.textSecondary }]}>
-                  {t('exercise.summary.total', {
-                    minutes: totalMinutes,
-                    count: activityCount,
-                    activities: activityCount === 1 ? t('exercise.summary.activity_one') : t('exercise.summary.activity_other'),
-                  })}
-                </ThemedText>
-              )
-            )}
-          </View>
+          {/* Today's Exercise Section - Card */}
+          <ExerciseSectionContainer>
+            <SurfaceCard module="exercise">
+              {/* Standardized Summary Card Header */}
+              <SummaryCardHeader
+                titleKey="home.summary.title_other"
+                materialIcon="heart-pulse"
+                module="exercise"
+                isLoading={logsLoading}
+                subtitle={
+                  !logsLoading && activityCount > 0
+                    ? t('exercise.summary.total', {
+                        minutes: totalMinutes,
+                        count: activityCount,
+                        activities: activityCount === 1 ? t('exercise.summary.activity_one') : t('exercise.summary.activity_other'),
+                      })
+                    : undefined
+                }
+                rightContent={
+                  !logsLoading && (
+                    <View style={styles.headerButtons}>
+                      {!editMode ? (
+                        <>
+                          {/* Clone button */}
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (!exerciseLogs || exerciseLogs.length === 0) {
+                                showAppToast(t('exercise.clone.nothing_to_copy'));
+                                return;
+                              }
+                              setEditMode(true);
+                            }}
+                            disabled={!exerciseLogs || exerciseLogs.length === 0}
+                            style={[
+                              styles.cloneButton,
+                              (!exerciseLogs || exerciseLogs.length === 0) && { opacity: 0.4 },
+                            ]}
+                            activeOpacity={0.7}
+                            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                            {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.enter_edit_mode'))}
+                          >
+                            <IconSymbol name="doc.on.doc" size={20} color={colors.tint} />
+                          </TouchableOpacity>
+                          
+                          {/* Delete button */}
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (!exerciseLogs || exerciseLogs.length === 0) {
+                                return;
+                              }
+                              setEditMode(true);
+                            }}
+                            disabled={!exerciseLogs || exerciseLogs.length === 0}
+                            style={[
+                              styles.deleteButton,
+                              (!exerciseLogs || exerciseLogs.length === 0) && { opacity: 0.4 },
+                            ]}
+                            activeOpacity={0.7}
+                            {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
+                            {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.enter_edit_mode'))}
+                          >
+                            <IconSymbol name="trash.fill" size={20} color="#EF4444" />
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        /* Exit edit mode button */
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditMode(false);
+                            clearEntrySelection();
+                          }}
+                          style={[
+                            styles.cloneButton,
+                            {
+                              backgroundColor: '#10B981' + '20',
+                              borderColor: '#10B981' + '40',
+                            },
+                          ]}
+                          activeOpacity={0.7}
+                          {...(Platform.OS === 'web' && getFocusStyle('#10B981'))}
+                          {...getButtonAccessibilityProps(t('exercise.clone.edit_mode.exit_edit_mode'))}
+                        >
+                          <IconSymbol name="checkmark" size={20} color="#10B981" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )
+                }
+              />
 
           {logsLoading ? (
             <View style={styles.loadingContainer}>
@@ -1247,8 +1213,6 @@ export default function ExerciseHomeScreen() {
         </DesktopPageContainer>
       </ScrollView>
       
-      {/* Module-specific FAB */}
-      <ModuleFAB module="exercise" icon="plus" />
 
       {/* Delete Confirmation Modal */}
       <Modal
@@ -1541,24 +1505,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     overflow: 'hidden',
     width: '100%',
-  },
-  cardHeader: {
-    marginBottom: Spacing.md,
-    paddingBottom: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.separator,
-    // Sticky positioning for web (optional)
-    ...(Platform.OS === 'web' && {
-      position: 'sticky',
-      top: 0,
-      zIndex: 10,
-    }),
-  },
-  cardHeaderTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
   },
   cardTitle: {
     fontSize: FontSize.lg,

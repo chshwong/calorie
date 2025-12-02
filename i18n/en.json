@@ -57,7 +57,7 @@
       "carbs": "Carbs",
       "fat": "Fat",
       "fiber": "Fiber",
-      "saturated_fat": "Saturated Fat",
+      "saturated_fat": "SAT FAT",
       "trans_fat": "Trans Fat",
       "sugar": "Sugar",
       "sodium": "Sodium",
@@ -236,7 +236,7 @@
   },
 
   "onboarding": {
-    "title": "Complete Setup",
+    "title": "Your Fitness Setup",
     "goal": {
       "header": "A clear goal leads to real progress.",
       "title": "What's your goal?",
@@ -264,7 +264,7 @@
       "title": "Tell us a bit about you.",
       "subtitle": "Your date of birth helps us calculate your calorie needs accurately.",
       "preferred_name_label": "Preferred Name",
-      "preferred_name_placeholder": "Enter your preferred name (optional)",
+      "preferred_name_placeholder": "How do you like to be called?",
       "dob_label": "Date of birth",
       "dob_placeholder": "Select your date of birth",
       "age_display": "Age: {{age}} years old",
@@ -276,7 +276,7 @@
       "error_name_too_long": "Preferred name must be 40 characters or less"
     },
     "sex": {
-      "title": "What's your sex?",
+      "title": "Sex at birth",
       "subtitle": "We use this to calculate your calorie needs.",
       "male": "Male",
       "female": "Female",
@@ -672,7 +672,7 @@
       "fat_placeholder": "0",
       "fiber": "Fiber (g)",
       "fiber_placeholder": "0",
-      "saturated_fat": "Saturated Fat (g)",
+      "saturated_fat": "Sat Fat (g)",
       "saturated_fat_placeholder": "0",
       "trans_fat": "Trans Fat (g)",
       "trans_fat_placeholder": "0",

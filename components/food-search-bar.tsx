@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { FoodSourceBadge } from '@/components/food-source-badge';
 import { type FoodMaster } from '@/utils/nutritionMath';
 
 export interface FoodSearchBarProps {
@@ -149,19 +150,12 @@ export function FoodSearchBar({
                       >
                         {food.name}
                       </ThemedText>
-                      {/* CUSTOM badge - only show for custom foods */}
-                      {food.is_custom === true && (
-                        <View style={[styles.customBadge, { 
-                          backgroundColor: colors.tint + '20',
-                          borderColor: colors.tint + '40',
-                        }]}>
-                          <ThemedText style={[styles.customBadgeText, { 
-                            color: colors.tint
-                          }]}>
-                            CUSTOM
-                          </ThemedText>
-                        </View>
-                      )}
+                      {/* Food source badge - shows "C" chip only for custom foods */}
+                      <FoodSourceBadge
+                        isCustom={food.is_custom === true}
+                        colors={colors}
+                        marginLeft={6}
+                      />
                     </View>
                     {food.brand && (
                       <ThemedText
@@ -287,18 +281,6 @@ const styles = StyleSheet.create({
   searchResultName: {
     fontSize: 15,
     fontWeight: '600',
-  },
-  customBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-    borderWidth: 1,
-    marginLeft: 6,
-  },
-  customBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-    textTransform: 'uppercase',
   },
   searchResultBrand: {
     fontSize: 12,

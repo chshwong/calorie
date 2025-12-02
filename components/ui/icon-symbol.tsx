@@ -74,6 +74,7 @@ const MAPPING = {
   'gearshape': 'settings',
   'gearshape.fill': 'settings',
   'cup.and.saucer.fill': { type: 'community', name: 'cup-outline' },
+  'cup.water.fill': { type: 'community', name: 'cup-water' },
   'wineglass.fill': { type: 'community', name: 'glass-wine' },
   'bottle.fill': { type: 'community', name: 'bottle-wine-outline' },
   'plus': 'add',

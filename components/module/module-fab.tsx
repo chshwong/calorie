@@ -57,19 +57,14 @@ export function ModuleFAB({ module, onPress, icon, iconText }: ModuleFABProps) {
   const fabColor = moduleTheme.accent;
   const iconColor = '#FFFFFF'; // White icon on colored background
   
-  // Don't render FAB on desktop/large screens (>= 768px)
-  if (isDesktop) {
-    return null;
-  }
-  
-  // Animation values
+  // Animation values - MUST be called before any conditional returns
   const scale = useSharedValue(1);
   const rotation = useSharedValue(0);
   const shadowOpacity = useSharedValue(0.3);
   const rippleScale = useSharedValue(0);
   const rippleOpacity = useSharedValue(0);
   
-  // Animated styles for main button
+  // Animated styles for main button - MUST be called before any conditional returns
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -80,13 +75,18 @@ export function ModuleFAB({ module, onPress, icon, iconText }: ModuleFABProps) {
     };
   });
 
-  // Animated styles for ripple effect
+  // Animated styles for ripple effect - MUST be called before any conditional returns
   const rippleStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: rippleScale.value }],
       opacity: rippleOpacity.value,
     };
   });
+  
+  // Don't render FAB on desktop/large screens (>= 768px) - AFTER all hooks
+  if (isDesktop) {
+    return null;
+  }
 
   const handlePressIn = () => {
     // Haptic feedback

@@ -115,6 +115,86 @@ export const formatUTCDate = (utcDateTime: string | null): string => {
 };
 
 /**
+ * Get array of date strings for the last N days including today
+ * @param today - Date object representing today
+ * @param days - Number of days to include (default: 7)
+ * @returns Array of date strings in YYYY-MM-DD format, ordered oldest to newest
+ */
+export const getLastNDays = (today: Date, days: number = 7): string[] => {
+  const dateStrings: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateString = date.toISOString().split('T')[0];
+    dateStrings.push(dateString);
+  }
+  return dateStrings;
+};
+
+/**
+ * Add or subtract days from a date
+ * @param date - Date object to modify
+ * @param days - Number of days to add (positive) or subtract (negative)
+ * @returns New Date object with days added/subtracted
+ */
+export const addDays = (date: Date, days: number): Date => {
+  const newDate = new Date(date);
+  newDate.setDate(newDate.getDate() + days);
+  return newDate;
+};
+
+/**
+ * Format a date for display in a user-friendly format
+ * Shows "Today" or "Yesterday" for recent dates, otherwise formatted date
+ * @param date - Date object to format
+ * @param today - Date object representing today (for comparison)
+ * @param options - Optional Intl.DateTimeFormatOptions
+ * @returns Formatted date string
+ */
+export const formatDateForDisplay = (
+  date: Date,
+  today: Date,
+  options?: Intl.DateTimeFormatOptions
+): string => {
+  const todayDate = new Date(today);
+  todayDate.setHours(0, 0, 0, 0);
+  const yesterday = new Date(todayDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const dateToFormat = new Date(date);
+  dateToFormat.setHours(0, 0, 0, 0);
+  
+  const defaultOptions: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+  };
+  
+  const formattedDate = dateToFormat.toLocaleDateString('en-US', {
+    ...defaultOptions,
+    ...(dateToFormat.getTime() === todayDate.getTime() || dateToFormat.getTime() === yesterday.getTime() 
+      ? {} 
+      : { weekday: 'short' }),
+    ...options,
+  });
+  
+  if (dateToFormat.getTime() === todayDate.getTime()) {
+    return formattedDate; // "Today" will be prepended by caller if needed
+  } else if (dateToFormat.getTime() === yesterday.getTime()) {
+    return formattedDate; // "Yesterday" will be prepended by caller if needed
+  }
+  return formattedDate;
+};
+
+/**
+ * Get date string in YYYY-MM-DD format from a Date object
+ * @param date - Date object
+ * @returns Date string in YYYY-MM-DD format
+ */
+export const getDateString = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+/**
  * Determine meal type based on current time in user's local timezone
  * Meal type logic:
  * - 4:00 AM to 11:30 AM: Breakfast

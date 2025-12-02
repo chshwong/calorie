@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert, ActivityIndicator, Animated, Dimensions, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +50,7 @@ import {
   FOOD_SERVING_COLUMNS,
 } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { TabButton } from '@/components/ui/tab-button';
 import { TabBar } from '@/components/ui/tab-bar';
@@ -556,15 +557,20 @@ export default function LogFoodScreen() {
         useNativeDriver: false,
       }).start();
     }
-  }, [showEntryDetails, toggleAnimation, loadingDetailsPreference]);
+    // toggleAnimation is a ref and doesn't need to be in dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEntryDetails, loadingDetailsPreference]);
 
   // Use React Query hook for entries (shared cache with Home screen)
   const { data: allEntriesForDay = [], isLoading: entriesLoading, isError: entriesError, refetch: refetchEntries } = useDailyEntries(entryDate);
   
   // Filter entries by current meal type (client-side filtering)
-  const entries = (allEntriesForDay ?? []).filter(
-    (entry) => entry.meal_type === mealType
-  );
+  // Memoize to prevent unnecessary re-renders and useEffect triggers
+  const entries = useMemo(() => {
+    return (allEntriesForDay ?? []).filter(
+      (entry) => entry.meal_type === mealType
+    );
+  }, [allEntriesForDay, mealType]);
   
   // Use reusable highlight hook for newly added entries
   const {
@@ -804,48 +810,54 @@ export default function LogFoodScreen() {
 
   // Fetch food source types and brand for entries with food_id
   // This runs whenever entries change
+  // Use a ref to track the last entries to prevent unnecessary re-runs when array reference changes but content is same
+  const lastEntriesKeyRef = useRef<string>('');
   useEffect(() => {
-    if (!entries.length) {
+    const foodIds = [...new Set(entries.filter(e => e.food_id).map(e => e.food_id))] as string[];
+    const foodIdsKey = foodIds.sort().join(',');
+    const currentKey = `${entries.length}:${foodIdsKey}`;
+    
+    // Only run if entries actually changed (by length or food IDs)
+    if (lastEntriesKeyRef.current === currentKey) {
+      return;
+    }
+    lastEntriesKeyRef.current = currentKey;
+    
+    if (!entries.length || foodIds.length === 0) {
       setFoodSourceMap({});
       setFoodBrandMap({});
       return;
     }
 
-    const foodIds = [...new Set(entries.filter(e => e.food_id).map(e => e.food_id))] as string[];
-    if (foodIds.length > 0) {
-      supabase
-        .from('food_master')
-        .select('id, is_custom, brand')
-        .in('id', foodIds)
-        .then(({ data: foodsData, error }) => {
-          if (error) {
-            setFoodSourceMap({});
-            setFoodBrandMap({});
-            return;
-          }
-          if (foodsData) {
-            const sourceMap: { [foodId: string]: boolean } = {};
-            const brandMap: { [foodId: string]: string | null } = {};
-            foodsData.forEach(food => {
-              // Simple logic: if is_custom is true, mark as custom; otherwise database
-              sourceMap[food.id] = food.is_custom === true;
-              brandMap[food.id] = food.brand;
-            });
-            setFoodSourceMap(sourceMap);
-            setFoodBrandMap(brandMap);
-          } else {
-            setFoodSourceMap({});
-            setFoodBrandMap({});
-          }
-        })
-        .catch(() => {
+    supabase
+      .from('food_master')
+      .select('id, is_custom, brand')
+      .in('id', foodIds)
+      .then(({ data: foodsData, error }) => {
+        if (error) {
           setFoodSourceMap({});
           setFoodBrandMap({});
-        });
-    } else {
-      setFoodSourceMap({});
-      setFoodBrandMap({});
-    }
+          return;
+        }
+        if (foodsData) {
+          const sourceMap: { [foodId: string]: boolean } = {};
+          const brandMap: { [foodId: string]: string | null } = {};
+          foodsData.forEach(food => {
+            // Simple logic: if is_custom is true, mark as custom; otherwise database
+            sourceMap[food.id] = food.is_custom === true;
+            brandMap[food.id] = food.brand;
+          });
+          setFoodSourceMap(sourceMap);
+          setFoodBrandMap(brandMap);
+        } else {
+          setFoodSourceMap({});
+          setFoodBrandMap({});
+        }
+      })
+      .catch(() => {
+        setFoodSourceMap({});
+        setFoodBrandMap({});
+      });
   }, [entries]);
 
   // Fetch functions removed - now using React Query hooks above
@@ -1222,7 +1234,10 @@ export default function LogFoodScreen() {
       saveBundleOrder();
       setBundleEditMode(false);
     }
-  }, [activeTab, customFoodEditMode, bundleEditMode, saveCustomFoodOrder, saveBundleOrder]);
+    // Only depend on activeTab - callbacks are stable and don't need to be in deps
+    // States we're modifying (customFoodEditMode, bundleEditMode) are checked inside, not in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Preloaded entries are no longer needed - React Query handles caching
   // Entries now come from useDailyEntries hook which shares cache with Home screen
@@ -2155,7 +2170,9 @@ export default function LogFoodScreen() {
     
     // Update previous tab
     previousActiveTab.current = activeTab;
-  }, [activeTab, user?.id, refetchCustomFoods, refreshCustomFoodsParam, queryClient]);
+    // queryClient and refetchCustomFoods are stable from React Query, but we'll be explicit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user?.id, refreshCustomFoodsParam]);
   
   // Also check refresh param separately to catch it even if activeTab hasn't changed
   // This is the primary mechanism for detecting when we come back from create page
@@ -3470,17 +3487,11 @@ export default function LogFoodScreen() {
                                               {rightSideText}
                                             </ThemedText>
                                           </TouchableOpacity>
-                                          <View style={[styles.sourceBadge, { 
-                                            backgroundColor: isCustom ? colors.tint + '20' : '#3B82F6' + '20',
-                                            borderColor: isCustom ? colors.tint + '40' : '#3B82F6' + '40',
-                                            marginLeft: 6
-                                          }]}>
-                                            <ThemedText style={[styles.sourceBadgeText, { 
-                                              color: isCustom ? colors.tint : '#3B82F6'
-                                            }]}>
-                                              {isCustom ? 'Custom' : 'Database'}
-                                            </ThemedText>
-                                          </View>
+                                          <FoodSourceBadge
+                                            isCustom={isCustom}
+                                            colors={colors}
+                                            marginLeft={6}
+                                          />
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                             onPress={() => handleQuickAdd(food)}
@@ -3565,17 +3576,11 @@ export default function LogFoodScreen() {
                                               {rightSideText}
                                             </ThemedText>
                                           </TouchableOpacity>
-                                          <View style={[styles.sourceBadge, { 
-                                            backgroundColor: isCustom ? colors.tint + '20' : '#3B82F6' + '20',
-                                            borderColor: isCustom ? colors.tint + '40' : '#3B82F6' + '40',
-                                            marginLeft: 6
-                                          }]}>
-                                            <ThemedText style={[styles.sourceBadgeText, { 
-                                              color: isCustom ? colors.tint : '#3B82F6'
-                                            }]}>
-                                              {isCustom ? 'Custom' : 'Database'}
-                                            </ThemedText>
-                                          </View>
+                                          <FoodSourceBadge
+                                            isCustom={isCustom}
+                                            colors={colors}
+                                            marginLeft={6}
+                                          />
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                             onPress={() => handleQuickAdd(food, food.latestEntry || undefined)}
@@ -4137,17 +4142,11 @@ export default function LogFoodScreen() {
                       // Simple check: is_custom === true
                       const isCustom = selectedFood.is_custom === true;
                       return (
-                        <View style={[styles.sourceBadge, { 
-                          backgroundColor: isCustom ? colors.tint + '20' : '#3B82F6' + '20',
-                          borderColor: isCustom ? colors.tint + '40' : '#3B82F6' + '40',
-                          marginLeft: 8
-                        }]}>
-                          <ThemedText style={[styles.sourceBadgeText, { 
-                            color: isCustom ? colors.tint : '#3B82F6'
-                          }]}>
-                            {isCustom ? 'Custom' : 'Database'}
-                          </ThemedText>
-                        </View>
+                        <FoodSourceBadge
+                          isCustom={isCustom}
+                          colors={colors}
+                          marginLeft={8}
+                        />
                       );
                     })()}
                   </View>
@@ -4476,7 +4475,7 @@ export default function LogFoodScreen() {
                 ) : (
                   // Input fields for custom entries - all 4 macros on one line
                   <View style={styles.row}>
-                    <View style={[styles.field, { flex: 1, marginRight: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginRight: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.protein')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: proteinError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
@@ -4492,7 +4491,7 @@ export default function LogFoodScreen() {
                         <Text style={styles.errorText}>{proteinError}</Text>
                       ) : null}
                     </View>
-                    <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.carbs')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: carbsError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
@@ -4508,7 +4507,7 @@ export default function LogFoodScreen() {
                         <Text style={styles.errorText}>{carbsError}</Text>
                       ) : null}
                     </View>
-                    <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.fat')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: fatError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
@@ -4524,7 +4523,7 @@ export default function LogFoodScreen() {
                         <Text style={styles.errorText}>{fatError}</Text>
                       ) : null}
                     </View>
-                    <View style={[styles.field, { flex: 1, marginLeft: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginLeft: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.fiber')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: fiberError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
@@ -4580,7 +4579,7 @@ export default function LogFoodScreen() {
                 ) : (
                   // Input fields for custom entries - all in one row
                   <View style={styles.row}>
-                    <View style={[styles.field, { flex: 1, marginRight: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginRight: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.saturated_fat')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
@@ -4591,7 +4590,7 @@ export default function LogFoodScreen() {
                         keyboardType="decimal-pad"
                       />
                     </View>
-                    <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.trans_fat')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
@@ -4602,7 +4601,7 @@ export default function LogFoodScreen() {
                         keyboardType="decimal-pad"
                       />
                     </View>
-                    <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
                       <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.sugar')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
@@ -4613,7 +4612,7 @@ export default function LogFoodScreen() {
                         keyboardType="decimal-pad"
                       />
                     </View>
-                    <View style={[styles.field, { flex: 1, marginLeft: 8 }]}>
+                    <View style={[styles.field, { flex: 0.85, marginLeft: 8 }]}>
                       <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.sodium')}</ThemedText>
                       <TextInput
                         style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
@@ -4910,31 +4909,12 @@ export default function LogFoodScreen() {
                       )}
                       {/* Source indicator badge */}
                       {entry.food_id && (
-                        <View style={[
-                          styles.sourceBadge,
-                          {
-                            backgroundColor: foodSourceMap[entry.food_id]
-                              ? colors.tint + '20' 
-                              : '#3B82F6' + '20',
-                            borderColor: foodSourceMap[entry.food_id]
-                              ? colors.tint + '40' 
-                              : '#3B82F6' + '40',
-                            marginRight: 4,
-                          }
-                        ]}>
-                          <ThemedText style={[
-                            styles.sourceBadgeText,
-                            {
-                              color: foodSourceMap[entry.food_id]
-                                ? colors.tint 
-                                : '#3B82F6',
-                            }
-                          ]}>
-                            {foodSourceMap[entry.food_id] 
-                              ? (isMobileScreen ? 'C' : 'Custom')
-                              : (isMobileScreen ? 'DB' : 'Database')}
-                          </ThemedText>
-                        </View>
+                        <FoodSourceBadge
+                          isCustom={foodSourceMap[entry.food_id] === true}
+                          colors={colors}
+                          marginLeft={0}
+                          containerStyle={{ marginRight: 4 }}
+                        />
                       )}
                       {!entry.food_id && (
                         <View style={[

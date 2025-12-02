@@ -37,6 +37,17 @@ export function mlToCups(ml: number): number {
 export type WaterUnit = 'ml' | 'floz' | 'cup';
 
 /**
+ * Water validation limits (in ml - canonical unit)
+ * These constants define the business rules for water tracking
+ */
+export const WATER_LIMITS = {
+  MAX_TOTAL_ML: 6000,      // Maximum total daily water intake
+  MAX_SINGLE_ADD_ML: 5000, // Maximum amount that can be added in a single operation
+  MIN_GOAL_ML: 480,        // Minimum water goal
+  MAX_GOAL_ML: 5000,        // Maximum water goal
+} as const;
+
+/**
  * Convert value from any unit to milliliters (canonical)
  */
 export function toMl(value: number, unit: WaterUnit): number {
