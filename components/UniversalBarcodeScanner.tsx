@@ -209,8 +209,8 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
         { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 }, // Square box for better barcode detection
-          aspectRatio: 1.0, // Square aspect ratio
+          qrbox: { width: 250, height: 150 }, // Rectangular box for barcode detection
+          aspectRatio: 1.777778, // 16:9 aspect ratio for better mobile display
         },
         scanSuccessCallback,
         scanErrorCallback
@@ -302,11 +302,23 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
       timeoutId = setTimeout(async () => {
         if (!isMounted) return;
         
+        // Ensure container is visible before starting
+        const container = document.getElementById(cameraContainerId);
+        if (container) {
+          container.style.display = "block";
+          container.style.visibility = "visible";
+        }
+        
         // Wait for scanner to be initialized
         if (!scannerRef.current) {
           // Retry after a bit more time
           setTimeout(async () => {
             if (!isMounted || !scannerRef.current || isCameraActive || isStartingRef.current) return;
+            const retryContainer = document.getElementById(cameraContainerId);
+            if (retryContainer) {
+              retryContainer.style.display = "block";
+              retryContainer.style.visibility = "visible";
+            }
             isStartingRef.current = true;
             await startCameraSafely();
             isStartingRef.current = false;
@@ -433,12 +445,24 @@ function BarcodeScannerModal({ onDetected }: UniversalBarcodeScannerProps) {
             id={cameraContainerId} 
             style={{ 
               width: "100%", 
-              height: 400,
+              minHeight: 400,
+              height: "auto",
               backgroundColor: "#000",
-              visibility: loading || errorMessage ? "hidden" : "visible",
-              position: loading || errorMessage ? "absolute" : "relative",
+              display: loading || errorMessage ? "none" : "block",
+              position: "relative",
             }} 
           />
+          {/* Add CSS to ensure video fills container */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            #${cameraContainerId} video {
+              width: 100% !important;
+              height: auto !important;
+              object-fit: cover !important;
+            }
+            #${cameraContainerId} > div {
+              width: 100% !important;
+            }
+          `}} />
         </>
       )}
 
