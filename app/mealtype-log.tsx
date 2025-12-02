@@ -5008,7 +5008,13 @@ export default function LogFoodScreen() {
           
           <View style={styles.scannerContent}>
             <UniversalBarcodeScanner
-              onDetected={handleBarcodeScanned}
+              mealType={mealType}
+              entryDate={entryDate}
+              onClose={() => {
+                setShowBarcodeScanner(false);
+                setScanned(false);
+                setBarcodeScanning(false);
+              }}
             />
             {barcodeScanning && (
               <View style={styles.scannerOverlay}>
