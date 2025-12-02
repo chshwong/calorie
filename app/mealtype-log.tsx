@@ -54,7 +54,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { TabButton } from '@/components/ui/tab-button';
 import { TabBar } from '@/components/ui/tab-bar';
 import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
-import { HighlightableItem } from '@/components/highlightable-item';
+import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
 import { MultiSelectItem } from '@/components/multi-select-item';
 import { useMultiSelect } from '@/hooks/use-multi-select';
@@ -2615,9 +2615,11 @@ export default function LogFoodScreen() {
       }
 
       // 5. Insert entry
-      const { error: insertError } = await supabase
+      const { data: insertResult, error: insertError } = await supabase
         .from('calorie_entries')
-        .insert(entryData);
+        .insert(entryData)
+        .select('id')
+        .single();
 
       if (insertError) {
         console.error('Quick add insert error:', insertError);
@@ -2628,7 +2630,12 @@ export default function LogFoodScreen() {
         return;
       }
 
-      // 6. Success! Clear search and refresh entries
+      // 6. Mark as newly added for highlight animation
+      if (insertResult?.id) {
+        markAsNewlyAdded(insertResult.id);
+      }
+
+      // 7. Success! Clear search and refresh entries
       clearSearch();
       await refetchEntries();
 
@@ -3947,10 +3954,9 @@ export default function LogFoodScreen() {
                               keyboardShouldPersistTaps="handled"
                             >
                               {bundles.map((bundle) => (
-                                <HighlightableItem
+                                <HighlightableRow
                                   key={bundle.id}
-                                  isHighlighted={isBundleNewlyAdded(bundle.id)}
-                                  animationValue={getBundleAnimationValue(bundle.id)}
+                                  isNew={isBundleNewlyAdded(bundle.id)}
                                   style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
                                 >
                                   {!bundleEditMode ? (
@@ -4088,7 +4094,7 @@ export default function LogFoodScreen() {
                                       </View>
                                     </>
                                   )}
-                                </HighlightableItem>
+                                </HighlightableRow>
                               ))}
                             </ScrollView>
                           </View>
@@ -4784,9 +4790,8 @@ export default function LogFoodScreen() {
             entries.map((entry) => {
               const isEditing = editingEntryId === entry.id;
               const entryContent = (
-                <HighlightableItem
-                  isHighlighted={isNewlyAdded(entry.id)}
-                  animationValue={getAnimationValue(entry.id)}
+                <HighlightableRow
+                  isNew={isNewlyAdded(entry.id)}
                   style={[
                     styles.entryCard, 
                     { 
@@ -4959,7 +4964,7 @@ export default function LogFoodScreen() {
                       )}
                     </View>
                   </View>
-                </HighlightableItem>
+                </HighlightableRow>
               );
               
               // Wrap with MultiSelectItem if in edit mode

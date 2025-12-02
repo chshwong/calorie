@@ -20,6 +20,7 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { MultiSelectItem } from '@/components/multi-select-item';
 import { useMultiSelect } from '@/hooks/use-multi-select';
 import { showAppToast } from '@/components/ui/app-toast';
+import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
@@ -497,6 +498,9 @@ export default function MedsHomeScreen() {
 
   // Animation refs for newly added rows
   const animationRefs = useRef<Map<string, Animated.Value>>(new Map());
+  
+  // Track newly added entry ID for highlight animation
+  const [newEntryId, setNewEntryId] = useState<string | null>(null);
 
   // Modal state for custom med form
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -687,8 +691,10 @@ export default function MedsHomeScreen() {
         notes: null,
       },
       {
-        onSuccess: () => {
-          // Animation handled by useEffect above
+        onSuccess: (data) => {
+          if (data?.id) {
+            setNewEntryId(data.id);
+          }
         },
         onError: (error: any) => {
           Alert.alert(t('meds.form.error_save_failed', { error: error.message || t('common.unexpected_error') }));
@@ -793,7 +799,10 @@ export default function MedsHomeScreen() {
           notes: formNotes.trim() || null,
         },
         {
-          onSuccess: () => {
+          onSuccess: (data) => {
+            if (data?.id) {
+              setNewEntryId(data.id);
+            }
             closeCustomForm();
           },
           onError: (error: any) => {
@@ -1165,26 +1174,30 @@ export default function MedsHomeScreen() {
                             <View style={styles.medList}>
                               {medLogsFiltered.map((log, index) => {
                                 const rowContent = (
-                                  <MedRow
+                                  <HighlightableRow
                                     key={log.id}
-                                    log={log}
-                                    colors={colors}
-                                    onEdit={() => {
-                                      if (!editMode) {
-                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                      }
-                                    }}
-                                    onDelete={() => {
-                                      if (!editMode) {
-                                        handleDelete(log.id, log.name);
-                                      }
-                                    }}
-                                    onDoseUpdate={handleDoseUpdate}
-                                    isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
-                                    animationValue={animationRefs.current.get(log.id)}
-                                    t={t}
-                                    disabled={editMode}
-                                  />
+                                    isNew={log.id === newEntryId}
+                                  >
+                                    <MedRow
+                                      log={log}
+                                      colors={colors}
+                                      onEdit={() => {
+                                        if (!editMode) {
+                                          openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                        }
+                                      }}
+                                      onDelete={() => {
+                                        if (!editMode) {
+                                          handleDelete(log.id, log.name);
+                                        }
+                                      }}
+                                      onDoseUpdate={handleDoseUpdate}
+                                      isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
+                                      animationValue={animationRefs.current.get(log.id)}
+                                      t={t}
+                                      disabled={editMode}
+                                    />
+                                  </HighlightableRow>
                                 );
                                 
                                 if (editMode) {
@@ -1232,26 +1245,30 @@ export default function MedsHomeScreen() {
                             <View style={styles.medList}>
                               {suppLogsFiltered.map((log, index) => {
                                 const rowContent = (
-                                  <MedRow
+                                  <HighlightableRow
                                     key={log.id}
-                                    log={log}
-                                    colors={colors}
-                                    onEdit={() => {
-                                      if (!editMode) {
-                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                      }
-                                    }}
-                                    onDelete={() => {
-                                      if (!editMode) {
-                                        handleDelete(log.id, log.name);
-                                      }
-                                    }}
-                                    onDoseUpdate={handleDoseUpdate}
-                                    isLast={index === suppLogsFiltered.length - 1}
-                                    animationValue={animationRefs.current.get(log.id)}
-                                    t={t}
-                                    disabled={editMode}
-                                  />
+                                    isNew={log.id === newEntryId}
+                                  >
+                                    <MedRow
+                                      log={log}
+                                      colors={colors}
+                                      onEdit={() => {
+                                        if (!editMode) {
+                                          openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                        }
+                                      }}
+                                      onDelete={() => {
+                                        if (!editMode) {
+                                          handleDelete(log.id, log.name);
+                                        }
+                                      }}
+                                      onDoseUpdate={handleDoseUpdate}
+                                      isLast={index === suppLogsFiltered.length - 1}
+                                      animationValue={animationRefs.current.get(log.id)}
+                                      t={t}
+                                      disabled={editMode}
+                                    />
+                                  </HighlightableRow>
                                 );
                                 
                                 if (editMode) {
@@ -1363,26 +1380,30 @@ export default function MedsHomeScreen() {
                             <View style={styles.medList}>
                               {medLogsFiltered.map((log, index) => {
                                 const rowContent = (
-                                  <MedRow
+                                  <HighlightableRow
                                     key={log.id}
-                                    log={log}
-                                    colors={colors}
-                                    onEdit={() => {
-                                      if (!editMode) {
-                                        openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                      }
-                                    }}
-                                    onDelete={() => {
-                                      if (!editMode) {
-                                        handleDelete(log.id, log.name);
-                                      }
-                                    }}
-                                    onDoseUpdate={handleDoseUpdate}
-                                    isLast={index === medLogsFiltered.length - 1}
-                                    animationValue={animationRefs.current.get(log.id)}
-                                    t={t}
-                                    disabled={editMode}
-                                  />
+                                    isNew={log.id === newEntryId}
+                                  >
+                                    <MedRow
+                                      log={log}
+                                      colors={colors}
+                                      onEdit={() => {
+                                        if (!editMode) {
+                                          openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                        }
+                                      }}
+                                      onDelete={() => {
+                                        if (!editMode) {
+                                          handleDelete(log.id, log.name);
+                                        }
+                                      }}
+                                      onDoseUpdate={handleDoseUpdate}
+                                      isLast={index === medLogsFiltered.length - 1}
+                                      animationValue={animationRefs.current.get(log.id)}
+                                      t={t}
+                                      disabled={editMode}
+                                    />
+                                  </HighlightableRow>
                                 );
                                 
                                 if (editMode) {

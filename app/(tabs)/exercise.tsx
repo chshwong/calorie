@@ -18,6 +18,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { showAppToast } from '@/components/ui/app-toast';
 import { MultiSelectItem } from '@/components/multi-select-item';
 import { useMultiSelect } from '@/hooks/use-multi-select';
+import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
@@ -401,6 +402,9 @@ export default function ExerciseHomeScreen() {
 
   // Animation refs for newly added rows
   const animationRefs = useRef<Map<string, Animated.Value>>(new Map());
+  
+  // Track newly added entry ID for highlight animation
+  const [newEntryId, setNewEntryId] = useState<string | null>(null);
 
   // Modal state for custom exercise form
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -567,6 +571,12 @@ export default function ExerciseHomeScreen() {
       name: name.trim(),
       minutes: minutes,
       notes: null,
+    }, {
+      onSuccess: (data) => {
+        if (data?.id) {
+          setNewEntryId(data.id);
+        }
+      },
     });
   }, [user?.id, selectedDateString, createMutation]);
 
@@ -686,7 +696,10 @@ export default function ExerciseHomeScreen() {
           notes,
         },
         {
-          onSuccess: () => {
+          onSuccess: (data) => {
+            if (data?.id) {
+              setNewEntryId(data.id);
+            }
             closeCustomForm();
           },
           onError: (error: Error) => {
@@ -1033,25 +1046,29 @@ export default function ExerciseHomeScreen() {
                   
                   {exerciseLogs.map((log, index) => {
                     const rowContent = (
-                      <ExerciseRow
+                      <HighlightableRow
                         key={log.id}
-                        log={log}
-                        colors={colors}
-                        onEdit={() => {
-                          if (!editMode) {
-                            openEditForm({ id: log.id, name: log.name, minutes: log.minutes, notes: log.notes });
-                          }
-                        }}
-                        onDelete={() => {
-                          if (!editMode) {
-                            handleDelete(log.id, log.name);
-                          }
-                        }}
-                        onMinutesUpdate={handleMinutesUpdate}
-                        isLast={index === exerciseLogs.length - 1}
-                        animationValue={animationRefs.current.get(log.id)}
-                        disabled={editMode}
-                      />
+                        isNew={log.id === newEntryId}
+                      >
+                        <ExerciseRow
+                          log={log}
+                          colors={colors}
+                          onEdit={() => {
+                            if (!editMode) {
+                              openEditForm({ id: log.id, name: log.name, minutes: log.minutes, notes: log.notes });
+                            }
+                          }}
+                          onDelete={() => {
+                            if (!editMode) {
+                              handleDelete(log.id, log.name);
+                            }
+                          }}
+                          onMinutesUpdate={handleMinutesUpdate}
+                          isLast={index === exerciseLogs.length - 1}
+                          animationValue={animationRefs.current.get(log.id)}
+                          disabled={editMode}
+                        />
+                      </HighlightableRow>
                     );
                     
                     if (editMode) {
