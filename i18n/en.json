@@ -1244,7 +1244,7 @@
       "error_save_failed": "Failed to save exercise: {{error}}"
     },
     "quick_add": {
-      "add_custom": "Add custom exercise",
+      "add_custom": "Log Exercise",
       "add_custom_hint": "Double tap to add a custom exercise",
       "your_recent_frequent": "Your recent & frequent",
       "common_exercises": "Common exercises",
@@ -1489,7 +1489,7 @@
       "error_save_failed": "Failed to save med: {{error}}"
     },
     "quick_add": {
-      "add_custom": "Add custom",
+      "add_custom": "Log New",
       "add_custom_hint": "Double tap to add a custom med",
       "recent_freq": "RECENT & FREQ",
       "common": "COMMON",
