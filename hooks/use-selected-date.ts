@@ -1,38 +1,44 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 
 /**
- * Hook for managing selected date state and formatting
- * Reusable across Food Log and Exercise screens
+ * Hook for managing selected date - always derived from URL params
+ * Single source of truth: route param ?date=YYYY-MM-DD
  */
 export function useSelectedDate() {
   const params = useLocalSearchParams();
   
   // Get today's date for comparison
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
   
-  // Get date from params if available (when navigating from other screens)
-  const dateParam = params.date;
-  const initialDate = dateParam && typeof dateParam === 'string' 
-    ? new Date(dateParam + 'T00:00:00') 
-    : new Date(today);
+  // Get date from params if available
+  const raw = params.date;
+  const dateParam = Array.isArray(raw) ? raw[0] : (raw as string | undefined);
   
-  // State for selected date (defaults to today or date from params)
-  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
-  
-  // Update selected date when params change (e.g., navigation from another screen)
-  useEffect(() => {
+  // Parse date from params or default to today
+  const selectedDate = useMemo(() => {
     if (dateParam && typeof dateParam === 'string') {
-      const newDate = new Date(dateParam + 'T00:00:00');
-      setSelectedDate(newDate);
+      const parsed = new Date(dateParam + 'T00:00:00');
+      if (!isNaN(parsed.getTime())) {
+        parsed.setHours(0, 0, 0, 0);
+        return parsed;
+      }
     }
-  }, [dateParam]);
+    // Default to today if param is missing or invalid
+    return new Date(today);
+  }, [dateParam, today]);
   
-  // Calendar view month (for date picker navigation)
-  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
-    return new Date(selectedDate);
-  });
+  // Format selected date as YYYY-MM-DD for SQL query
+  const selectedDateString = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, [selectedDate]);
   
   // Check if selected date is from current year
   const currentYear = today.getFullYear();
@@ -41,72 +47,19 @@ export function useSelectedDate() {
   
   // Calculate if it's today or yesterday
   const isToday = selectedDate.getTime() === today.getTime();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterday = useMemo(() => {
+    const y = new Date(today);
+    y.setDate(y.getDate() - 1);
+    return y;
+  }, [today]);
   const isYesterday = selectedDate.getTime() === yesterday.getTime();
-  
-  // Format selected date for display (short form)
-  // Exclude weekday for today/yesterday to save space
-  // Include year only if date is from previous year
-  const dateOptions: Intl.DateTimeFormatOptions = { 
-    ...(isToday || isYesterday ? {} : { weekday: 'short' }),
-    month: 'short', 
-    day: 'numeric',
-    ...(isCurrentYear ? {} : { year: 'numeric' })
-  };
-  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
-  
-  // Format display date with appropriate prefix (short form)
-  const getDisplayDate = (t: (key: string) => string) => {
-    if (isToday) {
-      return `${t('common.today')}, ${formattedDate}`;
-    } else if (isYesterday) {
-      return `${t('common.yesterday')}, ${formattedDate}`;
-    }
-    return formattedDate;
-  };
-  
-  // Format selected date as YYYY-MM-DD for SQL query (in user's local timezone)
-  // Use useMemo to ensure it updates when selectedDate changes
-  const selectedDateString = useMemo(() => {
-    const year = selectedDate.getFullYear();
-    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-    const day = String(selectedDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }, [selectedDate]);
-  
-  // Navigation functions
-  const goBackOneDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
-  };
-  
-  const goForwardOneDay = () => {
-    if (!isToday) {
-      const newDate = new Date(selectedDate);
-      newDate.setDate(newDate.getDate() + 1);
-      setSelectedDate(newDate);
-    }
-  };
-  
-  const goToToday = () => {
-    setSelectedDate(new Date(today));
-  };
   
   return {
     selectedDate,
-    setSelectedDate,
     selectedDateString,
     isToday,
     isYesterday,
     today,
-    getDisplayDate,
-    goBackOneDay,
-    goForwardOneDay,
-    goToToday,
-    calendarViewMonth,
-    setCalendarViewMonth,
+    isCurrentYear,
   };
 }
-

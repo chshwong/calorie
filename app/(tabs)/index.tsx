@@ -71,43 +71,57 @@ export default function FoodLogHomeScreen() {
   // Use React Query hooks for data fetching
   const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = useUserProfile();
-  const { data: calorieEntries = [], isLoading: entriesLoading, refetch: refetchEntries } = useDailyEntries(selectedDateString);
+  const { 
+    data: calorieEntries, 
+    isLoading: entriesLoading, 
+    isFetching: entriesFetching,
+    refetch: refetchEntries 
+  } = useDailyEntries(selectedDateString);
+  
+  // Use empty array as default only when we have no cached data
+  const entries = calorieEntries ?? [];
   
   // Background prefetch for mealtype-log tab data (after Home data is ready)
   // Use default meal type 'late_night' (same as mealtype-log default)
   const defaultMealType = 'late_night';
   useEffect(() => {
-    if (!user?.id || entriesLoading) return; // Wait until Home's own data is ready
+    // Only wait for initial load if there's no cached data
+    // If entries exist in cache, we can proceed with prefetching
+    if (!user?.id) return;
     
-    // Silently prefetch tab data in the background
-    queryClient.prefetchQuery({
-      queryKey: ['frequentFoods', user.id, defaultMealType],
-      queryFn: () => fetchFrequentFoods(user.id, defaultMealType),
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-    });
+    // Silently prefetch tab data in the background, but only if not already cached
+    const frequentFoodsKey = ['frequentFoods', user.id, defaultMealType];
+    if (!queryClient.getQueryData(frequentFoodsKey)) {
+      queryClient.prefetchQuery({
+        queryKey: frequentFoodsKey,
+        queryFn: () => fetchFrequentFoods(user.id, defaultMealType),
+      });
+    }
     
-    queryClient.prefetchQuery({
-      queryKey: ['recentFoods', user.id, defaultMealType],
-      queryFn: () => fetchRecentFoods(user.id, defaultMealType),
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-    });
+    const recentFoodsKey = ['recentFoods', user.id, defaultMealType];
+    if (!queryClient.getQueryData(recentFoodsKey)) {
+      queryClient.prefetchQuery({
+        queryKey: recentFoodsKey,
+        queryFn: () => fetchRecentFoods(user.id, defaultMealType),
+      });
+    }
     
-    queryClient.prefetchQuery({
-      queryKey: ['customFoods', user.id],
-      queryFn: () => fetchCustomFoods(user.id),
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-    });
+    const customFoodsKey = ['customFoods', user.id];
+    if (!queryClient.getQueryData(customFoodsKey)) {
+      queryClient.prefetchQuery({
+        queryKey: customFoodsKey,
+        queryFn: () => fetchCustomFoods(user.id),
+      });
+    }
     
-    queryClient.prefetchQuery({
-      queryKey: ['bundles', user.id],
-      queryFn: () => fetchBundles(user.id),
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-    });
-  }, [user?.id, entriesLoading, queryClient]);
+    const bundlesKey = ['bundles', user.id];
+    if (!queryClient.getQueryData(bundlesKey)) {
+      queryClient.prefetchQuery({
+        queryKey: bundlesKey,
+        queryFn: () => fetchBundles(user.id),
+      });
+    }
+  }, [user?.id, queryClient]);
 
   // Generate calendar days for a given month
   const generateCalendarDays = (viewMonth: Date) => {
@@ -308,10 +322,10 @@ export default function FoodLogHomeScreen() {
   }
 
   // Calculate daily totals using domain utility
-  const dailyTotals = calculateDailyTotals(calorieEntries);
+  const dailyTotals = calculateDailyTotals(entries);
 
   // Group entries by meal type using domain utility
-  const groupedEntries = groupEntriesByMealType(calorieEntries);
+  const groupedEntries = groupEntriesByMealType(entries);
 
   // Use meal type order from shared types
   const sortedMealTypes = MEAL_TYPE_ORDER;
@@ -398,18 +412,18 @@ export default function FoodLogHomeScreen() {
                 titleKey="home.summary.title_other"
                 icon="fork.knife"
                 module="food"
-                isLoading={entriesLoading}
+                isLoading={entriesLoading && entries.length === 0}
                 rightContent={
-                  !entriesLoading ? (
+                  entries.length > 0 ? (
                     <ThemedText style={[styles.entryCount, { color: colors.textSecondary }]}>
-                      {t('home.summary.entry', { count: calorieEntries.length })}
+                      {t('home.summary.entry', { count: entries.length })}
                     </ThemedText>
                   ) : undefined
                 }
                 style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
               />
             
-            {!entriesLoading && (
+            {(entries.length > 0 || !entriesLoading) && (
               <View style={styles.dailyTotalsContent}>
                 <View style={styles.dailyTotalsMainRow}>
                   {/* Total Calories - Left Side */}
@@ -556,7 +570,7 @@ export default function FoodLogHomeScreen() {
           {/* Today's Calorie Entries */}
           <View style={[styles.entriesSectionCard, { backgroundColor: colors.card }]}>
             <View style={styles.entriesSection}>
-              {entriesLoading ? (
+              {entriesLoading && entries.length === 0 ? (
                 <View style={[styles.emptyState, { backgroundColor: 'transparent' }]}>
                   <ActivityIndicator size="small" color={colors.tint} />
                   <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>

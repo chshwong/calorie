@@ -1417,7 +1417,7 @@
       "error_save_failed": "Échec de l'enregistrement du médicament : {{error}}"
     },
     "quick_add": {
-      "add_custom": "+ Ajouter personnalisé",
+      "add_custom": "Enregistrer nouveau",
       "add_custom_hint": "Double appui pour ajouter un médicament personnalisé",
       "recent_freq": "RÉCENTS & FRÉQUENTS",
       "common": "COURANTS",

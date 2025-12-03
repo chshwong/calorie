@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -67,6 +68,7 @@ export default function CreateCustomFoodScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   // Get meal type and entry date from params (for navigation back)
   const mealType = params.mealType as string || 'breakfast';
@@ -645,6 +647,11 @@ export default function CreateCustomFoodScreen() {
 
   // Handle save
   const handleSave = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
     // Close any open dropdowns
     setShowWeightUnitDropdown(false);
     setShowVolumeUnitDropdown(false);
@@ -653,6 +660,9 @@ export default function CreateCustomFoodScreen() {
       Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.not_logged_in'));
       return;
     }
+
+    // Set loading early to prevent multiple submissions
+    setLoading(true);
 
     const validation = await validateForm();
 
@@ -687,7 +697,6 @@ export default function CreateCustomFoodScreen() {
       }
     }
 
-    setLoading(true);
     try {
       // Get values based on serving type
       const quantity = isWeightBased ? parseFloat(weightQuantity) : parseFloat(volumeQuantity);
@@ -769,6 +778,9 @@ export default function CreateCustomFoodScreen() {
 
       // Note: No food_servings records are created for custom foods
       // The serving info is stored directly in food_master (serving_size, serving_unit)
+      
+      // Invalidate custom foods cache immediately so it appears right away
+      queryClient.invalidateQueries({ queryKey: ['customFoods', user.id] });
       
       // Navigate back to mealtype-log page with custom tab selected
       // Use push instead of replace to ensure params are updated
@@ -1366,6 +1378,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     width: '100%',
     maxWidth: 600,
+    alignSelf: 'center',
     padding: 12,
     paddingBottom: 32,
     ...Platform.select({

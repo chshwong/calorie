@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions, ViewStyle } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedView } from '@/components/themed-view';
@@ -359,16 +359,32 @@ export default function ExerciseHomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  // Use shared date hook
+  // Use shared date hook - always derived from URL params
   const {
     selectedDate,
-    setSelectedDate,
     selectedDateString,
     isToday,
     today,
-    calendarViewMonth,
-    setCalendarViewMonth,
   } = useSelectedDate();
+  
+  // Calendar view month state (local to component for date picker modal)
+  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
+    return new Date(selectedDate);
+  });
+  
+  // Update calendar view month when selectedDate changes
+  useEffect(() => {
+    setCalendarViewMonth(new Date(selectedDate));
+  }, [selectedDate]);
+  
+  // Helper function to navigate with new date (updates URL param)
+  const navigateWithDate = (date: Date) => {
+    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    router.replace({
+      pathname: '/exercise',
+      params: { date: dateString }
+    });
+  };
 
   // Format date for display with full weekday (used in Recent Days section)
   const formatDateForDisplay = (date: Date): string => {
@@ -631,6 +647,11 @@ export default function ExerciseHomeScreen() {
   };
 
   const handleSaveExercise = () => {
+    // Prevent multiple submissions
+    if (createMutation.isPending || updateMutation.isPending) {
+      return;
+    }
+
     const name = formName.trim();
     const minutesValue = formMinutes.trim();
     const minutes = minutesValue ? parseInt(minutesValue, 10) : null;
@@ -760,7 +781,7 @@ export default function ExerciseHomeScreen() {
   const handleDateSelect = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
     if (!isNaN(date.getTime())) {
-      setSelectedDate(date);
+      navigateWithDate(date);
     }
   };
 
@@ -810,7 +831,7 @@ export default function ExerciseHomeScreen() {
               showGreeting={true}
               module="exercise"
               selectedDate={selectedDate}
-              setSelectedDate={setSelectedDate}
+              setSelectedDate={navigateWithDate}
               selectedDateString={selectedDateString}
               isToday={isToday}
               getDisplayDate={(t) => {
@@ -833,13 +854,13 @@ export default function ExerciseHomeScreen() {
               goBackOneDay={() => {
                 const newDate = new Date(selectedDate);
                 newDate.setDate(newDate.getDate() - 1);
-                setSelectedDate(newDate);
+                navigateWithDate(newDate);
               }}
               goForwardOneDay={() => {
                 if (!isToday) {
                   const newDate = new Date(selectedDate);
                   newDate.setDate(newDate.getDate() + 1);
-                  setSelectedDate(newDate);
+                  navigateWithDate(newDate);
                 }
               }}
               calendarViewMonth={calendarViewMonth}

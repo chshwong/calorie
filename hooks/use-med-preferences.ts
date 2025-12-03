@@ -45,8 +45,8 @@ export function useMedPreferences() {
       };
     },
     enabled: !!userId,
-    staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours
   });
 }
 

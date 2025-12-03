@@ -27,3 +27,5 @@ ADD CONSTRAINT med_log_type_valid CHECK (type IN ('med','supp'));
 
 
 
+
+

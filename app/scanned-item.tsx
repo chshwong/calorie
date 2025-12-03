@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -45,6 +46,7 @@ export default function ScannedItemScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { barcode, mealType, entryDate } = params;
 
@@ -110,6 +112,11 @@ export default function ScannedItemScreen() {
   // Save external food as custom food (promote to food_master), then auto-select
   // Save as Custom and Log Food - promotes to food_master and auto-selects for logging
   const handleSaveAsCustomAndLog = async () => {
+    // Prevent multiple submissions
+    if (isSaving) {
+      return;
+    }
+
     if (!lookupResult || !user) return;
     
     // Only allow saving from cache or OpenFoodFacts results
@@ -125,6 +132,9 @@ export default function ScannedItemScreen() {
       const result = await promoteToFoodMaster(cacheRow, user.id);
       
       if (result.success) {
+        // Invalidate custom foods cache immediately so it appears right away
+        queryClient.invalidateQueries({ queryKey: ['customFoods', user.id] });
+        
         // Navigate back to meal log with auto-select of the new food (this will open the entry form)
         router.replace({
           pathname: '/mealtype-log',

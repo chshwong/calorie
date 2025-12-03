@@ -12,6 +12,10 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
+import type { FocusModule } from '@/utils/types';
+import { getLocalDateString } from '@/utils/calculations';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
@@ -22,6 +26,17 @@ function TabLayoutContent() {
   const [isMoreMenuVisible, setMoreMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+  
+  // Get user profile for focus module preferences
+  const { data: profile } = useUserProfile();
+  const focusModule1: FocusModule = (profile?.focus_module_1) || 'Food';
+  const focusModule2: FocusModule = (profile?.focus_module_2) || 'Exercise';
+  const focusModule3: FocusModule = (profile?.focus_module_3) || 'Med';
+  
+  // Compute the remaining module
+  const ALL_MODULES: FocusModule[] = ['Food', 'Exercise', 'Med', 'Water'];
+  const used = new Set([focusModule1, focusModule2, focusModule3]);
+  const remainingModule = ALL_MODULES.find(m => !used.has(m)) || null;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -99,23 +114,148 @@ function TabLayoutContent() {
     router.push('/(tabs)/water');
   };
 
-  const renderQuickAddCard = (label: string) => (
-    <Pressable
-      key={label}
-      style={({ pressed }) => [
-        styles.quickAddCard,
-        pressed && styles.quickAddCardPressed,
-      ]}
-      onPress={() => setQuickAddVisible(false)}
-    >
-      <View style={styles.quickAddCardIconCircle}>
-        <Text style={styles.quickAddCardIconText}>
-          {label.charAt(0)}
-        </Text>
-      </View>
-      <Text style={styles.quickAddCardLabel}>{label}</Text>
-    </Pressable>
-  );
+  // Get module configs
+  const module1Config = MODULE_CONFIGS[focusModule1];
+  const module2Config = MODULE_CONFIGS[focusModule2];
+  const module3Config = MODULE_CONFIGS[focusModule3];
+  const remainingModuleConfig = remainingModule ? MODULE_CONFIGS[remainingModule] : null;
+
+  // Helper function to open mealtype-log for current time
+  // Reuses the same route and params structure as the old FAB behavior
+  const openMealTypeLogForNow = () => {
+    const now = new Date();
+    
+    // Determine the mealType based on current time
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    let mealType: string;
+    
+    // 22:00–04:00 -> Late Night
+    // 04:00–11:30 -> Breakfast
+    // 11:30–14:00 -> Lunch
+    // 14:00–17:00 -> Snack
+    // 17:00–22:00 -> Dinner
+    if (minutes >= 22 * 60 || minutes < 4 * 60) {
+      mealType = 'late_night';
+    } else if (minutes >= 4 * 60 && minutes < (11 * 60 + 30)) {
+      mealType = 'breakfast';
+    } else if (minutes >= (11 * 60 + 30) && minutes < 14 * 60) {
+      mealType = 'lunch';
+    } else if (minutes >= 14 * 60 && minutes < 17 * 60) {
+      mealType = 'afternoon_snack';
+    } else {
+      mealType = 'dinner';
+    }
+    
+    // Use the same date format and param structure that mealtype-log already expects
+    // Reuse getLocalDateString() utility for consistency with FAB behavior
+    const todayString = getLocalDateString();
+    
+    // Navigate to mealtype-log with the same params structure as the FAB
+    router.push({
+      pathname: '/mealtype-log',
+      params: {
+        entryDate: todayString,
+        mealType: mealType,
+        preloadedEntries: JSON.stringify([])
+      }
+    });
+  };
+
+  // Helper function to open Exercise screen for today
+  // Reuses the same route and params structure as module-fab and dashboard
+  // Use replace to ensure params update when already on the same route
+  const openExerciseForToday = () => {
+    const todayString = getLocalDateString();
+    router.replace({
+      pathname: '/exercise',
+      params: { date: todayString }
+    });
+  };
+
+  // Helper function to open Meds screen for today
+  // Reuses the same route and params structure as module-fab and dashboard
+  // Use replace to ensure params update when already on the same route
+  const openMedsForToday = () => {
+    const todayString = getLocalDateString();
+    router.replace({
+      pathname: '/meds',
+      params: { date: todayString }
+    });
+  };
+
+  // Helper function to open Water screen for today
+  // Reuses the same route and params structure as dashboard
+  // Use replace to ensure params update when already on the same route
+  const openWaterForToday = () => {
+    const todayString = getLocalDateString();
+    router.replace({
+      pathname: '/water',
+      params: { date: todayString }
+    });
+  };
+
+  const renderQuickAddModuleCard = (config: typeof module1Config) => {
+    const moduleIconMap: Record<FocusModule, string> = {
+      'Food': '🍽️',
+      'Exercise': '🔥',
+      'Med': '💊',
+      'Water': '💧',
+    };
+
+    return (
+      <Pressable
+        key={config.key}
+        style={({ pressed }) => [
+          styles.quickAddCard,
+          pressed && styles.quickAddCardPressed,
+        ]}
+        onPress={() => {
+          setQuickAddVisible(false);
+          if (config.key === 'Food') {
+            openMealTypeLogForNow();
+          } else if (config.key === 'Exercise') {
+            openExerciseForToday();
+          } else if (config.key === 'Med') {
+            openMedsForToday();
+          } else if (config.key === 'Water') {
+            openWaterForToday();
+          }
+        }}
+      >
+        <View style={styles.quickAddCardIconCircle}>
+          <Text style={styles.quickAddCardIconEmoji}>
+            {moduleIconMap[config.key] || '•'}
+          </Text>
+        </View>
+        <Text style={styles.quickAddCardLabel}>{config.label}</Text>
+      </Pressable>
+    );
+  };
+
+  const renderQuickAddCard = (label: string) => {
+    const iconMap: Record<string, string> = {
+      'Enter Weight': '⚖️',
+      'Scan Barcode': '📷',
+    };
+
+    return (
+      <Pressable
+        key={label}
+        style={({ pressed }) => [
+          styles.quickAddCard,
+          pressed && styles.quickAddCardPressed,
+        ]}
+        onPress={() => setQuickAddVisible(false)}
+      >
+        <View style={styles.quickAddCardIconCircle}>
+          <Text style={styles.quickAddCardIconEmoji}>
+            {iconMap[label] || '•'}
+          </Text>
+        </View>
+        <Text style={styles.quickAddCardLabel}>{label}</Text>
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -134,8 +274,17 @@ function TabLayoutContent() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Food Diary',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
+            title: module1Config.label,
+            tabBarIcon: ({ color }) => module1Config.icon({ color, size: 28 }),
+            listeners: {
+              tabPress: (e) => {
+                // If focusModule1 is not 'Food', redirect to the correct route
+                if (focusModule1 !== 'Food' && module1Config.routeName !== 'index') {
+                  e.preventDefault();
+                  router.push(`/(tabs)/${module1Config.routeName}` as any);
+                }
+              },
+            },
           }}
         />
         <Tabs.Screen
@@ -162,8 +311,17 @@ function TabLayoutContent() {
         <Tabs.Screen
           name="exercise"
           options={{
-            title: 'Custom',
-            tabBarIcon: ({ color }) => <MaterialCommunityIcons name="heart-pulse" size={28} color={color} />,
+            title: module2Config.label,
+            tabBarIcon: ({ color }) => module2Config.icon({ color, size: 28 }),
+            listeners: {
+              tabPress: (e) => {
+                // If focusModule2 is not 'Exercise', redirect to the correct route
+                if (focusModule2 !== 'Exercise' && module2Config.routeName !== 'exercise') {
+                  e.preventDefault();
+                  router.push(`/(tabs)/${module2Config.routeName}` as any);
+                }
+              },
+            },
           }}
         />
         <Tabs.Screen
@@ -211,12 +369,12 @@ function TabLayoutContent() {
 
                   {/* cards grid */}
                   <View style={styles.quickAddGrid}>
-                    {renderQuickAddCard('Log Food')}
-                    {renderQuickAddCard('Custom')}
+                    {renderQuickAddModuleCard(module1Config)}
+                    {renderQuickAddModuleCard(module2Config)}
                     {renderQuickAddCard('Enter Weight')}
                     {renderQuickAddCard('Scan Barcode')}
-                    {renderQuickAddCard('Water')}
-                    {renderQuickAddCard('Exercise')}
+                    {renderQuickAddModuleCard(module3Config)}
+                    {remainingModuleConfig && renderQuickAddModuleCard(remainingModuleConfig)}
                   </View>
                 </Animated.View>
               </View>
@@ -283,13 +441,14 @@ const styles = StyleSheet.create({
   },
   quickAddSheetInner: {
     width: '100%',
-    maxWidth: 900,
-    backgroundColor: '#ffffff',
-    paddingTop: 8,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    maxWidth: 1200,
+    backgroundColor: 'rgba(255,255,255,0.9)', // softer, modern
+    paddingTop: 12,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backdropFilter: 'blur(10px)', // web only, ignored on RN, safe to include
   },
   quickAddHandle: {
     alignSelf: 'center',
@@ -303,37 +462,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    rowGap: 16,
+    columnGap: 12,
   },
   quickAddCard: {
     width: '48%',
-    backgroundColor: '#f6f7fb',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.85)', // slight frosted feel
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    // shadows — modern soft look
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 4,
   },
   quickAddCardPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.9,
   },
   quickAddCardIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0A7599',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  quickAddCardIconText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 18,
+  quickAddCardIconEmoji: {
+    fontSize: 32,
   },
   quickAddCardLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
-    color: '#222',
+    color: '#1a1a1a',
+    marginTop: 4,
+    textAlign: 'center',
   },
   moreMenuOverlay: {
     flex: 1,

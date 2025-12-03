@@ -37,16 +37,32 @@ export default function WaterScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  // Use shared date hook
+  // Use shared date hook - always derived from URL params
   const {
     selectedDate,
-    setSelectedDate,
     selectedDateString,
     isToday,
     today,
-    calendarViewMonth,
-    setCalendarViewMonth,
   } = useSelectedDate();
+  
+  // Calendar view month state (local to component for date picker modal)
+  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
+    return new Date(selectedDate);
+  });
+  
+  // Update calendar view month when selectedDate changes
+  useEffect(() => {
+    setCalendarViewMonth(new Date(selectedDate));
+  }, [selectedDate]);
+  
+  // Helper function to navigate with new date (updates URL param)
+  const navigateWithDate = (date: Date) => {
+    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    router.replace({
+      pathname: '/water',
+      params: { date: dateString }
+    });
+  };
 
   // Get profile for water unit preference
   const { data: profile } = useUserProfile();
@@ -326,7 +342,7 @@ export default function WaterScreen() {
             <DateHeader
               showGreeting={true}
               selectedDate={selectedDate}
-              setSelectedDate={setSelectedDate}
+              setSelectedDate={navigateWithDate}
               selectedDateString={selectedDateString}
               isToday={isToday}
               getDisplayDate={(t) => {
@@ -346,11 +362,11 @@ export default function WaterScreen() {
                 return formattedDate;
               }}
               goBackOneDay={() => {
-                setSelectedDate(addDays(selectedDate, -1));
+                navigateWithDate(addDays(selectedDate, -1));
               }}
               goForwardOneDay={() => {
                 if (!isToday) {
-                  setSelectedDate(addDays(selectedDate, 1));
+                  navigateWithDate(addDays(selectedDate, 1));
                 }
               }}
               calendarViewMonth={calendarViewMonth}

@@ -130,6 +130,11 @@ export interface DateDisplayInfo {
 export type Gender = 'male' | 'female' | 'not_telling';
 
 /**
+ * Focus module types for user preferences
+ */
+export type FocusModule = 'Food' | 'Exercise' | 'Med' | 'Water';
+
+/**
  * User profile from the profiles table
  */
 export interface UserProfile {
@@ -146,6 +151,9 @@ export interface UserProfile {
   weight_unit_preference?: 'lbs' | 'kg';
   height_unit_preference?: 'cm' | 'ft';
   water_unit_preference?: 'metric' | 'imperial';
+  focus_module_1: FocusModule;
+  focus_module_2: FocusModule;
+  focus_module_3: FocusModule;
   created_at: string;
   updated_at: string;
 }

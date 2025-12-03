@@ -496,6 +496,12 @@ export default function LogFoodScreen() {
   const [showMealTypeDropdown, setShowMealTypeDropdown] = useState(false);
   const mealTypeButtonRef = useRef<View>(null);
   const [mealTypeDropdownLayout, setMealTypeDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  
+  // Track active tab position for dropdown attachment (for tab content area)
+  const [activeTabLayout, setActiveTabLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const tabsContainerWrapperRef = useRef<View>(null);
+  const [tabsContainerWrapperLayout, setTabsContainerWrapperLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const tabsScrollOffsetRef = useRef<number>(0);
 
   // Use local state values if editing/adding, otherwise use URL params
   const activeMealType = currentMealType || mealType;
@@ -876,19 +882,32 @@ export default function LogFoodScreen() {
       return '';
     }
 
-    const foodsMap = bundle.foodsMap || new Map();
+    // Handle case where foodsMap might be a plain object (from React Query cache serialization)
+    // instead of a Map instance
+    let foodsMap: Map<string, { id: string; name: string; calories_kcal: number; protein_g: number | null; carbs_g: number | null; fat_g: number | null; fiber_g: number | null; serving_size: number; serving_unit: string }>;
+    if (bundle.foodsMap instanceof Map) {
+      foodsMap = bundle.foodsMap;
+    } else if (bundle.foodsMap && typeof bundle.foodsMap === 'object') {
+      // Convert plain object to Map
+      foodsMap = new Map(Object.entries(bundle.foodsMap));
+    } else {
+      foodsMap = new Map();
+    }
 
     return bundle.items
       .map((item) => {
         // Get food name
         let foodName = item.item_name || t('mealtype_log.food_log.unknown_food');
         if (item.food_id && foodsMap.has(item.food_id)) {
-          foodName = foodsMap.get(item.food_id)!.name;
+          const food = foodsMap.get(item.food_id);
+          if (food) {
+            foodName = food.name;
+          }
         }
         return foodName;
       })
       .join(', ');
-  }, []);
+  }, [t]);
 
   // Fetch bundles function removed - now using React Query hook above
 
@@ -1985,6 +2004,11 @@ export default function LogFoodScreen() {
   };
 
   const handleSave = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
     try {
       // Check calories before even calling saveEntry
       const currentCalories = parseFloat(calories);
@@ -3203,7 +3227,16 @@ export default function LogFoodScreen() {
         {/* Tabs - Hide when food is selected, editing, or in manual mode */}
         {!selectedFood && !editingEntryId && !isManualMode && (
           <>
-            <View style={[styles.tabsContainerWrapper, { borderBottomColor: colors.icon + '15' }]} accessibilityRole="tablist">
+            <View 
+              ref={tabsContainerWrapperRef}
+              style={[styles.tabsContainerWrapper, { borderBottomColor: colors.icon + '15' }]} 
+              accessibilityRole="tablist"
+              onLayout={() => {
+                tabsContainerWrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                  setTabsContainerWrapperLayout({ x: pageX, y: pageY, width, height });
+                });
+              }}
+            >
               {/* Left arrow */}
               {canScrollLeft && (
                 <TouchableOpacity
@@ -3226,7 +3259,11 @@ export default function LogFoodScreen() {
                 contentContainerStyle={styles.tabsContainer}
                 style={styles.tabsScrollView}
                 scrollIndicatorInsets={{ bottom: -1 }}
-                onScroll={handleTabsScroll}
+                onScroll={(e) => {
+                  handleTabsScroll(e);
+                  const scrollX = e.nativeEvent.contentOffset?.x || 0;
+                  tabsScrollOffsetRef.current = scrollX;
+                }}
                 onContentSizeChange={handleTabsContentSizeChange}
                 scrollEventThrottle={16}
               >
@@ -3291,6 +3328,20 @@ export default function LogFoodScreen() {
                     },
                   ]}
                   activeKey={activeTab}
+                  onActiveTabLayout={(layout) => {
+                    if (layout) {
+                      // Store layout relative to the TabBar container (which is inside the ScrollView)
+                      // We'll account for scroll offset when positioning the dropdown
+                      setActiveTabLayout({
+                        x: layout.x,
+                        y: layout.y + layout.height, // Bottom of tab
+                        width: layout.width,
+                        height: layout.height,
+                      });
+                    } else {
+                      setActiveTabLayout(null);
+                    }
+                  }}
                   onTabPress={(key) => {
                     if (key === 'manual') {
                       // Manual+ button always opens manual mode - no expand/collapse toggle
@@ -3372,12 +3423,57 @@ export default function LogFoodScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Tab Content - Animated */}
-            <AnimatedTabContent
-              activeKey={activeTab}
-              previousKey={previousTabKey}
-              isExpanded={!tabContentCollapsed}
-              renderContent={(key: TabKey) => {
+            {/* Tab Content - Animated with attached popover styling */}
+            {!tabContentCollapsed && activeTabLayout ? (
+              <View style={{ position: 'relative', marginTop: 6 }}>
+                {/* Connector pill - horizontal bridge between tab and dropdown */}
+                <View
+                  style={[
+                    {
+                      position: 'absolute',
+                      top: -6, // Overlap bottom of tab
+                      left: activeTabLayout.x - tabsScrollOffsetRef.current + activeTabLayout.width / 2 - 13, // Centered horizontally on active tab (width 26 / 2 = 13)
+                      width: 26,
+                      height: 11,
+                      borderRadius: 999,
+                      backgroundColor: getTabListBackgroundColor(activeTab), // Match the dropdown background
+                      zIndex: 1001,
+                    }
+                  ]}
+                />
+                {/* Wrapper for tab content with attached popover styling - full width, matches inner list styling */}
+                <View
+                  style={[
+                    {
+                      backgroundColor: getTabListBackgroundColor(activeTab), // Match the list background color
+                      borderColor: colors.icon + '20',
+                      borderWidth: 1,
+                      borderRadius: 12, // Match searchResultsContainer borderRadius
+                      left: 0,
+                      right: 0,
+                      overflow: 'hidden',
+                      ...Platform.select({
+                        ios: {
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 12,
+                        },
+                        android: {
+                          elevation: 4,
+                        },
+                        web: {
+                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                        },
+                      }),
+                    },
+                  ]}
+                >
+                  <AnimatedTabContent
+                    activeKey={activeTab}
+                    previousKey={previousTabKey}
+                    isExpanded={!tabContentCollapsed}
+                    renderContent={(key: TabKey) => {
                 // Render content for each tab using cached data only
                 switch (key) {
                   case 'frequent':
@@ -3393,9 +3489,9 @@ export default function LogFoodScreen() {
                                 </ThemedText>
                               </View>
                             ) : frequentFoods.length > 0 ? (
-                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('frequent'), borderColor: colors.icon + '20' }]}>
+                              <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
                                 <ScrollView 
-                                  style={styles.searchResultsList}
+                                  style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
                                   nestedScrollEnabled
                                   keyboardShouldPersistTaps="handled"
                                 >
@@ -3477,9 +3573,9 @@ export default function LogFoodScreen() {
                                 </ThemedText>
                               </View>
                             ) : recentFoods.length > 0 ? (
-                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('recent'), borderColor: colors.icon + '20' }]}>
+                              <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
                                 <ScrollView 
-                                  style={styles.searchResultsList}
+                                  style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
                                   nestedScrollEnabled
                                   keyboardShouldPersistTaps="handled"
                                 >
@@ -3568,7 +3664,7 @@ export default function LogFoodScreen() {
                         {!searchQuery && (
                           <>
                             {/* Create New Custom Food Button */}
-                            <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('custom'), borderColor: colors.icon + '20', marginBottom: customFoodsLoading || customFoods.length === 0 ? 0 : 0 }]}>
+                            <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: customFoodsLoading || customFoods.length === 0 ? 0 : 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
                               <TouchableOpacity
                                 style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15', backgroundColor: colors.tint + '10' }]}
                                 onPress={() => {
@@ -3620,9 +3716,9 @@ export default function LogFoodScreen() {
                                 </ThemedText>
                               </View>
                             ) : customFoods.length > 0 ? (
-                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('custom'), borderColor: colors.icon + '20' }]}>
+                              <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
                                 <ScrollView 
-                                  style={styles.searchResultsList}
+                                  style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
                                   nestedScrollEnabled
                                   keyboardShouldPersistTaps="handled"
                                 >
@@ -3821,7 +3917,7 @@ export default function LogFoodScreen() {
                     return (
                       <View style={styles.tabContent}>
                         {/* Create New Bundle Button */}
-                        <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20', marginBottom: bundlesLoading || bundles.length === 0 ? 0 : 0 }]}>
+                        <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: bundlesLoading || bundles.length === 0 ? 0 : 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
                           <TouchableOpacity
                             style={[
                               styles.searchResultItem, 
@@ -3899,9 +3995,9 @@ export default function LogFoodScreen() {
                             </ThemedText>
                           </View>
                         ) : bundles.length > 0 ? (
-                          <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20' }]}>
+                          <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
                             <ScrollView 
-                              style={styles.searchResultsList}
+                              style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
                               nestedScrollEnabled
                               keyboardShouldPersistTaps="handled"
                             >
@@ -4070,7 +4166,515 @@ export default function LogFoodScreen() {
                     return null;
                 }
               }}
-            />
+                  />
+                </View>
+              </View>
+            ) : (
+              <AnimatedTabContent
+                activeKey={activeTab}
+                previousKey={previousTabKey}
+                isExpanded={!tabContentCollapsed}
+                renderContent={(key: TabKey) => {
+                  // Render content for each tab using cached data only
+                  switch (key) {
+                    case 'frequent':
+                      return (
+                        <View style={styles.tabContent}>
+                          {!searchQuery && (
+                            <>
+                              {frequentFoodsLoading ? (
+                                <View style={styles.emptyTabState}>
+                                  <ActivityIndicator size="small" color={colors.tint} />
+                                  <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
+                                    {t('mealtype_log.frequent_foods.loading')}
+                                  </ThemedText>
+                                </View>
+                              ) : frequentFoods.length > 0 ? (
+                                <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('frequent'), borderColor: colors.icon + '20' }]}>
+                                  <ScrollView 
+                                    style={styles.searchResultsList}
+                                    nestedScrollEnabled
+                                    keyboardShouldPersistTaps="handled"
+                                  >
+                                    {frequentFoods.map((food) => {
+                                      const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                      const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                      const rightSideText = `${brandText}${nutritionInfo}`;
+                                      const isCustom = food.is_custom === true;
+
+                                      return (
+                                        <View
+                                          key={food.id}
+                                          style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                        >
+                                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <TouchableOpacity
+                                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
+                                              onPress={() => handleFoodSelect(food)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                                <ThemedText 
+                                                  style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                                  numberOfLines={1}
+                                                  ellipsizeMode="tail"
+                                                >
+                                                  {truncatedName}
+                                                </ThemedText>
+                                              </View>
+                                              <ThemedText 
+                                                style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                                numberOfLines={1}
+                                              >
+                                                {rightSideText}
+                                              </ThemedText>
+                                            </TouchableOpacity>
+                                            <FoodSourceBadge
+                                              isCustom={isCustom}
+                                              colors={colors}
+                                              marginLeft={6}
+                                            />
+                                            <TouchableOpacity
+                                              style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                              onPress={() => handleQuickAdd(food)}
+                                              activeOpacity={0.7}
+                                              accessibilityLabel={t('mealtype_log.quick_add')}
+                                              accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                            >
+                                              <IconSymbol
+                                                name="plus.circle.fill"
+                                                size={22}
+                                                color={colors.tint}
+                                              />
+                                            </TouchableOpacity>
+                                          </View>
+                                        </View>
+                                      );
+                                    })}
+                                  </ScrollView>
+                                </View>
+                              ) : null}
+                            </>
+                          )}
+                        </View>
+                      );
+                    
+                    case 'recent':
+                      return (
+                        <View style={styles.tabContent}>
+                          {!searchQuery && (
+                            <>
+                              {recentFoodsLoading ? (
+                                <View style={styles.emptyTabState}>
+                                  <ActivityIndicator size="small" color={colors.tint} />
+                                  <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
+                                    {t('mealtype_log.recent_foods.loading')}
+                                  </ThemedText>
+                                </View>
+                              ) : recentFoods.length > 0 ? (
+                                <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('recent'), borderColor: colors.icon + '20' }]}>
+                                  <ScrollView 
+                                    style={styles.searchResultsList}
+                                    nestedScrollEnabled
+                                    keyboardShouldPersistTaps="handled"
+                                  >
+                                    {recentFoods.map((food) => {
+                                      const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                      const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                      const rightSideText = `${brandText}${nutritionInfo}`;
+                                      const isCustom = food.is_custom === true;
+
+                                      return (
+                                        <View
+                                          key={food.id}
+                                          style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                        >
+                                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <TouchableOpacity
+                                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
+                                              onPress={() => handleFoodSelect(food)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                                <ThemedText 
+                                                  style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                                  numberOfLines={1}
+                                                  ellipsizeMode="tail"
+                                                >
+                                                  {truncatedName}
+                                                </ThemedText>
+                                              </View>
+                                              <ThemedText 
+                                                style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                                numberOfLines={1}
+                                              >
+                                                {rightSideText}
+                                              </ThemedText>
+                                            </TouchableOpacity>
+                                            <FoodSourceBadge
+                                              isCustom={isCustom}
+                                              colors={colors}
+                                              marginLeft={6}
+                                            />
+                                            <TouchableOpacity
+                                              style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                              onPress={() => handleQuickAdd(food)}
+                                              activeOpacity={0.7}
+                                              accessibilityLabel={t('mealtype_log.quick_add')}
+                                              accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                            >
+                                              <IconSymbol
+                                                name="plus.circle.fill"
+                                                size={22}
+                                                color={colors.tint}
+                                              />
+                                            </TouchableOpacity>
+                                          </View>
+                                        </View>
+                                      );
+                                    })}
+                                  </ScrollView>
+                                </View>
+                              ) : null}
+                            </>
+                          )}
+                        </View>
+                      );
+                    
+                    case 'custom':
+                      return (
+                        <View style={styles.tabContent}>
+                          {!searchQuery && (
+                            <>
+                              {customFoodsLoading ? (
+                                <View style={styles.emptyTabState}>
+                                  <ActivityIndicator size="small" color={colors.tint} />
+                                  <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
+                                    {t('mealtype_log.custom_foods.loading')}
+                                  </ThemedText>
+                                </View>
+                            ) : customFoods.length > 0 ? (
+                              <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
+                                <ScrollView 
+                                  style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
+                                  nestedScrollEnabled
+                                  keyboardShouldPersistTaps="handled"
+                                >
+                                    {customFoods.map((food) => {
+                                      const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                      const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                      const rightSideText = `${brandText}${nutritionInfo}`;
+                                      const isCustom = food.is_custom === true;
+
+                                      return (
+                                        <View
+                                          key={food.id}
+                                          style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                        >
+                                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <TouchableOpacity
+                                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
+                                              onPress={() => handleFoodSelect(food)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                                <ThemedText 
+                                                  style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                                  numberOfLines={1}
+                                                  ellipsizeMode="tail"
+                                                >
+                                                  {truncatedName}
+                                                </ThemedText>
+                                              </View>
+                                              <ThemedText 
+                                                style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                                numberOfLines={1}
+                                              >
+                                                {rightSideText}
+                                              </ThemedText>
+                                            </TouchableOpacity>
+                                            <FoodSourceBadge
+                                              isCustom={isCustom}
+                                              colors={colors}
+                                              marginLeft={6}
+                                            />
+                                            <TouchableOpacity
+                                              style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                              onPress={() => handleQuickAdd(food)}
+                                              activeOpacity={0.7}
+                                              accessibilityLabel={t('mealtype_log.quick_add')}
+                                              accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                            >
+                                              <IconSymbol
+                                                name="plus.circle.fill"
+                                                size={22}
+                                                color={colors.tint}
+                                              />
+                                            </TouchableOpacity>
+                                          </View>
+                                        </View>
+                                      );
+                                    })}
+                                  </ScrollView>
+                                </View>
+                              ) : null}
+                            </>
+                          )}
+                        </View>
+                      );
+                    
+                    case 'bundle':
+                      return (
+                        <View style={styles.tabContent}>
+                          {!searchQuery && (
+                            <>
+                              <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20', marginBottom: 8 }]}>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    router.push({
+                                      pathname: '/create-bundle',
+                                      params: {
+                                        mealType: mealType || 'breakfast',
+                                        entryDate: entryDate || getLocalDateString(),
+                                      },
+                                    });
+                                  }}
+                                  disabled={bundles.length >= 20}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
+                                    <ThemedText style={[
+                                      styles.searchResultName, 
+                                      { 
+                                        color: bundles.length >= 20 ? colors.icon : colors.tint, 
+                                        fontWeight: '700',
+                                        flex: 1,
+                                      }
+                                    ]}>
+                                      {t('mealtype_log.bundles.create_new')}{' '}
+                                      <ThemedText style={{
+                                        fontWeight: '400',
+                                        fontSize: 13,
+                                        color: bundles.length >= 20 ? colors.icon + '80' : colors.tint + 'CC',
+                                      }}>
+                                        {t('mealtype_log.bundles.bundles_count', { count: bundles.length })}
+                                      </ThemedText>
+                                    </ThemedText>
+                                    {bundles.length > 0 && (
+                                      <TouchableOpacity
+                                        onPress={() => {
+                                          if (bundleEditMode) {
+                                            handleExitBundleEditMode();
+                                          } else {
+                                            setBundleEditMode(true);
+                                          }
+                                        }}
+                                        style={[styles.editButton, { 
+                                          backgroundColor: bundleEditMode ? '#10B981' + '20' : colors.tint + '20', 
+                                          borderColor: bundleEditMode ? '#10B981' + '40' : colors.tint + '40' 
+                                        }]}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={[styles.editButtonText, { 
+                                          color: bundleEditMode ? '#10B981' : colors.tint 
+                                        }]}>
+                                          {bundleEditMode ? '✓' : '✏️'}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                </TouchableOpacity>
+                              </View>
+
+                              {bundlesLoading ? (
+                                <View style={styles.emptyTabState}>
+                                  <ActivityIndicator size="large" color={colors.tint} />
+                                  <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 12 }]}>
+                                    {t('mealtype_log.bundles.loading')}
+                                  </ThemedText>
+                                </View>
+                              ) : bundles.length > 0 ? (
+                                <View style={[styles.searchResultsContainer, { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20' }]}>
+                                  <ScrollView 
+                                    style={styles.searchResultsList}
+                                    nestedScrollEnabled
+                                    keyboardShouldPersistTaps="handled"
+                                  >
+                                    {bundles.map((bundle) => (
+                                      <HighlightableRow
+                                        key={bundle.id}
+                                        isNew={isBundleNewlyAdded(bundle.id)}
+                                        style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                      >
+                                        {!bundleEditMode ? (
+                                          <TouchableOpacity
+                                            style={[
+                                              { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+                                              getMinTouchTargetStyle(),
+                                              { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                                            ]}
+                                            onPress={() => {
+                                              if (!loading) {
+                                                handleAddBundleToMeal(bundle);
+                                              }
+                                            }}
+                                            disabled={loading}
+                                            activeOpacity={0.7}
+                                            {...getButtonAccessibilityProps(
+                                              t('mealtype_log.add_bundle.label'),
+                                              t('mealtype_log.add_bundle.hint')
+                                            )}
+                                            {...(Platform.OS === 'web' ? getWebAccessibilityProps(
+                                              'button',
+                                              t('mealtype_log.add_bundle.label'),
+                                              `add-bundle-${bundle.id}`
+                                            ) : {})}
+                                          >
+                                            <View style={{ flex: 1, minWidth: 0 }}>
+                                              <ThemedText 
+                                                style={[styles.searchResultName, { color: colors.text, flexShrink: 1, marginBottom: 4 }]}
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                              >
+                                                {bundle.name}{' '}
+                                                <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>
+                                                  ({bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'})
+                                                </ThemedText>
+                                              </ThemedText>
+                                              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                                                {bundle.totalCalories !== undefined && (
+                                                  <ThemedText style={[styles.searchResultNutrition, { color: colors.tint, fontSize: 12, fontWeight: '600' }]}>
+                                                    {bundle.totalCalories} kcal
+                                                  </ThemedText>
+                                                )}
+                                                {(bundle.totalProtein || bundle.totalCarbs || bundle.totalFat || bundle.totalFiber) && (
+                                                  <>
+                                                    <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 8 }]}>
+                                                      •
+                                                    </ThemedText>
+                                                    {bundle.totalProtein ? (
+                                                      <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
+                                                        P: {bundle.totalProtein}g
+                                                      </ThemedText>
+                                                    ) : null}
+                                                    {bundle.totalCarbs ? (
+                                                      <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
+                                                        C: {bundle.totalCarbs}g
+                                                      </ThemedText>
+                                                    ) : null}
+                                                    {bundle.totalFat ? (
+                                                      <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
+                                                        Fat: {bundle.totalFat}g
+                                                      </ThemedText>
+                                                    ) : null}
+                                                    {bundle.totalFiber ? (
+                                                      <ThemedText style={[styles.searchResultNutrition, { color: colors.textSecondary, fontSize: 11, marginLeft: 4 }]}>
+                                                        Fib: {bundle.totalFiber}g
+                                                      </ThemedText>
+                                                    ) : null}
+                                                  </>
+                                                )}
+                                              </View>
+                                              <ThemedText 
+                                                style={[styles.searchResultNutrition, { color: colors.icon, fontSize: 11, marginTop: 2 }]}
+                                                numberOfLines={3}
+                                                ellipsizeMode="tail"
+                                              >
+                                                {formatBundleItemsList(bundle)}
+                                              </ThemedText>
+                                            </View>
+                                          </TouchableOpacity>
+                                        ) : (
+                                          <>
+                                            <View style={{ flex: 1, minWidth: 0 }}>
+                                              <ThemedText 
+                                                style={[styles.searchResultName, { color: colors.text, flexShrink: 1, marginBottom: 0 }]}
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                              >
+                                                {bundle.name}{' '}
+                                                <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>
+                                                  ({bundle.items?.length || 0} {bundle.items?.length === 1 ? 'item' : 'items'})
+                                                </ThemedText>
+                                              </ThemedText>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                                onPress={() => handleMoveBundleUp(bundle.id)}
+                                                disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                                onPress={() => handleMoveBundleDown(bundle.id)}
+                                                disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                                                onPress={() => handleDeleteBundle(bundle)}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginRight: 6 }]}
+                                                onPress={() => {
+                                                  router.push({
+                                                    pathname: '/create-bundle',
+                                                    params: {
+                                                      mealType: mealType || 'breakfast',
+                                                      entryDate: entryDate || getLocalDateString(),
+                                                      bundleId: bundle.id,
+                                                    },
+                                                  });
+                                                }}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.tint }]}>✏️</Text>
+                                              </TouchableOpacity>
+                                            </View>
+                                          </>
+                                        )}
+                                      </HighlightableRow>
+                                    ))}
+                                  </ScrollView>
+                                </View>
+                              ) : (
+                                <View style={styles.emptyTabState}>
+                                  <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
+                                    {t('mealtype_log.bundles.empty')}
+                                  </ThemedText>
+                                  <ThemedText style={[styles.emptyTabSubtext, { color: colors.textSecondary }]}>
+                                    {t('mealtype_log.bundles.hint')}
+                                  </ThemedText>
+                                </View>
+                              )}
+                            </>
+                          )}
+                        </View>
+                      );
+                    
+                    case 'manual':
+                      return null; // Manual mode is handled separately
+                    
+                    default:
+                      return null;
+                  }
+                }}
+              />
+            )}
           </>
         )}
 

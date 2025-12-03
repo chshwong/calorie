@@ -2,7 +2,7 @@
  * React Query hook for fetching daily calorie entries
  * 
  * Query key: ['entries', userId, entryDate]
- * staleTime: 60s, gcTime: 5min
+ * staleTime: 3min, gcTime: 24h, refetchOnWindowFocus: true
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -23,8 +23,9 @@ export function useDailyEntries(entryDate: string) {
       return getEntriesForDate(userId, entryDate);
     },
     enabled: !!userId && !!entryDate,
-    staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 3 * 60 * 1000, // 3 minutes
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours
+    refetchOnWindowFocus: true,
   });
 }
 

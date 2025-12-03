@@ -97,6 +97,11 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
     setError(null);
     
     // Check if Supabase is configured

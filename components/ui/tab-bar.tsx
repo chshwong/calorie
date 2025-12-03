@@ -39,6 +39,7 @@ type TabBarProps = {
   onTabPress: (key: string) => void;
   reduceMotion?: boolean;
   underlineColor?: string; // Optional custom underline color (defaults to active tab's activeColor)
+  onActiveTabLayout?: (layout: { x: number; y: number; width: number; height: number } | null) => void; // Optional callback to report active tab layout
 };
 
 export const TabBar: React.FC<TabBarProps> = ({
@@ -47,6 +48,7 @@ export const TabBar: React.FC<TabBarProps> = ({
   onTabPress,
   reduceMotion = false,
   underlineColor,
+  onActiveTabLayout,
 }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const underlineWidth = useRef(new Animated.Value(0)).current;
@@ -64,6 +66,17 @@ export const TabBar: React.FC<TabBarProps> = ({
 
   // Track previous active key to detect tab changes
   const previousActiveKey = useRef<string | null>(null);
+
+  // Report active tab layout to parent if callback provided
+  useEffect(() => {
+    const activeLayout = layouts[activeKey];
+    if (activeLayout && onActiveTabLayout) {
+      const { x, y, width, height } = activeLayout;
+      onActiveTabLayout({ x, y, width, height });
+    } else if (onActiveTabLayout) {
+      onActiveTabLayout(null);
+    }
+  }, [activeKey, layouts, onActiveTabLayout]);
 
   // Update underline position when activeKey or layouts change
   useEffect(() => {

@@ -367,6 +367,11 @@ export default function CreateBundleScreen() {
   };
 
   const handleSaveBundle = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
     if (!bundleName.trim()) {
       Alert.alert(t('alerts.error_title'), t('create_bundle.errors.enter_bundle_name'));
       return;
@@ -382,6 +387,9 @@ export default function CreateBundleScreen() {
       return;
     }
 
+    // Set loading early to prevent multiple submissions
+    setLoading(true);
+
     // Check bundle limit when creating new bundle (not editing)
     if (!isEditing && user?.id) {
       const { count, error: countError } = await supabase
@@ -394,11 +402,10 @@ export default function CreateBundleScreen() {
           t('create_bundle.errors.bundle_limit_reached_title'),
           t('create_bundle.errors.bundle_limit_reached_message')
         );
+        setLoading(false);
         return;
       }
     }
-
-    setLoading(true);
     try {
       let finalBundleId = bundleId;
       

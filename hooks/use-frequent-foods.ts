@@ -2,7 +2,7 @@
  * React Query hook for fetching frequent foods
  * 
  * Query key: ['frequentFoods', userId, mealType]
- * staleTime: 60s, gcTime: 5min
+ * Heavily cached: staleTime: Infinity, gcTime: 7 days
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -22,8 +22,10 @@ export function useFrequentFoods(mealType?: string) {
       return fetchFrequentFoods(userId, mealType);
     },
     enabled: !!userId,
-    staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: Infinity,
+    gcTime: 7 * 24 * 60 * 60 * 1000, // 7 days
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

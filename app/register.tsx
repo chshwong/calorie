@@ -145,6 +145,11 @@ export default function RegisterScreen() {
   };
   
   const handleRegister = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
     setError(null);
     
     // Validate Step 1 (email/password) only
@@ -166,6 +171,7 @@ export default function RegisterScreen() {
       return;
     }
     
+    // Set loading early to prevent multiple submissions
     setLoading(true);
     
     try {

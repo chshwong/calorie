@@ -7,6 +7,8 @@ import 'react-native-reanimated';
 import { I18nextProvider } from 'react-i18next';
 import i18n, { loadStoredLanguage } from '@/i18n';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
@@ -26,6 +28,19 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Enable cache persistence on web
+if (typeof window !== 'undefined') {
+  const persister = createSyncStoragePersister({
+    storage: window.localStorage,
+  });
+
+  persistQueryClient({
+    queryClient,
+    persister,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  });
+}
 
 // Keep the splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();

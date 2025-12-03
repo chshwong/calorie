@@ -2,7 +2,7 @@
  * React Query hook for fetching user profile
  * 
  * Query key: ['userProfile', userId]
- * staleTime: 60s, gcTime: 5min
+ * staleTime: 30min, gcTime: 24h
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -22,8 +22,8 @@ export function useUserProfile() {
       return getUserProfile(userId);
     },
     enabled: !!userId,
-    staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours
   });
 }
 

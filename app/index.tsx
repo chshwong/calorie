@@ -1,15 +1,64 @@
-import { useEffect, useRef } from 'react';
-import { View, ActivityIndicator, Platform } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, ActivityIndicator, Platform, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/themed-text';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function Index() {
-  const { session, loading, isPasswordRecovery, profile, onboardingComplete } = useAuth();
+  const { session, loading, isPasswordRecovery, profile, onboardingComplete, refreshProfile } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const hasRedirected = useRef(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+
+  // Global timeout for initial loading (12 seconds)
+  useEffect(() => {
+    // Reset timeout state when loading completes
+    if (!loading) {
+      setHasTimedOut(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      return;
+    }
+
+    // Set timeout if we're still loading
+    if (loading && !hasTimedOut) {
+      // Clear any existing timeout before setting a new one
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setHasTimedOut(true);
+      }, 12000); // 12 seconds
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [loading, hasTimedOut]);
+
+  const handleRetry = () => {
+    // Reset timeout state
+    setHasTimedOut(false);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    // Retry initialization
+    refreshProfile();
+  };
 
   useEffect(() => {
     // Don't redirect while loading
@@ -100,10 +149,55 @@ export default function Index() {
     };
   }, [session, loading, router, segments]); // Include segments but use hasRedirected to prevent loops
 
+  // Show fallback UI if timeout occurred and still loading
+  if (hasTimedOut && loading) {
+    return (
+      <ThemedView style={styles.fallbackContainer}>
+        <ThemedText type="subtitle" style={styles.fallbackMessage}>
+          Unable to connect. Please try again.
+        </ThemedText>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: colors.tint }]}
+          onPress={handleRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry connection"
+        >
+          <ThemedText style={[styles.retryButtonText, { color: colors.background }]}>
+            Retry
+          </ThemedText>
+        </TouchableOpacity>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <ActivityIndicator size="large" />
     </ThemedView>
   );
 }
+
+const styles = StyleSheet.create({
+  fallbackContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  fallbackMessage: {
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
