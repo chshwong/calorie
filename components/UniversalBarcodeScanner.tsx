@@ -1,10 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Platform, View, Text, ActivityIndicator, Alert } from "react-native";
+import { Platform, View, Text, ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, TextInput } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { validateAndNormalizeBarcode } from "@/lib/barcode";
 import { getLocalDateString } from "@/utils/calculations";
+import { ThemedView } from "@/components/themed-view";
+import { ThemedText } from "@/components/themed-text";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 type UniversalBarcodeScannerProps = {
   onDetected?: (code: string) => void; // Optional for backward compatibility
@@ -238,9 +243,20 @@ function BarcodeScannerModal({
 }: UniversalBarcodeScannerProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"camera" | "upload">("camera");
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const screenWidth = Dimensions.get('window').width;
+  const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+  
+  // Platform detection (web only)
+  const isWeb = typeof window !== "undefined";
+  const isMobileWeb = isWeb && /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+  const isDesktopWeb = isWeb && !isMobileWeb;
+  
+  const [activeTab, setActiveTab] = useState<"camera" | "upload">(isMobileWeb ? "camera" : "upload");
   const [scanError, setScanError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState("");
   
   const scannerRef = useRef<any | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -364,10 +380,32 @@ function BarcodeScannerModal({
   }, []);
 
   // ============================================================================
-  // Camera lifecycle - start when camera tab is active
+  // Manual barcode entry handler
+  // ============================================================================
+  const handleManualSearch = useCallback(async () => {
+    const trimmedBarcode = manualBarcode.trim();
+    if (!trimmedBarcode) {
+      setScanError("Please enter a barcode.");
+      return;
+    }
+    
+    // Clear manual input and use the shared handler
+    setManualBarcode("");
+    await handleDecodedBarcode(trimmedBarcode);
+  }, [manualBarcode, handleDecodedBarcode]);
+
+  // ============================================================================
+  // Camera lifecycle - start when camera tab is active (mobile web only)
   // ============================================================================
   useEffect(() => {
     if (Platform.OS !== "web") return;
+    
+    // Only start camera on mobile web
+    if (!isMobileWeb) {
+      stopCamera();
+      return;
+    }
+    
     if (activeTab !== "camera") {
       stopCamera();
       return;
@@ -393,8 +431,23 @@ function BarcodeScannerModal({
         // Make container visible with fixed dimensions (required for mobile)
         container.style.display = "block";
         container.style.width = "100%";
-        container.style.height = "300px";
         container.style.backgroundColor = "#000";
+        
+        // Calculate height based on width and 3:4 aspect ratio for better responsiveness
+        // Try to get width immediately, fallback to 300px if not available yet
+        let containerWidth = container.offsetWidth;
+        if (!containerWidth || containerWidth === 0) {
+          // Container might not be laid out yet, use a reasonable default
+          containerWidth = 300;
+          // Update height after a short delay when container is laid out
+          setTimeout(() => {
+            const actualWidth = container.offsetWidth || containerWidth;
+            const calculatedHeight = Math.round(actualWidth * (4 / 3));
+            container.style.height = `${calculatedHeight}px`;
+          }, 50);
+        }
+        const calculatedHeight = Math.round(containerWidth * (4 / 3));
+        container.style.height = `${calculatedHeight}px`;
 
         // Configure scanner for product barcodes
         const formatsToSupport = Html5QrcodeSupportedFormats ? [
@@ -469,7 +522,7 @@ function BarcodeScannerModal({
       clearTimeout(timeoutId);
       stopCamera();
     };
-  }, [activeTab, isCameraActive, onScanSuccess, onScanFailure, stopCamera]);
+  }, [activeTab, isCameraActive, isMobileWeb, onScanSuccess, onScanFailure, stopCamera]);
 
   // ============================================================================
   // Upload Photo handler
@@ -517,111 +570,454 @@ function BarcodeScannerModal({
   // Render
   // ============================================================================
   return (
-    <View style={{ flex: 1, padding: 16, backgroundColor: "#fff" }}>
-      {/* Tab buttons */}
-      <View style={{ flexDirection: "row", marginBottom: 12, gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab("camera")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 4,
-            borderWidth: 1,
-            borderStyle: "solid",
-            borderColor: activeTab === "camera" ? "#007AFF" : "#ccc",
-            backgroundColor: activeTab === "camera" ? "#007AFF" : "#fff",
-            color: activeTab === "camera" ? "#fff" : "#000",
-            fontWeight: activeTab === "camera" ? "bold" : "normal",
-            cursor: "pointer",
-          }}
-        >
-          Use Camera
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("upload")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 4,
-            borderWidth: 1,
-            borderStyle: "solid",
-            borderColor: activeTab === "upload" ? "#007AFF" : "#ccc",
-            backgroundColor: activeTab === "upload" ? "#007AFF" : "#fff",
-            color: activeTab === "upload" ? "#fff" : "#000",
-            fontWeight: activeTab === "upload" ? "bold" : "normal",
-            cursor: "pointer",
-          }}
-        >
-          Upload Photo
-        </button>
-      </View>
+    <ThemedView style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.cardContainer, { maxWidth: isDesktop ? 420 : '100%' }]}>
+          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            {/* Title */}
+            <ThemedText 
+              type="title" 
+              style={[styles.title, { color: colors.text }]}
+            >
+              {t('mealtype_log.scanner.title', 'Scan Barcode')}
+            </ThemedText>
 
-      {/* Error message */}
-      {scanError && (
-        <View style={{ marginBottom: 12, padding: 12, backgroundColor: "#ffebee", borderRadius: 4 }}>
-          <Text style={{ color: "#c62828" }}>{scanError}</Text>
+            {/* Mobile Web: Segmented Control (Camera / Upload Photo) */}
+            {isMobileWeb && (
+              <View style={styles.segmentedControl}>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    styles.segmentButtonLeft,
+                    { 
+                      borderColor: activeTab === "camera" ? colors.tint : colors.border,
+                      backgroundColor: activeTab === "camera" ? colors.tint : 'transparent',
+                    },
+                  ]}
+                  onPress={() => setActiveTab("camera")}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText 
+                    style={[
+                      styles.segmentButtonText,
+                      { color: activeTab === "camera" ? "#fff" : colors.text },
+                    ]}
+                  >
+                    {t('mealtype_log.scanner.use_camera', 'Use Camera')}
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    styles.segmentButtonRight,
+                    { 
+                      borderColor: activeTab === "upload" ? colors.tint : colors.border,
+                      backgroundColor: activeTab === "upload" ? colors.tint : 'transparent',
+                    },
+                  ]}
+                  onPress={() => setActiveTab("upload")}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText 
+                    style={[
+                      styles.segmentButtonText,
+                      { color: activeTab === "upload" ? "#fff" : colors.text },
+                    ]}
+                  >
+                    {t('mealtype_log.scanner.upload_photo', 'Upload Photo')}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Desktop Web: Upload Photo Button Only */}
+            {isDesktopWeb && (
+              <View style={styles.uploadButtonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.uploadButton,
+                    { 
+                      backgroundColor: colors.tint,
+                      opacity: isProcessing ? 0.6 : 1,
+                    },
+                  ]}
+                  onPress={() => {
+                    // Trigger file input click
+                    const fileInput = document.getElementById('barcode-file-input-desktop') as HTMLInputElement;
+                    fileInput?.click();
+                  }}
+                  disabled={isProcessing}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={[styles.uploadButtonText, { color: "#fff" }]}>
+                    {t('mealtype_log.scanner.upload_photo', 'Upload Photo')}
+                  </ThemedText>
+                </TouchableOpacity>
+                <input 
+                  id="barcode-file-input-desktop"
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  disabled={isProcessing}
+                  style={{ display: "none" }}
+                />
+                <div id="html5-qrcode-web-file" style={{ display: "none" }} />
+              </View>
+            )}
+
+            {/* Error message */}
+            {scanError && (
+              <View 
+                style={[
+                  styles.errorContainer, 
+                  { 
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+                    borderColor: '#EF4444' 
+                  }
+                ]}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                {...(Platform.OS === 'web' ? { role: 'alert', 'aria-live': 'polite' as const } : {})}
+              >
+                <IconSymbol name="info.circle.fill" size={18} color="#EF4444" />
+                <ThemedText style={[styles.errorText, { color: '#EF4444' }]}>
+                  {scanError}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Processing indicator */}
+            {isProcessing && (
+              <View style={styles.processingContainer}>
+                <ActivityIndicator size="small" color={colors.tint} />
+                <ThemedText style={[styles.processingText, { color: colors.textSecondary }]}>
+                  {t('mealtype_log.scanner.processing', 'Processing barcode...')}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Mobile Web: Camera view */}
+            {isMobileWeb && activeTab === "camera" && (
+              <View style={styles.cameraSection}>
+                <View style={styles.cameraWrapper}>
+                  <div 
+                    id={cameraContainerId} 
+                    style={{ 
+                      width: "100%", 
+                      backgroundColor: "#000",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                    }} 
+                  />
+                  {/* CSS to ensure video fills container */}
+                  <style dangerouslySetInnerHTML={{ __html: `
+                    #${cameraContainerId} {
+                      width: 100% !important;
+                      position: relative !important;
+                      background-color: #000 !important;
+                      border-radius: 12px !important;
+                      overflow: hidden !important;
+                    }
+                    #${cameraContainerId} video {
+                      width: 100% !important;
+                      height: 100% !important;
+                      object-fit: cover !important;
+                      display: block !important;
+                      position: absolute !important;
+                      top: 0 !important;
+                      left: 0 !important;
+                    }
+                    #${cameraContainerId} > div {
+                      width: 100% !important;
+                      height: 100% !important;
+                      position: relative !important;
+                    }
+                    #${cameraContainerId} canvas {
+                      display: none !important;
+                    }
+                  `}} />
+                </View>
+                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                  {t('mealtype_log.scanner.helper_text', 'Align the barcode inside the frame to scan.')}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Mobile Web: Upload Photo view */}
+            {isMobileWeb && activeTab === "upload" && (
+              <View style={styles.uploadSection}>
+                <ThemedText style={[styles.uploadLabel, { color: colors.text }]}>
+                  {t('mealtype_log.scanner.upload_label', 'Upload a photo of a barcode to scan:')}
+                </ThemedText>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  disabled={isProcessing}
+                  style={{
+                    padding: "12px",
+                    fontSize: 16,
+                    border: `1.5px solid ${colors.border}`,
+                    borderRadius: 12,
+                    width: "100%",
+                    backgroundColor: colors.backgroundSecondary,
+                    color: colors.text,
+                    cursor: isProcessing ? "not-allowed" : "pointer",
+                    opacity: isProcessing ? 0.6 : 1,
+                  }}
+                />
+                <div id="html5-qrcode-web-file" style={{ display: "none" }} />
+              </View>
+            )}
+
+            {/* Manual Barcode Entry (always visible on both desktop and mobile web) */}
+            <View style={[styles.manualEntrySection, { borderTopColor: colors.border }]}>
+              <View style={styles.manualEntryDivider}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <ThemedText style={[styles.dividerText, { color: colors.textSecondary }]}>
+                  {t('common.or', 'or')}
+                </ThemedText>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              </View>
+              
+              <ThemedText style={[styles.manualEntryLabel, { color: colors.text }]}>
+                {t('mealtype_log.scanner.manual_entry_label', 'Enter barcode manually:')}
+              </ThemedText>
+              
+              <View style={styles.manualEntryRow}>
+                <TextInput
+                  style={[
+                    styles.manualEntryInput,
+                    {
+                      borderColor: colors.border,
+                      color: colors.text,
+                      backgroundColor: colors.backgroundSecondary,
+                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                    },
+                  ]}
+                  placeholder={t('mealtype_log.scanner.manual_entry_placeholder', 'Enter barcode number')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={manualBarcode}
+                  onChangeText={(text) => {
+                    setManualBarcode(text);
+                    setScanError(null);
+                  }}
+                  onSubmitEditing={handleManualSearch}
+                  returnKeyType="search"
+                  keyboardType="numeric"
+                  autoCapitalize="none"
+                  editable={!isProcessing}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.manualEntryButton,
+                    { 
+                      backgroundColor: isProcessing || !manualBarcode.trim() ? colors.textSecondary : colors.tint,
+                      opacity: isProcessing || !manualBarcode.trim() ? 0.6 : 1,
+                    },
+                  ]}
+                  onPress={handleManualSearch}
+                  disabled={isProcessing || !manualBarcode.trim()}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={[styles.manualEntryButtonText, { color: "#fff" }]}>
+                    {t('common.search', 'Search')}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </View>
-      )}
-
-      {/* Processing indicator */}
-      {isProcessing && (
-        <View style={{ alignItems: "center", justifyContent: "center", marginBottom: 12, padding: 16 }}>
-          <ActivityIndicator />
-          <Text style={{ marginTop: 8 }}>Processing barcode...</Text>
-        </View>
-      )}
-
-      {/* Camera view */}
-      {activeTab === "camera" && (
-        <>
-          <div 
-            id={cameraContainerId} 
-            style={{ 
-              width: "100%", 
-              height: 300,
-              backgroundColor: "#000",
-              overflow: "hidden",
-            }} 
-          />
-          {/* CSS to ensure video fills container */}
-          <style dangerouslySetInnerHTML={{ __html: `
-            #${cameraContainerId} {
-              width: 100% !important;
-              height: 300px !important;
-              position: relative !important;
-              background-color: #000 !important;
-            }
-            #${cameraContainerId} video {
-              width: 100% !important;
-              height: 100% !important;
-              object-fit: cover !important;
-              display: block !important;
-            }
-          `}} />
-        </>
-      )}
-
-      {/* Upload Photo view */}
-      {activeTab === "upload" && (
-        <View>
-          <Text style={{ marginBottom: 8, fontSize: 16 }}>Upload a photo of a barcode to scan:</Text>
-          <input 
-            type="file" 
-            accept="image/*" 
-            onChange={handleFileChange}
-            disabled={isProcessing}
-            style={{
-              padding: "8px",
-              fontSize: 16,
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              width: "100%",
-              maxWidth: 400,
-            }}
-          />
-          <div id="html5-qrcode-web-file" style={{ display: "none" }} />
-        </View>
-      )}
-    </View>
+      </ScrollView>
+    </ThemedView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 20,
+    minHeight: '100%',
+  },
+  cardContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  card: {
+    borderRadius: 24,
+    padding: 32,
+    borderWidth: 1,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 24,
+        elevation: 8,
+      },
+    }),
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 24,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    gap: 0,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    backgroundColor: 'transparent',
+  },
+  segmentButtonLeft: {
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderRightWidth: 0,
+  },
+  segmentButtonRight: {
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    borderLeftWidth: 0,
+  },
+  segmentButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    marginBottom: 20,
+  },
+  processingText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  cameraSection: {
+    marginTop: 8,
+  },
+  cameraWrapper: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  helperText: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  uploadSection: {
+    marginTop: 8,
+  },
+  uploadLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  uploadButtonContainer: {
+    marginBottom: 24,
+  },
+  uploadButton: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  uploadButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  manualEntrySection: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+  },
+  manualEntryDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    paddingHorizontal: 16,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  manualEntryLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  manualEntryRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  manualEntryInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    minHeight: 52,
+  },
+  manualEntryButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    minWidth: 100,
+  },
+  manualEntryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+});
