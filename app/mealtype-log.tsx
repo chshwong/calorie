@@ -5320,6 +5320,32 @@ export default function LogFoodScreen() {
               <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
                 {t('mealtype_log.food_log.no_entries')}
               </ThemedText>
+              <TouchableOpacity
+                style={[styles.barcodeButton, { 
+                  backgroundColor: colors.tint + '15', 
+                  borderColor: colors.tint + '40',
+                  marginTop: 16,
+                  flexDirection: 'row',
+                  gap: 8,
+                }]}
+                onPress={handleBarcodeScanPress}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                {...getButtonAccessibilityProps(
+                  'Scan barcode',
+                  'Double tap to scan a barcode'
+                )}
+              >
+                <IconSymbol 
+                  name="barcode.viewfinder" 
+                  size={24} 
+                  color={colors.tint}
+                  accessibilityLabel={t('mealtype_log.accessibility.scan_barcode')}
+                />
+                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
+                  {t('mealtype_log.scanner.title', 'Scan Barcode')}
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           ) : (
             entries.map((entry) => {
@@ -5565,7 +5591,7 @@ export default function LogFoodScreen() {
         </>
       )}
       
-      {/* Barcode Scanner Modal */}
+      {/* Barcode Scanner Modal - Always rendered unconditionally, visibility controlled by showBarcodeScanner state */}
       <Modal
         visible={showBarcodeScanner}
         animationType="slide"
@@ -5596,6 +5622,7 @@ export default function LogFoodScreen() {
           </View>
           
           <View style={styles.scannerContent}>
+            {/* UniversalBarcodeScanner always receives the same props regardless of entries.length */}
             <UniversalBarcodeScanner
               mealType={mealType}
               entryDate={entryDate}
