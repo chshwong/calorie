@@ -12,15 +12,16 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEnhancedFoodSearch } from '@/hooks/use-enhanced-food-search';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
 import { useFrequentFoods } from '@/hooks/use-frequent-foods';
 import { useRecentFoods } from '@/hooks/use-recent-foods';
 import { useCustomFoods } from '@/hooks/use-custom-foods';
 import { useBundles } from '@/hooks/use-bundles';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useFoodMasterByIds } from '@/hooks/use-food-master-by-ids';
 import { useQueryClient } from '@tanstack/react-query';
 import { validateAndNormalizeBarcode } from '@/lib/barcode';
+import { supabase } from '@/lib/supabase';
 import { 
   calculateNutrientsSimple, 
   calculateMasterUnitsForDisplay,
@@ -502,6 +503,22 @@ export default function LogFoodScreen() {
   const tabsContainerWrapperRef = useRef<View>(null);
   const [tabsContainerWrapperLayout, setTabsContainerWrapperLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const tabsScrollOffsetRef = useRef<number>(0);
+  
+  // Memoize the callback to prevent infinite loops
+  const handleActiveTabLayout = useCallback((layout: { x: number; y: number; width: number; height: number } | null) => {
+    if (layout) {
+      // Store layout relative to the TabBar container (which is inside the ScrollView)
+      // We'll account for scroll offset when positioning the dropdown
+      setActiveTabLayout({
+        x: layout.x,
+        y: layout.y + layout.height, // Bottom of tab
+        width: layout.width,
+        height: layout.height,
+      });
+    } else {
+      setActiveTabLayout(null);
+    }
+  }, []);
 
   // Use local state values if editing/adding, otherwise use URL params
   const activeMealType = currentMealType || mealType;
@@ -569,7 +586,7 @@ export default function LogFoodScreen() {
   }, [showEntryDetails, loadingDetailsPreference]);
 
   // Use React Query hook for entries (shared cache with Home screen)
-  const { data: allEntriesForDay = [], isLoading: entriesLoading, isError: entriesError, refetch: refetchEntries } = useDailyEntries(entryDate);
+  const { data: allEntriesForDay = [], isLoading: entriesLoading, isFetching: entriesFetching, isError: entriesError, refetch: refetchEntries } = useDailyEntries(entryDate);
   
   // Filter entries by current meal type (client-side filtering)
   // Memoize to prevent unnecessary re-renders and useEffect triggers
@@ -578,6 +595,17 @@ export default function LogFoodScreen() {
       (entry) => entry.meal_type === mealType
     );
   }, [allEntriesForDay, mealType]);
+  
+  // Only show loading spinner if we're truly loading and have no cached data
+  const showLoadingSpinner = entriesLoading && entries.length === 0 && allEntriesForDay === undefined;
+  
+  // Extract unique food IDs from entries for food master lookup
+  const foodIds = useMemo(() => {
+    return [...new Set(entries.filter(e => e.food_id).map(e => e.food_id))] as string[];
+  }, [entries]);
+  
+  // Use React Query hook for food master metadata (replaces direct Supabase call)
+  const { data: foodMasterData = [] } = useFoodMasterByIds(foodIds);
   
   // Use reusable highlight hook for newly added entries
   const {
@@ -822,57 +850,25 @@ export default function LogFoodScreen() {
     }
   };
 
-  // Fetch food source types and brand for entries with food_id
-  // This runs whenever entries change
-  // Use a ref to track the last entries to prevent unnecessary re-runs when array reference changes but content is same
-  const lastEntriesKeyRef = useRef<string>('');
+  // Build food source and brand maps from food master data
+  // This runs whenever foodMasterData changes
   useEffect(() => {
-    const foodIds = [...new Set(entries.filter(e => e.food_id).map(e => e.food_id))] as string[];
-    const foodIdsKey = foodIds.sort().join(',');
-    const currentKey = `${entries.length}:${foodIdsKey}`;
-    
-    // Only run if entries actually changed (by length or food IDs)
-    if (lastEntriesKeyRef.current === currentKey) {
-      return;
-    }
-    lastEntriesKeyRef.current = currentKey;
-    
-    if (!entries.length || foodIds.length === 0) {
+    if (!foodMasterData || foodMasterData.length === 0) {
       setFoodSourceMap({});
       setFoodBrandMap({});
       return;
     }
 
-    supabase
-      .from('food_master')
-      .select('id, is_custom, brand')
-      .in('id', foodIds)
-      .then(({ data: foodsData, error }) => {
-        if (error) {
-          setFoodSourceMap({});
-          setFoodBrandMap({});
-          return;
-        }
-        if (foodsData) {
-          const sourceMap: { [foodId: string]: boolean } = {};
-          const brandMap: { [foodId: string]: string | null } = {};
-          foodsData.forEach(food => {
-            // Simple logic: if is_custom is true, mark as custom; otherwise database
-            sourceMap[food.id] = food.is_custom === true;
-            brandMap[food.id] = food.brand;
-          });
-          setFoodSourceMap(sourceMap);
-          setFoodBrandMap(brandMap);
-        } else {
-          setFoodSourceMap({});
-          setFoodBrandMap({});
-        }
-      })
-      .catch(() => {
-        setFoodSourceMap({});
-        setFoodBrandMap({});
-      });
-  }, [entries]);
+    const sourceMap: { [foodId: string]: boolean } = {};
+    const brandMap: { [foodId: string]: string | null } = {};
+    foodMasterData.forEach(food => {
+      // Simple logic: if is_custom is true, mark as custom; otherwise database
+      sourceMap[food.id] = food.is_custom === true;
+      brandMap[food.id] = food.brand;
+    });
+    setFoodSourceMap(sourceMap);
+    setFoodBrandMap(brandMap);
+  }, [foodMasterData]);
 
   // Fetch functions removed - now using React Query hooks above
 
@@ -2340,16 +2336,18 @@ export default function LogFoodScreen() {
   }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab]);
 
   // Handle openBarcodeScanner param - open scanner when navigating from scanned-item "Scan Another"
+  // Use a ref to ensure we only trigger once, even on re-renders
+  const hasAutoOpenedScanner = useRef(false);
   useEffect(() => {
     const shouldOpenScanner = Array.isArray(openBarcodeScannerParam) 
       ? openBarcodeScannerParam[0] === 'true' 
       : openBarcodeScannerParam === 'true';
     
-    if (shouldOpenScanner && !showBarcodeScanner) {
+    if (shouldOpenScanner && !showBarcodeScanner && !hasAutoOpenedScanner.current) {
       setScanned(false); // Reset scanned state
       setBarcodeScanning(false); // Reset scanning state
       setShowBarcodeScanner(true);
-      setBarcodeScannerKey(prev => prev + 1); // Force remount
+      hasAutoOpenedScanner.current = true; // Mark as consumed
     }
   }, [openBarcodeScannerParam, showBarcodeScanner]);
 
@@ -3328,20 +3326,7 @@ export default function LogFoodScreen() {
                     },
                   ]}
                   activeKey={activeTab}
-                  onActiveTabLayout={(layout) => {
-                    if (layout) {
-                      // Store layout relative to the TabBar container (which is inside the ScrollView)
-                      // We'll account for scroll offset when positioning the dropdown
-                      setActiveTabLayout({
-                        x: layout.x,
-                        y: layout.y + layout.height, // Bottom of tab
-                        width: layout.width,
-                        height: layout.height,
-                      });
-                    } else {
-                      setActiveTabLayout(null);
-                    }
-                  }}
+                  onActiveTabLayout={handleActiveTabLayout}
                   onTabPress={(key) => {
                     if (key === 'manual') {
                       // Manual+ button always opens manual mode - no expand/collapse toggle
@@ -5222,7 +5207,7 @@ export default function LogFoodScreen() {
               {t('mealtype_log.food_log.title_with_count', { count: entries.length })}
             </ThemedText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {!entriesLoading && entries.length > 0 && (
+              {!showLoadingSpinner && entries.length > 0 && (
                 <View style={styles.toggleContainer}>
                   <ThemedText style={[styles.toggleLabel, { color: colors.textSecondary }]}>
                     {t('mealtype_log.food_log.details')}
@@ -5259,7 +5244,7 @@ export default function LogFoodScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {!entriesLoading && entries.length > 0 && (
+              {!showLoadingSpinner && entries.length > 0 && (
                 <TouchableOpacity
                   onPress={() => {
                     setEntriesEditMode(!entriesEditMode);
@@ -5323,7 +5308,7 @@ export default function LogFoodScreen() {
             </View>
           )}
 
-          {entriesLoading ? (
+          {showLoadingSpinner ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
               <ActivityIndicator size="small" color={colors.tint} />
               <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>

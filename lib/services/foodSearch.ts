@@ -36,28 +36,104 @@ export async function searchFoodsWithUsage(
     return [];
   }
 
+  // Don't search if query is empty or just whitespace
+  if (!query || !query.trim()) {
+    return [];
+  }
+
   try {
-    // Normalize query for search
-    const normalizedQuery = query.trim().toLowerCase();
-    const queryPattern = `%${normalizedQuery}%`;
+    // Try to use the backend RPC function for multi-word token-based search
+    // This ensures multi-word queries match items even when words are not adjacent
+    // Example: "egg soup" matches "egg drop soup"
+    let foodsData: any[] | null = null;
+    let foodsError: any = null;
     
-    // Search food_master table
-    // SECURITY: Exclude custom foods that don't belong to this user
-    // Custom foods (is_custom = true) must have owner_user_id = userId
-    // Base foods (is_custom = false or null) are visible to all users
-    let searchQuery = supabase
-      .from('food_master')
-      .select('*')
-      .or(`name.ilike.${queryPattern},brand.ilike.${queryPattern}`);
+    try {
+      const rpcResult = await supabase.rpc('search_food_master', {
+        p_query: query,
+        p_user_id: userId,
+        p_limit: limit * 3, // Get more to account for client-side filtering/ranking
+      });
+      foodsData = rpcResult.data;
+      foodsError = rpcResult.error;
+      
+      if (foodsError) {
+        console.warn('RPC search_food_master returned error:', foodsError);
+        console.warn('Error details:', JSON.stringify(foodsError, null, 2));
+      }
+    } catch (rpcError) {
+      // RPC function might not exist yet, fall back to original query method
+      console.warn('RPC search_food_master threw exception, falling back to direct query:', rpcError);
+      foodsError = rpcError;
+    }
     
-    // Filter: Only include custom foods that belong to this user, or base foods (is_custom = false/null)
-    // This is done by filtering out custom foods where owner_user_id != userId
-    // We'll filter in two steps: get all matching foods, then filter out other users' custom foods
-    const { data: foodsData, error: foodsError } = await searchQuery.limit(limit * 3); // Get more to account for filtering
-    
+    // If RPC failed (error occurred), fall back to original query method
+    // Note: If RPC succeeded but returned empty data, that's valid - don't fall back
     if (foodsError) {
-      console.error('Error searching foods:', foodsError);
-      return [];
+      console.log('Using fallback query method for search (query:', query, ')');
+      
+      // Normalize query for search (same as use-food-search.ts)
+      const normalizeText = (text: string): string => {
+        return text
+          .toLowerCase()
+          .replace(/[%(),]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+      
+      const cleanedQuery = normalizeText(query);
+      const words = cleanedQuery.split(/\s+/).filter(word => word.length > 0);
+      
+      if (words.length === 0) {
+        return [];
+      }
+      
+      // Build search conditions: entire query OR first word (to ensure we get relevant results)
+      const queryPattern = `%${cleanedQuery}%`;
+      const firstWordPattern = words.length > 0 ? `%${words[0]}%` : queryPattern;
+      
+      const searchConditions = [
+        `name.ilike.${queryPattern}`,
+        `brand.ilike.${queryPattern}`,
+        `name.ilike.${firstWordPattern}`,
+        `brand.ilike.${firstWordPattern}`,
+      ];
+      
+      // Search food_master table using original method (get more results for client-side filtering)
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('food_master')
+        .select('*')
+        .or(searchConditions.join(','))
+        .limit(limit * 5); // Get more results for client-side filtering
+      
+      if (fallbackError) {
+        console.error('Error searching foods (fallback):', fallbackError);
+        return [];
+      }
+      
+      // Client-side filtering: match entire query as substring OR all words appear
+      // This handles cases like "egg soup" matching "egg drop soup"
+      const filteredResults = (fallbackData || []).filter((food: any) => {
+        const foodName = normalizeText(food.name || '');
+        const foodBrand = normalizeText(food.brand || '');
+        const searchText = `${foodName} ${foodBrand}`.trim();
+        
+        // First check: entire query appears as substring in name or brand
+        if (foodName.includes(cleanedQuery) || foodBrand.includes(cleanedQuery)) {
+          return true;
+        }
+        
+        // Second check: entire query appears as substring in combined text
+        if (searchText.includes(cleanedQuery)) {
+          return true;
+        }
+        
+        // Third check: all words appear (word-order-independent matching)
+        // This handles cases like "egg soup" matching "egg drop soup"
+        return words.every(word => searchText.includes(word));
+      });
+      
+      foodsData = filteredResults;
     }
 
     if (!foodsData || foodsData.length === 0) {

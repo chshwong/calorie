@@ -68,15 +68,30 @@ export const TabBar: React.FC<TabBarProps> = ({
   const previousActiveKey = useRef<string | null>(null);
 
   // Report active tab layout to parent if callback provided
+  // Use ref to store callback to avoid including it in dependencies (prevents infinite loops)
+  const onActiveTabLayoutRef = useRef(onActiveTabLayout);
+  const previousLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  
+  useEffect(() => {
+    onActiveTabLayoutRef.current = onActiveTabLayout;
+  }, [onActiveTabLayout]);
+
   useEffect(() => {
     const activeLayout = layouts[activeKey];
-    if (activeLayout && onActiveTabLayout) {
+    if (activeLayout && onActiveTabLayoutRef.current) {
       const { x, y, width, height } = activeLayout;
-      onActiveTabLayout({ x, y, width, height });
-    } else if (onActiveTabLayout) {
-      onActiveTabLayout(null);
+      // Only call callback if layout actually changed
+      const previous = previousLayoutRef.current;
+      if (!previous || previous.x !== x || previous.y !== y || previous.width !== width || previous.height !== height) {
+        previousLayoutRef.current = { x, y, width, height };
+        onActiveTabLayoutRef.current({ x, y, width, height });
+      }
+    } else if (onActiveTabLayoutRef.current && previousLayoutRef.current !== null) {
+      // Layout was removed
+      previousLayoutRef.current = null;
+      onActiveTabLayoutRef.current(null);
     }
-  }, [activeKey, layouts, onActiveTabLayout]);
+  }, [activeKey, layouts]);
 
   // Update underline position when activeKey or layouts change
   useEffect(() => {

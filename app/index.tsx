@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator, Platform, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOfflineMode } from '@/contexts/OfflineModeContext';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function Index() {
-  const { session, loading, isPasswordRecovery, profile, onboardingComplete, refreshProfile } = useAuth();
+  const { session, user, loading, isPasswordRecovery, profile, onboardingComplete, refreshProfile } = useAuth();
+  const queryClient = useQueryClient();
+  const { setIsOfflineMode } = useOfflineMode();
   const router = useRouter();
   const segments = useSegments();
   const hasRedirected = useRef(false);
@@ -20,9 +24,10 @@ export default function Index() {
 
   // Global timeout for initial loading (12 seconds)
   useEffect(() => {
-    // Reset timeout state when loading completes
+    // Reset timeout state and offline mode when loading completes
     if (!loading) {
       setHasTimedOut(false);
+      setIsOfflineMode(false);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -37,7 +42,24 @@ export default function Index() {
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
-        setHasTimedOut(true);
+        // Before showing error, check if we have cached profile data
+        const userId = user?.id || session?.user?.id;
+        let hasCachedProfile = false;
+        
+        if (userId) {
+          const cachedProfile = queryClient.getQueryData(['userProfile', userId]);
+          if (cachedProfile) {
+            hasCachedProfile = true;
+            // Set offline mode and allow app to render with cached data
+            setIsOfflineMode(true);
+          }
+        }
+        
+        // Only set timeout if we don't have cached data
+        // If we have cached data, we'll allow normal rendering
+        if (!hasCachedProfile) {
+          setHasTimedOut(true);
+        }
       }, 12000); // 12 seconds
     }
 
@@ -47,11 +69,12 @@ export default function Index() {
         timeoutRef.current = null;
       }
     };
-  }, [loading, hasTimedOut]);
+  }, [loading, hasTimedOut, user, session, queryClient, setIsOfflineMode]);
 
   const handleRetry = () => {
-    // Reset timeout state
+    // Reset timeout state and offline mode
     setHasTimedOut(false);
+    setIsOfflineMode(false);
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -61,11 +84,6 @@ export default function Index() {
   };
 
   useEffect(() => {
-    // Don't redirect while loading
-    if (loading) {
-      return;
-    }
-
     // If we've already redirected, don't redirect again
     if (hasRedirected.current) {
       return;
@@ -84,6 +102,18 @@ export default function Index() {
     // Only redirect from index route (or when route is undefined/empty)
     // This should only happen once on initial load
     if (!currentRoute || currentRoute === 'index') {
+      // Check for cached profile if Supabase is slow
+      const userId = user?.id || session?.user?.id;
+      const cachedProfile = userId ? queryClient.getQueryData(['userProfile', userId]) : null;
+      
+      // If we're in offline mode (have cached data but still loading), allow redirect
+      const shouldProceed = !loading || cachedProfile;
+      
+      // Don't redirect while loading unless we have cached data
+      if (loading && !cachedProfile) {
+        return;
+      }
+      
       // Mark as redirected immediately to prevent multiple redirects
       hasRedirected.current = true;
       
@@ -103,24 +133,21 @@ export default function Index() {
             // SECURITY: If in recovery mode, redirect to reset-password
             // Recovery sessions should NOT grant access to the app
             router.replace('/reset-password');
-          } else if (session) {
-            // If we have a session but profile is still loading, wait
-            if (loading) {
-              // Still loading profile, wait
-              hasRedirected.current = false; // Reset so we can redirect once profile loads
-              return;
-            }
+          } else if (session || cachedProfile) {
+            // Use cached profile if available, otherwise use profile from AuthContext
+            const effectiveProfile = profile || cachedProfile;
             
             // Check if user is active before navigating
             // If profile exists and is_active is false/null, don't navigate (user should be signed out by AuthContext)
-            if (profile && (profile.is_active === false || profile.is_active === null)) {
+            if (effectiveProfile && (effectiveProfile.is_active === false || effectiveProfile.is_active === null)) {
               // User is inactive - don't navigate, AuthContext should handle sign out
               return;
             }
             
             // Check if onboarding is complete
             // If no profile OR onboarding_complete is false, redirect to onboarding
-            if (!profile || !onboardingComplete) {
+            const effectiveOnboardingComplete = effectiveProfile?.onboarding_complete ?? false;
+            if (!effectiveProfile || !effectiveOnboardingComplete) {
               router.replace('/onboarding');
               return;
             }
@@ -147,27 +174,40 @@ export default function Index() {
         redirectTimeoutRef.current = null;
       }
     };
-  }, [session, loading, router, segments]); // Include segments but use hasRedirected to prevent loops
+  }, [session, loading, profile, router, segments, user, queryClient]); // Include segments but use hasRedirected to prevent loops
 
   // Show fallback UI if timeout occurred and still loading
+  // Only show if we have no session AND no cached profile
   if (hasTimedOut && loading) {
-    return (
-      <ThemedView style={styles.fallbackContainer}>
-        <ThemedText type="subtitle" style={styles.fallbackMessage}>
-          Unable to connect. Please try again.
-        </ThemedText>
-        <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: colors.tint }]}
-          onPress={handleRetry}
-          accessibilityRole="button"
-          accessibilityLabel="Retry connection"
-        >
-          <ThemedText style={[styles.retryButtonText, { color: colors.background }]}>
-            Retry
+    const userId = user?.id || session?.user?.id;
+    const cachedProfile = userId ? queryClient.getQueryData(['userProfile', userId]) : null;
+    
+    // If we have cached profile, don't show error screen - allow normal rendering
+    if (cachedProfile) {
+      // Clear timeout state since we're using cached data
+      setHasTimedOut(false);
+      setIsOfflineMode(true);
+      // Continue to normal rendering below
+    } else if (!session && !userId) {
+      // Only show error screen if we truly have no session and no cache
+      return (
+        <ThemedView style={styles.fallbackContainer}>
+          <ThemedText type="subtitle" style={styles.fallbackMessage}>
+            Unable to connect. Please try again.
           </ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
-    );
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.tint }]}
+            onPress={handleRetry}
+            accessibilityRole="button"
+            accessibilityLabel="Retry connection"
+          >
+            <ThemedText style={[styles.retryButtonText, { color: colors.background }]}>
+              Retry
+            </ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      );
+    }
   }
 
   return (

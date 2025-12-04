@@ -83,6 +83,19 @@
       "log_food_prompt": "← Ajouter aliment",
       "kcal": "kcal"
     },
+    "previous_day_copy": {
+      "label_yesterday": "D'hier",
+      "label_previous": "Du jour précédent",
+      "accessibility_label_yesterday": "Copier les entrées {{mealType}} d'hier à aujourd'hui",
+      "accessibility_label_previous": "Copier les entrées {{mealType}} du jour précédent au jour actuel",
+      "success_message": "{{count}} {{items}} copiés depuis le jour précédent.",
+      "item_one": "entrée",
+      "item_other": "entrées",
+      "nothing_to_copy": "Rien à copier pour ce jour.",
+      "error_title": "Échec de la copie",
+      "error_message": "Échec de la copie des entrées : {{error}}",
+      "same_date_error": "Impossible de copier les entrées à la même date."
+    },
     "accessibility": {
       "refresh_entries": "Actualiser les entrées",
       "refresh_hint": "Appuyez deux fois pour actualiser les entrées",

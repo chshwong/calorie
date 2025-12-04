@@ -179,7 +179,12 @@ export function DateHeader({
             styles.dateNavButtonSimple,
             getMinTouchTargetStyle(),
             { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+            Platform.OS === 'web' && {
+              zIndex: 10,
+              pointerEvents: 'auto' as any,
+            },
           ]}
+          pointerEvents="auto"
           {...getButtonAccessibilityProps(
             t('home.date_picker.previous_day'),
             'Double tap to go to the previous day'
@@ -206,13 +211,18 @@ export function DateHeader({
             { 
               backgroundColor: moduleAccent,
               ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
-            }
+            },
+            Platform.OS === 'web' && {
+              zIndex: 10,
+              pointerEvents: 'auto' as any,
+            },
           ]}
           onPress={() => {
             setShowDatePicker(true);
             setCalendarViewMonth(new Date(selectedDate));
           }}
           activeOpacity={0.8}
+          pointerEvents="auto"
           {...getButtonAccessibilityProps(
             t('home.date_picker.select_date'),
             'Double tap to open date picker'
@@ -228,7 +238,12 @@ export function DateHeader({
               styles.dateNavButtonSimple,
               getMinTouchTargetStyle(),
               { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+              Platform.OS === 'web' && {
+                zIndex: 10,
+                pointerEvents: 'auto' as any,
+              },
             ]}
+            pointerEvents="auto"
             {...getButtonAccessibilityProps(
               t('home.date_picker.next_day'),
               'Double tap to go to the next day'
@@ -250,13 +265,18 @@ export function DateHeader({
         onRequestClose={() => setShowDatePicker(false)}
       >
         <TouchableOpacity
-          style={[styles.datePickerModalOverlay, { backgroundColor: colors.overlay }]}
+          style={[
+            styles.datePickerModalOverlay, 
+            { backgroundColor: colors.overlay }
+          ]}
           activeOpacity={1}
           onPress={() => setShowDatePicker(false)}
+          pointerEvents={showDatePicker ? 'auto' : 'none'}
         >
           <TouchableOpacity
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
+            pointerEvents="auto"
           >
             <View style={[styles.datePickerModalContent, { backgroundColor: colors.card }]}>
               <View style={[styles.datePickerHeader, { borderBottomColor: colors.separator }]}>
@@ -359,12 +379,17 @@ export function DateHeader({
                             borderColor: moduleAccent,
                             borderRadius: 8,
                           },
+                          Platform.OS === 'web' && {
+                            zIndex: 1002,
+                            pointerEvents: 'auto' as any,
+                          },
                         ]}
                         onPress={() => {
                           const newDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
                           handleDateSelect(newDate);
                         }}
                         activeOpacity={0.7}
+                        pointerEvents="auto"
                         {...getButtonAccessibilityProps(
                           `Select ${day}`,
                           `Double tap to select ${day}`
@@ -474,6 +499,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: Platform.select({ web: 8, default: 4 }),
     paddingHorizontal: 0,
+    ...Platform.select({
+      web: {
+        zIndex: 10,
+        position: 'relative' as any,
+      },
+    }),
   },
   dateNavButtonSimple: {
     // Touch target handled by getMinTouchTargetStyle
@@ -518,6 +549,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.lg,
+    ...Platform.select({
+      web: {
+        // Ensure overlay doesn't block touches when modal is closed
+        zIndex: 1000,
+      },
+    }),
   },
   datePickerModalContent: {
     width: '100%',
@@ -527,6 +564,8 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        zIndex: 1001,
+        pointerEvents: 'auto' as any,
       },
       default: {
         shadowOffset: { width: 0, height: 8 },

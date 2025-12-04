@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, RefreshControl, Alert } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
@@ -10,7 +10,7 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Layout, Spacing } from '@/constants/theme';
+import { Colors, Layout, Spacing, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
@@ -23,11 +23,121 @@ import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchBundles } from '@/lib/services/bundles';
+import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
+import { showAppToast } from '@/components/ui/app-toast';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
+
+// Component for copy from yesterday button on meal type chip
+type MealTypeCopyButtonProps = {
+  mealType: string;
+  mealTypeLabel: string;
+  selectedDate: Date;
+  isToday: boolean;
+  colors: typeof Colors.light;
+  t: (key: string) => string;
+};
+
+function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, colors, t }: MealTypeCopyButtonProps) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  const { cloneMealTypeFromPreviousDay, isLoading } = useCloneMealTypeFromPreviousDay({
+    currentDate: selectedDate,
+    mealType,
+    onSuccess: (clonedCount) => {
+      if (clonedCount > 0) {
+        showAppToast(t('home.previous_day_copy.success_message', {
+          count: clonedCount,
+          items: clonedCount === 1 ? t('home.previous_day_copy.item_one') : t('home.previous_day_copy.item_other'),
+        }));
+      }
+    },
+    onError: (error: Error) => {
+      // Handle nothing to copy error
+      if (error.message === 'NOTHING_TO_COPY') {
+        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+      // Handle same-date error specifically
+      if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
+        Alert.alert(
+          t('home.previous_day_copy.error_title'),
+          t('home.previous_day_copy.same_date_error')
+        );
+      } else {
+        Alert.alert(
+          t('home.previous_day_copy.error_title'),
+          t('home.previous_day_copy.error_message', {
+            error: error.message || t('common.unexpected_error'),
+          })
+        );
+      }
+    },
+  });
+
+  const handleCopy = () => {
+    // Check cache for previous day before cloning
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const previousDateString = previousDay.toISOString().split('T')[0];
+    
+    // Use React Query cache to check if previous day has entries for this meal type
+    const previousDayQueryKey = ['entries', user?.id, previousDateString];
+    const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
+    
+    // If cache exists and is empty or has no entries for this meal type, show message and skip DB call
+    if (cachedPreviousDayEntries !== undefined) {
+      if (cachedPreviousDayEntries === null || cachedPreviousDayEntries.length === 0) {
+        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+      
+      const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+        entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+      );
+      
+      if (mealTypeEntries.length === 0) {
+        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+    }
+    
+    cloneMealTypeFromPreviousDay();
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handleCopy}
+      style={styles.copyFromYesterdayButton}
+      activeOpacity={0.7}
+      disabled={isLoading}
+      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+      {...getButtonAccessibilityProps(
+        isToday 
+          ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: mealTypeLabel })
+          : t('home.previous_day_copy.accessibility_label_previous', { mealType: mealTypeLabel })
+      )}
+    >
+      {isLoading ? (
+        <ActivityIndicator size="small" color={colors.tint} />
+      ) : (
+        <>
+          <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
+          <ThemedText style={[styles.copyFromYesterdayButtonText, { color: colors.tint }]}>
+            {isToday 
+              ? t('home.previous_day_copy.label_yesterday')
+              : t('home.previous_day_copy.label_previous')}
+          </ThemedText>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
 
 export default function FoodLogHomeScreen() {
   const { t } = useTranslation();
@@ -60,13 +170,30 @@ export default function FoodLogHomeScreen() {
   // Use shared date hook
   const {
     selectedDate,
-    setSelectedDate,
     selectedDateString,
     isToday,
     today,
-    calendarViewMonth,
-    setCalendarViewMonth,
   } = useSelectedDate();
+
+  // Calendar view month state (local to component for date picker modal)
+  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
+    return new Date(selectedDate);
+  });
+  
+  // Update calendar view month when selectedDate changes
+  useEffect(() => {
+    setCalendarViewMonth(new Date(selectedDate));
+  }, [selectedDate]);
+
+  // Helper function to navigate with new date (updates URL param)
+  const navigateWithDate = useCallback((date: Date) => {
+    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    // Use replace to update URL params - ensure it works on mobile web
+    router.replace({
+      pathname: '/',
+      params: { date: dateString }
+    });
+  }, [router]);
 
   // Use React Query hooks for data fetching
   const queryClient = useQueryClient();
@@ -78,8 +205,10 @@ export default function FoodLogHomeScreen() {
     refetch: refetchEntries 
   } = useDailyEntries(selectedDateString);
   
-  // Use empty array as default only when we have no cached data
+  // Use cached data immediately - only show loading if we have no cached data at all
   const entries = calorieEntries ?? [];
+  // Only show loading spinner if we're truly loading and have no cached data
+  const showLoadingSpinner = entriesLoading && entries.length === 0 && calorieEntries === undefined;
   
   // Background prefetch for mealtype-log tab data (after Home data is ready)
   // Use default meal type 'late_night' (same as mealtype-log default)
@@ -332,6 +461,7 @@ export default function FoodLogHomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <OfflineBanner />
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContentContainer} 
@@ -363,7 +493,7 @@ export default function FoodLogHomeScreen() {
               <DateHeader
                 showGreeting={true}
                 selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
+                setSelectedDate={navigateWithDate}
                 selectedDateString={selectedDateString}
                 isToday={isToday}
                 getDisplayDate={(t) => {
@@ -391,13 +521,13 @@ export default function FoodLogHomeScreen() {
                 goBackOneDay={() => {
                   const newDate = new Date(selectedDate);
                   newDate.setDate(newDate.getDate() - 1);
-                  setSelectedDate(newDate);
+                  navigateWithDate(newDate);
                 }}
                 goForwardOneDay={() => {
                   if (!isToday) {
                     const newDate = new Date(selectedDate);
                     newDate.setDate(newDate.getDate() + 1);
-                    setSelectedDate(newDate);
+                    navigateWithDate(newDate);
                   }
                 }}
                 calendarViewMonth={calendarViewMonth}
@@ -412,7 +542,7 @@ export default function FoodLogHomeScreen() {
                 titleKey="home.summary.title_other"
                 icon="fork.knife"
                 module="food"
-                isLoading={entriesLoading && entries.length === 0}
+                isLoading={showLoadingSpinner}
                 rightContent={
                   entries.length > 0 ? (
                     <ThemedText style={[styles.entryCount, { color: colors.textSecondary }]}>
@@ -423,7 +553,7 @@ export default function FoodLogHomeScreen() {
                 style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
               />
             
-            {(entries.length > 0 || !entriesLoading) && (
+            {(entries.length > 0 || !showLoadingSpinner) && (
               <View style={styles.dailyTotalsContent}>
                 <View style={styles.dailyTotalsMainRow}>
                   {/* Total Calories - Left Side */}
@@ -570,7 +700,7 @@ export default function FoodLogHomeScreen() {
           {/* Today's Calorie Entries */}
           <View style={[styles.entriesSectionCard, { backgroundColor: colors.card }]}>
             <View style={styles.entriesSection}>
-              {entriesLoading && entries.length === 0 ? (
+              {showLoadingSpinner ? (
                 <View style={[styles.emptyState, { backgroundColor: 'transparent' }]}>
                   <ActivityIndicator size="small" color={colors.tint} />
                   <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
@@ -658,6 +788,20 @@ export default function FoodLogHomeScreen() {
                           )}
                         </View>
                       </View>
+
+                      {/* Copy from yesterday button - only show when no entries */}
+                      {group.entries.length === 0 && (
+                        <View style={styles.copyFromYesterdayContainer}>
+                          <MealTypeCopyButton
+                            mealType={mealType}
+                            mealTypeLabel={mealTypeLabel}
+                            selectedDate={selectedDate}
+                            isToday={isToday}
+                            colors={colors}
+                            t={t}
+                          />
+                        </View>
+                      )}
 
                       {/* Individual Entries as Descriptions */}
                       {group.entries.length > 0 && (
@@ -1192,6 +1336,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     flexShrink: 0,
+  },
+  copyFromYesterdayContainer: {
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+    alignItems: 'flex-start',
+  },
+  copyFromYesterdayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: (44 - 16) / 2, // Ensure minimum touch target
+    paddingHorizontal: 0,
+    gap: Spacing.xs,
+    ...getMinTouchTargetStyle(),
+  },
+  copyFromYesterdayButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
   mealTypeBadge: {
     paddingHorizontal: Platform.select({ web: 14, default: 16 }),

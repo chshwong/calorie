@@ -13,6 +13,7 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { OfflineModeProvider } from '@/contexts/OfflineModeContext';
 import { ThemeProvider as AppThemeProvider } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/theme';
 import { ToastProvider } from '@/components/ui/app-toast';
@@ -138,7 +139,9 @@ export default function RootLayout() {
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <AppThemeProvider>
-          <ThemeProviderWrapper />
+          <OfflineModeProvider>
+            <ThemeProviderWrapper />
+          </OfflineModeProvider>
         </AppThemeProvider>
       </QueryClientProvider>
     </I18nextProvider>

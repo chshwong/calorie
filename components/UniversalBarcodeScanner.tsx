@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Platform, View, Text, ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, TextInput } from "react-native";
+import { Platform, View, Text, ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, TextInput, Pressable } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -220,14 +220,30 @@ function NativeScanner({
     );
   }
 
+  const handleClose = useCallback(() => {
+    // Stop scanning
+    setIsScanning(false);
+    // Call onClose if provided, otherwise navigate back
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
+  }, [onClose, router]);
+
   return (
-    <CameraView
-      style={{ flex: 1 }}
-      barcodeScannerSettings={{
-        barcodeTypes: ["qr", "ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
-      }}
-      onBarcodeScanned={handleBarcodeScanned}
-    />
+    <View style={{ flex: 1 }}>
+      <CameraView
+        style={{ flex: 1 }}
+        barcodeScannerSettings={{
+          barcodeTypes: ["qr", "ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
+        }}
+        onBarcodeScanned={handleBarcodeScanned}
+      />
+      <Pressable onPress={handleClose} style={styles.closeButton}>
+        <Text style={styles.closeButtonText}>✕</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -248,12 +264,28 @@ function BarcodeScannerModal({
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = Platform.OS === 'web' && screenWidth > 768;
   
-  // Platform detection (web only)
-  const isWeb = typeof window !== "undefined";
-  const isMobileWeb = isWeb && /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
-  const isDesktopWeb = isWeb && !isMobileWeb;
+  // Platform detection (web only) - using state to avoid SSR issues
+  const [isMobileWeb, setIsMobileWeb] = useState(false);
+  const [isDesktopWeb, setIsDesktopWeb] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<"camera" | "upload">(isMobileWeb ? "camera" : "upload");
+  // Detect platform on client side only
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const ua = window.navigator.userAgent || "";
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+    setIsMobileWeb(isMobile);
+    setIsDesktopWeb(!isMobile);
+  }, []);
+  
+  const [activeTab, setActiveTab] = useState<"camera" | "upload">("upload");
+  
+  // Update activeTab to "camera" when we detect mobile web (after hydration)
+  useEffect(() => {
+    if (isMobileWeb && activeTab === "upload") {
+      setActiveTab("camera");
+    }
+  }, [isMobileWeb]);
   const [scanError, setScanError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [manualBarcode, setManualBarcode] = useState("");
@@ -567,10 +599,31 @@ function BarcodeScannerModal({
   };
 
   // ============================================================================
+  // Close handler
+  // ============================================================================
+  const handleClose = useCallback(() => {
+    // Stop camera if active
+    stopCamera();
+    // Call onClose if provided, otherwise navigate back
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
+  }, [onClose, router, stopCamera]);
+
+  // ============================================================================
   // Render
   // ============================================================================
+  // Determine text color based on background
+  const isLightBackground = colorScheme === 'light' || colors.background === '#fff' || colors.background === '#ffffff';
+  const closeButtonTextColor = isLightBackground ? '#000' : '#fff';
+
   return (
     <ThemedView style={styles.container}>
+      <Pressable onPress={handleClose} style={styles.closeButton}>
+        <Text style={[styles.closeButtonText, { color: closeButtonTextColor }]}>✕</Text>
+      </Pressable>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -1019,5 +1072,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.3,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 50,
+  },
+  closeButtonText: {
+    fontSize: 26,
+    color: '#fff',
   },
 });

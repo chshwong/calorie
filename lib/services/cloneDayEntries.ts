@@ -14,6 +14,8 @@
 import { supabase } from '@/lib/supabase';
 import { getMedLogsForDate, createMedLog, type MedLog } from './medLogs';
 import { getExerciseLogsForDate, createExerciseLog, type ExerciseLog } from './exerciseLogs';
+import { getEntriesForDate, createEntry } from './calorieEntries';
+import type { CalorieEntry } from '@/utils/types';
 
 /**
  * Entity types that can be cloned
@@ -28,6 +30,7 @@ export type CloneEntityType = 'pill_intake' | 'food_log' | 'exercise_log';
  * @param sourceDate - Source date in YYYY-MM-DD format
  * @param targetDate - Target date in YYYY-MM-DD format
  * @param entryIds - Optional: Array of entry IDs to clone. If provided, only these entries will be cloned. If omitted, all entries for the source date will be cloned.
+ * @param mealType - Optional: For food_log only, filter by meal type. If provided, only entries with this meal type will be cloned.
  * @returns Number of entries cloned
  * @throws Error if sourceDate equals targetDate or if validation fails
  */
@@ -36,7 +39,8 @@ export async function cloneDayEntries(
   userId: string,
   sourceDate: string,
   targetDate: string,
-  entryIds?: string[]
+  entryIds?: string[],
+  mealType?: string
 ): Promise<number> {
   if (!userId || !sourceDate || !targetDate) {
     throw new Error('Missing required parameters');
@@ -61,8 +65,7 @@ export async function cloneDayEntries(
     case 'pill_intake':
       return clonePillIntakeForDate(userId, normalizedSource, normalizedTarget, entryIds);
     case 'food_log':
-      // TODO: implement 'food_log' cloning here
-      throw new Error('food_log cloning not yet implemented');
+      return cloneFoodLogForDate(userId, normalizedSource, normalizedTarget, entryIds, mealType);
     case 'exercise_log':
       return cloneExerciseLogForDate(userId, normalizedSource, normalizedTarget, entryIds);
     default:
@@ -127,6 +130,89 @@ async function clonePillIntakeForDate(
     return clonedCount;
   } catch (error) {
     console.error('Exception cloning pill intake:', error);
+    return 0;
+  }
+}
+
+/**
+ * Clone food log entries from one date to another
+ * 
+ * @param userId - The user's ID
+ * @param sourceDate - Source date in YYYY-MM-DD format
+ * @param targetDate - Target date in YYYY-MM-DD format
+ * @param entryIds - Optional: Array of entry IDs to clone. If provided, only these entries will be cloned.
+ * @param mealType - Optional: Filter by meal type. If provided, only entries with this meal type will be cloned.
+ * @returns Number of entries cloned, or 0 on error
+ */
+async function cloneFoodLogForDate(
+  userId: string,
+  sourceDate: string,
+  targetDate: string,
+  entryIds?: string[],
+  mealType?: string
+): Promise<number> {
+  try {
+    // Fetch all entries for the source date
+    const sourceEntries = await getEntriesForDate(userId, sourceDate);
+
+    if (!sourceEntries || sourceEntries.length === 0) {
+      return 0; // No entries to clone
+    }
+
+    // Filter entries by meal type if provided
+    let filteredEntries = sourceEntries;
+    if (mealType) {
+      filteredEntries = filteredEntries.filter(entry => 
+        entry.meal_type.toLowerCase() === mealType.toLowerCase()
+      );
+    }
+
+    // Filter entries if entryIds is provided
+    const entriesToClone = entryIds 
+      ? filteredEntries.filter(entry => entryIds.includes(entry.id))
+      : filteredEntries;
+
+    if (entriesToClone.length === 0) {
+      return 0; // No matching entries to clone
+    }
+
+    // Clone each entry to the target date (1:1 cloning, including duplicates)
+    let clonedCount = 0;
+    for (const entry of entriesToClone) {
+      // Create new entry with same data but new date
+      const newEntry: Omit<CalorieEntry, 'id' | 'created_at' | 'updated_at'> = {
+        user_id: entry.user_id,
+        entry_date: targetDate,
+        eaten_at: entry.eaten_at, // Preserve time if available
+        meal_type: entry.meal_type,
+        item_name: entry.item_name,
+        food_id: entry.food_id,
+        serving_id: entry.serving_id,
+        quantity: entry.quantity,
+        unit: entry.unit,
+        calories_kcal: entry.calories_kcal,
+        protein_g: entry.protein_g,
+        carbs_g: entry.carbs_g,
+        fat_g: entry.fat_g,
+        fiber_g: entry.fiber_g,
+        saturated_fat_g: entry.saturated_fat_g,
+        trans_fat_g: entry.trans_fat_g,
+        sugar_g: entry.sugar_g,
+        sodium_mg: entry.sodium_mg,
+        notes: entry.notes,
+      };
+
+      const created = await createEntry(newEntry);
+      if (created) {
+        clonedCount++;
+      } else {
+        console.error(`Failed to clone food log entry: ${entry.item_name}`);
+      }
+    }
+
+    return clonedCount;
+  } catch (error) {
+    console.error('Exception cloning food log:', error);
     return 0;
   }
 }

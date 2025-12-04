@@ -84,6 +84,19 @@
       "log_food_prompt": "← Log Food",
       "kcal": "kcal"
     },
+    "previous_day_copy": {
+      "label_yesterday": "From Yesterday",
+      "label_previous": "From Previous Day",
+      "accessibility_label_yesterday": "Copy yesterday's {{mealType}} entries to today",
+      "accessibility_label_previous": "Copy previous day's {{mealType}} entries to current day",
+      "success_message": "{{count}} {{items}} copied over from previous day.",
+      "item_one": "entry",
+      "item_other": "entries",
+      "nothing_to_copy": "Nothing to copy for this day.",
+      "error_title": "Copy Failed",
+      "error_message": "Failed to copy entries: {{error}}",
+      "same_date_error": "Cannot copy entries to the same date."
+    },
     "accessibility": {
       "refresh_entries": "Refresh entries",
       "refresh_hint": "Double tap to refresh calorie entries",

@@ -1,6 +1,6 @@
 import { Tabs, useRouter } from 'expo-router';
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
@@ -122,7 +122,8 @@ function TabLayoutContent() {
 
   // Helper function to open mealtype-log for current time
   // Reuses the same route and params structure as the old FAB behavior
-  const openMealTypeLogForNow = () => {
+  // autoScan: if true, automatically opens the barcode scanner when the screen loads
+  const openMealTypeLogForNow = (autoScan: boolean = false) => {
     const now = new Date();
     
     // Determine the mealType based on current time
@@ -150,14 +151,22 @@ function TabLayoutContent() {
     // Reuse getLocalDateString() utility for consistency with FAB behavior
     const todayString = getLocalDateString();
     
+    // Build params object
+    const params: Record<string, string> = {
+      entryDate: todayString,
+      mealType: mealType,
+      preloadedEntries: JSON.stringify([])
+    };
+    
+    // Add auto-scan param if requested
+    if (autoScan) {
+      params.openBarcodeScanner = 'true';
+    }
+    
     // Navigate to mealtype-log with the same params structure as the FAB
     router.push({
       pathname: '/mealtype-log',
-      params: {
-        entryDate: todayString,
-        mealType: mealType,
-        preloadedEntries: JSON.stringify([])
-      }
+      params
     });
   };
 
@@ -245,7 +254,14 @@ function TabLayoutContent() {
           styles.quickAddCard,
           pressed && styles.quickAddCardPressed,
         ]}
-        onPress={() => setQuickAddVisible(false)}
+        onPress={() => {
+          setQuickAddVisible(false);
+          // Handle Scan Barcode card - navigate to mealtype-log with auto-scan
+          if (label === 'Scan Barcode') {
+            openMealTypeLogForNow(true);
+          }
+          // Enter Weight and other cards can be handled here in the future
+        }}
       >
         <View style={styles.quickAddCardIconCircle}>
           <Text style={styles.quickAddCardIconEmoji}>
@@ -347,8 +363,14 @@ function TabLayoutContent() {
           onRequestClose={() => setQuickAddVisible(false)}
         >
           <Pressable
-            style={styles.quickAddOverlay}
+            style={[
+              styles.quickAddOverlay,
+              Platform.OS === 'web' && {
+                pointerEvents: isQuickAddVisible ? 'auto' : 'none' as any,
+              }
+            ]}
             onPress={() => setQuickAddVisible(false)}
+            pointerEvents={isQuickAddVisible ? 'auto' : 'none'}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.quickAddSheet}>
@@ -388,8 +410,14 @@ function TabLayoutContent() {
           onRequestClose={() => setMoreMenuVisible(false)}
         >
           <Pressable
-            style={styles.moreMenuOverlay}
+            style={[
+              styles.moreMenuOverlay,
+              Platform.OS === 'web' && {
+                pointerEvents: isMoreMenuVisible ? 'auto' : 'none' as any,
+              }
+            ]}
             onPress={() => setMoreMenuVisible(false)}
+            pointerEvents={isMoreMenuVisible ? 'auto' : 'none'}
           >
             <View style={styles.moreMenuSheet}>
               <View style={styles.moreMenuHandle} />
