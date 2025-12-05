@@ -169,6 +169,77 @@ export function groupEntriesByMealType(entries: CalorieEntry[], metaByMealType?:
 }
 
 /**
+ * Calculate nutrition totals for a single meal type
+ * Combines entries and Quick Log values from mealtype_meta
+ * 
+ * @param mealEntries - Array of calorie entries for the meal
+ * @param mealMeta - Optional mealtype_meta object for the meal
+ * @returns Object with all nutrient totals (including Quick Log values)
+ */
+export function calculateMealNutritionTotals(
+  mealEntries: CalorieEntry[],
+  mealMeta: any | null
+): {
+  kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  saturated_fat_g: number;
+  sugar_g: number;
+  sodium_mg: number;
+} {
+  // Sum nutrients from entries
+  const totals = mealEntries.reduce(
+    (acc, entry) => {
+      acc.kcal += entry.calories_kcal ?? 0;
+      acc.protein_g += entry.protein_g ?? 0;
+      acc.carbs_g += entry.carbs_g ?? 0;
+      acc.fat_g += entry.fat_g ?? 0;
+      acc.fiber_g += entry.fiber_g ?? 0;
+      acc.saturated_fat_g += entry.saturated_fat_g ?? 0;
+      acc.sugar_g += entry.sugar_g ?? 0;
+      acc.sodium_mg += entry.sodium_mg ?? 0;
+      return acc;
+    },
+    {
+      kcal: 0,
+      protein_g: 0,
+      carbs_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      saturated_fat_g: 0,
+      sugar_g: 0,
+      sodium_mg: 0,
+    }
+  );
+
+  // Add Quick Log values from mealtype_meta
+  if (mealMeta) {
+    totals.kcal += mealMeta.quick_kcal ?? 0;
+    totals.protein_g += mealMeta.quick_protein_g ?? 0;
+    totals.carbs_g += mealMeta.quick_carbs_g ?? 0;
+    totals.fat_g += mealMeta.quick_fat_g ?? 0;
+    totals.fiber_g += mealMeta.quick_fiber_g ?? 0;
+    totals.saturated_fat_g += 0; // Quick Log doesn't have saturated_fat
+    totals.sugar_g += mealMeta.quick_sugar_g ?? 0;
+    totals.sodium_mg += mealMeta.quick_sodium_mg ?? 0;
+  }
+
+  // Round values
+  return {
+    kcal: Math.round(totals.kcal),
+    protein_g: Math.round(totals.protein_g),
+    carbs_g: Math.round(totals.carbs_g),
+    fat_g: Math.round(totals.fat_g),
+    fiber_g: Math.round(totals.fiber_g),
+    saturated_fat_g: Math.round(totals.saturated_fat_g),
+    sugar_g: Math.round(totals.sugar_g),
+    sodium_mg: Math.round(totals.sodium_mg),
+  };
+}
+
+/**
  * Format entries for display as a consolidated string
  * e.g., "1 x g Tofu, 2 x servings Apple"
  */

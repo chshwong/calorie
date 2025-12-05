@@ -58,6 +58,7 @@ import { QuickLogEditor } from '@/components/quick-log-editor';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { showAppToast } from '@/components/ui/app-toast';
+import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
 import { TabButton } from '@/components/ui/tab-button';
 import { TabBar } from '@/components/ui/tab-bar';
 import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
@@ -681,15 +682,18 @@ export default function LogFoodScreen() {
     );
   }, [allEntriesForDay, mealType]);
   
+  // Calculate meal totals for nutrients (entries + Quick Log from mealtype_meta)
+  // This is the single source of truth for meal totals
+  const mealTotals = useMemo(
+    () => calculateMealNutritionTotals(entries ?? [], currentMealMeta ?? null),
+    [entries, currentMealMeta]
+  );
+
   // Calculate total kcal for this meal (entries + Quick Log)
+  // Use mealTotals as the single source of truth
   const mealCaloriesTotal = useMemo(() => {
-    const baseEntriesKcal = entries.reduce((sum, entry) => {
-      const calories = entry.calories_kcal ?? 0;
-      return sum + (Number.isFinite(calories) ? calories : 0);
-    }, 0);
-    const quickLogKcal = currentMealMeta?.quick_kcal ?? 0;
-    return Math.round(baseEntriesKcal + quickLogKcal);
-  }, [entries, currentMealMeta]);
+    return mealTotals?.kcal ?? 0;
+  }, [mealTotals]);
   
   // Only show loading spinner if we're truly loading and have no cached data
   const showLoadingSpinner = entriesLoading && entries.length === 0 && allEntriesForDay === undefined;
@@ -947,23 +951,23 @@ export default function LogFoodScreen() {
 
   // Build food source and brand maps from food master data
   // This runs whenever foodMasterData changes
-  // useEffect(() => {
-  //   if (!foodMasterData || foodMasterData.length === 0) {
-  //     setFoodSourceMap({});
-  //     setFoodBrandMap({});
-  //     return;
-  //   }
+  useEffect(() => {
+    if (!foodMasterData || foodMasterData.length === 0) {
+      setFoodSourceMap({});
+      setFoodBrandMap({});
+      return;
+    }
 
-  //   const sourceMap: { [foodId: string]: boolean } = {};
-  //   const brandMap: { [foodId: string]: string | null } = {};
-  //   foodMasterData.forEach(food => {
-  //     // Simple logic: if is_custom is true, mark as custom; otherwise database
-  //     sourceMap[food.id] = food.is_custom === true;
-  //     brandMap[food.id] = food.brand;
-  //   });
-  //   setFoodSourceMap(sourceMap);
-  //   setFoodBrandMap(brandMap);
-  // }, [foodMasterData]);
+    const sourceMap: { [foodId: string]: boolean } = {};
+    const brandMap: { [foodId: string]: string | null } = {};
+    foodMasterData.forEach(food => {
+      // Simple logic: if is_custom is true, mark as custom; otherwise database
+      sourceMap[food.id] = food.is_custom === true;
+      brandMap[food.id] = food.brand;
+    });
+    setFoodSourceMap(sourceMap);
+    setFoodBrandMap(brandMap);
+  }, [foodMasterData]);
 
   // Fetch functions removed - now using React Query hooks above
 
@@ -3594,7 +3598,7 @@ export default function LogFoodScreen() {
                                             onPress={() => handleFoodSelect(food)}
                                             activeOpacity={0.7}
                                           >
-                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                                               <ThemedText 
                                                 style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
                                                 numberOfLines={1}
@@ -3602,6 +3606,12 @@ export default function LogFoodScreen() {
                                               >
                                                 {truncatedName}
                                               </ThemedText>
+                                              <FoodSourceBadge
+                                                isCustom={isCustom}
+                                                colors={colors}
+                                                marginLeft={6}
+                                                containerStyle={{ marginRight: 0 }}
+                                              />
                                             </View>
                                             <ThemedText 
                                               style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
@@ -3610,11 +3620,6 @@ export default function LogFoodScreen() {
                                               {rightSideText}
                                             </ThemedText>
                                           </TouchableOpacity>
-                                          <FoodSourceBadge
-                                            isCustom={isCustom}
-                                            colors={colors}
-                                            marginLeft={6}
-                                          />
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                             onPress={() => handleQuickAdd(food)}
@@ -3683,7 +3688,7 @@ export default function LogFoodScreen() {
                                             onPress={() => handleFoodSelect(food)}
                                             activeOpacity={0.7}
                                           >
-                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                                               <ThemedText 
                                                 style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
                                                 numberOfLines={1}
@@ -3691,6 +3696,12 @@ export default function LogFoodScreen() {
                                               >
                                                 {truncatedName}
                                               </ThemedText>
+                                              <FoodSourceBadge
+                                                isCustom={isCustom}
+                                                colors={colors}
+                                                marginLeft={6}
+                                                containerStyle={{ marginRight: 0 }}
+                                              />
                                             </View>
                                             <ThemedText 
                                               style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
@@ -3699,11 +3710,6 @@ export default function LogFoodScreen() {
                                               {rightSideText}
                                             </ThemedText>
                                           </TouchableOpacity>
-                                          <FoodSourceBadge
-                                            isCustom={isCustom}
-                                            colors={colors}
-                                            marginLeft={6}
-                                          />
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                             onPress={() => handleQuickAdd(food, food.latestEntry || undefined)}
@@ -4459,7 +4465,7 @@ export default function LogFoodScreen() {
                                               onPress={() => handleFoodSelect(food)}
                                               activeOpacity={0.7}
                                             >
-                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                                                 <ThemedText 
                                                   style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
                                                   numberOfLines={1}
@@ -4467,6 +4473,12 @@ export default function LogFoodScreen() {
                                                 >
                                                   {truncatedName}
                                                 </ThemedText>
+                                                <FoodSourceBadge
+                                                  isCustom={isCustom}
+                                                  colors={colors}
+                                                  marginLeft={6}
+                                                  containerStyle={{ marginRight: 0 }}
+                                                />
                                               </View>
                                               <ThemedText 
                                                 style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
@@ -4475,11 +4487,6 @@ export default function LogFoodScreen() {
                                                 {rightSideText}
                                               </ThemedText>
                                             </TouchableOpacity>
-                                            <FoodSourceBadge
-                                              isCustom={isCustom}
-                                              colors={colors}
-                                              marginLeft={6}
-                                            />
                                             <TouchableOpacity
                                               style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                               onPress={() => handleQuickAdd(food)}
@@ -5301,7 +5308,7 @@ export default function LogFoodScreen() {
               <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
                 {` \u00B7 `}
               </ThemedText>
-              <ThemedText style={[styles.sectionTitle, { color: colors.tint }]}>
+              <ThemedText style={[styles.sectionTitle, { color: colors.tint, fontWeight: '400' }]}>
                 {`${mealCaloriesTotal} ${t('home.food_log.kcal')}`}
               </ThemedText>
             </View>
@@ -5368,6 +5375,30 @@ export default function LogFoodScreen() {
             </View>
           </View>
           <View style={[styles.foodLogDivider, { backgroundColor: colors.separator }]} />
+
+          {/* Meal Totals - Only shown when Details toggle is ON and there are entries or Quick Log */}
+          {showEntryDetails && mealTotals && (mealTotals.kcal > 0 || (entries?.length ?? 0) > 0) && (
+            <View style={styles.mealTotalsContainer}>
+              <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
+                {`Total · Pro `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.protein_g ?? 0}g</ThemedText>
+                {`  Carb `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.carbs_g ?? 0}g</ThemedText>
+                {`  Fat `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.fat_g ?? 0}g</ThemedText>
+                {`  Fib `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.fiber_g ?? 0}g</ThemedText>
+              </ThemedText>
+              <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
+                {`Sat Fat `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.saturated_fat_g ?? 0}g</ThemedText>
+                {`  Sugar `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sugar_g ?? 0}g</ThemedText>
+                {`  Sodium `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sodium_mg ?? 0}mg</ThemedText>
+              </ThemedText>
+            </View>
+          )}
 
           {/* Select All Row - Only shown in edit mode */}
           {entriesEditMode && entries.length > 0 && (
@@ -5498,7 +5529,7 @@ export default function LogFoodScreen() {
                   <View style={styles.entryHeader}>
                     <View style={styles.entryHeaderLeft}>
                       <View style={styles.entryNameRow}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                           <TouchableOpacity
                             onPress={() => handleEditEntry(entry)}
                             activeOpacity={0.7}
@@ -5526,11 +5557,38 @@ export default function LogFoodScreen() {
                               {entry.item_name}
                             </ThemedText>
                           </TouchableOpacity>
+                          {/* Source indicator badge - moved to left side */}
+                          {entry.food_id && (
+                            <FoodSourceBadge
+                              isCustom={foodSourceMap[entry.food_id] === true}
+                              colors={colors}
+                              marginLeft={6}
+                              containerStyle={{ marginRight: 0 }}
+                            />
+                          )}
+                          {!entry.food_id && (
+                            <View style={[
+                              styles.sourceBadge,
+                              {
+                                backgroundColor: colors.icon + '20',
+                                borderColor: colors.icon + '40',
+                                marginLeft: 6,
+                                marginRight: 0,
+                              }
+                            ]}>
+                              <ThemedText style={[
+                                styles.sourceBadgeText,
+                                { color: colors.icon }
+                              ]}>
+                                {isMobileScreen ? 'M' : 'Manual'}
+                              </ThemedText>
+                            </View>
+                          )}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
                           {entry.food_id && foodBrandMap[entry.food_id] && (
                             <ThemedText 
-                              style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11, marginLeft: 6 }]}
+                              style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11, marginLeft: 0 }]}
                               numberOfLines={1}
                             >
                               {foodBrandMap[entry.food_id]?.length > 14 
@@ -5539,10 +5597,7 @@ export default function LogFoodScreen() {
                             </ThemedText>
                           )}
                           <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>
-                            {entry.quantity} x {entry.unit} •{' '}
-                          </ThemedText>
-                          <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                            {entry.calories_kcal} kcal
+                            {entry.quantity} x {entry.unit}
                           </ThemedText>
                         </View>
                       </View>
@@ -5602,32 +5657,10 @@ export default function LogFoodScreen() {
                           </ThemedText>
                         </View>
                       )}
-                      {/* Source indicator badge */}
-                      {entry.food_id && (
-                        <FoodSourceBadge
-                          isCustom={foodSourceMap[entry.food_id] === true}
-                          colors={colors}
-                          marginLeft={0}
-                          containerStyle={{ marginRight: 4 }}
-                        />
-                      )}
-                      {!entry.food_id && (
-                        <View style={[
-                          styles.sourceBadge,
-                          {
-                            backgroundColor: colors.icon + '20',
-                            borderColor: colors.icon + '40',
-                            marginRight: 4,
-                          }
-                        ]}>
-                          <ThemedText style={[
-                            styles.sourceBadgeText,
-                            { color: colors.icon }
-                          ]}>
-                            {isMobileScreen ? 'M' : 'Manual'}
-                          </ThemedText>
-                        </View>
-                      )}
+                      {/* Kcal value */}
+                      <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
+                        {entry.calories_kcal} kcal
+                      </ThemedText>
                       {!hasEntrySelection && !editingEntryId && (
                         <TouchableOpacity
                           style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
@@ -6461,6 +6494,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  mealTotalsContainer: {
+    paddingHorizontal: 8,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  mealTotalsLine: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   editButton: {
     paddingHorizontal: 6,
     paddingVertical: 4,
@@ -6894,7 +6936,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sourceBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 2,
     paddingVertical: 2,
     borderRadius: 3,
     borderWidth: 1,
