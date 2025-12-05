@@ -54,6 +54,11 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { QuickLogEditor } from '@/components/quick-log-editor';
+import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
+import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
+import { showAppToast } from '@/components/ui/app-toast';
+import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
 import { TabButton } from '@/components/ui/tab-button';
 import { TabBar } from '@/components/ui/tab-bar';
 import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
@@ -230,6 +235,85 @@ export default function LogFoodScreen() {
   const entryDate = Array.isArray(entryDateParam)
     ? entryDateParam[0]
     : (entryDateParam as string) || getLocalDateString(); // Use local date, not UTC
+  
+  // Quick Log hooks and state
+  const selectedMealType = mealType;
+  const selectedDateString = entryDate;
+  const { dataByMealType } = useMealtypeMeta(selectedDateString);
+  const upsertMealtypeMetaMutation = useUpsertMealtypeMeta();
+  const [quickLogEditor, setQuickLogEditor] = useState<{ visible: boolean }>({ visible: false });
+  const [showDeleteQuickLogConfirm, setShowDeleteQuickLogConfirm] = useState(false);
+  
+  const currentMealMeta = dataByMealType?.[selectedMealType] || null;
+  
+  // Quick Log exists if any of the Quick fields is non-null
+  const hasQuickLog =
+    !!currentMealMeta &&
+    (
+      currentMealMeta.quick_kcal != null ||
+      currentMealMeta.quick_protein_g != null ||
+      currentMealMeta.quick_carbs_g != null ||
+      currentMealMeta.quick_fat_g != null ||
+      currentMealMeta.quick_fiber_g != null ||
+      currentMealMeta.quick_sugar_g != null ||
+      currentMealMeta.quick_sodium_mg != null
+    );
+  
+  const handleQuickLogSave = (data: {
+    quickKcal: number | null;
+    quickProteinG: number | null;
+    quickCarbsG: number | null;
+    quickFatG: number | null;
+    quickFiberG: number | null;
+    quickSugarG: number | null;
+    quickSodiumMg: number | null;
+  }) => {
+    upsertMealtypeMetaMutation.mutate(
+      {
+        entryDate: selectedDateString,
+        mealType: selectedMealType,
+        quickKcal: data.quickKcal,
+        quickProteinG: data.quickProteinG,
+        quickCarbsG: data.quickCarbsG,
+        quickFatG: data.quickFatG,
+        quickFiberG: data.quickFiberG,
+        quickSugarG: data.quickSugarG,
+        quickSodiumMg: data.quickSodiumMg,
+      },
+      {
+        onSuccess: () => {
+          setQuickLogEditor({ visible: false });
+        },
+      }
+    );
+  };
+  
+  const handleQuickLogDelete = () => {
+    upsertMealtypeMetaMutation.mutate(
+      {
+        entryDate: selectedDateString,
+        mealType: selectedMealType,
+        quickKcal: null,
+        quickProteinG: null,
+        quickCarbsG: null,
+        quickFatG: null,
+        quickFiberG: null,
+        quickSugarG: null,
+        quickSodiumMg: null,
+      },
+      {
+        onSuccess: () => {
+          setShowDeleteQuickLogConfirm(false);
+          setQuickLogEditor({ visible: false });
+          showAppToast(
+            t('food.quick_log.deleted_toast', {
+              defaultValue: 'Quick Log removed.',
+            })
+          );
+        },
+      }
+    );
+  };
   
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -546,13 +630,15 @@ export default function LogFoodScreen() {
           }
         }
       } catch (error) {
-        // Error loading preference - silently fail
+        // silently ignore
       } finally {
         setLoadingDetailsPreference(false);
       }
     };
     loadDetailsPreference();
-  }, [toggleAnimation]);
+  }, []);  // ← good: runs only once
+    
+  
 
   // Save preference when showEntryDetails changes
   useEffect(() => {
@@ -595,6 +681,19 @@ export default function LogFoodScreen() {
       (entry) => entry.meal_type === mealType
     );
   }, [allEntriesForDay, mealType]);
+  
+  // Calculate meal totals for nutrients (entries + Quick Log from mealtype_meta)
+  // This is the single source of truth for meal totals
+  const mealTotals = useMemo(
+    () => calculateMealNutritionTotals(entries ?? [], currentMealMeta ?? null),
+    [entries, currentMealMeta]
+  );
+
+  // Calculate total kcal for this meal (entries + Quick Log)
+  // Use mealTotals as the single source of truth
+  const mealCaloriesTotal = useMemo(() => {
+    return mealTotals?.kcal ?? 0;
+  }, [mealTotals]);
   
   // Only show loading spinner if we're truly loading and have no cached data
   const showLoadingSpinner = entriesLoading && entries.length === 0 && allEntriesForDay === undefined;
@@ -791,36 +890,36 @@ export default function LogFoodScreen() {
   };
 
   // Load user preference for macros and other nutrients expansion
-  useEffect(() => {
-    const loadPreference = async () => {
-      try {
-        if (Platform.OS === 'web') {
-          const macrosStored = localStorage.getItem('macrosExpanded');
-          if (macrosStored !== null) {
-            setMacrosExpanded(macrosStored === 'true');
-          }
-          const fattyAcidsStored = localStorage.getItem('fattyAcidsExpanded');
-          if (fattyAcidsStored !== null) {
-            setFattyAcidsExpanded(fattyAcidsStored === 'true');
-          }
-        } else {
-          const macrosStored = await SecureStore.getItemAsync('macrosExpanded');
-          if (macrosStored !== null) {
-            setMacrosExpanded(macrosStored === 'true');
-          }
-          const fattyAcidsStored = await SecureStore.getItemAsync('fattyAcidsExpanded');
-          if (fattyAcidsStored !== null) {
-            setFattyAcidsExpanded(fattyAcidsStored === 'true');
-          }
-        }
-    } catch (error) {
-      // Error loading preference - silently fail
-    } finally {
-        setLoadingPreference(false);
-      }
-    };
-    loadPreference();
-  }, []);
+  // useEffect(() => {
+  //   const loadPreference = async () => {
+  //     try {
+  //       if (Platform.OS === 'web') {
+  //         const macrosStored = localStorage.getItem('macrosExpanded');
+  //         if (macrosStored !== null) {
+  //           setMacrosExpanded(macrosStored === 'true');
+  //         }
+  //         const fattyAcidsStored = localStorage.getItem('fattyAcidsExpanded');
+  //         if (fattyAcidsStored !== null) {
+  //           setFattyAcidsExpanded(fattyAcidsStored === 'true');
+  //         }
+  //       } else {
+  //         const macrosStored = await SecureStore.getItemAsync('macrosExpanded');
+  //         if (macrosStored !== null) {
+  //           setMacrosExpanded(macrosStored === 'true');
+  //         }
+  //         const fattyAcidsStored = await SecureStore.getItemAsync('fattyAcidsExpanded');
+  //         if (fattyAcidsStored !== null) {
+  //           setFattyAcidsExpanded(fattyAcidsStored === 'true');
+  //         }
+  //       }
+  //   } catch (error) {
+  //     // Error loading preference - silently fail
+  //   } finally {
+  //       setLoadingPreference(false);
+  //     }
+  //   };
+  //   loadPreference();
+  // }, []);
 
   const toggleMacros = async () => {
     const newValue = !macrosExpanded;
@@ -3499,7 +3598,7 @@ export default function LogFoodScreen() {
                                             onPress={() => handleFoodSelect(food)}
                                             activeOpacity={0.7}
                                           >
-                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                                               <ThemedText 
                                                 style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
                                                 numberOfLines={1}
@@ -3507,6 +3606,12 @@ export default function LogFoodScreen() {
                                               >
                                                 {truncatedName}
                                               </ThemedText>
+                                              <FoodSourceBadge
+                                                isCustom={isCustom}
+                                                colors={colors}
+                                                marginLeft={6}
+                                                containerStyle={{ marginRight: 0 }}
+                                              />
                                             </View>
                                             <ThemedText 
                                               style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
@@ -3515,11 +3620,6 @@ export default function LogFoodScreen() {
                                               {rightSideText}
                                             </ThemedText>
                                           </TouchableOpacity>
-                                          <FoodSourceBadge
-                                            isCustom={isCustom}
-                                            colors={colors}
-                                            marginLeft={6}
-                                          />
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                             onPress={() => handleQuickAdd(food)}
@@ -3588,7 +3688,7 @@ export default function LogFoodScreen() {
                                             onPress={() => handleFoodSelect(food)}
                                             activeOpacity={0.7}
                                           >
-                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                                               <ThemedText 
                                                 style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
                                                 numberOfLines={1}
@@ -3596,6 +3696,12 @@ export default function LogFoodScreen() {
                                               >
                                                 {truncatedName}
                                               </ThemedText>
+                                              <FoodSourceBadge
+                                                isCustom={isCustom}
+                                                colors={colors}
+                                                marginLeft={6}
+                                                containerStyle={{ marginRight: 0 }}
+                                              />
                                             </View>
                                             <ThemedText 
                                               style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
@@ -3604,11 +3710,6 @@ export default function LogFoodScreen() {
                                               {rightSideText}
                                             </ThemedText>
                                           </TouchableOpacity>
-                                          <FoodSourceBadge
-                                            isCustom={isCustom}
-                                            colors={colors}
-                                            marginLeft={6}
-                                          />
                                           <TouchableOpacity
                                             style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                             onPress={() => handleQuickAdd(food, food.latestEntry || undefined)}
@@ -3793,8 +3894,6 @@ export default function LogFoodScreen() {
                                                     backgroundColor: colors.icon + '20', 
                                                     borderColor: colors.icon + '40', 
                                                     marginRight: 4, 
-                                                    paddingHorizontal: 8, 
-                                                    paddingVertical: 4,
                                                     opacity: sortedFoods.findIndex(f => f.id === food.id) === 0 ? 0.5 : 1,
                                                   }
                                                 ]}
@@ -3811,8 +3910,6 @@ export default function LogFoodScreen() {
                                                     backgroundColor: colors.icon + '20', 
                                                     borderColor: colors.icon + '40', 
                                                     marginRight: 6, 
-                                                    paddingHorizontal: 8, 
-                                                    paddingVertical: 4,
                                                     opacity: sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1 ? 0.5 : 1,
                                                   }
                                                 ]}
@@ -4086,7 +4183,7 @@ export default function LogFoodScreen() {
                                       </View>
                                       <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
                                         <TouchableOpacity
-                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4 }]}
                                           onPress={() => handleMoveBundleUp(bundle.id)}
                                           disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
                                           activeOpacity={0.7}
@@ -4094,7 +4191,7 @@ export default function LogFoodScreen() {
                                           <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
-                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6 }]}
                                           onPress={() => handleMoveBundleDown(bundle.id)}
                                           disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
                                           activeOpacity={0.7}
@@ -4368,7 +4465,7 @@ export default function LogFoodScreen() {
                                               onPress={() => handleFoodSelect(food)}
                                               activeOpacity={0.7}
                                             >
-                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                                                 <ThemedText 
                                                   style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
                                                   numberOfLines={1}
@@ -4376,6 +4473,12 @@ export default function LogFoodScreen() {
                                                 >
                                                   {truncatedName}
                                                 </ThemedText>
+                                                <FoodSourceBadge
+                                                  isCustom={isCustom}
+                                                  colors={colors}
+                                                  marginLeft={6}
+                                                  containerStyle={{ marginRight: 0 }}
+                                                />
                                               </View>
                                               <ThemedText 
                                                 style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
@@ -4384,11 +4487,6 @@ export default function LogFoodScreen() {
                                                 {rightSideText}
                                               </ThemedText>
                                             </TouchableOpacity>
-                                            <FoodSourceBadge
-                                              isCustom={isCustom}
-                                              colors={colors}
-                                              marginLeft={6}
-                                            />
                                             <TouchableOpacity
                                               style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
                                               onPress={() => handleQuickAdd(food)}
@@ -4591,7 +4689,7 @@ export default function LogFoodScreen() {
                                             </View>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
                                               <TouchableOpacity
-                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4 }]}
                                                 onPress={() => handleMoveBundleUp(bundle.id)}
                                                 disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
                                                 activeOpacity={0.7}
@@ -4599,7 +4697,7 @@ export default function LogFoodScreen() {
                                                 <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
                                               </TouchableOpacity>
                                               <TouchableOpacity
-                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6, paddingHorizontal: 8, paddingVertical: 4 }]}
+                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6 }]}
                                                 onPress={() => handleMoveBundleDown(bundle.id)}
                                                 disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
                                                 activeOpacity={0.7}
@@ -5203,9 +5301,17 @@ export default function LogFoodScreen() {
         <View style={[styles.foodLogContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.entriesSection}>
             <View style={styles.entriesHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
             <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
               {t('mealtype_log.food_log.title_with_count', { count: entries.length })}
             </ThemedText>
+              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                {` \u00B7 `}
+              </ThemedText>
+              <ThemedText style={[styles.sectionTitle, { color: colors.tint, fontWeight: '400' }]}>
+                {`${mealCaloriesTotal} ${t('home.food_log.kcal')}`}
+              </ThemedText>
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {!showLoadingSpinner && entries.length > 0 && (
                 <View style={styles.toggleContainer}>
@@ -5270,6 +5376,30 @@ export default function LogFoodScreen() {
           </View>
           <View style={[styles.foodLogDivider, { backgroundColor: colors.separator }]} />
 
+          {/* Meal Totals - Only shown when Details toggle is ON and there are entries or Quick Log */}
+          {showEntryDetails && mealTotals && (mealTotals.kcal > 0 || (entries?.length ?? 0) > 0) && (
+            <View style={styles.mealTotalsContainer}>
+              <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
+                {`Total · Pro `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.protein_g ?? 0}g</ThemedText>
+                {`  Carb `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.carbs_g ?? 0}g</ThemedText>
+                {`  Fat `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.fat_g ?? 0}g</ThemedText>
+                {`  Fib `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.fiber_g ?? 0}g</ThemedText>
+              </ThemedText>
+              <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
+                {`Sat Fat `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.saturated_fat_g ?? 0}g</ThemedText>
+                {`  Sugar `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sugar_g ?? 0}g</ThemedText>
+                {`  Sodium `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sodium_mg ?? 0}mg</ThemedText>
+              </ThemedText>
+            </View>
+          )}
+
           {/* Select All Row - Only shown in edit mode */}
           {entriesEditMode && entries.length > 0 && (
             <View style={[styles.selectAllRow, { backgroundColor: colors.background, borderBottomColor: colors.separator }]}>
@@ -5315,7 +5445,7 @@ export default function LogFoodScreen() {
                 {t('common.loading')}
               </ThemedText>
             </View>
-          ) : entries.length === 0 ? (
+          ) : entries.length === 0 && !hasQuickLog ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
               <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
                 {t('mealtype_log.food_log.no_entries')}
@@ -5348,7 +5478,67 @@ export default function LogFoodScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            entries.map((entry) => {
+            <>
+              {hasQuickLog && (
+                <HighlightableRow
+                  style={[
+                    styles.entryCard,
+                    {
+                      backgroundColor: 'transparent',
+                      borderColor: 'transparent',
+                      borderWidth: 0,
+                    }
+                  ]}
+                >
+                  <View style={styles.entryHeader}>
+                    <View style={styles.entryHeaderLeft}>
+                      <View style={styles.entryNameRow}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+              <TouchableOpacity
+                            onPress={() => setQuickLogEditor({ visible: true })}
+                activeOpacity={0.7}
+                            style={[
+                              styles.entryItemNameButton,
+                              { flexShrink: 1, minWidth: 0 },
+                              getMinTouchTargetStyle(),
+                              { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                            ]}
+                {...getButtonAccessibilityProps(
+                              t('food.quick_log.label', { defaultValue: 'Quick Log' }),
+                              'Double tap to edit Quick Log'
+                            )}
+                          >
+                            <ThemedText
+                              style={[styles.entryItemName, { color: colors.text, flexShrink: 1 }]}
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                            >
+                              ⚡ {t('food.quick_log.label', { defaultValue: 'Quick Log' })}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+                          <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
+                            {Math.round(currentMealMeta?.quick_kcal || 0)} kcal
+                          </ThemedText>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.entryHeaderRight}>
+                      {!hasEntrySelection && (
+                        <TouchableOpacity
+                          style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
+                          onPress={() => setShowDeleteQuickLogConfirm(true)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </HighlightableRow>
+              )}
+              {entries.map((entry) => {
               const isEditing = editingEntryId === entry.id;
               const entryContent = (
                 <HighlightableRow
@@ -5365,7 +5555,7 @@ export default function LogFoodScreen() {
                   <View style={styles.entryHeader}>
                     <View style={styles.entryHeaderLeft}>
                       <View style={styles.entryNameRow}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                           <TouchableOpacity
                             onPress={() => handleEditEntry(entry)}
                             activeOpacity={0.7}
@@ -5393,11 +5583,38 @@ export default function LogFoodScreen() {
                               {entry.item_name}
                             </ThemedText>
                           </TouchableOpacity>
+                          {/* Source indicator badge - moved to left side */}
+                          {entry.food_id && (
+                            <FoodSourceBadge
+                              isCustom={foodSourceMap[entry.food_id] === true}
+                              colors={colors}
+                              marginLeft={6}
+                              containerStyle={{ marginRight: 0 }}
+                            />
+                          )}
+                          {!entry.food_id && (
+                            <View style={[
+                              styles.sourceBadge,
+                              {
+                                backgroundColor: colors.icon + '20',
+                                borderColor: colors.icon + '40',
+                                marginLeft: 6,
+                                marginRight: 0,
+                              }
+                            ]}>
+                              <ThemedText style={[
+                                styles.sourceBadgeText,
+                                { color: colors.icon }
+                              ]}>
+                                {isMobileScreen ? 'M' : 'Manual'}
+                              </ThemedText>
+                            </View>
+                          )}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
                           {entry.food_id && foodBrandMap[entry.food_id] && (
                             <ThemedText 
-                              style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11, marginLeft: 6 }]}
+                              style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11, marginLeft: 0 }]}
                               numberOfLines={1}
                             >
                               {foodBrandMap[entry.food_id]?.length > 14 
@@ -5406,10 +5623,7 @@ export default function LogFoodScreen() {
                             </ThemedText>
                           )}
                           <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>
-                            {entry.quantity} x {entry.unit} •{' '}
-                          </ThemedText>
-                          <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                            {entry.calories_kcal} kcal
+                            {entry.quantity} x {entry.unit}
                           </ThemedText>
                         </View>
                       </View>
@@ -5469,32 +5683,10 @@ export default function LogFoodScreen() {
                           </ThemedText>
                         </View>
                       )}
-                      {/* Source indicator badge */}
-                      {entry.food_id && (
-                        <FoodSourceBadge
-                          isCustom={foodSourceMap[entry.food_id] === true}
-                          colors={colors}
-                          marginLeft={0}
-                          containerStyle={{ marginRight: 4 }}
-                        />
-                      )}
-                      {!entry.food_id && (
-                        <View style={[
-                          styles.sourceBadge,
-                          {
-                            backgroundColor: colors.icon + '20',
-                            borderColor: colors.icon + '40',
-                            marginRight: 4,
-                          }
-                        ]}>
-                          <ThemedText style={[
-                            styles.sourceBadgeText,
-                            { color: colors.icon }
-                          ]}>
-                            {isMobileScreen ? 'M' : 'Manual'}
-                          </ThemedText>
-                        </View>
-                      )}
+                      {/* Kcal value */}
+                      <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
+                        {entry.calories_kcal} kcal
+                      </ThemedText>
                       {!hasEntrySelection && !editingEntryId && (
                         <TouchableOpacity
                           style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
@@ -5523,7 +5715,8 @@ export default function LogFoodScreen() {
               }
               
               return <React.Fragment key={entry.id}>{entryContent}</React.Fragment>;
-            })
+            })}
+            </>
           )}
           </View>
         </View>
@@ -5772,6 +5965,43 @@ export default function LogFoodScreen() {
         onCancel={handleMassDeleteCancel}
         confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
+
+      {/* Delete Quick Log Confirmation Modal */}
+      <ConfirmModal
+        visible={showDeleteQuickLogConfirm}
+        title={t('food.quick_log.delete_title', { defaultValue: 'Delete Quick Log?' })}
+        message={t('food.quick_log.delete_message', { defaultValue: 'This will remove the Quick Log for this meal.' })}
+        confirmText={t('mealtype_log.delete_entry.confirm')}
+        cancelText={t('mealtype_log.delete_entry.cancel')}
+        onConfirm={handleQuickLogDelete}
+        onCancel={() => setShowDeleteQuickLogConfirm(false)}
+        confirmButtonStyle={{ backgroundColor: '#EF4444' }}
+      />
+
+      {/* Quick Log Editor */}
+      {(hasQuickLog || quickLogEditor.visible) && (
+        <QuickLogEditor
+          visible={quickLogEditor.visible}
+          onClose={() => setQuickLogEditor({ visible: false })}
+          onSave={handleQuickLogSave}
+          onDelete={handleQuickLogDelete}
+          initialData={
+            currentMealMeta
+              ? {
+                  quickKcal: currentMealMeta.quick_kcal ?? null,
+                  quickProteinG: currentMealMeta.quick_protein_g ?? null,
+                  quickCarbsG: currentMealMeta.quick_carbs_g ?? null,
+                  quickFatG: currentMealMeta.quick_fat_g ?? null,
+                  quickFiberG: currentMealMeta.quick_fiber_g ?? null,
+                  quickSugarG: currentMealMeta.quick_sugar_g ?? null,
+                  quickSodiumMg: currentMealMeta.quick_sodium_mg ?? null,
+                }
+              : null
+          }
+          mealTypeLabel={t(`home.meal_types.${selectedMealType}`)}
+          isLoading={upsertMealtypeMetaMutation.isPending}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -6215,7 +6445,7 @@ const styles = StyleSheet.create({
   },
   entryHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 0,
     paddingHorizontal: 0,
@@ -6229,7 +6459,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     flexDirection: 'row',
     gap: 6,
-    alignItems: 'flex-start',
+    alignItems: 'center',
     zIndex: 10,
   },
   entryNameRow: {
@@ -6291,14 +6521,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  mealTotalsContainer: {
+    paddingHorizontal: 8,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  mealTotalsLine: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   editButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderRadius: 8,
+    minWidth: 0,
+    minHeight: 0,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 44,
-    minHeight: 44,
     zIndex: 11,
     ...Platform.select({
       web: {
@@ -6317,13 +6558,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   deleteButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderRadius: 8,
+    minWidth: 0,
+    minHeight: 0,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 44,
-    minHeight: 44,
     zIndex: 11,
     ...Platform.select({
       web: {
@@ -6720,7 +6963,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sourceBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 2,
     paddingVertical: 2,
     borderRadius: 3,
     borderWidth: 1,

@@ -198,6 +198,7 @@ export type ThemeColors = typeof Colors.light;
  * Use these values instead of arbitrary numbers
  */
 export const Spacing = {
+  none: 0,
   xs: 4,
   sm: 8,
   md: 12,

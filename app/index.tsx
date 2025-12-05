@@ -22,6 +22,10 @@ export default function Index() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  
+  const userId = user?.id || session?.user?.id;
+  const cachedProfile = userId ? queryClient.getQueryData(['userProfile', userId]) : null;
+  
   // Global timeout for initial loading (12 seconds)
   useEffect(() => {
     // Reset timeout state and offline mode when loading completes
@@ -110,9 +114,12 @@ export default function Index() {
       const shouldProceed = !loading || cachedProfile;
       
       // Don't redirect while loading unless we have cached data
-      if (loading && !cachedProfile) {
+      if (loading && !cachedProfile) {        
         return;
+      } else {
+        
       }
+      
       
       // Mark as redirected immediately to prevent multiple redirects
       hasRedirected.current = true;
@@ -209,6 +216,19 @@ export default function Index() {
       );
     }
   }
+  
+  // Skip rendering once we're routed away from the index
+  
+  if (segments?.[0] && segments[0] !== 'index') {    
+    return null;
+  }
+  
+  // Failsafe: If stuck on index for too long with cachedProfile, force redirect
+  if (!hasRedirected.current && cachedProfile && loading) {    
+    hasRedirected.current = true;
+    router.replace('/(tabs)');
+  }
+  
 
   return (
     <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

@@ -10,12 +10,12 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Layout, Spacing, FontSize } from '@/constants/theme';
+import { Colors, Layout, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
-import { MEAL_TYPE_ORDER } from '@/utils/types';
+import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,12 @@ import { fetchBundles } from '@/lib/services/bundles';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { showAppToast } from '@/components/ui/app-toast';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
+import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
+import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
+import { QuickLogEditor } from '@/components/quick-log-editor';
+import { NoteEditor } from '@/components/note-editor';
+import { CopyMealtypeModal } from '@/components/copy-mealtype-modal';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -148,6 +154,18 @@ export default function FoodLogHomeScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [refreshing, setRefreshing] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  
+  // Menu state for meal type options
+  const [mealMenuVisible, setMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
+  
+  // Quick Log editor state
+  const [quickLogEditor, setQuickLogEditor] = useState<{ visible: boolean; mealType: string | null }>({ visible: false, mealType: null });
+  
+  // Note editor state
+  const [noteEditor, setNoteEditor] = useState<{ visible: boolean; mealType: string | null }>({ visible: false, mealType: null });
+  
+  // Copy mealtype modal state
+  const [copyMealtypeModal, setCopyMealtypeModal] = useState<{ visible: boolean; mealType: string | null }>({ visible: false, mealType: null });
 
   // SECURITY: Check if we're in password recovery mode and block access
   const { isPasswordRecovery } = useAuth();
@@ -174,6 +192,15 @@ export default function FoodLogHomeScreen() {
     isToday,
     today,
   } = useSelectedDate();
+
+  // Fetch mealtype meta
+  const { dataByMealType } = useMealtypeMeta(selectedDateString);
+  
+  // Mutation for upserting mealtype meta
+  const upsertMealtypeMetaMutation = useUpsertMealtypeMeta();
+  
+  // Mutation for copying mealtype entries
+  const copyMealtypeMutation = useCopyMealtypeEntries();
 
   // Calendar view month state (local to component for date picker modal)
   const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
@@ -450,14 +477,163 @@ export default function FoodLogHomeScreen() {
     );
   }
 
-  // Calculate daily totals using domain utility
-  const dailyTotals = calculateDailyTotals(entries);
+  // Calculate daily totals using domain utility (includes Quick Log values from mealtype_meta)
+  const dailyTotals = calculateDailyTotals(entries, dataByMealType);
 
-  // Group entries by meal type using domain utility
-  const groupedEntries = groupEntriesByMealType(entries);
+  // Group entries by meal type using domain utility (includes Quick Log values from mealtype_meta)
+  const groupedEntries = groupEntriesByMealType(entries, dataByMealType);
 
   // Use meal type order from shared types
   const sortedMealTypes = MEAL_TYPE_ORDER;
+
+  // Handlers for meal menu actions
+  const handleQuickLog = (mealType: string) => {
+    setMealMenuVisible({ mealType: null });
+    setQuickLogEditor({ visible: true, mealType });
+  };
+  
+  const handleQuickLogSave = (mealType: string, data: {
+    quickKcal: number | null;
+    quickProteinG: number | null;
+    quickCarbsG: number | null;
+    quickFatG: number | null;
+    quickFiberG: number | null;
+    quickSugarG: number | null;
+    quickSodiumMg: number | null;
+  }) => {
+    upsertMealtypeMetaMutation.mutate(
+      {
+        entryDate: selectedDateString,
+        mealType,
+        quickKcal: data.quickKcal,
+        quickProteinG: data.quickProteinG,
+        quickCarbsG: data.quickCarbsG,
+        quickFatG: data.quickFatG,
+        quickFiberG: data.quickFiberG,
+        quickSugarG: data.quickSugarG,
+        quickSodiumMg: data.quickSodiumMg,
+      },
+      {
+        onSuccess: () => {
+          setQuickLogEditor({ visible: false, mealType: null });
+        },
+        onError: (error) => {
+          console.error('Error saving quick log:', error);
+          Alert.alert(t('common.error', { defaultValue: 'Error' }), t('food.quick_log.save_error', { defaultValue: 'Failed to save quick log' }));
+        },
+      }
+    );
+  };
+  
+  const handleQuickLogDelete = (mealType: string) => {
+    upsertMealtypeMetaMutation.mutate(
+      {
+        entryDate: selectedDateString,
+        mealType,
+        quickKcal: null,
+        quickProteinG: null,
+        quickCarbsG: null,
+        quickFatG: null,
+        quickFiberG: null,
+        quickSugarG: null,
+        quickSodiumMg: null,
+      },
+      {
+        onSuccess: () => {
+          setQuickLogEditor({ visible: false, mealType: null });
+        },
+        onError: (error) => {
+          console.error('Error deleting quick log:', error);
+          Alert.alert(t('common.error', { defaultValue: 'Error' }), t('food.quick_log.delete_error', { defaultValue: 'Failed to delete quick log' }));
+        },
+      }
+    );
+  };
+
+  // Handlers for Notes
+  const handleNotes = (mealType: string) => {
+    setMealMenuVisible({ mealType: null });
+    setNoteEditor({ visible: true, mealType });
+  };
+
+  const handleNoteSave = (mealType: string, note: string | null) => {
+    upsertMealtypeMetaMutation.mutate(
+      {
+        entryDate: selectedDateString,
+        mealType,
+        note,
+      },
+      {
+        onSuccess: () => {
+          setNoteEditor({ visible: false, mealType: null });
+        },
+        onError: (error) => {
+          console.error('Error saving note:', error);
+          Alert.alert(t('common.error', { defaultValue: 'Error' }), t('food.note.save_error', { defaultValue: 'Failed to save note' }));
+        },
+      }
+    );
+  };
+
+  const handleCopyTo = (mealType: string) => {
+    setMealMenuVisible({ mealType: null });
+    setCopyMealtypeModal({ visible: true, mealType });
+  };
+
+  const handleCopyConfirm = (mealType: string, targetDate: Date, targetMealType: string, includeQuickLog: boolean) => {
+    const targetDateString = targetDate.toISOString().split('T')[0];
+    
+    // Helper to check if two dates are the same day
+    const isSameDay = (date1: string, date2: string): boolean => {
+      return date1 === date2;
+    };
+    
+    // Prevent copying to the same meal type on the same date
+    const sameDay = isSameDay(selectedDateString, targetDateString);
+    const sameMealType = mealType.toLowerCase() === targetMealType.toLowerCase();
+    
+    if (sameDay && sameMealType) {
+      showAppToast(
+        t('food.copy.same_meal_error', {
+          defaultValue: "You can't copy into the same meal. Pick another meal or date.",
+        })
+      );
+      return; // Don't proceed with the copy
+    }
+    
+    copyMealtypeMutation.mutate(
+      {
+        sourceDate: selectedDateString,
+        sourceMealType: mealType,
+        targetDate: targetDateString,
+        targetMealType,
+        includeQuickLog,
+      },
+      {
+        onSuccess: (result) => {
+          setCopyMealtypeModal({ visible: false, mealType: null });
+          const mealTypeLabel = t(`home.meal_types.${targetMealType}`);
+          const dateLabel = targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+          showAppToast(
+            t('food.copy.success_toast', {
+              defaultValue: '{{count}} item(s) copied to {{mealType}} on {{date}}',
+              count: result.entriesCloned,
+              mealType: mealTypeLabel,
+              date: dateLabel,
+            })
+          );
+        },
+        onError: (error: Error) => {
+          setCopyMealtypeModal({ visible: false, mealType: null });
+          if (error.message === 'SAME_DATE') {
+            showAppToast(t('food.copy.same_date_error', { defaultValue: 'Cannot copy to the same date and meal type' }));
+          } else {
+            showAppToast(t('food.copy.error_message', { defaultValue: 'Unable to copy entries. Please try again.' }));
+          }
+        },
+      }
+    );
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -713,6 +889,10 @@ export default function FoodLogHomeScreen() {
                   const group = groupedEntries[mealType];
                   // Use i18n for meal type labels
                   const mealTypeLabel = t(`home.meal_types.${mealType}`);
+                  // Check if mealtype_meta has meaningful data (quick log or note)
+                  // Only hide the "Copy from yesterday" button if there's actual data, not just an empty row
+                  const meta = dataByMealType[mealType];
+                  const hasMealtypeMeta = meta?.quick_kcal != null || (meta?.note && meta.note.trim().length > 0);
                   const isLast = index === sortedMealTypes.length - 1;
                   
                   return (
@@ -786,11 +966,29 @@ export default function FoodLogHomeScreen() {
                               </ThemedText>
                             </View>
                           )}
+                          {/* 3-dot menu button */}
+                          <TouchableOpacity
+                            style={[
+                              styles.mealMoreButton,
+                              getMinTouchTargetStyle(),
+                              Platform.OS === 'web' && getFocusStyle(colors.tint),
+                            ]}
+                            onPress={() => {
+                              setMealMenuVisible({ mealType });
+                            }}
+                            activeOpacity={0.7}
+                            {...getButtonAccessibilityProps(
+                              `More options for ${mealTypeLabel}`,
+                              `Open menu for ${mealTypeLabel}`
+                            )}
+                          >
+                            <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} />
+                          </TouchableOpacity>
                         </View>
                       </View>
 
-                      {/* Copy from yesterday button - only show when no entries */}
-                      {group.entries.length === 0 && (
+                      {/* Copy from yesterday button - only show when no entries AND no mealtype_meta */}
+                      {group.entries.length === 0 && !hasMealtypeMeta && (
                         <View style={styles.copyFromYesterdayContainer}>
                           <MealTypeCopyButton
                             mealType={mealType}
@@ -861,6 +1059,58 @@ export default function FoodLogHomeScreen() {
                           })()}
                         </View>
                       )}
+
+                      {/* Quick Log row */}
+                      {dataByMealType[mealType]?.quick_kcal && (
+                        <TouchableOpacity
+                          style={[
+                            styles.quickLogRow,
+                            getMinTouchTargetStyle(),
+                            Platform.OS === 'web' && getFocusStyle(colors.tint),
+                          ]}
+                          onPress={() => {
+                            setQuickLogEditor({ visible: true, mealType });
+                          }}
+                          activeOpacity={0.7}
+                          {...getButtonAccessibilityProps(
+                            t('food.quick_log.edit', { defaultValue: `Edit Quick Log for ${mealTypeLabel}`, mealType: mealTypeLabel })
+                          )}
+                        >
+                          <ThemedText style={[styles.quickLogRowText, { color: colors.textSecondary }]}>
+                            ⚡ Quick Log:{' '}
+                            <ThemedText style={[styles.quickLogRowText, { color: colors.textSecondary }]}>
+                              {Math.round(dataByMealType[mealType].quick_kcal || 0)} {t('home.food_log.kcal')}
+                            </ThemedText>
+                          </ThemedText>
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Notes row */}
+                      {dataByMealType[mealType]?.note && dataByMealType[mealType].note.trim().length > 0 && (
+                        <TouchableOpacity
+                          style={[
+                            styles.noteRow,
+                            getMinTouchTargetStyle(),
+                            Platform.OS === 'web' && getFocusStyle(colors.tint),
+                          ]}
+                          onPress={() => {
+                            setNoteEditor({ visible: true, mealType });
+                          }}
+                          activeOpacity={0.7}
+                          {...getButtonAccessibilityProps(
+                            t('food.note.edit', { defaultValue: `Edit notes for ${mealTypeLabel}`, mealType: mealTypeLabel })
+                          )}
+                        >
+                          <IconSymbol name="note.text" size={16} color={colors.textSecondary} style={{ marginRight: Spacing.xs }} />
+                          <ThemedText
+                            style={[styles.noteRowText, { color: colors.text }]}
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                          >
+                            📝 {dataByMealType[mealType].note}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      )}
                       </View>
                       {!isLast && (
                         <View style={[styles.mealTypeDivider, { backgroundColor: colors.separator }]} />
@@ -875,6 +1125,151 @@ export default function FoodLogHomeScreen() {
           </DesktopPageContainer>
         </View>
       </ScrollView>
+
+      {/* Meal Type Options Menu Modal */}
+      <Modal
+        visible={mealMenuVisible.mealType !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMealMenuVisible({ mealType: null })}
+      >
+        <TouchableOpacity
+          style={[styles.mealMenuOverlay, { backgroundColor: colors.overlay }]}
+          activeOpacity={1}
+          onPress={() => setMealMenuVisible({ mealType: null })}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.mealMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {mealMenuVisible.mealType && (() => {
+                // Calculate if there's anything to copy for this meal type
+                const currentMealType = mealMenuVisible.mealType;
+                const mealTypeEntries = groupedEntries[currentMealType as keyof typeof groupedEntries]?.entries ?? [];
+                const mealMeta = dataByMealType[currentMealType];
+                const hasAnythingToCopy = 
+                  mealTypeEntries.length > 0 ||
+                  mealMeta?.quick_kcal != null ||
+                  (mealMeta?.note?.trim()?.length ?? 0) > 0;
+
+                return (
+                  <>
+                    <TouchableOpacity
+                      style={styles.mealMenuItem}
+                      onPress={() => handleQuickLog(mealMenuVisible.mealType!)}
+                      activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(
+                        `Quick Log for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`,
+                        `Add quick log for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`
+                      )}
+                    >
+                      <ThemedText style={[styles.mealMenuItemText, { color: colors.text }]}>
+                        ⚡️ {t('food.menu.quick_log', { defaultValue: 'Quick Log' })}
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.mealMenuItem}
+                      onPress={() => {
+                        if (hasAnythingToCopy) {
+                          handleCopyTo(mealMenuVisible.mealType!);
+                        }
+                      }}
+                      activeOpacity={hasAnythingToCopy ? 0.7 : 1}
+                      disabled={!hasAnythingToCopy}
+                      {...getButtonAccessibilityProps(
+                        `Copy ${t(`home.meal_types.${mealMenuVisible.mealType}`)} to another date`,
+                        `Copy ${t(`home.meal_types.${mealMenuVisible.mealType}`)} to another date`
+                      )}
+                    >
+                      <View style={styles.mealMenuItemWithIcon}>
+                        <IconSymbol 
+                          name="doc.on.doc" 
+                          size={16} 
+                          color={hasAnythingToCopy ? colors.text : colors.textSecondary} 
+                        />
+                        <ThemedText 
+                          style={[
+                            styles.mealMenuItemText, 
+                            { 
+                              color: hasAnythingToCopy ? colors.text : colors.textSecondary,
+                              marginLeft: Spacing.sm,
+                              opacity: hasAnythingToCopy ? 1 : 0.5,
+                            }
+                          ]}
+                        >
+                          {t('food.menu.copy_to', { defaultValue: 'Copy To' })}
+                        </ThemedText>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.mealMenuItem}
+                      onPress={() => handleNotes(mealMenuVisible.mealType!)}
+                      activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(
+                        `Notes for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`,
+                        `Add or edit notes for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`
+                      )}
+                    >
+                      <ThemedText style={[styles.mealMenuItemText, { color: colors.text }]}>
+                        📝 {t('food.menu.notes', { defaultValue: 'Notes' })}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </>
+                );
+              })()}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Quick Log Editor */}
+      {quickLogEditor.mealType && (
+        <QuickLogEditor
+          visible={quickLogEditor.visible}
+          onClose={() => setQuickLogEditor({ visible: false, mealType: null })}
+          onSave={(data) => handleQuickLogSave(quickLogEditor.mealType!, data)}
+          onDelete={() => handleQuickLogDelete(quickLogEditor.mealType!)}
+          initialData={dataByMealType[quickLogEditor.mealType] ? {
+            quickKcal: dataByMealType[quickLogEditor.mealType]?.quick_kcal ?? null,
+            quickProteinG: dataByMealType[quickLogEditor.mealType]?.quick_protein_g ?? null,
+            quickCarbsG: dataByMealType[quickLogEditor.mealType]?.quick_carbs_g ?? null,
+            quickFatG: dataByMealType[quickLogEditor.mealType]?.quick_fat_g ?? null,
+            quickFiberG: dataByMealType[quickLogEditor.mealType]?.quick_fiber_g ?? null,
+            quickSugarG: dataByMealType[quickLogEditor.mealType]?.quick_sugar_g ?? null,
+            quickSodiumMg: dataByMealType[quickLogEditor.mealType]?.quick_sodium_mg ?? null,
+          } : null}
+          mealTypeLabel={t(`home.meal_types.${quickLogEditor.mealType}`)}
+          isLoading={upsertMealtypeMetaMutation.isPending}
+        />
+      )}
+
+      {/* Note Editor */}
+      {noteEditor.mealType && (
+        <NoteEditor
+          visible={noteEditor.visible}
+          onClose={() => setNoteEditor({ visible: false, mealType: null })}
+          onSave={(note) => handleNoteSave(noteEditor.mealType!, note)}
+          initialNote={dataByMealType[noteEditor.mealType]?.note ?? null}
+          mealTypeLabel={t(`home.meal_types.${noteEditor.mealType}`)}
+          isLoading={upsertMealtypeMetaMutation.isPending}
+        />
+      )}
+
+      {/* Copy Mealtype Modal */}
+      {copyMealtypeModal.mealType && (
+        <CopyMealtypeModal
+          visible={copyMealtypeModal.visible}
+          onClose={() => setCopyMealtypeModal({ visible: false, mealType: null })}
+          onConfirm={(targetDate, targetMealType, includeQuickLog) => handleCopyConfirm(copyMealtypeModal.mealType!, targetDate, targetMealType, includeQuickLog)}
+          sourceDate={selectedDate}
+          sourceMealType={copyMealtypeModal.mealType}
+          isLoading={copyMealtypeMutation.isPending}
+          title={t('food.copy.title', { defaultValue: 'Copy To' })}
+          subtitle={t('food.copy.subtitle', { defaultValue: 'Choose a date and meal type to copy to.' })}
+          confirmButtonText={t('food.copy.confirm', { defaultValue: 'Copy' })}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -1305,15 +1700,15 @@ const styles = StyleSheet.create({
   mealTypeDivider: {
     height: 2,
     width: '100%',
-    marginTop: Platform.select({ web: 8, default: 10 }),
-    marginBottom: Platform.select({ web: 8, default: 10 }),
+    marginTop: Platform.select({ web: 0, default: 0 }),
+    marginBottom: Platform.select({ web: 0, default: 0 }),
     opacity: 0.6,
   },
   mealGroupHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingVertical: Platform.select({ web: 6, default: 8 }),
+    paddingVertical: Platform.select({ web: 0, default: 0 }),
     paddingHorizontal: 0,
     flexWrap: 'wrap',
     gap: Platform.select({ web: 4, default: 4 }),
@@ -1321,7 +1716,7 @@ const styles = StyleSheet.create({
   mealGroupDivider: {
     height: 1,
     width: '100%',
-    marginBottom: Platform.select({ web: 8, default: 12 }),
+    marginBottom: Platform.select({ web: 0, default: 0 }),
   },
   mealGroupHeaderLeft: {
     flexDirection: 'row',
@@ -1387,7 +1782,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     lineHeight: Platform.select({ web: 12, default: 13 }),
-    marginBottom: Platform.select({ web: -1, default: -2 }),
+    marginBottom: Platform.select({ web: 0, default: 0 }),
     paddingBottom: 0,
     ...Platform.select({
       android: {
@@ -1823,5 +2218,72 @@ const styles = StyleSheet.create({
   webRefreshText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  mealMoreButton: {
+    padding: Spacing.xs,
+    marginLeft: Spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mealMenuOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mealMenuContent: {
+    minWidth: 200,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingVertical: Spacing.xs,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      },
+      default: {
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
+      },
+    }),
+  },
+  mealMenuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  mealMenuItemWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mealMenuItemText: {
+    fontSize: FontSize.base,
+    fontWeight: '500',
+  },
+  quickLogRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingVertical: Platform.select({ web: 6, default: 8 }),
+    paddingHorizontal: 0,
+  },
+  quickLogRowText: {
+    fontSize: Platform.select({ web: 12, default: 13 }),
+    fontWeight: '500',
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: Platform.select({ web: 0, default: 0 }),
+    paddingHorizontal: 0,
+    marginTop: Spacing.none,
+  },
+  noteRowText: {
+    flex: 1,
+    fontSize: Platform.select({ web: 12, default: 13 }),
+    fontWeight: '400',
   },
 });
