@@ -13,6 +13,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloneDayEntries } from '@/lib/services/cloneDayEntries';
+import { getMealtypeMetaByDate, upsertMealtypeMeta } from '@/lib/services/calories-entries-mealtype-meta';
 
 export interface CloneMealTypeFromPreviousDayOptions {
   /**
@@ -85,11 +86,46 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       }
 
       // Use the shared cloneDayEntries service with meal type filter
-      return cloneDayEntries('food_log', userId, sourceDate, targetDate, undefined, mealType);
+      const clonedCount = await cloneDayEntries('food_log', userId, sourceDate, targetDate, undefined, mealType);
+
+      // After successfully cloning entries, also clone mealtype_meta if it exists
+      // Only copy quick log values; do NOT copy notes (set note = null)
+      const sourceMetaArray = await getMealtypeMetaByDate(userId, sourceDate);
+      const sourceMeta = sourceMetaArray.find(meta => 
+        meta.meal_type.toLowerCase() === mealType.toLowerCase()
+      );
+
+      if (sourceMeta) {
+        // Only copy quick log values if they exist; always set note = null (do not copy notes)
+        const hasQuickLog = sourceMeta.quick_kcal != null;
+        
+        if (hasQuickLog) {
+          // Upsert meta for target date/meal type with quick log values only
+          await upsertMealtypeMeta({
+            userId,
+            entryDate: targetDate,
+            mealType,
+            quickKcal: sourceMeta.quick_kcal,
+            quickProteinG: sourceMeta.quick_protein_g,
+            quickCarbsG: sourceMeta.quick_carbs_g,
+            quickFatG: sourceMeta.quick_fat_g,
+            quickFiberG: sourceMeta.quick_fiber_g,
+            quickSugarG: sourceMeta.quick_sugar_g,
+            quickSodiumMg: sourceMeta.quick_sodium_mg,
+            note: null, // Always set note to null - do not copy notes
+          });
+        }
+      }
+
+      return clonedCount;
     },
     onSuccess: (clonedCount) => {
       // Invalidate food log queries (matches useDailyEntries query key pattern)
       queryClient.invalidateQueries({ queryKey: ['entries', userId] });
+      // Also invalidate mealtype meta queries for both source and target dates
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ['mealtypeMeta', userId] });
+      }
 
       // Call user-provided success callback
       onSuccess?.(clonedCount);

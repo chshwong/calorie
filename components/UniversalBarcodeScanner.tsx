@@ -427,16 +427,10 @@ function BarcodeScannerModal({
   }, [manualBarcode, handleDecodedBarcode]);
 
   // ============================================================================
-  // Camera lifecycle - start when camera tab is active (mobile web only)
+  // Camera lifecycle - start when camera tab is active
   // ============================================================================
   useEffect(() => {
     if (Platform.OS !== "web") return;
-    
-    // Only start camera on mobile web
-    if (!isMobileWeb) {
-      stopCamera();
-      return;
-    }
     
     if (activeTab !== "camera") {
       stopCamera();
@@ -554,7 +548,7 @@ function BarcodeScannerModal({
       clearTimeout(timeoutId);
       stopCamera();
     };
-  }, [activeTab, isCameraActive, isMobileWeb, onScanSuccess, onScanFailure, stopCamera]);
+  }, [activeTab, isCameraActive, onScanSuccess, onScanFailure, stopCamera]);
 
   // ============================================================================
   // Upload Photo handler

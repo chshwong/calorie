@@ -21,10 +21,11 @@ import { MEAL_TYPE_ORDER } from './types';
  * Calculate daily nutrition totals from an array of calorie entries
  * 
  * @param entries - Array of calorie entries for the day
+ * @param metaByMealType - Optional lookup map of mealtype_meta by meal type
  * @returns DailyTotals with all nutrient sums rounded to whole numbers
  */
-export function calculateDailyTotals(entries: CalorieEntry[]): DailyTotals {
-  return {
+export function calculateDailyTotals(entries: CalorieEntry[], metaByMealType?: { [mealType: string]: any }): DailyTotals {
+  const totals = {
     calories: Math.round(
       entries.reduce((sum, entry) => sum + entry.calories_kcal, 0)
     ),
@@ -53,6 +54,32 @@ export function calculateDailyTotals(entries: CalorieEntry[]): DailyTotals {
       entries.reduce((sum, entry) => sum + (entry.sodium_mg || 0), 0)
     ),
   };
+
+  // Add Quick Log values from mealtype_meta
+  if (metaByMealType) {
+    Object.values(metaByMealType).forEach((meta: any) => {
+      totals.calories += meta.quick_kcal ?? 0;
+      totals.protein += meta.quick_protein_g ?? 0;
+      totals.carbs += meta.quick_carbs_g ?? 0;
+      totals.fat += meta.quick_fat_g ?? 0;
+      totals.fiber += meta.quick_fiber_g ?? 0;
+      totals.sugar += meta.quick_sugar_g ?? 0;
+      totals.sodium += meta.quick_sodium_mg ?? 0;
+    });
+  }
+
+  // Round totals after adding Quick Log values
+  return {
+    calories: Math.round(totals.calories),
+    protein: Math.round(totals.protein),
+    carbs: Math.round(totals.carbs),
+    fat: Math.round(totals.fat),
+    fiber: Math.round(totals.fiber),
+    saturatedFat: totals.saturatedFat,
+    transFat: totals.transFat,
+    sugar: totals.sugar,
+    sodium: Math.round(totals.sodium),
+  };
 }
 
 /**
@@ -66,6 +93,7 @@ function createEmptyMealGroup(): MealGroup {
     totalCarbs: 0,
     totalFat: 0,
     totalFiber: 0,
+    totalSugar: 0,
   };
 }
 
@@ -101,9 +129,10 @@ export function normalizeMealType(mealType: string | null | undefined): MealType
  * Group calorie entries by meal type and calculate totals for each group
  * 
  * @param entries - Array of calorie entries
+ * @param metaByMealType - Optional lookup map of mealtype_meta by meal type
  * @returns GroupedEntries with entries organized by meal type
  */
-export function groupEntriesByMealType(entries: CalorieEntry[]): GroupedEntries {
+export function groupEntriesByMealType(entries: CalorieEntry[], metaByMealType?: { [mealType: string]: any }): GroupedEntries {
   const grouped = createEmptyGroupedEntries();
 
   for (const entry of entries) {
@@ -116,6 +145,24 @@ export function groupEntriesByMealType(entries: CalorieEntry[]): GroupedEntries 
     group.totalCarbs += entry.carbs_g || 0;
     group.totalFat += entry.fat_g || 0;
     group.totalFiber += entry.fiber_g || 0;
+    group.totalSugar += entry.sugar_g || 0;
+  }
+
+  // Add Quick Log values from mealtype_meta
+  if (metaByMealType) {
+    Object.entries(metaByMealType).forEach(([mealType, meta]: [string, any]) => {
+      if (!meta) return;
+
+      const normalizedMealType = normalizeMealType(mealType);
+      const group = grouped[normalizedMealType];
+      
+      group.totalCalories += meta.quick_kcal ?? 0;
+      group.totalProtein += meta.quick_protein_g ?? 0;
+      group.totalCarbs += meta.quick_carbs_g ?? 0;
+      group.totalFat += meta.quick_fat_g ?? 0;
+      group.totalFiber += meta.quick_fiber_g ?? 0;
+      group.totalSugar += meta.quick_sugar_g ?? 0;
+    });
   }
 
   return grouped;

@@ -82,6 +82,7 @@ export interface MealGroup {
   totalCarbs: number;
   totalFat: number;
   totalFiber: number;
+  totalSugar: number;
 }
 
 /**
