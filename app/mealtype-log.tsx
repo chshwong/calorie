@@ -752,12 +752,18 @@ export default function LogFoodScreen() {
   const manualEntryDataParam = params.manualEntryData; // JSON string for manual entry prefilling
   const openManualModeParam = params.openManualMode; // Flag to open manual mode
   const openBarcodeScannerParam = params.openBarcodeScanner; // Flag to open barcode scanner
+  const openFoodSearchParam = params.openFoodSearch; // Flag to open food search expanded
   const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual')
     ? activeTabParam
     : 'frequent';
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [previousTabKey, setPreviousTabKey] = useState<TabKey>(initialTab);
-  const [tabContentCollapsed, setTabContentCollapsed] = useState(false);
+  // Default to collapsed state (shows tabs + "Tap to expand", hides full results list)
+  // Only expand if explicitly requested via openFoodSearch param
+  const shouldStartExpanded = Array.isArray(openFoodSearchParam) 
+    ? openFoodSearchParam[0] === 'true' 
+    : openFoodSearchParam === 'true';
+  const [tabContentCollapsed, setTabContentCollapsed] = useState(!shouldStartExpanded);
   
   // Helper function to handle tab press - toggles content collapse if already active
   const handleTabPress = (tab: TabKey, additionalActions?: () => void) => {
@@ -864,9 +870,30 @@ export default function LogFoodScreen() {
   const [showServingDropdown, setShowServingDropdown] = useState(false);
   
   // Map to store food source types (custom vs database) for entries
-  const [foodSourceMap, setFoodSourceMap] = useState<{ [foodId: string]: boolean }>({});
-  const [foodBrandMap, setFoodBrandMap] = useState<{ [foodId: string]: string | null }>({});
+ 
+  //Commented out to fix infinite loop on empty mealtype_log screen
+  // replaced the below with "foodSourceMap = useMemo"
+  // const [foodSourceMap, setFoodSourceMap] = useState<{ [foodId: string]: boolean }>({});
+  // const [foodBrandMap, setFoodBrandMap] = useState<{ [foodId: string]: string | null }>({});
+  const foodSourceMap = useMemo<{ [foodId: string]: boolean }>(() => {
+    if (!foodMasterData || foodMasterData.length === 0) return {};
+    const map: { [foodId: string]: boolean } = {};
+    foodMasterData.forEach((food) => {
+      // Simple logic: if is_custom is true, mark as custom; otherwise database
+      map[food.id] = food.is_custom === true;
+    });
+    return map;
+  }, [foodMasterData]);
   
+  const foodBrandMap = useMemo<{ [foodId: string]: string | null }>(() => {
+    if (!foodMasterData || foodMasterData.length === 0) return {};
+    const map: { [foodId: string]: string | null } = {};
+    foodMasterData.forEach((food) => {
+      map[food.id] = food.brand ?? null;
+    });
+    return map;
+  }, [foodMasterData]);
+
   // Ref for quantity input to auto-focus
   const quantityInputRef = useRef<TextInput>(null);
   
@@ -951,23 +978,24 @@ export default function LogFoodScreen() {
 
   // Build food source and brand maps from food master data
   // This runs whenever foodMasterData changes
-  useEffect(() => {
-    if (!foodMasterData || foodMasterData.length === 0) {
-      setFoodSourceMap({});
-      setFoodBrandMap({});
-      return;
-    }
+  // commented out to fix infinite loop on empty mealtype_log screen
+  // useEffect(() => {
+  //   if (!foodMasterData || foodMasterData.length === 0) {
+  //     setFoodSourceMap({});
+  //     setFoodBrandMap({});
+  //     return;
+  //   }
 
-    const sourceMap: { [foodId: string]: boolean } = {};
-    const brandMap: { [foodId: string]: string | null } = {};
-    foodMasterData.forEach(food => {
-      // Simple logic: if is_custom is true, mark as custom; otherwise database
-      sourceMap[food.id] = food.is_custom === true;
-      brandMap[food.id] = food.brand;
-    });
-    setFoodSourceMap(sourceMap);
-    setFoodBrandMap(brandMap);
-  }, [foodMasterData]);
+  //   const sourceMap: { [foodId: string]: boolean } = {};
+  //   const brandMap: { [foodId: string]: string | null } = {};
+  //   foodMasterData.forEach(food => {
+  //     // Simple logic: if is_custom is true, mark as custom; otherwise database
+  //     sourceMap[food.id] = food.is_custom === true;
+  //     brandMap[food.id] = food.brand;
+  //   });
+  //   setFoodSourceMap(sourceMap);
+  //   setFoodBrandMap(brandMap);
+  // }, [foodMasterData]);
 
   // Fetch functions removed - now using React Query hooks above
 
@@ -1560,36 +1588,80 @@ export default function LogFoodScreen() {
           const options = buildServingOptions(foodData, dbServings);
           setAvailableServings(options);
           
-          // Select the serving that matches entry.serving_id, or use default
+          // When editing, ALWAYS preserve the exact serving that was saved, never fall back to default
+          // Select the serving that matches entry.serving_id, or match by unit
+          let servingMatched = false;
+          
           if (entry.serving_id) {
-            // Find the saved option that matches entry.serving_id
+            // Try to find the saved serving by serving_id
             const matchingOption = options.find(
               o => o.kind === 'saved' && o.serving.id === entry.serving_id
             );
             if (matchingOption) {
               setSelectedServing(matchingOption);
               calculateNutrientsFromOption(foodData, matchingOption, entry.quantity);
+              servingMatched = true;
             } else {
-              // If serving not found, use default
-              const { defaultOption } = getDefaultServingSelection(foodData, dbServings);
-              setSelectedServing(defaultOption);
-              calculateNutrientsFromOption(foodData, defaultOption, entry.quantity);
+              // Serving not found in options - try to fetch it directly from DB
+              // This handles cases where the serving exists but wasn't in the options list
+              const { data: servingData, error: servingFetchError } = await supabase
+                .from('food_servings')
+                .select('*')
+                .eq('id', entry.serving_id)
+                .single();
+              
+              if (!servingFetchError && servingData) {
+                // Found the serving in DB, try to create a matching option
+                const dbServingsWithFound: FoodServing[] = [...dbServings];
+                if (!dbServings.find(s => s.id === entry.serving_id)) {
+                  dbServingsWithFound.push(servingData);
+                }
+                const updatedOptions = buildServingOptions(foodData, dbServingsWithFound);
+                setAvailableServings(updatedOptions);
+                const foundOption = updatedOptions.find(
+                  o => o.kind === 'saved' && o.serving.id === entry.serving_id
+                );
+                if (foundOption) {
+                  setSelectedServing(foundOption);
+                  calculateNutrientsFromOption(foodData, foundOption, entry.quantity);
+                  servingMatched = true;
+                }
+              }
             }
-          } else {
-            // No serving_id - check if unit matches a raw unit option
-            const entryUnit = entry.unit?.toLowerCase();
-            const rawMatch = options.find(
-              o => o.kind === 'raw' && o.unit.toLowerCase() === entryUnit
+          }
+          
+          // If serving_id didn't match, or if entry has no serving_id, try to match by unit
+          if (!servingMatched && entry.unit) {
+            const entryUnit = entry.unit.trim().toLowerCase();
+            
+            // First try to match a saved serving by serving_name
+            const savedByNameMatch = options.find(
+              o => o.kind === 'saved' && o.label.toLowerCase() === entryUnit
             );
-            if (rawMatch) {
-              setSelectedServing(rawMatch);
-              calculateNutrientsFromOption(foodData, rawMatch, entry.quantity);
+            if (savedByNameMatch) {
+              setSelectedServing(savedByNameMatch);
+              calculateNutrientsFromOption(foodData, savedByNameMatch, entry.quantity);
+              servingMatched = true;
             } else {
-              // Fall back to default
-              const { defaultOption } = getDefaultServingSelection(foodData, dbServings);
-              setSelectedServing(defaultOption);
-              calculateNutrientsFromOption(foodData, defaultOption, entry.quantity);
+              // Try to match a raw unit option
+              const rawMatch = options.find(
+                o => o.kind === 'raw' && o.unit.toLowerCase() === entryUnit
+              );
+              if (rawMatch) {
+                setSelectedServing(rawMatch);
+                calculateNutrientsFromOption(foodData, rawMatch, entry.quantity);
+                servingMatched = true;
+              }
             }
+          }
+          
+          // If still no match, preserve the unit from entry but don't change to default
+          // The nutrients are already set from the saved entry, so we keep those
+          if (!servingMatched) {
+            // Don't set a serving option - keep selectedServing as null
+            // The unit is already set from entry.unit above, and nutrients are already loaded
+            // This preserves the exact state that was saved
+            setSelectedServing(null);
           }
         }
       } catch (error) {

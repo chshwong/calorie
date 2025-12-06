@@ -66,11 +66,12 @@ export function DateHeader({
   // Use provided date state or create own instance
   const hookDateState = useSelectedDate();
   const selectedDate = propSelectedDate ?? hookDateState.selectedDate;
-  const setSelectedDate = propSetSelectedDate ?? hookDateState.setSelectedDate;
+  // Only use prop functions - useSelectedDate doesn't return navigation functions
+  const setSelectedDate = propSetSelectedDate;
   const isToday = propIsToday ?? hookDateState.isToday;
-  const getDisplayDate = propGetDisplayDate ?? hookDateState.getDisplayDate;
-  const goBackOneDay = propGoBackOneDay ?? hookDateState.goBackOneDay;
-  const goForwardOneDay = propGoForwardOneDay ?? hookDateState.goForwardOneDay;
+  const getDisplayDate = propGetDisplayDate;
+  const goBackOneDay = propGoBackOneDay;
+  const goForwardOneDay = propGoForwardOneDay;
   const today = propToday ?? hookDateState.today;
   
   // Calendar view month state (local to DateHeader for modal)
@@ -145,7 +146,9 @@ export function DateHeader({
   };
   
   const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
+    if (setSelectedDate) {
+      setSelectedDate(date);
+    }
     setShowDatePicker(false);
   };
   
@@ -173,8 +176,9 @@ export function DateHeader({
       {/* Date Navigation Section */}
       <View style={styles.dateNavigation} accessibilityRole="toolbar">
         <TouchableOpacity
-          onPress={goBackOneDay}
+          onPress={goBackOneDay || undefined}
           activeOpacity={0.6}
+          disabled={!goBackOneDay}
           style={[
             styles.dateNavButtonSimple,
             getMinTouchTargetStyle(),
@@ -232,8 +236,9 @@ export function DateHeader({
         </TouchableOpacity>
         {!isToday && (
           <TouchableOpacity
-            onPress={goForwardOneDay}
+            onPress={goForwardOneDay || undefined}
             activeOpacity={0.6}
+            disabled={!goForwardOneDay}
             style={[
               styles.dateNavButtonSimple,
               getMinTouchTargetStyle(),
@@ -462,7 +467,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.xxs,
     paddingHorizontal: 0,
   },
   headerContent: {
@@ -496,7 +501,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.xxs,
     gap: Platform.select({ web: 8, default: 4 }),
     paddingHorizontal: 0,
     ...Platform.select({
@@ -510,8 +515,8 @@ const styles = StyleSheet.create({
     // Touch target handled by getMinTouchTargetStyle
   },
   dateNavIconContainer: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
@@ -533,15 +538,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   calendarButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dateNavButtonPlaceholder: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
   },
   // Date Picker Modal Styles
   datePickerModalOverlay: {

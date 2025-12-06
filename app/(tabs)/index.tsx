@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Layout, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -176,7 +176,8 @@ export default function FoodLogHomeScreen() {
       // User is in password recovery mode - redirect to reset-password page
       router.replace('/reset-password');
     }
-  }, [router, isPasswordRecovery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]); // Only depend on router, call isPasswordRecovery inside effect
   
   // Pull-to-refresh state for web
   const [pullToRefreshDistance, setPullToRefreshDistance] = useState(0);
@@ -664,7 +665,7 @@ export default function FoodLogHomeScreen() {
           {/* Desktop Container for Header and Content */}
           <DesktopPageContainer>
             {/* Standardized Header Container */}
-            <MainScreenHeaderContainer>
+            <ScreenHeaderContainer>
               {/* Date Header with Greeting and Navigation */}
               <DateHeader
                 showGreeting={true}
@@ -710,7 +711,7 @@ export default function FoodLogHomeScreen() {
                 setCalendarViewMonth={setCalendarViewMonth}
                 today={today}
               />
-            </MainScreenHeaderContainer>
+            </ScreenHeaderContainer>
 
             {/* Daily Totals Summary */}
             <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>

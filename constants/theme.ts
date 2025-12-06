@@ -199,6 +199,7 @@ export type ThemeColors = typeof Colors.light;
  */
 export const Spacing = {
   none: 0,
+  xxs:2,
   xs: 4,
   sm: 8,
   md: 12,

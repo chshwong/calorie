@@ -12,7 +12,7 @@ import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -944,7 +944,7 @@ export default function MedsHomeScreen() {
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
           {/* Standardized Header Container */}
-          <MainScreenHeaderContainer>
+          <ScreenHeaderContainer>
             {/* Date Header with Greeting and Navigation */}
             <DateHeader 
               showGreeting={true}
@@ -986,7 +986,7 @@ export default function MedsHomeScreen() {
               setCalendarViewMonth={setCalendarViewMonth}
               today={today}
             />
-          </MainScreenHeaderContainer>
+          </ScreenHeaderContainer>
 
           {/* Today's Meds Section - Card */}
           <MedSectionContainer>

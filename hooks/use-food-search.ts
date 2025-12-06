@@ -53,20 +53,9 @@ export interface UseFoodSearchResult {
 }
 
 /**
- * Normalize text for search comparison
- * Removes special characters and normalizes whitespace
- */
-const normalizeText = (text: string): string => {
-  return text
-    .toLowerCase()
-    .replace(/[%(),]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
-/**
  * Hook for food search functionality
  * Shared between create-bundle and mealtype-log screens
+ * Uses Supabase RPC search_food_master - server handles normalization
  */
 export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearchResult {
   const {
@@ -82,8 +71,9 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
   const [showSearchResults, setShowSearchResults] = useState(false);
 
   /**
-   * Search food_master table
-   * Uses word-order-independent matching
+   * Search food_master table using Supabase RPC
+   * Server handles normalization using combined name+brand field
+   * Client sends raw user input - no client-side normalization
    */
   const searchFoodMaster = useCallback(async (query: string) => {
     if (!query || query.length < minQueryLength) {
@@ -92,109 +82,54 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
       return;
     }
 
+    if (!userId) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
     setSearchLoading(true);
     try {
-      const cleanedQuery = normalizeText(query);
-      const words = cleanedQuery.split(/\s+/).filter(word => word.length > 0);
-      
-      if (words.length === 0) {
+      // Use Supabase RPC - server handles normalization using combined name+brand field
+      // Client sends raw user input - no client-side normalization
+      const { data: foodsData, error: rpcError } = await supabase.rpc('search_food_master', {
+        search_term: query.trim(), // Raw user input - server normalizes using combined name+brand field
+        limit_rows: maxResults * 2, // Get more results for client-side sorting/filtering
+      });
+
+      if (rpcError) {
+        console.error('Error searching foods:', rpcError);
         setSearchResults([]);
         setShowSearchResults(false);
         setSearchLoading(false);
         return;
       }
-      
-      // Primary search: entire query as substring (handles "popcorn c" matching "popcorn chicken")
-      const queryPattern = `%${cleanedQuery}%`;
-      
-      // Fallback search: first word (for broader initial results)
-      const firstWordPattern = words.length > 0 ? `%${words[0]}%` : queryPattern;
-      
-      // Build search conditions: entire query OR first word (to ensure we get relevant results)
-      const searchConditions = [
-        `name.ilike.${queryPattern}`,
-        `brand.ilike.${queryPattern}`,
-        `name.ilike.${firstWordPattern}`,
-        `brand.ilike.${firstWordPattern}`,
-      ];
 
-      let allData: FoodMaster[] = [];
-
-      if (includeCustomFoods && userId) {
-        // Search both public foods and user's custom foods
-        const { data: publicData, error: publicError } = await supabase
-          .from('food_master')
-          .select('*')
-          .or(searchConditions.join(','))
-          .eq('is_custom', false)
-          .limit(100); // Increased limit to ensure we get enough results for client-side filtering
-
-        const { data: customData, error: customError } = await supabase
-          .from('food_master')
-          .select('*')
-          .or(searchConditions.join(','))
-          .eq('is_custom', true)
-          .eq('owner_user_id', userId)
-          .limit(100);
-
-        if (publicError || customError) {
-          setSearchResults([]);
-          setShowSearchResults(false);
-          setSearchLoading(false);
-          return;
-        }
-
-        allData = [...(publicData || []), ...(customData || [])];
-        
-        // Remove duplicates based on food id
-        allData = Array.from(
-          new Map(allData.map(food => [food.id, food])).values()
-        );
-      } else {
-        // Search all foods (original behavior)
-        const { data, error } = await supabase
-          .from('food_master')
-          .select('*')
-          .or(searchConditions.join(','))
-          .limit(100) // Increased limit to ensure we get enough results for client-side filtering
-          .order('name', { ascending: true });
-
-        if (error) {
-          setSearchResults([]);
-          setShowSearchResults(false);
-          setSearchLoading(false);
-          return;
-        }
-
-        allData = data || [];
+      if (!foodsData || foodsData.length === 0) {
+        setSearchResults([]);
+        setShowSearchResults(false);
+        setSearchLoading(false);
+        return;
       }
 
-      // Client-side filtering: match entire query as substring OR all words appear
-      // This handles cases like "popcorn c" matching "popcorn chicken" and "fried c" matching "fried chicken"
-      const filteredResults = allData.filter(food => {
-        const foodName = normalizeText(food.name || '');
-        const foodBrand = normalizeText(food.brand || '');
-        const searchText = `${foodName} ${foodBrand}`.trim();
-        
-        // First check: entire query appears as substring in name or brand
-        // This handles partial word matches like "popcorn c" → "popcorn chicken"
-        if (foodName.includes(cleanedQuery) || foodBrand.includes(cleanedQuery)) {
-          return true;
-        }
-        
-        // Second check: entire query appears as substring in combined text
-        if (searchText.includes(cleanedQuery)) {
-          return true;
-        }
-        
-        // Third check: all words appear (word-order-independent matching)
-        // This handles cases like "chicken fried" matching "fried chicken"
-        return words.every(word => searchText.includes(word));
-      });
+      // SECURITY: Filter custom foods if includeCustomFoods is false, or filter by owner
+      let filteredFoods = foodsData;
+      if (!includeCustomFoods) {
+        // Exclude all custom foods
+        filteredFoods = foodsData.filter((food: any) => food.is_custom !== true);
+      } else {
+        // Include only custom foods that belong to this user, or base foods
+        filteredFoods = foodsData.filter((food: any) => {
+          if (food.is_custom === true) {
+            return food.owner_user_id === userId;
+          }
+          return true; // Base foods are visible to all
+        });
+      }
       
       // Sort by priority: is_base_food > is_quality_data > order_index (ascending)
-      const sortedResults = filteredResults
-        .sort((a, b) => {
+      const sortedResults = filteredFoods
+        .sort((a: any, b: any) => {
           // 1. is_base_food = true first (highest priority)
           const aIsBase = a.is_base_food === true ? 1 : 0;
           const bIsBase = b.is_base_food === true ? 1 : 0;
@@ -211,16 +146,16 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
           if (aOrder !== bOrder) return aOrder - bOrder;
           
           // 4. Fallback to name for consistent ordering
-          return a.name.localeCompare(b.name);
+          return (a.name || '').localeCompare(b.name || '');
         })
         .slice(0, maxResults);
       
       // Batch fetch servings for all results using centralized data access
-      const foodIds = sortedResults.map(food => food.id);
+      const foodIds = sortedResults.map((food: any) => food.id);
       const servingsMap = await getServingsForFoods(foodIds);
       
       // Enrich results with default serving info using centralized logic
-      const resultsWithServings: FoodSearchResult[] = sortedResults.map(food => {
+      const resultsWithServings: FoodSearchResult[] = sortedResults.map((food: any) => {
         const foodServings = servingsMap.get(food.id) || [];
         const { defaultServing, nutrients } = getDefaultServingWithNutrients(food, foodServings);
         
@@ -235,6 +170,7 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
       setSearchResults(resultsWithServings);
       setShowSearchResults(true);
     } catch (error) {
+      console.error('Exception searching foods:', error);
       setSearchResults([]);
       setShowSearchResults(false);
     } finally {

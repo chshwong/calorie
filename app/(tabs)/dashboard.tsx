@@ -8,6 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DateHeader } from '@/components/date-header';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { PremiumCard } from '@/components/dashboard/premium-card';
 import { StatTile } from '@/components/dashboard/stat-tile';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -359,8 +360,10 @@ export default function DashboardScreen() {
       >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
-          {/* Date Header */}
-          <DateHeader
+          {/* Standardized Header Container */}
+          <ScreenHeaderContainer>
+            {/* Date Header */}
+            <DateHeader
           showGreeting={true}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
@@ -399,6 +402,7 @@ export default function DashboardScreen() {
           setCalendarViewMonth={setCalendarViewMonth}
           today={today}
         />
+          </ScreenHeaderContainer>
 
         {/* Body Metrics Row */}
         <DashboardSectionContainer>

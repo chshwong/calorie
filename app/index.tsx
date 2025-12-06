@@ -183,6 +183,20 @@ export default function Index() {
     };
   }, [session, loading, profile, router, segments, user, queryClient]); // Include segments but use hasRedirected to prevent loops
 
+  // Handle cached profile when timeout occurs - move state updates to useEffect
+  useEffect(() => {
+    if (hasTimedOut && loading) {
+      const userId = user?.id || session?.user?.id;
+      const cachedProfile = userId ? queryClient.getQueryData(['userProfile', userId]) : null;
+      
+      // If we have cached profile, clear timeout state since we're using cached data
+      if (cachedProfile) {
+        setHasTimedOut(false);
+        setIsOfflineMode(true);
+      }
+    }
+  }, [hasTimedOut, loading, user, session, queryClient, setIsOfflineMode]);
+
   // Show fallback UI if timeout occurred and still loading
   // Only show if we have no session AND no cached profile
   if (hasTimedOut && loading) {
@@ -191,9 +205,6 @@ export default function Index() {
     
     // If we have cached profile, don't show error screen - allow normal rendering
     if (cachedProfile) {
-      // Clear timeout state since we're using cached data
-      setHasTimedOut(false);
-      setIsOfflineMode(true);
       // Continue to normal rendering below
     } else if (!session && !userId) {
       // Only show error screen if we truly have no session and no cache
@@ -224,10 +235,12 @@ export default function Index() {
   }
   
   // Failsafe: If stuck on index for too long with cachedProfile, force redirect
-  if (!hasRedirected.current && cachedProfile && loading) {    
-    hasRedirected.current = true;
-    router.replace('/(tabs)');
-  }
+  useEffect(() => {
+    if (!hasRedirected.current && cachedProfile && loading) {    
+      hasRedirected.current = true;
+      router.replace('/(tabs)');
+    }
+  }, [cachedProfile, loading, router]);
   
 
   return (

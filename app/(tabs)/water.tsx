@@ -8,7 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { MainScreenHeaderContainer } from '@/components/layout/main-screen-header-container';
+import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { BarChart } from '@/components/charts/bar-chart';
@@ -337,7 +337,7 @@ export default function WaterScreen() {
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
           {/* Standardized Header Container */}
-          <MainScreenHeaderContainer>
+          <ScreenHeaderContainer>
             {/* Date Header */}
             <DateHeader
               showGreeting={true}
@@ -373,7 +373,7 @@ export default function WaterScreen() {
               setCalendarViewMonth={setCalendarViewMonth}
               today={today}
             />
-          </MainScreenHeaderContainer>
+          </ScreenHeaderContainer>
 
           {/* Today's Water Section - Card */}
           <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
@@ -383,7 +383,7 @@ export default function WaterScreen() {
               module="water"
               isLoading={isLoading}
               onPressSettings={isToday ? handleOpenSettings : undefined}
-              style={{ borderBottomWidth: 1, borderBottomColor: colors.separator, marginTop: -6 }}
+              style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
             />
 
           {isLoading ? (
