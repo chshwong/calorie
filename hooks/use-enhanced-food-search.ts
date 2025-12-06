@@ -222,7 +222,6 @@ export function useEnhancedFoodSearch(
       
       return results;
     } catch (error) {
-      console.error('Error performing DB search:', error);
       return [];
     }
   }, [userId, maxResults]);
@@ -234,7 +233,13 @@ export function useEnhancedFoodSearch(
     dbResults: EnhancedFoodItem[],
     localFoods: EnhancedFoodItem[]
   ): EnhancedFoodItem[] => {
-    const merged = mergeFoodResults(dbResults, localFoods);
+    // Attach intrinsic DB rank (0 = best) to each DB result
+    const dbWithRank: EnhancedFoodItem[] = dbResults.map((item, index) => ({
+      ...item,
+      search_rank: index,
+    }));
+    
+    const merged = mergeFoodResults(dbWithRank, localFoods);
     const sorted = sortFoodsByPriority(merged);
     return sorted.slice(0, maxResults);
   }, [maxResults]);

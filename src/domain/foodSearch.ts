@@ -26,6 +26,9 @@ export interface EnhancedFoodItem extends FoodMaster {
   is_frequent: boolean; // times_used >= FREQUENT_THRESHOLD
   is_recent: boolean; // last_used_at within RECENT_DAYS
   
+  // Intrinsic rank from DB (0 = best, lower = better)
+  search_rank?: number | null;
+  
   // Serving info
   default_serving?: {
     quantity: number;
@@ -82,61 +85,59 @@ export function matchesQuery(food: FoodMaster, query: string): boolean {
 
 /**
  * Sort foods according to the priority rules:
- * 1. is_frequent (true first)
- * 2. is_recent (true first)
- * 3. is_custom (true first)
- * 4. is_base_food (true first)
- * 5. is_quality (true first)
- * 6. frequency_score (higher first)
- * 7. last_used_at (more recent first, nulls last)
- * 8. name (A–Z)
+ * 1. is_recent (true first)
+ * 2. is_frequent (true first)
+ * 3. search_rank (lower = better, default large number when null)
+ * 4. order_index (lower = better, default large number)
+ * 5. is_base_food (true first)
+ * 6. is_quality_data (true first)
+ * 7. times_used (higher = better)
+ * 8. last_used_at (newer date first)
+ * 9. name (A–Z) as final tie-breaker
  */
 export function sortFoodsByPriority(foods: EnhancedFoodItem[]): EnhancedFoodItem[] {
   return [...foods].sort((a, b) => {
-    // 1. is_frequent (true first)
-    if (a.is_frequent !== b.is_frequent) {
-      return b.is_frequent ? 1 : -1;
-    }
-    
-    // 2. is_recent (true first)
-    if (a.is_recent !== b.is_recent) {
-      return b.is_recent ? 1 : -1;
-    }
-    
-    // 3. is_custom (true first)
-    const aIsCustom = a.is_custom === true ? 1 : 0;
-    const bIsCustom = b.is_custom === true ? 1 : 0;
-    if (aIsCustom !== bIsCustom) {
-      return bIsCustom - aIsCustom;
-    }
-    
-    // 4. is_base_food (true first)
-    const aIsBase = a.is_base_food === true ? 1 : 0;
-    const bIsBase = b.is_base_food === true ? 1 : 0;
-    if (aIsBase !== bIsBase) {
-      return bIsBase - aIsBase;
-    }
-    
-    // 5. is_quality (true first)
-    const aIsQuality = a.is_quality_data === true ? 1 : 0;
-    const bIsQuality = b.is_quality_data === true ? 1 : 0;
-    if (aIsQuality !== bIsQuality) {
-      return bIsQuality - aIsQuality;
-    }
-    
-    // 6. frequency_score (higher first)
-    if (a.times_used !== b.times_used) {
-      return b.times_used - a.times_used;
-    }
-    
-    // 7. last_used_at (more recent first, nulls last)
-    if (a.last_used_at !== b.last_used_at) {
-      if (!a.last_used_at) return 1;
-      if (!b.last_used_at) return -1;
-      return b.last_used_at.getTime() - a.last_used_at.getTime();
-    }
-    
-    // 8. name (A–Z)
+    // 1) Recent first
+    const aRecent = a.is_recent ? 1 : 0;
+    const bRecent = b.is_recent ? 1 : 0;
+    if (aRecent !== bRecent) return bRecent - aRecent;
+
+    // 2) Frequent next
+    const aFreq = a.is_frequent ? 1 : 0;
+    const bFreq = b.is_frequent ? 1 : 0;
+    if (aFreq !== bFreq) return bFreq - aFreq;
+
+    // 3) Intrinsic DB rank (lower is better)
+    const aRank = a.search_rank ?? 999999;
+    const bRank = b.search_rank ?? 999999;
+    if (aRank !== bRank) return aRank - bRank;
+
+    // 4) order_index from food_master
+    const aOrder = (a as any).order_index ?? 999999;
+    const bOrder = (b as any).order_index ?? 999999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    // 5) is_base_food
+    const aBase = a.is_base_food ? 1 : 0;
+    const bBase = b.is_base_food ? 1 : 0;
+    if (aBase !== bBase) return bBase - aBase;
+
+    // 6) is_quality_data
+    const aQuality = a.is_quality_data ? 1 : 0;
+    const bQuality = b.is_quality_data ? 1 : 0;
+    if (aQuality !== bQuality) return bQuality - aQuality;
+
+    // 7) times_used (higher first)
+    const aTimes = a.times_used ?? 0;
+    const bTimes = b.times_used ?? 0;
+    if (aTimes !== bTimes) return bTimes - aTimes;
+
+    // 8) last_used_at (newer first)
+    const aLast = a.last_used_at ? a.last_used_at.getTime() : 0;
+    const bLast = b.last_used_at ? b.last_used_at.getTime() : 0;
+    if (aLast !== bLast) return bLast - aLast;
+
+    // 9) final tie-breaker: name A–Z
     return (a.name || '').localeCompare(b.name || '');
   });
 }
