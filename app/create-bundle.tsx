@@ -659,12 +659,12 @@ export default function CreateBundleScreen() {
                   </View>
                 </View>
                 
-                {/* Total kcal (read-only) */}
+                {/* Total cal (read-only) */}
                 <View style={styles.bundleItemKcal}>
                   <ThemedText style={[styles.bundleItemKcalText, { color: colors.tint }]}>
                     {Math.round(item.calculatedNutrition?.calories_kcal || 0)}
                   </ThemedText>
-                  <ThemedText style={[styles.bundleItemKcalUnit, { color: colors.textSecondary }]}>kcal</ThemedText>
+                  <ThemedText style={[styles.bundleItemKcalUnit, { color: colors.textSecondary }]}>{t('units.kcal')}</ThemedText>
                 </View>
                 
                 {/* Delete Button */}
@@ -717,7 +717,7 @@ export default function CreateBundleScreen() {
                     {Math.round(totals.calories)}
                   </ThemedText>
                   <ThemedText style={[styles.summaryCaloriesLabel, { color: colors.textSecondary }]}>
-                    kcal
+                    {t('units.kcal')}
                   </ThemedText>
                 </View>
                 <View style={styles.summaryMacros}>

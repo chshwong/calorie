@@ -267,6 +267,7 @@ export default function LogFoodScreen() {
     quickFiberG: number | null;
     quickSugarG: number | null;
     quickSodiumMg: number | null;
+    quickLogFood: string | null;
   }) => {
     upsertMealtypeMetaMutation.mutate(
       {
@@ -279,6 +280,7 @@ export default function LogFoodScreen() {
         quickFiberG: data.quickFiberG,
         quickSugarG: data.quickSugarG,
         quickSodiumMg: data.quickSodiumMg,
+        quickLogFood: data.quickLogFood,
       },
       {
         onSuccess: () => {
@@ -300,6 +302,7 @@ export default function LogFoodScreen() {
         quickFiberG: null,
         quickSugarG: null,
         quickSodiumMg: null,
+        quickLogFood: null,
       },
       {
         onSuccess: () => {
@@ -689,7 +692,7 @@ export default function LogFoodScreen() {
     [entries, currentMealMeta]
   );
 
-  // Calculate total kcal for this meal (entries + Quick Log)
+  // Calculate total cal for this meal (entries + Quick Log)
   // Use mealTotals as the single source of truth
   const mealCaloriesTotal = useMemo(() => {
     return mealTotals?.kcal ?? 0;
@@ -1872,7 +1875,7 @@ export default function LogFoodScreen() {
     const maxCaloriesValue = Number(MAX_CALORIES);
     
     if (caloriesValue > maxCaloriesValue) {
-      const errorMsg = `❌ Calories Limit: ${caloriesValue.toLocaleString()} kcal exceeds maximum of ${maxCaloriesValue.toLocaleString()} kcal per entry. Reduce quantity or split into ${Math.ceil(caloriesValue / maxCaloriesValue)} entries.`;
+      const errorMsg = `❌ Calories Limit: ${caloriesValue.toLocaleString()} cal exceeds maximum of ${maxCaloriesValue.toLocaleString()} cal per entry. Reduce quantity or split into ${Math.ceil(caloriesValue / maxCaloriesValue)} entries.`;
       setCaloriesError(errorMsg);
       
       const suggestedQuantity = Math.floor((maxCaloriesValue / caloriesValue) * parsedQuantity * 10) / 10;
@@ -2015,7 +2018,7 @@ export default function LogFoodScreen() {
       // Final validation check before database call
       // Double-check calories limit (database constraint: max 5000)
       if (parsedCalories > 5000) {
-        const errorMsg = `Calories (${parsedCalories.toLocaleString()} kcal) exceed the 5,000 kcal limit per entry. Please reduce quantity or split into multiple entries.`;
+        const errorMsg = `Calories (${parsedCalories.toLocaleString()} cal) exceed the 5,000 cal limit per entry. Please reduce quantity or split into multiple entries.`;
         setCaloriesError(errorMsg);
         
         const alertMessage = 
@@ -2093,7 +2096,7 @@ export default function LogFoodScreen() {
             `SOLUTIONS:\n` +
             `• Reduce quantity to ${suggestedQty} (instead of ${parsedQuantity || 'current'})\n` +
             `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
-          setCaloriesError(`Calories (${currentCalories.toLocaleString()} kcal) exceed the 5,000 kcal limit per entry`);
+          setCaloriesError(`Calories (${currentCalories.toLocaleString()} cal) exceed the 5,000 cal limit per entry`);
           
         } else if (errorMsg.includes('numeric') || errorMsg.includes('value too large') || errorMsg.includes('out of range') || errorCode === '22003') {
           errorMessage = 'The calculated values are too large. Please reduce the quantity or split into multiple entries.';
@@ -2187,7 +2190,7 @@ export default function LogFoodScreen() {
           `• Reduce the quantity\n` +
           `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
         
-        setCaloriesError(`Calories (${currentCalories.toLocaleString()} kcal) exceed the 5,000 kcal limit per entry`);
+        setCaloriesError(`Calories (${currentCalories.toLocaleString()} cal) exceed the 5,000 cal limit per entry`);
         Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
         setLoading(false);
         return;
@@ -2200,7 +2203,7 @@ export default function LogFoodScreen() {
         // Show a generic error message as a fallback
         Alert.alert(
           t('alerts.save_failed'), 
-          t('mealtype_log.errors.save_failed_checklist') + `\n\nCurrent calories: ${currentCalories.toLocaleString()} kcal`
+          t('mealtype_log.errors.save_failed_checklist') + `\n\nCurrent calories: ${currentCalories.toLocaleString()} cal`
         );
         setLoading(false);
       }
@@ -2550,7 +2553,7 @@ export default function LogFoodScreen() {
       setCaloriesError('Calories must be a valid number');
       isValid = false;
     } else if (parsedCalories > MAX_CALORIES) {
-      setCaloriesError(`Calories cannot exceed ${MAX_CALORIES.toLocaleString()} kcal per entry. Current: ${parsedCalories.toLocaleString()} kcal. Reduce quantity or split into ${Math.ceil(parsedCalories / MAX_CALORIES)} entries.`);
+      setCaloriesError(`Calories cannot exceed ${MAX_CALORIES.toLocaleString()} cal per entry. Current: ${parsedCalories.toLocaleString()} cal. Reduce quantity or split into ${Math.ceil(parsedCalories / MAX_CALORIES)} entries.`);
       isValid = false;
     }
     
@@ -2650,7 +2653,7 @@ export default function LogFoodScreen() {
   // Calculate nutrients from ServingOption (new model per spec 8)
   // IMPORTANT: All nutrients in food_master are stored per serving_size × serving_unit
   // Example: skim milk with serving_size=250, serving_unit="ml", calories_kcal=85
-  //          means 250 ml = 85 kcal, so 1 ml = 0.34 kcal
+  //          means 250 ml = 85 cal, so 1 ml = 0.34 cal
   const calculateNutrientsFromOption = useCallback((food: FoodMaster, option: ServingOption, qty: number) => {
     let masterUnits: number;
     
@@ -3653,7 +3656,7 @@ export default function LogFoodScreen() {
                                 >
                                   {frequentFoods.map((food) => {
                                     const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                    const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                    const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
                                     const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                     const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                     const rightSideText = `${brandText}${nutritionInfo}`;
@@ -3743,7 +3746,7 @@ export default function LogFoodScreen() {
                                     const servingQty = food.latestEntry ? food.latestServingQty : food.defaultServingQty;
                                     const servingUnit = food.latestEntry ? food.latestServingUnit : food.defaultServingUnit;
                                     const servingCalories = food.latestEntry ? food.latestServingCalories : food.defaultServingCalories;
-                                    const nutritionInfo = `${servingQty} ${servingUnit} • ${servingCalories} kcal`;
+                                    const nutritionInfo = `${servingQty} ${servingUnit} • ${servingCalories} cal`;
                                     const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                     const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                     const rightSideText = `${brandText}${nutritionInfo}`;
@@ -3903,7 +3906,7 @@ export default function LogFoodScreen() {
                                       const isNewlyAdded = newlyAddedFoodId.current === food.id;
                                       const isNewlyEdited = newlyEditedFoodId.current === food.id;
                                       const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
                                       const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                       const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                       const rightSideText = `${brandText}${nutritionInfo}`;
@@ -4199,7 +4202,7 @@ export default function LogFoodScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                                           {bundle.totalCalories !== undefined && (
                                             <ThemedText style={[styles.searchResultNutrition, { color: colors.tint, fontSize: 12, fontWeight: '600' }]}>
-                                              {bundle.totalCalories} kcal
+                                              {bundle.totalCalories} cal
                                             </ThemedText>
                                           )}
                                           {(bundle.totalProtein || bundle.totalCarbs || bundle.totalFat || bundle.totalFiber) && (
@@ -4352,7 +4355,7 @@ export default function LogFoodScreen() {
                                   >
                                     {frequentFoods.map((food) => {
                                       const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
                                       const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                       const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                       const rightSideText = `${brandText}${nutritionInfo}`;
@@ -4436,7 +4439,7 @@ export default function LogFoodScreen() {
                                   >
                                     {recentFoods.map((food) => {
                                       const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
                                       const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                       const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                       const rightSideText = `${brandText}${nutritionInfo}`;
@@ -4520,7 +4523,7 @@ export default function LogFoodScreen() {
                                 >
                                     {customFoods.map((food) => {
                                       const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} kcal`;
+                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
                                       const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
                                       const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
                                       const rightSideText = `${brandText}${nutritionInfo}`;
@@ -4705,7 +4708,7 @@ export default function LogFoodScreen() {
                                               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                                                 {bundle.totalCalories !== undefined && (
                                                   <ThemedText style={[styles.searchResultNutrition, { color: colors.tint, fontSize: 12, fontWeight: '600' }]}>
-                                                    {bundle.totalCalories} kcal
+                                                    {bundle.totalCalories} cal
                                                   </ThemedText>
                                                 )}
                                                 {(bundle.totalProtein || bundle.totalCarbs || bundle.totalFat || bundle.totalFiber) && (
@@ -4858,7 +4861,7 @@ export default function LogFoodScreen() {
                   </View>
                   {/* Default serving info - uses centralized default serving logic */}
                   <ThemedText style={{ fontSize: 11, color: colors.icon, marginTop: -2 }}>
-                    {quantity} × {selectedServing?.label || `${selectedFood.serving_size} ${selectedFood.serving_unit}`} = {calories || selectedFood.calories_kcal} kcal
+                    {quantity} × {selectedServing?.label || `${selectedFood.serving_size} ${selectedFood.serving_unit}`} = {calories || selectedFood.calories_kcal} cal
                   </ThemedText>
                 </View>
               ) : editingEntryId ? (
@@ -5134,7 +5137,7 @@ export default function LogFoodScreen() {
                     {isVolumeUnit(selectedFood.serving_unit) ? 'Volume (ml)' : 'Weight (g)'}: <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{calculatedWeight || '0.0'}</ThemedText>
                   </ThemedText>
                   <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
-                    Calories (kcal): <ThemedText style={[styles.inlineValue, { color: caloriesError ? '#EF4444' : colors.text }]}>{calories || '0'}</ThemedText>
+                    Calories (cal): <ThemedText style={[styles.inlineValue, { color: caloriesError ? '#EF4444' : colors.text }]}>{calories || '0'}</ThemedText>
                   </ThemedText>
                 </View>
                 {caloriesError ? (
@@ -5586,12 +5589,13 @@ export default function LogFoodScreen() {
                               ellipsizeMode="tail"
                             >
                               ⚡ {t('food.quick_log.label', { defaultValue: 'Quick Log' })}
+                              {currentMealMeta?.quick_log_food ? `: ${currentMealMeta.quick_log_food}` : ''}
                 </ThemedText>
               </TouchableOpacity>
             </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
                           <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                            {Math.round(currentMealMeta?.quick_kcal || 0)} kcal
+                            {Math.round(currentMealMeta?.quick_kcal || 0)} cal
                           </ThemedText>
                         </View>
                       </View>
@@ -5757,7 +5761,7 @@ export default function LogFoodScreen() {
                       )}
                       {/* Kcal value */}
                       <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                        {entry.calories_kcal} kcal
+                        {entry.calories_kcal} cal
                       </ThemedText>
                       {!hasEntrySelection && !editingEntryId && (
                         <TouchableOpacity
@@ -6067,6 +6071,7 @@ export default function LogFoodScreen() {
                   quickFiberG: currentMealMeta.quick_fiber_g ?? null,
                   quickSugarG: currentMealMeta.quick_sugar_g ?? null,
                   quickSodiumMg: currentMealMeta.quick_sodium_mg ?? null,
+                  quickLogFood: currentMealMeta.quick_log_food ?? null,
                 }
               : null
           }

@@ -81,7 +81,7 @@
     },
     "food_log": {
       "log_food_prompt": "← Ajouter aliment",
-      "kcal": "kcal"
+      "kcal": "cal"
     },
     "previous_day_copy": {
       "label_yesterday": "D'hier",
@@ -483,8 +483,8 @@
     "calories": {
       "title": "Objectif calorique quotidien",
       "description": "Définissez une plage inférieure et/ou supérieure optionnelle",
-      "set_maximum": "Définir le maximum (kcal)",
-      "set_minimum": "Définir le minimum (kcal)",
+      "set_maximum": "Définir le maximum (cal)",
+      "set_minimum": "Définir le minimum (cal)",
       "placeholder_max": "ex: 2200",
       "placeholder_min": "ex: 1800"
     },
@@ -568,7 +568,7 @@
     "in": "po",
     "lbs": "lbs",
     "kg": "kg",
-    "kcal": "kcal",
+    "kcal": "cal",
     "g": "g",
     "mg": "mg",
     "ml": "ml",
@@ -667,7 +667,7 @@
       "quantity_placeholder": "1",
       "unit": "Unité",
       "unit_placeholder": "g",
-      "calories": "Calories (kcal)",
+      "calories": "Calories (cal)",
       "calories_required": "Calories *",
       "calories_placeholder": "625",
       "protein": "Protéines (g)",
@@ -897,7 +897,7 @@
       "protein_too_large": "La valeur de protéines est trop grande. Maximum autorisé: {{max}}g.",
       "carbs_too_large": "La valeur de glucides est trop grande. Maximum autorisé: {{max}}g.",
       "fat_too_large": "La valeur de lipides est trop grande. Maximum autorisé: {{max}}g.",
-      "calories_limit_exceeded": "Cette entrée ajouterait {{calories}} kcal, portant votre total {{mealType}} à {{total}} kcal.\n\nCela dépasse la limite de sécurité de {{limit}} kcal par repas.\n\nSi c'est intentionnel, veuillez diviser en plusieurs entrées.",
+      "calories_limit_exceeded": "Cette entrée ajouterait {{calories}} cal, portant votre total {{mealType}} à {{total}} cal.\n\nCela dépasse la limite de sécurité de {{limit}} cal par repas.\n\nSi c'est intentionnel, veuillez diviser en plusieurs entrées.",
       "fix_errors": "Veuillez corriger les erreurs affichées en rouge avant d'enregistrer.",
       "save_failed_checklist": "Impossible d'enregistrer l'entrée. Veuillez vérifier:\n\n• Le nom de l'aliment n'est pas vide\n• La quantité est un nombre valide\n• Les calories sont un nombre valide\n\nSi le problème persiste, essayez d'actualiser la page.",
       "save_unexpected": "Une erreur inattendue s'est produite lors de l'enregistrement: {{error}}",
@@ -980,7 +980,7 @@
       "quantity_label": "Quantité *",
       "quantity_placeholder": "100",
       "unit_label": "Unité *",
-      "calories_label": "Calories (kcal) *",
+      "calories_label": "Calories (cal) *",
       "calories_placeholder": "0"
     },
     
@@ -1036,7 +1036,7 @@
       "quantity_required": "La quantité doit être un nombre valide supérieur à 0",
       "quantity_exceeds_limit": "La quantité ne peut pas dépasser {{max}}. Veuillez réduire.",
       "calories_required": "Les calories doivent être un nombre valide",
-      "calories_exceeds_limit": "Les calories ne peuvent pas dépasser {{max}} kcal. Actuel: {{current}} kcal.",
+      "calories_exceeds_limit": "Les calories ne peuvent pas dépasser {{max}} cal. Actuel: {{current}} cal.",
       "volume_quantity_required": "La quantité de volume doit être un nombre valide supérieur à 0",
       "volume_quantity_exceeds_limit": "La quantité de volume ne peut pas dépasser {{max}}. Veuillez réduire.",
       "protein_invalid": "Les protéines doivent être un nombre valide",
@@ -1091,7 +1091,7 @@
     "quantity_label": "Quantité",
     "serving_label": "Portion",
     "select_serving": "Sélectionner la portion",
-    "total_kcal": "Total kcal",
+    "total_kcal": "Total cal",
     "add_to_bundle": "Ajouter à l'ensemble",
     
     "bundle_items_title": "Éléments de l'ensemble ({{count}})",
@@ -1136,7 +1136,7 @@
       "enter_valid_quantity": "Veuillez entrer une quantité valide",
       "quantity_greater_than_zero": "La quantité doit être supérieure à 0",
       "quantity_exceeds_limit": "La quantité ne peut pas dépasser {{max}}. Veuillez réduire ou diviser en plusieurs entrées.",
-      "calories_exceed_limit": "Les calories ({{calories}} kcal) dépassent la limite de {{max}} kcal par entrée. Réduisez la quantité ou divisez en {{entries}} entrées.",
+      "calories_exceed_limit": "Les calories ({{calories}} cal) dépassent la limite de {{max}} cal par entrée. Réduisez la quantité ou divisez en {{entries}} entrées.",
       "enter_bundle_name": "Veuillez entrer un nom d'ensemble",
       "bundle_name_too_long": "Le nom de l'ensemble doit contenir 40 caractères ou moins",
       "add_at_least_one_food": "Veuillez ajouter au moins un aliment à l'ensemble",
@@ -1313,7 +1313,7 @@
       "food": "Alimentation",
       "ex": "Ex",
       "meds": "Médicaments",
-      "kcal": "kcal",
+      "kcal": "cal",
       "min": "min",
       "items": "éléments",
       "status_ok": "OK",
@@ -1325,13 +1325,13 @@
     },
     "food": {
       "title": "Alimentation",
-      "calories": "{{calories}} kcal",
+      "calories": "{{calories}} cal",
       "entries": "{{count}} {{entries}}",
       "entry_one": "entrée",
       "entry_other": "entrées",
       "fiber": "Fibres",
       "sugar": "Sucre",
-      "chart_7d": "7j kcal"
+      "chart_7d": "7j cal"
     },
     "exercise": {
       "title": "Exercice",

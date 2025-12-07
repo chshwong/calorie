@@ -23,6 +23,7 @@ export interface QuickLogData {
   quickFiberG: number | null;
   quickSugarG: number | null;
   quickSodiumMg: number | null;
+  quickLogFood: string | null;
 }
 
 interface QuickLogEditorProps {
@@ -50,6 +51,7 @@ export function QuickLogEditor({
   const insets = useSafeAreaInsets();
 
   const [quickKcal, setQuickKcal] = useState('');
+  const [quickLogFood, setQuickLogFood] = useState('');
   const [quickProteinG, setQuickProteinG] = useState('');
   const [quickCarbsG, setQuickCarbsG] = useState('');
   const [quickFatG, setQuickFatG] = useState('');
@@ -64,6 +66,7 @@ export function QuickLogEditor({
   useEffect(() => {
     if (visible && initialData) {
       setQuickKcal(initialData.quickKcal?.toString() || '');
+      setQuickLogFood(initialData.quickLogFood || '');
       setQuickProteinG(initialData.quickProteinG?.toString() || '');
       setQuickCarbsG(initialData.quickCarbsG?.toString() || '');
       setQuickFatG(initialData.quickFatG?.toString() || '');
@@ -73,6 +76,7 @@ export function QuickLogEditor({
     } else if (visible && !initialData) {
       // Reset form when opening for new entry
       setQuickKcal('');
+      setQuickLogFood('');
       setQuickProteinG('');
       setQuickCarbsG('');
       setQuickFatG('');
@@ -158,6 +162,7 @@ export function QuickLogEditor({
       quickFiberG: fiberNumber !== null && !isNaN(fiberNumber) ? fiberNumber : null,
       quickSugarG: sugarNumber !== null && !isNaN(sugarNumber) ? sugarNumber : null,
       quickSodiumMg: sodiumNumber !== null && !isNaN(sodiumNumber) ? sodiumNumber : null,
+      quickLogFood: quickLogFood.trim() || null,
     };
 
     // Validate: at least calories must be provided and valid
@@ -215,6 +220,23 @@ export function QuickLogEditor({
                   placeholder={t('food.quick_log.calories_placeholder', { defaultValue: 'Enter calories' })}
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.fieldRow}>
+                <ThemedText style={[styles.fieldLabel, { color: colors.text }]}>
+                  {t('food.quick_log.food_label', { defaultValue: 'Food' })}
+                </ThemedText>
+                <TextInput
+                  style={[styles.fieldInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                  value={quickLogFood}
+                  onChangeText={setQuickLogFood}
+                  onSubmitEditing={handleSave}
+                  blurOnSubmit={true}
+                  returnKeyType="done"
+                  placeholder={t('food.quick_log.food_placeholder', { defaultValue: 'Optional (i.e. Buffet)' })}
+                  placeholderTextColor={colors.textSecondary}
+                  maxLength={20}
                 />
               </View>
 

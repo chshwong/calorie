@@ -400,7 +400,7 @@ export function FoodSearchBar({
                           numberOfLines={1}
                         >
                           {food.brand ? ' • ' : ''}
-                          {food.serving_size} {food.serving_unit} • {food.calories_kcal} kcal
+                          {food.serving_size} {food.serving_unit} • {food.calories_kcal} cal
                         </ThemedText>
                       </View>
                     </View>

@@ -501,6 +501,7 @@ export default function FoodLogHomeScreen() {
     quickFiberG: number | null;
     quickSugarG: number | null;
     quickSodiumMg: number | null;
+    quickLogFood: string | null;
   }) => {
     upsertMealtypeMetaMutation.mutate(
       {
@@ -513,6 +514,7 @@ export default function FoodLogHomeScreen() {
         quickFiberG: data.quickFiberG,
         quickSugarG: data.quickSugarG,
         quickSodiumMg: data.quickSodiumMg,
+        quickLogFood: data.quickLogFood,
       },
       {
         onSuccess: () => {
@@ -538,6 +540,7 @@ export default function FoodLogHomeScreen() {
         quickFiberG: null,
         quickSugarG: null,
         quickSodiumMg: null,
+        quickLogFood: null,
       },
       {
         onSuccess: () => {
@@ -951,21 +954,75 @@ export default function FoodLogHomeScreen() {
                           </TouchableOpacity>
                           {/* Show "← Log Food" immediately after meal type badge when no entries (except for Late Night) */}
                           {group.entries.length === 0 && mealType !== 'late_night' && (
-                            <View style={styles.addFoodPrompt}>
+                            <TouchableOpacity
+                              style={[
+                                styles.addFoodPrompt,
+                                getMinTouchTargetStyle(),
+                                Platform.OS === 'web' && getFocusStyle(colors.tint),
+                              ]}
+                              onPress={() => {
+                                // Filter entries for this meal type and date (may be empty array if no entries)
+                                const mealTypeEntries = group.entries.filter(entry => 
+                                  entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                                  entry.entry_date === selectedDateString
+                                );
+                                // Always go to mealtype-log page (whether entries exist or not)
+                                router.push({
+                                  pathname: '/mealtype-log',
+                                  params: { 
+                                    mealType: mealType,
+                                    entryDate: selectedDateString,
+                                    preloadedEntries: JSON.stringify(mealTypeEntries)
+                                  }
+                                });
+                              }}
+                              activeOpacity={0.7}
+                              {...getButtonAccessibilityProps(
+                                `Log food for ${mealTypeLabel}`,
+                                t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
+                              )}
+                            >
                               <ThemedText style={[styles.addFoodPromptText, { color: colors.tint }]}>
                                 {t('home.food_log.log_food_prompt')}
                               </ThemedText>
-                            </View>
+                            </TouchableOpacity>
                           )}
                         </View>
                         <View style={styles.mealGroupHeaderRight}>
                           {/* Show calories when there are entries */}
                           {group.entries.length > 0 && (
-                            <View style={styles.mealGroupCalories}>
+                            <TouchableOpacity
+                              style={[
+                                styles.mealGroupCalories,
+                                getMinTouchTargetStyle(),
+                                Platform.OS === 'web' && getFocusStyle(colors.tint),
+                              ]}
+                              onPress={() => {
+                                // Filter entries for this meal type and date (may be empty array if no entries)
+                                const mealTypeEntries = group.entries.filter(entry => 
+                                  entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                                  entry.entry_date === selectedDateString
+                                );
+                                // Always go to mealtype-log page (whether entries exist or not)
+                                router.push({
+                                  pathname: '/mealtype-log',
+                                  params: { 
+                                    mealType: mealType,
+                                    entryDate: selectedDateString,
+                                    preloadedEntries: JSON.stringify(mealTypeEntries)
+                                  }
+                                });
+                              }}
+                              activeOpacity={0.7}
+                              {...getButtonAccessibilityProps(
+                                `Log food for ${mealTypeLabel}`,
+                                t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
+                              )}
+                            >
                               <ThemedText style={[styles.mealGroupCaloriesValue, { color: colors.tint }]}>
                                 {Math.round(group.totalCalories)} {t('home.food_log.kcal')}
                               </ThemedText>
-                            </View>
+                            </TouchableOpacity>
                           )}
                           {/* 3-dot menu button */}
                           <TouchableOpacity
@@ -1079,6 +1136,7 @@ export default function FoodLogHomeScreen() {
                         >
                           <ThemedText style={[styles.quickLogRowText, { color: colors.textSecondary }]}>
                             ⚡ Quick Log:{' '}
+                            {dataByMealType[mealType].quick_log_food ? `${dataByMealType[mealType].quick_log_food} / ` : ''}
                             <ThemedText style={[styles.quickLogRowText, { color: colors.textSecondary }]}>
                               {Math.round(dataByMealType[mealType].quick_kcal || 0)} {t('home.food_log.kcal')}
                             </ThemedText>
@@ -1239,6 +1297,7 @@ export default function FoodLogHomeScreen() {
             quickFiberG: dataByMealType[quickLogEditor.mealType]?.quick_fiber_g ?? null,
             quickSugarG: dataByMealType[quickLogEditor.mealType]?.quick_sugar_g ?? null,
             quickSodiumMg: dataByMealType[quickLogEditor.mealType]?.quick_sodium_mg ?? null,
+            quickLogFood: dataByMealType[quickLogEditor.mealType]?.quick_log_food ?? null,
           } : null}
           mealTypeLabel={t(`home.meal_types.${quickLogEditor.mealType}`)}
           isLoading={upsertMealtypeMetaMutation.isPending}

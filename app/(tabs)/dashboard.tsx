@@ -416,7 +416,7 @@ export default function DashboardScreen() {
               <StatTile
                 icon="fork.knife"
                 label={t('dashboard.snapshot.food')}
-                value={`${Math.round(foodSummary.caloriesTotal)} / ${foodSummary.caloriesGoal} ${t('dashboard.snapshot.kcal')}`}
+                value={`${Math.round(foodSummary.caloriesTotal)} / ${foodSummary.caloriesGoal} ${t('units.kcal')}`}
                 status={getFoodStatus()}
                 accentColor={colors.accentFood}
                 onPress={() => router.push(`/?date=${selectedDateString}`)}
@@ -542,7 +542,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {/* 7-day kcal chart */}
+            {/* 7-day cal chart */}
             <View style={styles.chartSection}>
               <ThemedText style={[styles.chartTitle, { color: colors.text }]}>
                 {t('dashboard.food.chart_7d')}
@@ -559,7 +559,7 @@ export default function DashboardScreen() {
               {/* Chart subtitle */}
               {weeklyFood.data.length > 0 && (
                 <ThemedText style={[styles.chartSubtitle, { color: colors.textSubtle }]}>
-                  {t('dashboard.food.avg')}: {Math.round(weeklyFood.data.reduce((sum, d) => sum + d.caloriesTotal, 0) / weeklyFood.data.length)} {t('dashboard.snapshot.kcal')}
+                  {t('dashboard.food.avg')}: {Math.round(weeklyFood.data.reduce((sum, d) => sum + d.caloriesTotal, 0) / weeklyFood.data.length)} {t('units.kcal')}
                 </ThemedText>
               )}
             </View>
