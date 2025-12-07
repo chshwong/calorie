@@ -15,8 +15,10 @@ import { useAppFonts } from '@/hooks/use-fonts';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { OfflineModeProvider } from '@/contexts/OfflineModeContext';
 import { ThemeProvider as AppThemeProvider } from '@/contexts/ThemeContext';
+import { DebugLoadingProvider } from '@/contexts/DebugLoadingContext';
 import { Colors } from '@/constants/theme';
 import { ToastProvider } from '@/components/ui/app-toast';
+import { DebugOverlay } from '@/components/DebugOverlay';
 
 // Create QueryClient with sensible defaults
 const queryClient = new QueryClient({
@@ -138,11 +140,13 @@ export default function RootLayout() {
   return (
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <AppThemeProvider>
-          <OfflineModeProvider>
-            <ThemeProviderWrapper />
-          </OfflineModeProvider>
-        </AppThemeProvider>
+        <DebugLoadingProvider>
+          <AppThemeProvider>
+            <OfflineModeProvider>
+              <ThemeProviderWrapper />
+            </OfflineModeProvider>
+          </AppThemeProvider>
+        </DebugLoadingProvider>
       </QueryClientProvider>
     </I18nextProvider>
   );
