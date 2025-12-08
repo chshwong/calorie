@@ -20,6 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -70,6 +71,7 @@ const clearEmail = async () => {
 
 export default function LoginScreen() {
   const { t } = useTranslation();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -84,6 +86,13 @@ export default function LoginScreen() {
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = Platform.OS === 'web' && screenWidth > 768;
 
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/(tabs)');
+    }
+  }, [authLoading, user, router]);
+
   // Load remembered email on mount
   // NOTE: We do NOT clear recovery mode here - it should only be cleared after password reset
   // This prevents users from bypassing password reset by just visiting login page
@@ -95,6 +104,20 @@ export default function LoginScreen() {
       }
     });
   }, []);
+
+  // Show brief spinner only while auth is initializing
+  if (authLoading) {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </ThemedView>
+    );
+  }
+
+  // If user is logged in, return null (redirect is handled in useEffect)
+  if (user) {
+    return null;
+  }
 
   const handleLogin = async () => {
     // Prevent multiple submissions

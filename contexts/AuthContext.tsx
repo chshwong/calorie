@@ -161,16 +161,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      
       if (!mountedRef.current) return;
-      
+    
       setSession(session);
       setUser(session?.user ?? null);
+    
+      // Auth state is now known; stop global loading here
+      setLoading(false);
+    
       if (session?.user) {
+        // Load profile in the background – do NOT block global loading on this
         fetchProfile(session.user.id, true);
       } else {
         setProfile(null);
-        setLoading(false);
       }
     }).catch((error) => {
       console.error('[AuthProvider] Error getting initial session:', error);
@@ -181,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     });
+    
 
     // Listen for auth changes
     const {

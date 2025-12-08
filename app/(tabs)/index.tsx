@@ -223,21 +223,26 @@ export default function FoodLogHomeScreen() {
     });
   }, [router]);
 
-  // Use React Query hooks for data fetching
   const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = useUserProfile();
-  const { 
-    data: calorieEntries, 
-    isLoading: entriesLoading, 
+
+  const {
+    data: calorieEntries,
+    isLoading: entriesLoading,
     isFetching: entriesFetching,
-    refetch: refetchEntries 
+    refetch: refetchEntries,
   } = useDailyEntries(selectedDateString);
-  
-  // Use cached data immediately - only show loading if we have no cached data at all
+
+  // Entries: use cache immediately
   const entries = calorieEntries ?? [];
-  // Only show loading spinner if we're truly loading and have no cached data
-  const showLoadingSpinner = entriesLoading && entries.length === 0 && calorieEntries === undefined;
-  
+  const showLoadingSpinner =
+    entriesLoading && entries.length === 0 && calorieEntries === undefined;
+
+  // Profile: use cache immediately
+  const cachedProfile =
+    profile ?? queryClient.getQueryData(['userProfile', user?.id]);
+  const isProfileLoading = profileLoading && !cachedProfile;
+
   // Background prefetch for mealtype-log tab data (after Home data is ready)
   // Use default meal type 'late_night' (same as mealtype-log default)
   const defaultMealType = 'late_night';
@@ -423,7 +428,7 @@ export default function FoodLogHomeScreen() {
 
   // Only show error if profile is truly missing after all attempts (not loading, not retrying, and user exists)
   // Otherwise, keep UI visible and let background loading/retries happen silently
-  if (!profile && !profileLoading && !loading && !retrying && user) {
+  if (!cachedProfile && !isProfileLoading && !loading && !retrying && user) {
     return (
       <ThemedView style={[styles.container, styles.centerContent]}>
         <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center' }}>
@@ -442,36 +447,35 @@ export default function FoodLogHomeScreen() {
     );
   }
 
-  // Show a minimal loading modal if profile is not loaded yet
-  // This keeps the main UI stable while loading/retrying happens in background
-  const showLoadingModal = !profile && (profileLoading || loading || retrying);
+  const showLoadingModal = !cachedProfile && isProfileLoading;
 
-  // If no profile yet, show empty UI with loading modal
-  if (!profile) {
+  if (!cachedProfile && isProfileLoading) {
     return (
       <ThemedView style={styles.container}>
-        {/* Small loading modal - only shows when profile is loading */}
         <Modal
-          transparent={true}
+          transparent
           animationType="fade"
           visible={showLoadingModal}
           onRequestClose={() => {}}
         >
-          <View 
+          <View
             style={[styles.loadingModalOverlay, { backgroundColor: colors.overlay }]}
             pointerEvents="none"
           >
-            <View style={[styles.loadingModalContent, { backgroundColor: colors.card }]}>
+            <View
+              style={[styles.loadingModalContent, { backgroundColor: colors.card }]}
+            >
               <ActivityIndicator size="small" color={colors.tint} />
             </View>
           </View>
         </Modal>
-        <ScrollView 
-          contentContainerStyle={styles.scrollContentContainer} 
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContentContainer}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.scrollContent}>
-            {/* Empty state - UI will populate when profile loads */}
+            {/* Empty state – UI will populate when profile loads */}
           </View>
         </ScrollView>
       </ThemedView>

@@ -3,7 +3,6 @@ import { ActivityIndicator, Platform, TouchableOpacity, StyleSheet } from 'react
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOfflineMode } from '@/contexts/OfflineModeContext';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
@@ -21,7 +20,6 @@ export default function Index() {
     refreshProfile,
   } = useAuth();
   const queryClient = useQueryClient();
-  const { setIsOfflineMode } = useOfflineMode();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -38,9 +36,9 @@ export default function Index() {
 
   // 1) Global timeout for initial loading (5 seconds)
   useEffect(() => {
+    // If auth is done loading, clear any timeout and reset state
     if (!loading) {
       setHasTimedOut(false);
-      setIsOfflineMode(false);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -48,34 +46,26 @@ export default function Index() {
       return;
     }
 
+    // If still loading and we haven't timed out yet, start a 5s timer
     if (loading && !hasTimedOut) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
 
       timeoutRef.current = setTimeout(() => {
-        const currentUserId = user?.id || session?.user?.id;
-
-        if (currentUserId) {
-          const cached = queryClient.getQueryData(['userProfile', currentUserId]);
-          if (cached) {
-            // Allow app to run offline with cached profile
-            setIsOfflineMode(true);
-          }
-        }
-
-        // After 5 seconds, always stop "waiting forever"
+        // After 5 seconds, stop "waiting forever"
         setHasTimedOut(true);
-      }, 5000); // 5 seconds
+      }, 5000);
     }
 
+    // Cleanup on unmount / dependency change
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
     };
-  }, [loading, hasTimedOut, user, session, queryClient, setIsOfflineMode]);
+  }, [loading, hasTimedOut]);
 
   // 2) Drive the debug overlay with clear messages
   useEffect(() => {
@@ -94,10 +84,11 @@ export default function Index() {
 
   // 3) Core redirect logic (small and deterministic)
   useEffect(() => {
-    // Only decide once loading is done OR we decided we've waited long enough
-    if (loading && !hasTimedOut) {
-      return;
-    }
+  // Block only while we truly don't know auth state:
+  // still loading AND not timed out AND no session AND no cached profile.
+  if (loading && !hasTimedOut && !session && !cachedProfile) {
+    return;
+  }
 
     const inRecoveryMode = isPasswordRecovery();
 
@@ -154,7 +145,6 @@ export default function Index() {
 
   const handleRetry = () => {
     setHasTimedOut(false);
-    setIsOfflineMode(false);
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;

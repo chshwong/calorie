@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AvatarUploader } from '@/components/AvatarUploader';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { Colors } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
@@ -48,7 +49,7 @@ import {
   filterPreferredNameInput, 
   normalizeSpaces 
 } from '@/utils/inputFilters';
-import { updateProfile } from '@/lib/services/profileService';
+import { updateProfile, uploadProfileAvatar } from '@/lib/services/profileService';
 import { checkProfanity } from '@/utils/profanity';
 import {
   getButtonAccessibilityProps,
@@ -139,6 +140,7 @@ export default function OnboardingScreen() {
   const [showAdvancedGoals, setShowAdvancedGoals] = useState(false);
   
   // Step 1: Preferred Name and Date of Birth
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [preferredName, setPreferredName] = useState('');
   const [dateOfBirthStep2, setDateOfBirthStep2] = useState('');
   const [showDatePickerStep2, setShowDatePickerStep2] = useState(false);
@@ -1031,6 +1033,17 @@ export default function OnboardingScreen() {
       
       setLoading(true);
       try {
+        // Upload avatar if one was chosen
+        let avatarUrl: string | null = null;
+        if (avatarUri && user) {
+          try {
+            avatarUrl = await uploadProfileAvatar(user.id, avatarUri);
+          } catch (error) {
+            console.error('Failed to upload avatar', error);
+            // Optional: show toast, but DO NOT block onboarding completion
+          }
+        }
+
         // Calculate BMR and TDEE
         const bmr = calculateBMR(currentWeightKgValue, heightCmValue, ageNum, sex as 'male' | 'female');
         const tdee = calculateTDEE(bmr, activityLevel as ActivityLevel);
@@ -1082,6 +1095,11 @@ export default function OnboardingScreen() {
           goal_target_date: targetDate,
           goal_timeframe: timelineOption,
         };
+        
+        // Include avatar URL if upload was successful
+        if (avatarUrl) {
+          updateData.avatar_url = avatarUrl;
+        }
         
         // Save all the calculated values
         const updatedProfile = await updateProfile(user.id, updateData);
@@ -1358,6 +1376,13 @@ export default function OnboardingScreen() {
       <ThemedText type="title" style={[styles.stepTitle, { color: colors.text }]}>
         {t('onboarding.name_age.title')}
       </ThemedText>
+      
+      <AvatarUploader
+        value={avatarUri}
+        onChange={setAvatarUri}
+        size={110}
+        disabled={loading}
+      />
       
       <View style={styles.inputContainer}>
         <ThemedText style={[styles.label, { color: colors.text }]}>

@@ -1,4 +1,4 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, useSegments } from 'expo-router';
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -16,22 +16,46 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
 import type { FocusModule } from '@/utils/types';
 import { getLocalDateString } from '@/utils/calculations';
+import { useAuth } from '@/contexts/AuthContext';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const segments = useSegments();
+  const { user, profile: authProfile, loading: authLoading } = useAuth();
   const { isQuickAddVisible, setQuickAddVisible } = useQuickAdd();
   const [isMoreMenuVisible, setMoreMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   
   // Get user profile for focus module preferences
-  const { data: profile } = useUserProfile();
-  const focusModule1: FocusModule = (profile?.focus_module_1) || 'Food';
-  const focusModule2: FocusModule = (profile?.focus_module_2) || 'Exercise';
-  const focusModule3: FocusModule = (profile?.focus_module_3) || 'Med';
+  const { data: profileData, isLoading: profileLoading } = useUserProfile();
+  const effectiveProfile = authProfile || profileData;
+  const focusModule1: FocusModule = (effectiveProfile?.focus_module_1) || 'Food';
+  const focusModule2: FocusModule = (effectiveProfile?.focus_module_2) || 'Exercise';
+  const focusModule3: FocusModule = (effectiveProfile?.focus_module_3) || 'Med';
+
+  // Centralized onboarding redirect logic
+  // This ensures users with onboarding_complete = false always stay on /onboarding
+  useEffect(() => {
+    // Wait for auth and profile to load
+    if (authLoading || profileLoading) {
+      return;
+    }
+
+    // If we have a user and profile, check onboarding status
+    if (user && effectiveProfile) {
+      const onboardingComplete = effectiveProfile.onboarding_complete ?? false;
+      
+      // If onboarding is not complete, redirect to onboarding
+      // This protects the tabs area - if user tries to access tabs without completing onboarding, they get redirected
+      if (!onboardingComplete) {
+        router.replace('/onboarding');
+      }
+    }
+  }, [authLoading, profileLoading, user, effectiveProfile, router]);
   
   // Compute the remaining module
   const ALL_MODULES: FocusModule[] = ['Food', 'Exercise', 'Med', 'Water'];
