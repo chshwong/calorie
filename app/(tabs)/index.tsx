@@ -25,6 +25,7 @@ import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchBundles } from '@/lib/services/bundles';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { showAppToast } from '@/components/ui/app-toast';
+import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
@@ -51,6 +52,7 @@ type MealTypeCopyButtonProps = {
 function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, colors, t }: MealTypeCopyButtonProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { isCopyingFromYesterday, runCopyFromYesterday } = useCopyFromYesterday();
   
   const { cloneMealTypeFromPreviousDay, isLoading } = useCloneMealTypeFromPreviousDay({
     currentDate: selectedDate,
@@ -113,7 +115,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
       }
     }
     
-    cloneMealTypeFromPreviousDay();
+    runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
   };
 
   return (
@@ -121,7 +123,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
       onPress={handleCopy}
       style={styles.copyFromYesterdayButton}
       activeOpacity={0.7}
-      disabled={isLoading}
+      disabled={isCopyingFromYesterday}
       {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
       {...getButtonAccessibilityProps(
         isToday 
@@ -129,7 +131,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
           : t('home.previous_day_copy.accessibility_label_previous', { mealType: mealTypeLabel })
       )}
     >
-      {isLoading ? (
+      {isCopyingFromYesterday ? (
         <ActivityIndicator size="small" color={colors.tint} />
       ) : (
         <>

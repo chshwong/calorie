@@ -24,6 +24,7 @@ import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
+import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
 import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
@@ -656,6 +657,9 @@ export default function MedsHomeScreen() {
       }
     },
   });
+
+  // Centralized copy from yesterday hook
+  const { isCopyingFromYesterday, runCopyFromYesterday } = useCopyFromYesterday();
 
   // Calculate totals for selected date
   const totalItems = medLogs.length;
@@ -1461,11 +1465,11 @@ export default function MedsHomeScreen() {
                   return;
                 }
                 
-                cloneFromPreviousDay();
+                runCopyFromYesterday(() => cloneFromPreviousDay());
               }}
               style={styles.previousDayButton}
               activeOpacity={0.7}
-              disabled={isCloningFromPreviousDay}
+              disabled={isCopyingFromYesterday}
               {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
               {...getButtonAccessibilityProps(
                 isToday 
@@ -1473,12 +1477,18 @@ export default function MedsHomeScreen() {
                   : t('meds.previous_day_copy.accessibility_label_previous')
               )}
             >
-              <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
-              <ThemedText style={[styles.previousDayButtonText, { color: colors.tint }]}>
-                {isToday 
-                  ? t('meds.previous_day_copy.label_yesterday')
-                  : t('meds.previous_day_copy.label_previous')}
-              </ThemedText>
+              {isCopyingFromYesterday ? (
+                <ActivityIndicator size="small" color={colors.tint} />
+              ) : (
+                <>
+                  <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
+                  <ThemedText style={[styles.previousDayButtonText, { color: colors.tint }]}>
+                    {isToday 
+                      ? t('meds.previous_day_copy.label_yesterday')
+                      : t('meds.previous_day_copy.label_previous')}
+                  </ThemedText>
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
