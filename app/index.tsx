@@ -1,210 +1,95 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, TouchableOpacity, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useDebugLoading } from '@/contexts/DebugLoadingContext';
 
-export default function Index() {
-  const {
-    session,
-    user,
-    loading,
-    isPasswordRecovery,
-    profile,
-    onboardingComplete,
-    refreshProfile,
-  } = useAuth();
-  const queryClient = useQueryClient();
+/**
+ * Root route ("/") auth gate.
+ *
+ * - No manual timeouts.
+ * - Decide as soon as possible:
+ *   - password recovery  -> /reset-password
+ *   - logged in          -> /onboarding or /(tabs)
+ *   - not logged in      -> /login (when loading is done)
+ *
+ * Onboarding rule:
+ * - Only send to /onboarding when we explicitly know onboarding is NOT complete
+ *   (profile.onboarding_complete === false, or stored onboardingComplete === false).
+ * - If we have a session but no profile yet, bias toward sending the user to /(tabs)
+ *   instead of /onboarding to avoid flicker.
+ */
+export default function RootIndex() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-  const { setDebugLoading } = useDebugLoading();
+  const { session, profile, loading, onboardingComplete, isPasswordRecovery } = useAuth();
 
-  // Simple timeout for startup (hard cap)
-  const [hasTimedOut, setHasTimedOut] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hasNavigated, setHasNavigated] = useState(false);
 
-  const userId = user?.id || session?.user?.id;
-  const cachedProfile = userId
-    ? queryClient.getQueryData(['userProfile', userId])
-    : null;
-
-  // 1) Global timeout for initial loading (5 seconds)
   useEffect(() => {
-    // If auth is done loading, clear any timeout and reset state
-    if (!loading) {
-      setHasTimedOut(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      return;
-    }
+    if (!router || hasNavigated) return;
 
-    // If still loading and we haven't timed out yet, start a 5s timer
-    if (loading && !hasTimedOut) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        // After 5 seconds, stop "waiting forever"
-        setHasTimedOut(true);
-      }, 5000);
-    }
-
-    // Cleanup on unmount / dependency change
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [loading, hasTimedOut]);
-
-  // 2) Drive the debug overlay with clear messages
-  useEffect(() => {
-    if (hasTimedOut && loading) {
-      setDebugLoading(true, 'Startup timeout – server is slow or unreachable…');
-    } else if (loading) {
-      if (!session && !userId) {
-        setDebugLoading(true, 'Checking for existing login session…');
-      } else {
-        setDebugLoading(true, 'Initializing app – loading your profile…');
-      }
-    } else {
-      setDebugLoading(false);
-    }
-  }, [loading, hasTimedOut, setDebugLoading, session, userId]);
-
-  // 3) Core redirect logic (small and deterministic)
-  useEffect(() => {
-  // Block only while we truly don't know auth state:
-  // still loading AND not timed out AND no session AND no cached profile.
-  if (loading && !hasTimedOut && !session && !cachedProfile) {
-    return;
-  }
-
-    const inRecoveryMode = isPasswordRecovery();
-
-    // Password recovery takes precedence
-    if (inRecoveryMode) {
+    // 1) Password recovery takes precedence
+    if (isPasswordRecovery()) {
       router.replace('/reset-password');
+      setHasNavigated(true);
       return;
     }
 
-    const effectiveProfile: any = profile || cachedProfile;
+    // 2) If we have a session, decide onboarding vs tabs
+    if (session) {
+      const effectiveProfile: any = profile || null;
+      const completedFromProfile = effectiveProfile?.onboarding_complete;
 
-    // If we have a usable session/profile, decide onboarding vs tabs
-    if (session || effectiveProfile) {
-      if (
-        effectiveProfile &&
-        (effectiveProfile.is_active === false ||
-          effectiveProfile.is_active === null)
-      ) {
-        // Inactive user – safest is to send to login
-        router.replace('/login');
-        return;
-      }
+      // Explicit onboarding-complete flag:
+      // - If profile says true -> definitely done
+      // - If profile says false -> definitely NOT done
+      // - If profile is missing, fall back to in-memory onboardingComplete flag
+      const isOnboardingDone =
+        completedFromProfile === true
+          ? true
+          : completedFromProfile === false
+          ? false
+          : onboardingComplete ?? false;
 
-      const effectiveOnboardingComplete =
-        (effectiveProfile && effectiveProfile.onboarding_complete) ??
-        onboardingComplete ??
-        false;
-
-      if (!effectiveProfile || !effectiveOnboardingComplete) {
+      // Only send to /onboarding when we explicitly know onboarding is NOT done.
+      // If profile is still null (not loaded yet) or we have no explicit "false",
+      // bias toward sending to /(tabs) to avoid flashing the onboarding screen.
+      if (effectiveProfile && isOnboardingDone === false) {
         router.replace('/onboarding');
-        return;
+      } else {
+        router.replace('/(tabs)');
       }
 
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        sessionStorage.removeItem('password_recovery_mode');
-      }
-
-      router.replace('/(tabs)');
+      setHasNavigated(true);
       return;
     }
 
-    // No session and no profile → go to login (especially after timeout)
-    router.replace('/login');
+    // 3) No session yet:
+    //    - If still loading, wait (spinner below).
+    //    - If not loading AND still no session, go to login.
+    if (!loading && !session) {
+      router.replace('/login');
+      setHasNavigated(true);
+      return;
+    }
   }, [
-    loading,
-    hasTimedOut,
     router,
+    hasNavigated,
     session,
-    cachedProfile,
     profile,
+    loading,
     onboardingComplete,
     isPasswordRecovery,
   ]);
 
-  const handleRetry = () => {
-    setHasTimedOut(false);
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    refreshProfile();
-  };
-
-  // 4) Timeout fallback UI when we are stuck online with no cached profile
-  if (hasTimedOut && loading && !cachedProfile) {
-    return (
-      <ThemedView style={styles.fallbackContainer}>
-        <ThemedText type="subtitle" style={styles.fallbackMessage}>
-          Unable to connect. Please check your connection and try again.
-        </ThemedText>
-        <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: colors.tint }]}
-          onPress={handleRetry}
-          accessibilityRole="button"
-          accessibilityLabel="Retry connection"
-        >
-          <ThemedText
-            style={[styles.retryButtonText, { color: colors.background }]}
-          >
-            Retry
-          </ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
-    );
-  }
-
-  // 5) Default loading UI while redirecting
+  // Minimal fallback UI while we don't know yet
   return (
-    <ThemedView
-      style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-    >
-      <ActivityIndicator size="large" />
+    <ThemedView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ alignItems: 'center' }}>
+        <ActivityIndicator size="small" />
+        <ThemedText style={{ marginTop: 8 }}>Loading…</ThemedText>
+      </View>
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  fallbackContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  fallbackMessage: {
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
