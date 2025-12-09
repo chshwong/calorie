@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { Platform } from 'react-native';
 import { setLanguage, isLanguageSupported } from '@/i18n';
 import { ensureProfileExists } from '@/lib/services/profileService';
+import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+
+const PROFILE_CACHE_KEY = 'profile';
+const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 type AuthContextType = {
   session: Session | null;
@@ -72,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const newProfile = await ensureProfileExists(userId);
           if (newProfile) {
             setProfile(newProfile);
+            saveProfileSnapshot(newProfile);
             profileFetchRetryCount.current = 0;
             setRetrying(false);
             setLoading(false);
@@ -119,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         
         setProfile(data);
+        saveProfileSnapshot(data);
         profileFetchRetryCount.current = 0; // Reset retry count on success
         setRetrying(false);
         setLoading(false);
@@ -127,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data?.language_preference && isLanguageSupported(data.language_preference)) {
           setLanguage(data.language_preference);
         }
+      
       }
     } catch (error: any) {
       if (error.message === 'Profile fetch timeout') {
@@ -165,15 +172,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
       setSession(session);
       setUser(session?.user ?? null);
-    
-      // Auth state is now known; stop global loading here
-      setLoading(false);
-    
+  
       if (session?.user) {
-        // Load profile in the background – do NOT block global loading on this
+        // 1) Hydrate from persistent snapshot (if for same user)
+        const snapshot = loadProfileSnapshot();
+        if (snapshot && snapshot.user_id === session.user.id) {
+          setProfile(snapshot);
+        }
+  
+        // 2) Auth state is now known; stop global loading here
+        setLoading(false);
+  
+        // 3) Load profile from Supabase in the background – do NOT block global loading
         fetchProfile(session.user.id, true);
       } else {
+        // No session: clear profile and stop loading
         setProfile(null);
+        setLoading(false);
       }
     }).catch((error) => {
       console.error('[AuthProvider] Error getting initial session:', error);
@@ -380,3 +395,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export const useAuth = () => useContext(AuthContext);
 
+function loadProfileSnapshot() {
+  return getPersistentCache<any>(PROFILE_CACHE_KEY, PROFILE_MAX_AGE_MS);
+}
+
+function saveProfileSnapshot(profile: any) {
+  setPersistentCache(PROFILE_CACHE_KEY, profile);
+}
