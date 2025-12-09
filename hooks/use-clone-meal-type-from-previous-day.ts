@@ -15,6 +15,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cloneDayEntries } from '@/lib/services/cloneDayEntries';
 import { getMealtypeMetaByDate, upsertMealtypeMeta } from '@/lib/services/calories-entries-mealtype-meta';
 
+export interface CloneMealTypeFromPreviousDayResult {
+  entriesCloned: number;
+  quickLogCopied: boolean;
+  notesCopied: boolean;
+  totalCount: number; // entries + quick log (1) + notes (1)
+}
+
 export interface CloneMealTypeFromPreviousDayOptions {
   /**
    * Current date (target date for cloning)
@@ -28,9 +35,9 @@ export interface CloneMealTypeFromPreviousDayOptions {
   
   /**
    * Callback when cloning succeeds
-   * @param clonedCount - Number of items cloned
+   * @param result - Result with counts of cloned items
    */
-  onSuccess?: (clonedCount: number) => void;
+  onSuccess?: (result: CloneMealTypeFromPreviousDayResult) => void;
   
   /**
    * Callback when cloning fails
@@ -65,61 +72,113 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       const sourceDate = previousDay.toISOString().split('T')[0];
       const targetDate = currentDate.toISOString().split('T')[0];
 
-      // Check cache first - if no entries exist, throw special error
+      // Check cache first - check for entries, quick log, or notes
       const sourceQueryKey = ['entries', userId, sourceDate];
       const cachedData = queryClient.getQueryData<any[]>(sourceQueryKey);
       
-      // If cache exists, check if there are entries for this meal type
+      // Also check for mealtype meta
+      const sourceMetaQueryKey = ['mealtypeMeta', userId, sourceDate];
+      const cachedMeta = queryClient.getQueryData<any[]>(sourceMetaQueryKey);
+      
+      // Check if there's anything to copy: entries, quick log, or notes
+      let hasEntries = false;
+      let hasQuickLog = false;
+      let hasNotes = false;
+      
+      // Check entries
       if (cachedData !== undefined) {
-        if (cachedData === null || cachedData.length === 0) {
-          throw new Error('NOTHING_TO_COPY');
+        if (cachedData !== null && cachedData.length > 0) {
+          const mealTypeEntries = cachedData.filter(entry => 
+            entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+          );
+          hasEntries = mealTypeEntries.length > 0;
         }
-        
-        // Check if there are entries for this specific meal type
-        const mealTypeEntries = cachedData.filter(entry => 
-          entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+      }
+      
+      // Check quick log and notes from meta
+      if (cachedMeta !== undefined && cachedMeta !== null) {
+        const mealTypeMeta = cachedMeta.find(meta => 
+          meta.meal_type?.toLowerCase() === mealType.toLowerCase()
         );
-        
-        if (mealTypeEntries.length === 0) {
+        if (mealTypeMeta) {
+          hasQuickLog = mealTypeMeta.quick_kcal != null;
+          hasNotes = mealTypeMeta.note != null && mealTypeMeta.note.trim().length > 0;
+        }
+      }
+      
+      // If cache exists and there's nothing to copy, throw error
+      if (cachedData !== undefined && cachedMeta !== undefined) {
+        if (!hasEntries && !hasQuickLog && !hasNotes) {
           throw new Error('NOTHING_TO_COPY');
         }
       }
 
       // Use the shared cloneDayEntries service with meal type filter
-      const clonedCount = await cloneDayEntries('food_log', userId, sourceDate, targetDate, undefined, mealType);
+      const entriesCloned = await cloneDayEntries('food_log', userId, sourceDate, targetDate, undefined, mealType);
 
       // After successfully cloning entries, also clone mealtype_meta if it exists
-      // Only copy quick log values; do NOT copy notes (set note = null)
+      // Copy both quick log values and notes
       const sourceMetaArray = await getMealtypeMetaByDate(userId, sourceDate);
       const sourceMeta = sourceMetaArray.find(meta => 
         meta.meal_type.toLowerCase() === mealType.toLowerCase()
       );
 
+      let quickLogCopied = false;
+      let notesCopied = false;
+
       if (sourceMeta) {
-        // Only copy quick log values if they exist; always set note = null (do not copy notes)
-        const hasQuickLog = sourceMeta.quick_kcal != null;
+        const hasQuickLogValue = sourceMeta.quick_kcal != null;
+        const hasNoteValue = sourceMeta.note != null && sourceMeta.note.trim().length > 0;
         
-        if (hasQuickLog) {
-          // Upsert meta for target date/meal type with quick log values only
-          await upsertMealtypeMeta({
+        // Only upsert if there's something to copy
+        if (hasQuickLogValue || hasNoteValue) {
+          const upsertParams: any = {
             userId,
             entryDate: targetDate,
             mealType,
-            quickKcal: sourceMeta.quick_kcal,
-            quickProteinG: sourceMeta.quick_protein_g,
-            quickCarbsG: sourceMeta.quick_carbs_g,
-            quickFatG: sourceMeta.quick_fat_g,
-            quickFiberG: sourceMeta.quick_fiber_g,
-            quickSugarG: sourceMeta.quick_sugar_g,
-            quickSodiumMg: sourceMeta.quick_sodium_mg,
-            note: null, // Always set note to null - do not copy notes
-          });
+          };
+          
+          // Copy quick log if it exists
+          if (hasQuickLogValue) {
+            upsertParams.quickKcal = sourceMeta.quick_kcal;
+            upsertParams.quickProteinG = sourceMeta.quick_protein_g;
+            upsertParams.quickCarbsG = sourceMeta.quick_carbs_g;
+            upsertParams.quickFatG = sourceMeta.quick_fat_g;
+            upsertParams.quickFiberG = sourceMeta.quick_fiber_g;
+            upsertParams.quickSugarG = sourceMeta.quick_sugar_g;
+            upsertParams.quickSodiumMg = sourceMeta.quick_sodium_mg;
+            upsertParams.quickLogFood = sourceMeta.quick_log_food;
+            quickLogCopied = true;
+          }
+          
+          // Copy notes if they exist
+          if (hasNoteValue) {
+            upsertParams.note = sourceMeta.note;
+            notesCopied = true;
+          }
+          
+          const metaResult = await upsertMealtypeMeta(upsertParams);
+          // Only mark as copied if upsert was successful
+          if (!metaResult) {
+            quickLogCopied = false;
+            notesCopied = false;
+          }
         }
       }
 
-      return clonedCount;
+      // Calculate total count
+      let totalCount = entriesCloned;
+      if (quickLogCopied) totalCount += 1;
+      if (notesCopied) totalCount += 1;
+
+      return {
+        entriesCloned,
+        quickLogCopied,
+        notesCopied,
+        totalCount,
+      };
     },
-    onSuccess: (clonedCount) => {
+    onSuccess: (result) => {
       // Invalidate food log queries (matches useDailyEntries query key pattern)
       queryClient.invalidateQueries({ queryKey: ['entries', userId] });
       // Also invalidate mealtype meta queries for both source and target dates
@@ -128,7 +187,7 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       }
 
       // Call user-provided success callback
-      onSuccess?.(clonedCount);
+      onSuccess?.(result);
     },
     onError: (error: Error) => {
       // Call user-provided error callback

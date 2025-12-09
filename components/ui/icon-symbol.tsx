@@ -80,6 +80,7 @@ const MAPPING = {
   'plus': 'add',
   'doc.on.doc': 'content-copy',
   'ellipsis': 'more-horiz',
+  'note.text': { type: 'community', name: 'note-text' },
 } as IconMapping;
 
 /**

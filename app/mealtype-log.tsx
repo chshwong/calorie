@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { FoodSearchBar } from '@/components/food-search-bar';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEnhancedFoodSearch } from '@/hooks/use-enhanced-food-search';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
@@ -55,6 +55,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { QuickLogEditor } from '@/components/quick-log-editor';
+import { NoteEditor } from '@/components/note-editor';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -324,6 +325,31 @@ export default function LogFoodScreen() {
               defaultValue: 'Quick Log removed.',
             })
           );
+        },
+      }
+    );
+  };
+  
+  // Handlers for Notes
+  const handleNotes = () => {
+    setMassDeleteMenuVisible(false);
+    setNoteEditor({ visible: true });
+  };
+
+  const handleNoteSave = (note: string | null) => {
+    upsertMealtypeMetaMutation.mutate(
+      {
+        entryDate: selectedDateString,
+        mealType: selectedMealType,
+        note,
+      },
+      {
+        onSuccess: () => {
+          setNoteEditor({ visible: false });
+        },
+        onError: (error) => {
+          console.error('Error saving note:', error);
+          Alert.alert(t('common.error', { defaultValue: 'Error' }), t('food.note.save_error', { defaultValue: 'Failed to save note' }));
         },
       }
     );
@@ -880,6 +906,12 @@ export default function LogFoodScreen() {
   
   // Mass delete confirmation modal state
   const [massDeleteConfirmVisible, setMassDeleteConfirmVisible] = useState(false);
+  
+  // 3-dot menu state
+  const [massDeleteMenuVisible, setMassDeleteMenuVisible] = useState(false);
+  
+  // Note editor state
+  const [noteEditor, setNoteEditor] = useState<{ visible: boolean }>({ visible: false });
   
   // Selected food and serving state
   const [selectedFood, setSelectedFood] = useState<FoodMaster | null>(null);
@@ -5493,30 +5525,67 @@ export default function LogFoodScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {!showLoadingSpinner && entries.length > 0 && (
+              {!showLoadingSpinner && (
                 <TouchableOpacity
                   onPress={() => {
-                    setEntriesEditMode(!entriesEditMode);
-                    // Clear selection when exiting edit mode
                     if (entriesEditMode) {
+                      // Exit edit mode
+                      setEntriesEditMode(false);
                       clearEntrySelection();
+                    } else {
+                      // Open menu
+                      setMassDeleteMenuVisible(true);
                     }
                   }}
-                  style={[styles.deleteButton, { 
-                    backgroundColor: entriesEditMode ? '#10B981' + '20' : '#EF4444' + '20', 
-                    borderColor: entriesEditMode ? '#10B981' + '40' : '#EF4444' + '40' 
-                  }]}
+                  style={[
+                    styles.massDeleteMenuButton,
+                    getMinTouchTargetStyle(),
+                    Platform.OS === 'web' && getFocusStyle(colors.tint),
+                  ]}
                   activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(
+                    entriesEditMode 
+                      ? t('mealtype_log.food_log.exit_selection_mode', { defaultValue: 'Exit selection mode' })
+                      : t('mealtype_log.food_log.more_options', { defaultValue: 'More options' }),
+                    entriesEditMode
+                      ? t('mealtype_log.food_log.exit_selection_mode_hint', { defaultValue: 'Double tap to exit selection mode' })
+                      : t('mealtype_log.food_log.more_options_hint', { defaultValue: 'Double tap to open menu' })
+                  )}
                 >
-                  <Text style={[styles.deleteButtonText, { 
-                    color: entriesEditMode ? '#10B981' : '#EF4444' 
-                  }]}>
-                    {entriesEditMode ? '✓' : '🗑️'}
-                  </Text>
+                  {entriesEditMode ? (
+                    <IconSymbol name="checkmark" size={20} color={colors.tint} />
+                  ) : (
+                    <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} />
+                  )}
                 </TouchableOpacity>
               )}
             </View>
           </View>
+          {/* Notes row */}
+          {currentMealMeta?.note && currentMealMeta.note.trim().length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.noteRow,
+                getMinTouchTargetStyle(),
+                Platform.OS === 'web' && getFocusStyle(colors.tint),
+              ]}
+              onPress={() => {
+                setNoteEditor({ visible: true });
+              }}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps(
+                t('food.note.edit', { defaultValue: `Edit notes for ${t(`home.meal_types.${selectedMealType}`)}`, mealType: t(`home.meal_types.${selectedMealType}`) })
+              )}
+            >
+              <ThemedText
+                style={[styles.noteRowText, { color: colors.text }]}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                📝 {currentMealMeta.note}
+              </ThemedText>
+            </TouchableOpacity>
+          )}
           <View style={[styles.foodLogDivider, { backgroundColor: colors.separator }]} />
 
           {/* Meal Totals - Only shown when Details toggle is ON and there are entries or Quick Log */}
@@ -6233,6 +6302,98 @@ export default function LogFoodScreen() {
         confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
 
+      {/* Mass Delete Menu Modal */}
+      <Modal
+        visible={massDeleteMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMassDeleteMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={[styles.massDeleteMenuOverlay, { backgroundColor: colors.overlay }]}
+          activeOpacity={1}
+          onPress={() => setMassDeleteMenuVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.massDeleteMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Close button header */}
+              <View style={styles.massDeleteMenuHeader}>
+                <TouchableOpacity
+                  style={[styles.massDeleteMenuCloseButton, getMinTouchTargetStyle()]}
+                  onPress={() => setMassDeleteMenuVisible(false)}
+                  activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(
+                    t('common.close', { defaultValue: 'Close' }),
+                    t('common.close_hint', { defaultValue: 'Double tap to close menu' })
+                  )}
+                >
+                  <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.massDeleteMenuItem}
+                onPress={() => {
+                  setMassDeleteMenuVisible(false);
+                  setQuickLogEditor({ visible: true });
+                }}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  `Quick Log for ${t(`home.meal_types.${selectedMealType}`)}`,
+                  `Add quick log for ${t(`home.meal_types.${selectedMealType}`)}`
+                )}
+              >
+                <ThemedText style={[styles.massDeleteMenuItemText, { color: colors.text }]}>
+                  ⚡️ {t('food.menu.quick_log', { defaultValue: 'Quick Log' })}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.massDeleteMenuItem}
+                onPress={handleNotes}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  `Notes for ${t(`home.meal_types.${selectedMealType}`)}`,
+                  `Add or edit notes for ${t(`home.meal_types.${selectedMealType}`)}`
+                )}
+              >
+                <ThemedText style={[styles.massDeleteMenuItemText, { color: colors.text }]}>
+                  📝 {t('food.menu.notes', { defaultValue: 'Notes' })}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.massDeleteMenuItem}
+                onPress={() => {
+                  if (entries.length > 0 || hasQuickLog) {
+                    setMassDeleteMenuVisible(false);
+                    setEntriesEditMode(true);
+                  }
+                }}
+                activeOpacity={entries.length > 0 || hasQuickLog ? 0.7 : 1}
+                disabled={entries.length === 0 && !hasQuickLog}
+                {...getButtonAccessibilityProps(
+                  t('mealtype_log.food_log.mass_delete', { defaultValue: 'Mass Delete' }),
+                  entries.length > 0 || hasQuickLog
+                    ? t('mealtype_log.food_log.mass_delete_hint', { defaultValue: 'Double tap to enter mass delete mode' })
+                    : t('mealtype_log.food_log.mass_delete_disabled_hint', { defaultValue: 'Mass delete is not available when there are no entries' })
+                )}
+              >
+                <ThemedText style={[
+                  styles.massDeleteMenuItemText, 
+                  { 
+                    color: (entries.length > 0 || hasQuickLog) ? colors.text : colors.textSecondary,
+                    opacity: (entries.length > 0 || hasQuickLog) ? 1 : 0.5,
+                  }
+                ]}>
+                  🗑️ {t('mealtype_log.food_log.mass_delete', { defaultValue: 'Mass Delete' })}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Quick Log Editor */}
       {(hasQuickLog || quickLogEditor.visible) && (
         <QuickLogEditor
@@ -6256,6 +6417,18 @@ export default function LogFoodScreen() {
                 }
               : null
           }
+          mealTypeLabel={t(`home.meal_types.${selectedMealType}`)}
+          isLoading={upsertMealtypeMetaMutation.isPending}
+        />
+      )}
+
+      {/* Note Editor */}
+      {noteEditor.visible && (
+        <NoteEditor
+          visible={noteEditor.visible}
+          onClose={() => setNoteEditor({ visible: false })}
+          onSave={handleNoteSave}
+          initialNote={currentMealMeta?.note ?? null}
           mealTypeLabel={t(`home.meal_types.${selectedMealType}`)}
           isLoading={upsertMealtypeMetaMutation.isPending}
         />
@@ -7409,5 +7582,73 @@ const styles = StyleSheet.create({
   massDeleteButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  massDeleteMenuButton: {
+    padding: Spacing.xs,
+    marginLeft: Spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  massDeleteMenuOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  massDeleteMenuContent: {
+    minWidth: 200,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingVertical: Spacing.xs,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      },
+      default: {
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
+      },
+    }),
+  },
+  massDeleteMenuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xs,
+  },
+  massDeleteMenuCloseButton: {
+    padding: Spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  massDeleteMenuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  massDeleteMenuItemText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.medium,
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: Platform.select({ web: 0, default: 0 }),
+    paddingHorizontal: 0,
+    marginTop: -8,
+    marginBottom: 4,
+  },
+  noteRowText: {
+    flex: 1,
+    fontSize: Platform.select({ web: 12, default: 13 }),
+    fontWeight: '400',
   },
 });

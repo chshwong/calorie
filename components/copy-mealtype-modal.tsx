@@ -23,7 +23,7 @@ import {
 type CopyMealtypeModalProps = {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (targetDate: Date, targetMealType: string, includeQuickLog: boolean) => void;
+  onConfirm: (targetDate: Date, targetMealType: string, includeQuickLog: boolean, includeNotes: boolean) => void;
   sourceDate: Date;
   sourceMealType: string;
   isLoading?: boolean;
@@ -63,6 +63,7 @@ export function CopyMealtypeModal({
   const [targetMealType, setTargetMealType] = useState<string>(sourceMealType);
   const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => new Date(targetDate));
   const [includeQuickLog, setIncludeQuickLog] = useState<boolean>(false); // Default: "Exclude Quick Log"
+  const [includeNotes, setIncludeNotes] = useState<boolean>(false); // Default: "Exclude Notes"
 
   // Update target date and meal type when modal opens
   useEffect(() => {
@@ -72,6 +73,7 @@ export function CopyMealtypeModal({
       setTargetMealType(sourceMealType); // Default to same meal type
       setCalendarViewMonth(new Date(defaultDate));
       setIncludeQuickLog(false); // Reset to "Exclude Quick Log" (default)
+      setIncludeNotes(false); // Reset to "Exclude Notes" (default)
     }
   }, [visible, sourceDate, sourceMealType]);
 
@@ -124,7 +126,7 @@ export function CopyMealtypeModal({
   };
 
   const handleConfirm = () => {
-    onConfirm(targetDate, targetMealType, includeQuickLog);
+    onConfirm(targetDate, targetMealType, includeQuickLog, includeNotes);
   };
 
   const formatDateLabel = (date: Date): string => {
@@ -287,6 +289,90 @@ export function CopyMealtypeModal({
                     ]}
                   >
                     {t('food.copy.override_quick_log', { defaultValue: 'Override Quick Log' })}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Notes Radio Buttons */}
+            <View style={styles.radioSection}>
+              <View style={styles.radioContainer}>
+                <TouchableOpacity
+                  onPress={() => setIncludeNotes(false)}
+                  activeOpacity={0.7}
+                  style={styles.radioOption}
+                  {...getButtonAccessibilityProps(
+                    t('food.copy.exclude_notes', { defaultValue: 'Exclude Notes' })
+                  )}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: !includeNotes }}
+                >
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      {
+                        borderColor: !includeNotes ? colors.tint : colors.border,
+                      },
+                    ]}
+                  >
+                    {!includeNotes && (
+                      <View
+                        style={[
+                          styles.radioInner,
+                          { backgroundColor: colors.tint },
+                        ]}
+                      />
+                    )}
+                  </View>
+                  <ThemedText
+                    style={[
+                      styles.radioLabel,
+                      {
+                        color: !includeNotes ? colors.text : colors.textSecondary,
+                        fontWeight: !includeNotes ? '600' : '400',
+                      },
+                    ]}
+                  >
+                    {t('food.copy.exclude_notes', { defaultValue: 'Exclude Notes' })}
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setIncludeNotes(true)}
+                  activeOpacity={0.7}
+                  style={styles.radioOption}
+                  {...getButtonAccessibilityProps(
+                    t('food.copy.override_notes', { defaultValue: 'Override Notes' })
+                  )}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: includeNotes }}
+                >
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      {
+                        borderColor: includeNotes ? colors.tint : colors.border,
+                      },
+                    ]}
+                  >
+                    {includeNotes && (
+                      <View
+                        style={[
+                          styles.radioInner,
+                          { backgroundColor: colors.tint },
+                        ]}
+                      />
+                    )}
+                  </View>
+                  <ThemedText
+                    style={[
+                      styles.radioLabel,
+                      {
+                        color: includeNotes ? colors.text : colors.textSecondary,
+                        fontWeight: includeNotes ? '600' : '400',
+                      },
+                    ]}
+                  >
+                    {t('food.copy.override_notes', { defaultValue: 'Override Notes' })}
                   </ThemedText>
                 </TouchableOpacity>
               </View>

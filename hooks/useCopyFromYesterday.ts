@@ -12,7 +12,7 @@ export function useCopyFromYesterday() {
       }
 
       // Show toast immediately when user triggers the action
-      showAppToast("Copying from yesterday, please wait");
+      showAppToast("Copying from previous day, please wait");
 
       setIsCopyingFromYesterday(true);
       try {

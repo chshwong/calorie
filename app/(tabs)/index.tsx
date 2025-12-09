@@ -57,11 +57,11 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
   const { cloneMealTypeFromPreviousDay, isLoading } = useCloneMealTypeFromPreviousDay({
     currentDate: selectedDate,
     mealType,
-    onSuccess: (clonedCount) => {
-      if (clonedCount > 0) {
+    onSuccess: (result) => {
+      if (result.totalCount > 0) {
         showAppToast(t('home.previous_day_copy.success_message', {
-          count: clonedCount,
-          items: clonedCount === 1 ? t('home.previous_day_copy.item_one') : t('home.previous_day_copy.item_other'),
+          count: result.totalCount,
+          items: result.totalCount === 1 ? t('home.previous_day_copy.item_one') : t('home.previous_day_copy.item_other'),
         }));
       }
     },
@@ -94,22 +94,41 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     previousDay.setDate(previousDay.getDate() - 1);
     const previousDateString = previousDay.toISOString().split('T')[0];
     
-    // Use React Query cache to check if previous day has entries for this meal type
+    // Use React Query cache to check if previous day has entries, quick log, or notes for this meal type
     const previousDayQueryKey = ['entries', user?.id, previousDateString];
     const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
+    const previousDayMetaQueryKey = ['mealtypeMeta', user?.id, previousDateString];
+    const cachedPreviousDayMeta = queryClient.getQueryData<any[]>(previousDayMetaQueryKey);
     
-    // If cache exists and is empty or has no entries for this meal type, show message and skip DB call
+    // Check if there's anything to copy: entries, quick log, or notes
+    let hasEntries = false;
+    let hasQuickLog = false;
+    let hasNotes = false;
+    
+    // Check entries
     if (cachedPreviousDayEntries !== undefined) {
-      if (cachedPreviousDayEntries === null || cachedPreviousDayEntries.length === 0) {
-        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
-        return;
+      if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
+        const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+          entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+        );
+        hasEntries = mealTypeEntries.length > 0;
       }
-      
-      const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
-        entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+    }
+    
+    // Check quick log and notes from meta
+    if (cachedPreviousDayMeta !== undefined && cachedPreviousDayMeta !== null) {
+      const mealTypeMeta = cachedPreviousDayMeta.find(meta => 
+        meta.meal_type?.toLowerCase() === mealType.toLowerCase()
       );
-      
-      if (mealTypeEntries.length === 0) {
+      if (mealTypeMeta) {
+        hasQuickLog = mealTypeMeta.quick_kcal != null;
+        hasNotes = mealTypeMeta.note != null && mealTypeMeta.note.trim().length > 0;
+      }
+    }
+    
+    // If cache exists and there's nothing to copy, show message and skip DB call
+    if (cachedPreviousDayEntries !== undefined && cachedPreviousDayMeta !== undefined) {
+      if (!hasEntries && !hasQuickLog && !hasNotes) {
         showAppToast(t('home.previous_day_copy.nothing_to_copy'));
         return;
       }
@@ -596,7 +615,7 @@ export default function FoodLogHomeScreen() {
     setCopyMealtypeModal({ visible: true, mealType });
   };
 
-  const handleCopyConfirm = (mealType: string, targetDate: Date, targetMealType: string, includeQuickLog: boolean) => {
+  const handleCopyConfirm = (mealType: string, targetDate: Date, targetMealType: string, includeQuickLog: boolean, includeNotes: boolean) => {
     const targetDateString = targetDate.toISOString().split('T')[0];
     
     // Helper to check if two dates are the same day
@@ -624,16 +643,27 @@ export default function FoodLogHomeScreen() {
         targetDate: targetDateString,
         targetMealType,
         includeQuickLog,
+        includeNotes,
       },
       {
         onSuccess: (result) => {
           setCopyMealtypeModal({ visible: false, mealType: null });
           const mealTypeLabel = t(`home.meal_types.${targetMealType}`);
           const dateLabel = targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+          
+          // Calculate total count: entries + quick log (1 if copied) + notes (1 if copied)
+          let totalCount = result.entriesCloned;
+          if (result.quickLogCopied) {
+            totalCount += 1;
+          }
+          if (result.notesCopied) {
+            totalCount += 1;
+          }
+          
           showAppToast(
             t('food.copy.success_toast', {
               defaultValue: '{{count}} item(s) copied to {{mealType}} on {{date}}',
-              count: result.entriesCloned,
+              count: totalCount,
               mealType: mealTypeLabel,
               date: dateLabel,
             })
@@ -905,10 +935,11 @@ export default function FoodLogHomeScreen() {
                   const group = groupedEntries[mealType];
                   // Use i18n for meal type labels
                   const mealTypeLabel = t(`home.meal_types.${mealType}`);
-                  // Check if mealtype_meta has meaningful data (quick log or note)
+                  // Check if mealtype_meta has meaningful data (quick log or notes)
                   // Only hide the "Copy from yesterday" button if there's actual data, not just an empty row
                   const meta = dataByMealType[mealType];
-                  const hasMealtypeMeta = meta?.quick_kcal != null || (meta?.note && meta.note.trim().length > 0);
+                  const hasMealtypeMeta = meta?.quick_kcal != null;
+                  const hasNotes = meta?.note != null && meta.note.trim().length > 0;
                   const isLast = index === sortedMealTypes.length - 1;
                   
                   return (
@@ -964,8 +995,8 @@ export default function FoodLogHomeScreen() {
                               </View>
                             </View>
                           </TouchableOpacity>
-                          {/* Show "← Log Food" immediately after meal type badge when no entries (except for Late Night) */}
-                          {group.entries.length === 0 && mealType !== 'late_night' && (
+                          {/* Show "← Log Food" immediately after meal type badge when no entries AND no mealtype_meta (except for Late Night) */}
+                          {group.entries.length === 0 && !hasMealtypeMeta && mealType !== 'late_night' && (
                             <TouchableOpacity
                               style={[
                                 styles.addFoodPrompt,
@@ -1057,8 +1088,8 @@ export default function FoodLogHomeScreen() {
                         </View>
                       </View>
 
-                      {/* Copy from yesterday button - only show when no entries AND no mealtype_meta */}
-                      {group.entries.length === 0 && !hasMealtypeMeta && (
+                      {/* Copy from yesterday button - only show when no entries AND no mealtype_meta AND no notes */}
+                      {group.entries.length === 0 && !hasMealtypeMeta && !hasNotes && (
                         <View style={styles.copyFromYesterdayContainer}>
                           <MealTypeCopyButton
                             mealType={mealType}
@@ -1172,7 +1203,6 @@ export default function FoodLogHomeScreen() {
                             t('food.note.edit', { defaultValue: `Edit notes for ${mealTypeLabel}`, mealType: mealTypeLabel })
                           )}
                         >
-                          <IconSymbol name="note.text" size={16} color={colors.textSecondary} style={{ marginRight: Spacing.xs }} />
                           <ThemedText
                             style={[styles.noteRowText, { color: colors.text }]}
                             numberOfLines={2}
@@ -1214,6 +1244,20 @@ export default function FoodLogHomeScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <View style={[styles.mealMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Close button header */}
+              <View style={styles.mealMenuHeader}>
+                <TouchableOpacity
+                  style={[styles.mealMenuCloseButton, getMinTouchTargetStyle()]}
+                  onPress={() => setMealMenuVisible({ mealType: null })}
+                  activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(
+                    t('common.close', { defaultValue: 'Close' }),
+                    t('common.close_hint', { defaultValue: 'Double tap to close menu' })
+                  )}
+                >
+                  <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
               {mealMenuVisible.mealType && (() => {
                 // Calculate if there's anything to copy for this meal type
                 const currentMealType = mealMenuVisible.mealType;
@@ -1335,7 +1379,7 @@ export default function FoodLogHomeScreen() {
         <CopyMealtypeModal
           visible={copyMealtypeModal.visible}
           onClose={() => setCopyMealtypeModal({ visible: false, mealType: null })}
-          onConfirm={(targetDate, targetMealType, includeQuickLog) => handleCopyConfirm(copyMealtypeModal.mealType!, targetDate, targetMealType, includeQuickLog)}
+          onConfirm={(targetDate, targetMealType, includeQuickLog, includeNotes) => handleCopyConfirm(copyMealtypeModal.mealType!, targetDate, targetMealType, includeQuickLog, includeNotes)}
           sourceDate={selectedDate}
           sourceMealType={copyMealtypeModal.mealType}
           isLoading={copyMealtypeMutation.isPending}
@@ -2322,6 +2366,21 @@ const styles = StyleSheet.create({
         elevation: 5,
       },
     }),
+  },
+  mealMenuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xs,
+  },
+  mealMenuCloseButton: {
+    padding: Spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mealMenuItem: {
     paddingVertical: Spacing.md,

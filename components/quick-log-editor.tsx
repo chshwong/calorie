@@ -256,7 +256,7 @@ export function QuickLogEditor({
                   returnKeyType="done"
                   placeholder={t('food.quick_log.food_placeholder', { defaultValue: 'Optional (i.e. Buffet)' })}
                   placeholderTextColor={colors.textSecondary}
-                  maxLength={20}
+                  maxLength={40}
                 />
               </View>
 
