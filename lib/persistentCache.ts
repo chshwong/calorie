@@ -9,6 +9,8 @@
  * - Platform-agnostic (web vs mobile ready)
  */
 
+export const DEFAULT_CACHE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000; // 180 days
+
 import { Platform } from 'react-native';
 
 type CacheEntry<T> = {

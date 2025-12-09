@@ -21,6 +21,10 @@ import {
   deleteExerciseLog,
   type ExerciseLog,
 } from '@/lib/services/exerciseLogs';
+import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+
+
+
 
 /**
  * Hook to fetch exercise logs for a specific date
@@ -28,20 +32,56 @@ import {
 export function useExerciseLogsForDate(dateString: string) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = exerciseLogsCacheKey(userId, dateString);
+
+  // Persistent snapshot (survives full reloads)
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<ExerciseLog[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery<ExerciseLog[]>({
     queryKey: ['exerciseLogs', userId, dateString],
-    queryFn: () => {
+    // DB call + write-through to persistent cache
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getExerciseLogsForDate(userId, dateString);
+      const data = await getExerciseLogsForDate(userId, dateString);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId && !!dateString,
     staleTime: 60 * 1000, // 60 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+
+    // Priority: previousData → in-memory cache → persistent snapshot
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData<ExerciseLog[]>([
+        'exerciseLogs',
+        userId,
+        dateString,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
+
+
 
 /**
  * Hook to fetch exercise summary for recent days
@@ -49,20 +89,51 @@ export function useExerciseLogsForDate(dateString: string) {
 export function useExerciseSummaryForRecentDays(days: number = 7) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = exerciseSummaryCacheKey(userId, days);
+
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<any>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery({
     queryKey: ['exerciseSummary', userId, days],
-    queryFn: () => {
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getExerciseSummaryForRecentDays(userId, days);
+      const data = await getExerciseSummaryForRecentDays(userId, days);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId,
     staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes,
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData([
+        'exerciseSummary',
+        userId,
+        days,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
+
 
 /**
  * Hook to fetch recent and frequent exercises for Quick Add
@@ -71,20 +142,51 @@ export function useExerciseSummaryForRecentDays(days: number = 7) {
 export function useRecentAndFrequentExercises(days: number = 60) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = recentAndFrequentExercisesCacheKey(userId, days);
+
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<any[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery({
     queryKey: ['recentAndFrequentExercises', userId, days],
-    queryFn: () => {
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getRecentAndFrequentExercises(userId, days);
+      const data = await getRecentAndFrequentExercises(userId, days);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId,
     staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes,
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData([
+        'recentAndFrequentExercises',
+        userId,
+        days,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
+
 
 /**
  * @deprecated Use useRecentAndFrequentExercises instead
@@ -107,6 +209,23 @@ export function useRecentFrequentExercises(days: number = 60) {
     gcTime: 5 * 60 * 1000, // 5 minutes
   });
 }
+
+function exerciseLogsCacheKey(userId: string | undefined, date: string) {
+  if (!userId) return null;
+  return `exerciseLogs:${userId}:${date}`;
+}
+
+function exerciseSummaryCacheKey(userId: string | undefined, days: number) {
+  if (!userId) return null;
+  return `exerciseSummary:${userId}:${days}`;
+}
+
+function recentAndFrequentExercisesCacheKey(userId: string | undefined, days: number) {
+  if (!userId) return null;
+  return `recentAndFrequentExercises:${userId}:${days}`;
+}
+
+
 
 /**
  * Hook to create an exercise log entry
