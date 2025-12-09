@@ -21,6 +21,8 @@ export interface QuickLogData {
   quickCarbsG: number | null;
   quickFatG: number | null;
   quickFiberG: number | null;
+  quickSaturatedFatG: number | null;
+  quickTransFatG: number | null;
   quickSugarG: number | null;
   quickSodiumMg: number | null;
   quickLogFood: string | null;
@@ -56,6 +58,8 @@ export function QuickLogEditor({
   const [quickCarbsG, setQuickCarbsG] = useState('');
   const [quickFatG, setQuickFatG] = useState('');
   const [quickFiberG, setQuickFiberG] = useState('');
+  const [quickSaturatedFatG, setQuickSaturatedFatG] = useState('');
+  const [quickTransFatG, setQuickTransFatG] = useState('');
   const [quickSugarG, setQuickSugarG] = useState('');
   const [quickSodiumMg, setQuickSodiumMg] = useState('');
 
@@ -71,6 +75,8 @@ export function QuickLogEditor({
       setQuickCarbsG(initialData.quickCarbsG?.toString() || '');
       setQuickFatG(initialData.quickFatG?.toString() || '');
       setQuickFiberG(initialData.quickFiberG?.toString() || '');
+      setQuickSaturatedFatG(initialData.quickSaturatedFatG?.toString() || '');
+      setQuickTransFatG(initialData.quickTransFatG?.toString() || '');
       setQuickSugarG(initialData.quickSugarG?.toString() || '');
       setQuickSodiumMg(initialData.quickSodiumMg?.toString() || '');
     } else if (visible && !initialData) {
@@ -81,6 +87,8 @@ export function QuickLogEditor({
       setQuickCarbsG('');
       setQuickFatG('');
       setQuickFiberG('');
+      setQuickSaturatedFatG('');
+      setQuickTransFatG('');
       setQuickSugarG('');
       setQuickSodiumMg('');
     }
@@ -137,6 +145,14 @@ export function QuickLogEditor({
     setQuickFiberG(filterNumericInput(text, true));
   };
 
+  const handleSaturatedFatChange = (text: string) => {
+    setQuickSaturatedFatG(filterNumericInput(text, true));
+  };
+
+  const handleTransFatChange = (text: string) => {
+    setQuickTransFatG(filterNumericInput(text, true));
+  };
+
   const handleSugarChange = (text: string) => {
     setQuickSugarG(filterNumericInput(text, true));
   };
@@ -151,6 +167,8 @@ export function QuickLogEditor({
     const carbsNumber = quickCarbsG === '' ? null : Number(quickCarbsG);
     const fatNumber = quickFatG === '' ? null : Number(quickFatG);
     const fiberNumber = quickFiberG === '' ? null : Number(quickFiberG);
+    const saturatedFatNumber = quickSaturatedFatG === '' ? null : Number(quickSaturatedFatG);
+    const transFatNumber = quickTransFatG === '' ? null : Number(quickTransFatG);
     const sugarNumber = quickSugarG === '' ? null : Number(quickSugarG);
     const sodiumNumber = quickSodiumMg === '' ? null : Number(quickSodiumMg);
 
@@ -160,6 +178,8 @@ export function QuickLogEditor({
       quickCarbsG: carbsNumber !== null && !isNaN(carbsNumber) ? carbsNumber : null,
       quickFatG: fatNumber !== null && !isNaN(fatNumber) ? fatNumber : null,
       quickFiberG: fiberNumber !== null && !isNaN(fiberNumber) ? fiberNumber : null,
+      quickSaturatedFatG: saturatedFatNumber !== null && !isNaN(saturatedFatNumber) ? saturatedFatNumber : null,
+      quickTransFatG: transFatNumber !== null && !isNaN(transFatNumber) ? transFatNumber : null,
       quickSugarG: sugarNumber !== null && !isNaN(sugarNumber) ? sugarNumber : null,
       quickSodiumMg: sodiumNumber !== null && !isNaN(sodiumNumber) ? sodiumNumber : null,
       quickLogFood: quickLogFood.trim() || null,
@@ -303,6 +323,40 @@ export function QuickLogEditor({
                   blurOnSubmit={true}
                   returnKeyType="done"
                   placeholder={t('food.quick_log.fiber_placeholder', { defaultValue: 'Optional' })}
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.fieldRow}>
+                <ThemedText style={[styles.fieldLabel, { color: colors.text }]}>
+                  {t('food.quick_log.saturated_fat_label', { defaultValue: 'Saturated Fat (g)' })}
+                </ThemedText>
+                <TextInput
+                  style={[styles.fieldInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                  value={quickSaturatedFatG}
+                  onChangeText={handleSaturatedFatChange}
+                  onSubmitEditing={handleSave}
+                  blurOnSubmit={true}
+                  returnKeyType="done"
+                  placeholder={t('food.quick_log.saturated_fat_placeholder', { defaultValue: 'Optional' })}
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.fieldRow}>
+                <ThemedText style={[styles.fieldLabel, { color: colors.text }]}>
+                  {t('food.quick_log.trans_fat_label', { defaultValue: 'Trans Fat (g)' })}
+                </ThemedText>
+                <TextInput
+                  style={[styles.fieldInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                  value={quickTransFatG}
+                  onChangeText={handleTransFatChange}
+                  onSubmitEditing={handleSave}
+                  blurOnSubmit={true}
+                  returnKeyType="done"
+                  placeholder={t('food.quick_log.trans_fat_placeholder', { defaultValue: 'Optional' })}
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />

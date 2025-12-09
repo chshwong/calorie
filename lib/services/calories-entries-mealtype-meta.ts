@@ -20,6 +20,8 @@ export interface MealtypeMeta {
   quick_carbs_g: number | null;
   quick_fat_g: number | null;
   quick_fiber_g: number | null;
+  quick_saturated_fat_g: number | null;
+  quick_trans_fat_g: number | null;
   quick_sodium_mg: number | null;
   quick_sugar_g: number | null;
   quick_log_food: string | null;
@@ -75,6 +77,8 @@ export interface UpsertMealtypeMetaParams {
   quickCarbsG?: number | null;
   quickFatG?: number | null;
   quickFiberG?: number | null;
+  quickSaturatedFatG?: number | null;
+  quickTransFatG?: number | null;
   quickSodiumMg?: number | null;
   quickSugarG?: number | null;
   quickLogFood?: string | null;
@@ -93,7 +97,7 @@ export interface UpsertMealtypeMetaParams {
 export async function upsertMealtypeMeta(
   params: UpsertMealtypeMetaParams
 ): Promise<MealtypeMeta | null> {
-  const { userId, entryDate, mealType, quickKcal, quickProteinG, quickCarbsG, quickFatG, quickFiberG, quickSodiumMg, quickSugarG, quickLogFood, note } = params;
+  const { userId, entryDate, mealType, quickKcal, quickProteinG, quickCarbsG, quickFatG, quickFiberG, quickSaturatedFatG, quickTransFatG, quickSodiumMg, quickSugarG, quickLogFood, note } = params;
 
   if (!userId || !entryDate || !mealType) {
     console.error('Missing required parameters for upsertMealtypeMeta');
@@ -118,6 +122,12 @@ export async function upsertMealtypeMeta(
     }
     if (quickFiberG !== undefined) {
       updateData.quick_fiber_g = quickFiberG;
+    }
+    if (quickSaturatedFatG !== undefined) {
+      updateData.quick_saturated_fat_g = quickSaturatedFatG;
+    }
+    if (quickTransFatG !== undefined) {
+      updateData.quick_trans_fat_g = quickTransFatG;
     }
     if (quickSodiumMg !== undefined) {
       updateData.quick_sodium_mg = quickSodiumMg;

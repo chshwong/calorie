@@ -701,6 +701,7 @@
       "fat_short": "Fat",
       "fiber_short": "Fib",
       "saturated_fat_short": "Sat Fat",
+      "trans_fat_short": "Trans Fat",
       "sugar_short": "Sugar",
       "sodium_short": "Sodium"
     },

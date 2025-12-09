@@ -505,6 +505,8 @@ export default function FoodLogHomeScreen() {
     quickCarbsG: number | null;
     quickFatG: number | null;
     quickFiberG: number | null;
+    quickSaturatedFatG: number | null;
+    quickTransFatG: number | null;
     quickSugarG: number | null;
     quickSodiumMg: number | null;
     quickLogFood: string | null;
@@ -518,6 +520,8 @@ export default function FoodLogHomeScreen() {
         quickCarbsG: data.quickCarbsG,
         quickFatG: data.quickFatG,
         quickFiberG: data.quickFiberG,
+        quickSaturatedFatG: data.quickSaturatedFatG,
+        quickTransFatG: data.quickTransFatG,
         quickSugarG: data.quickSugarG,
         quickSodiumMg: data.quickSodiumMg,
         quickLogFood: data.quickLogFood,
@@ -544,6 +548,8 @@ export default function FoodLogHomeScreen() {
         quickCarbsG: null,
         quickFatG: null,
         quickFiberG: null,
+        quickSaturatedFatG: null,
+        quickTransFatG: null,
         quickSugarG: null,
         quickSodiumMg: null,
         quickLogFood: null,
@@ -1301,6 +1307,8 @@ export default function FoodLogHomeScreen() {
             quickCarbsG: dataByMealType[quickLogEditor.mealType]?.quick_carbs_g ?? null,
             quickFatG: dataByMealType[quickLogEditor.mealType]?.quick_fat_g ?? null,
             quickFiberG: dataByMealType[quickLogEditor.mealType]?.quick_fiber_g ?? null,
+            quickSaturatedFatG: dataByMealType[quickLogEditor.mealType]?.quick_saturated_fat_g ?? null,
+            quickTransFatG: dataByMealType[quickLogEditor.mealType]?.quick_trans_fat_g ?? null,
             quickSugarG: dataByMealType[quickLogEditor.mealType]?.quick_sugar_g ?? null,
             quickSodiumMg: dataByMealType[quickLogEditor.mealType]?.quick_sodium_mg ?? null,
             quickLogFood: dataByMealType[quickLogEditor.mealType]?.quick_log_food ?? null,

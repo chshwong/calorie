@@ -258,6 +258,8 @@ export default function LogFoodScreen() {
       currentMealMeta.quick_carbs_g != null ||
       currentMealMeta.quick_fat_g != null ||
       currentMealMeta.quick_fiber_g != null ||
+      currentMealMeta.quick_saturated_fat_g != null ||
+      currentMealMeta.quick_trans_fat_g != null ||
       currentMealMeta.quick_sugar_g != null ||
       currentMealMeta.quick_sodium_mg != null
     );
@@ -268,6 +270,8 @@ export default function LogFoodScreen() {
     quickCarbsG: number | null;
     quickFatG: number | null;
     quickFiberG: number | null;
+    quickSaturatedFatG: number | null;
+    quickTransFatG: number | null;
     quickSugarG: number | null;
     quickSodiumMg: number | null;
     quickLogFood: string | null;
@@ -281,6 +285,8 @@ export default function LogFoodScreen() {
         quickCarbsG: data.quickCarbsG,
         quickFatG: data.quickFatG,
         quickFiberG: data.quickFiberG,
+        quickSaturatedFatG: data.quickSaturatedFatG,
+        quickTransFatG: data.quickTransFatG,
         quickSugarG: data.quickSugarG,
         quickSodiumMg: data.quickSodiumMg,
         quickLogFood: data.quickLogFood,
@@ -303,6 +309,8 @@ export default function LogFoodScreen() {
         quickCarbsG: null,
         quickFatG: null,
         quickFiberG: null,
+        quickSaturatedFatG: null,
+        quickTransFatG: null,
         quickSugarG: null,
         quickSodiumMg: null,
         quickLogFood: null,
@@ -5438,7 +5446,7 @@ export default function LogFoodScreen() {
             <View style={styles.entriesHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
             <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('mealtype_log.food_log.title_with_count', { count: entries.length })}
+              {t('mealtype_log.food_log.title_with_count', { count: entries.length + (hasQuickLog ? 1 : 0) })}
             </ThemedText>
               <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
                 {` \u00B7 `}
@@ -5448,7 +5456,7 @@ export default function LogFoodScreen() {
               </ThemedText>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {!showLoadingSpinner && entries.length > 0 && (
+              {!showLoadingSpinner && (entries.length > 0 || hasQuickLog) && (
                 <View style={styles.toggleContainer}>
                   <ThemedText style={[styles.toggleLabel, { color: colors.textSecondary }]}>
                     {t('mealtype_log.food_log.details')}
@@ -5513,7 +5521,7 @@ export default function LogFoodScreen() {
 
           {/* Meal Totals - Only shown when Details toggle is ON and there are entries or Quick Log */}
           {showEntryDetails && mealTotals && (mealTotals.kcal > 0 || (entries?.length ?? 0) > 0) && (
-            <View style={styles.mealTotalsContainer}>
+            <View style={[styles.mealTotalsContainer, { backgroundColor: colors.tintLight }]}>
               <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
                 {`Total · Pro `}
                 <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.protein_g ?? 0}g</ThemedText>
@@ -5527,6 +5535,8 @@ export default function LogFoodScreen() {
               <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
                 {`Sat Fat `}
                 <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.saturated_fat_g ?? 0}g</ThemedText>
+                {`  Trans Fat `}
+                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.trans_fat_g ?? 0}g</ThemedText>
                 {`  Sugar `}
                 <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sugar_g ?? 0}g</ThemedText>
                 {`  Sodium `}
@@ -5688,28 +5698,67 @@ export default function LogFoodScreen() {
                               </TouchableOpacity>
                             </View>
                           </View>
+                          {showEntryDetails && (
+                            <TouchableOpacity
+                              onPress={() => setQuickLogEditor({ visible: true })}
+                              activeOpacity={0.7}
+                              style={styles.entryMacros}
+                            >
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_protein_g ?? 0}g</ThemedText>
+                              </View>
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.carbs_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_carbs_g ?? 0}g</ThemedText>
+                              </View>
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fat_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_fat_g ?? 0}g</ThemedText>
+                              </View>
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_fiber_g ?? 0}g</ThemedText>
+                              </View>
+                            </TouchableOpacity>
+                          )}
+                          {showEntryDetails && (
+                            <TouchableOpacity
+                              onPress={() => setQuickLogEditor({ visible: true })}
+                              activeOpacity={0.7}
+                              style={[styles.entryMacros, { marginTop: 2 }]}
+                            >
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_saturated_fat_g ?? 0}g</ThemedText>
+                              </View>
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.trans_fat_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_trans_fat_g ?? 0}g</ThemedText>
+                              </View>
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_sugar_g ?? 0}g</ThemedText>
+                              </View>
+                              <View style={styles.entryMacroItem}>
+                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
+                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_sodium_mg ?? 0}mg</ThemedText>
+                              </View>
+                            </TouchableOpacity>
+                          )}
                         </View>
                         <View style={styles.entryHeaderRight}>
                           <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
                             {Math.round(currentMealMeta?.quick_kcal || 0)} cal
                           </ThemedText>
                           {!hasAnySelection && (
-                            <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                              <TouchableOpacity
-                                onPress={() => setQuickLogEditor({ visible: true })}
-                                style={styles.entryIconButton}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                              >
-                                <Text style={styles.entryIconButtonText}>✏️</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => setShowDeleteQuickLogConfirm(true)}
-                                style={styles.entryIconButton}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                              >
-                                <Text style={styles.entryIconButtonText}>🗑️</Text>
-                              </TouchableOpacity>
-                            </View>
+                            <TouchableOpacity
+                              style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
+                              onPress={() => setShowDeleteQuickLogConfirm(true)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                            </TouchableOpacity>
                           )}
                         </View>
                       </View>
@@ -5820,7 +5869,12 @@ export default function LogFoodScreen() {
                         </View>
                       </View>
                       {showEntryDetails && (
-                        <View style={styles.entryMacros}>
+                        <TouchableOpacity
+                          onPress={() => handleEditEntry(entry)}
+                          activeOpacity={0.7}
+                          disabled={isEditing}
+                          style={styles.entryMacros}
+                        >
                           <View style={styles.entryMacroItem}>
                             <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.protein_g ?? 0}g</ThemedText>
@@ -5837,13 +5891,22 @@ export default function LogFoodScreen() {
                             <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fiber_g ?? 0}g</ThemedText>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                       )}
                       {showEntryDetails && (
-                        <View style={[styles.entryMacros, { marginTop: 2 }]}>
+                        <TouchableOpacity
+                          onPress={() => handleEditEntry(entry)}
+                          activeOpacity={0.7}
+                          disabled={isEditing}
+                          style={[styles.entryMacros, { marginTop: 2 }]}
+                        >
                           <View style={styles.entryMacroItem}>
                             <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.saturated_fat_g ?? 0}g</ThemedText>
+                          </View>
+                          <View style={styles.entryMacroItem}>
+                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.trans_fat_short')}</ThemedText>
+                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.trans_fat_g ?? 0}g</ThemedText>
                           </View>
                           <View style={styles.entryMacroItem}>
                             <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
@@ -5853,7 +5916,7 @@ export default function LogFoodScreen() {
                             <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
                             <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sodium_mg ?? 0}mg</ThemedText>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                       )}
                     </View>
                     <View style={styles.entryHeaderRight}>
@@ -6185,6 +6248,8 @@ export default function LogFoodScreen() {
                   quickCarbsG: currentMealMeta.quick_carbs_g ?? null,
                   quickFatG: currentMealMeta.quick_fat_g ?? null,
                   quickFiberG: currentMealMeta.quick_fiber_g ?? null,
+                  quickSaturatedFatG: currentMealMeta.quick_saturated_fat_g ?? null,
+                  quickTransFatG: currentMealMeta.quick_trans_fat_g ?? null,
                   quickSugarG: currentMealMeta.quick_sugar_g ?? null,
                   quickSodiumMg: currentMealMeta.quick_sodium_mg ?? null,
                   quickLogFood: currentMealMeta.quick_log_food ?? null,
@@ -6715,9 +6780,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mealTotalsContainer: {
-    paddingHorizontal: 8,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginVertical: 6,
+    borderRadius: 8,
   },
   mealTotalsLine: {
     fontSize: 13,

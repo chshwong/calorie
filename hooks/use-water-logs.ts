@@ -22,28 +22,72 @@ import {
   type WaterDaily,
 } from '@/lib/services/waterLogs';
 import { WaterUnit, toMl, fromMl } from '@/utils/waterUnits';
+import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
 
+
+
+/**
+ * Hook to fetch water daily log for a specific date
+ */
 /**
  * Hook to fetch water daily log for a specific date
  */
 export function useWaterDailyForDate(dateString: string) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = waterDailyCacheKey(userId, dateString);
+
+  // Persistent snapshot (survives full reloads)
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<WaterDaily | null>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery<WaterDaily | null>({
     queryKey: ['waterDaily', userId, dateString],
-    queryFn: () => {
+    // DB call + write-through to persistent cache
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getWaterDailyForDate(userId, dateString);
+      const data = await getWaterDailyForDate(userId, dateString);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId && !!dateString,
     staleTime: 60 * 1000, // 60 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+
+    // Priority: previousData → in-memory cache → persistent snapshot
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData<WaterDaily | null>([
+        'waterDaily',
+        userId,
+        dateString,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
 
+
+/**
+ * Hook to fetch water daily logs for a date range
+ */
 /**
  * Hook to fetch water daily logs for a date range
  */
@@ -53,20 +97,54 @@ export function useWaterDailyForDateRange(
 ) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = waterDailyRangeCacheKey(userId, startDate, endDate);
+
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<WaterDaily[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery<WaterDaily[]>({
     queryKey: ['waterDaily', userId, startDate, endDate],
-    queryFn: () => {
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getWaterDailyForDateRange(userId, startDate, endDate);
+      const data = await getWaterDailyForDateRange(userId, startDate, endDate);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId && !!startDate && !!endDate,
     staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes,
+
+    // Priority: previousData → in-memory cache → persistent snapshot
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData<WaterDaily[]>([
+        'waterDaily',
+        userId,
+        startDate,
+        endDate,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
+
 
 /**
  * Hook to fetch water data for a range (default: last 7 days to target date)
@@ -121,6 +199,7 @@ export function useWaterDaily(options?: {
   const targetWater = targetWaterFromRange || targetWaterQuery.data || null;
   const history = rangeQuery.data?.filter(w => w.date !== targetDateString) || [];
 
+  
   /**
    * Add water (optimistic update)
    */
@@ -221,6 +300,8 @@ export function useWaterDaily(options?: {
       queryClient.invalidateQueries({ queryKey: ['waterDaily', userId] });
     },
   });
+
+
 
   /**
    * Set water goal (with validation and optimistic update)
@@ -487,4 +568,16 @@ export function useWaterDaily(options?: {
     addWaterError: addWaterMutation.error,
   };
 }
+function waterDailyCacheKey(userId: string | undefined, date: string) {
+  if (!userId) return null;
+  return `waterDaily:${userId}:${date}`;
+}
 
+function waterDailyRangeCacheKey(
+  userId: string | undefined,
+  startDate: string,
+  endDate: string
+) {
+  if (!userId) return null;
+  return `waterDailyRange:${userId}:${startDate}:${endDate}`;
+}

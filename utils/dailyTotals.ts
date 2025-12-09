@@ -63,6 +63,8 @@ export function calculateDailyTotals(entries: CalorieEntry[], metaByMealType?: {
       totals.carbs += meta.quick_carbs_g ?? 0;
       totals.fat += meta.quick_fat_g ?? 0;
       totals.fiber += meta.quick_fiber_g ?? 0;
+      totals.saturatedFat += Math.round(meta.quick_saturated_fat_g ?? 0);
+      totals.transFat += Math.round(meta.quick_trans_fat_g ?? 0);
       totals.sugar += meta.quick_sugar_g ?? 0;
       totals.sodium += meta.quick_sodium_mg ?? 0;
     });
@@ -75,8 +77,8 @@ export function calculateDailyTotals(entries: CalorieEntry[], metaByMealType?: {
     carbs: Math.round(totals.carbs),
     fat: Math.round(totals.fat),
     fiber: Math.round(totals.fiber),
-    saturatedFat: totals.saturatedFat,
-    transFat: totals.transFat,
+    saturatedFat: Math.round(totals.saturatedFat),
+    transFat: Math.round(totals.transFat),
     sugar: totals.sugar,
     sodium: Math.round(totals.sodium),
   };
@@ -186,6 +188,7 @@ export function calculateMealNutritionTotals(
   fat_g: number;
   fiber_g: number;
   saturated_fat_g: number;
+  trans_fat_g: number;
   sugar_g: number;
   sodium_mg: number;
 } {
@@ -198,6 +201,7 @@ export function calculateMealNutritionTotals(
       acc.fat_g += entry.fat_g ?? 0;
       acc.fiber_g += entry.fiber_g ?? 0;
       acc.saturated_fat_g += entry.saturated_fat_g ?? 0;
+      acc.trans_fat_g += entry.trans_fat_g ?? 0;
       acc.sugar_g += entry.sugar_g ?? 0;
       acc.sodium_mg += entry.sodium_mg ?? 0;
       return acc;
@@ -209,6 +213,7 @@ export function calculateMealNutritionTotals(
       fat_g: 0,
       fiber_g: 0,
       saturated_fat_g: 0,
+      trans_fat_g: 0,
       sugar_g: 0,
       sodium_mg: 0,
     }
@@ -221,9 +226,10 @@ export function calculateMealNutritionTotals(
     totals.carbs_g += mealMeta.quick_carbs_g ?? 0;
     totals.fat_g += mealMeta.quick_fat_g ?? 0;
     totals.fiber_g += mealMeta.quick_fiber_g ?? 0;
-    totals.saturated_fat_g += 0; // Quick Log doesn't have saturated_fat
-    totals.sugar_g += mealMeta.quick_sugar_g ?? 0;
-    totals.sodium_mg += mealMeta.quick_sodium_mg ?? 0;
+      totals.saturated_fat_g += mealMeta.quick_saturated_fat_g ?? 0;
+      totals.trans_fat_g += mealMeta.quick_trans_fat_g ?? 0;
+      totals.sugar_g += mealMeta.quick_sugar_g ?? 0;
+      totals.sodium_mg += mealMeta.quick_sodium_mg ?? 0;
   }
 
   // Round values
@@ -234,6 +240,7 @@ export function calculateMealNutritionTotals(
     fat_g: Math.round(totals.fat_g),
     fiber_g: Math.round(totals.fiber_g),
     saturated_fat_g: Math.round(totals.saturated_fat_g),
+    trans_fat_g: Math.round(totals.trans_fat_g),
     sugar_g: Math.round(totals.sugar_g),
     sodium_mg: Math.round(totals.sodium_mg),
   };
