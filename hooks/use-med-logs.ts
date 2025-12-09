@@ -20,6 +20,8 @@ import {
   deleteMedLog,
   type MedLog,
 } from '@/lib/services/medLogs';
+import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+
 
 /**
  * Hook to fetch med logs for a specific date
@@ -27,20 +29,55 @@ import {
 export function useMedLogsForDate(dateString: string) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = medLogsCacheKey(userId, dateString);
+
+  // Persistent snapshot (survives full reloads)
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<MedLog[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery<MedLog[]>({
     queryKey: ['medLogs', userId, dateString],
-    queryFn: () => {
+    // DB call + write-through to persistent cache
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getMedLogsForDate(userId, dateString);
+      const data = await getMedLogsForDate(userId, dateString);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId && !!dateString,
     staleTime: 60 * 1000, // 60 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+
+    // Priority: previousData → in-memory cache → persistent snapshot
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData<MedLog[]>([
+        'medLogs',
+        userId,
+        dateString,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
+
 
 /**
  * Hook to fetch med summary for recent days
@@ -48,20 +85,51 @@ export function useMedLogsForDate(dateString: string) {
 export function useMedSummaryForRecentDays(days: number = 7) {
   const { user } = useAuth();
   const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  const cacheKey = medSummaryCacheKey(userId, days);
+
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<any>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
 
   return useQuery({
     queryKey: ['medSummary', userId, days],
-    queryFn: () => {
+    queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getMedSummaryForRecentDays(userId, days);
+      const data = await getMedSummaryForRecentDays(userId, days);
+
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     enabled: !!userId,
     staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes,
+    placeholderData: (previousData) => {
+      if (previousData !== undefined) {
+        return previousData;
+      }
+
+      const cachedData = queryClient.getQueryData([
+        'medSummary',
+        userId,
+        days,
+      ]);
+      if (cachedData !== undefined) {
+        return cachedData;
+      }
+
+      return snapshot ?? undefined;
+    },
   });
 }
+
 
 /**
  * Hook to fetch recent and frequent meds for Quick Add
@@ -84,6 +152,22 @@ export function useMedRecentAndFrequent(days: number = 60) {
     gcTime: 5 * 60 * 1000, // 5 minutes
   });
 }
+
+function medLogsCacheKey(userId: string | undefined, date: string) {
+  if (!userId) return null;
+  return `medLogs:${userId}:${date}`;
+}
+
+function medSummaryCacheKey(userId: string | undefined, days: number) {
+  if (!userId) return null;
+  return `medSummary:${userId}:${days}`;
+}
+
+function recentAndFrequentMedsCacheKey(userId: string | undefined, days: number) {
+  if (!userId) return null;
+  return `recentAndFrequentMeds:${userId}:${days}`;
+}
+
 
 /**
  * Hook to create a med log entry

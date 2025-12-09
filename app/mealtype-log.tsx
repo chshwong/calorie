@@ -244,6 +244,9 @@ export default function LogFoodScreen() {
   const [quickLogEditor, setQuickLogEditor] = useState<{ visible: boolean }>({ visible: false });
   const [showDeleteQuickLogConfirm, setShowDeleteQuickLogConfirm] = useState(false);
   
+  // Selection state for Quick Log when in entries edit mode
+  const [isQuickLogSelected, setIsQuickLogSelected] = useState(false);
+  
   const currentMealMeta = dataByMealType?.[selectedMealType] || null;
   
   // Quick Log exists if any of the Quick fields is non-null
@@ -862,6 +865,10 @@ export default function LogFoodScreen() {
     hasSelection: hasEntrySelection,
     clearSelection: clearEntrySelection,
   } = useMultiSelect<CalorieEntry>({ enabled: entriesEditMode });
+  
+  // Treat Quick Log as part of "any selection"
+  const hasAnySelection = hasEntrySelection || isQuickLogSelected;
+  const totalSelectedItems = selectedEntryCount + (isQuickLogSelected ? 1 : 0);
   
   // Mass delete confirmation modal state
   const [massDeleteConfirmVisible, setMassDeleteConfirmVisible] = useState(false);
@@ -1705,42 +1712,95 @@ export default function LogFoodScreen() {
     setEntryToDelete(null);
   };
 
+  // Reset Quick Log selection when leaving edit mode or when Quick Log disappears
+  useEffect(() => {
+    if (!entriesEditMode) {
+      setIsQuickLogSelected(false);
+    }
+  }, [entriesEditMode]);
+
+  useEffect(() => {
+    if (!hasQuickLog) {
+      setIsQuickLogSelected(false);
+    }
+  }, [hasQuickLog]);
+
   // Mass delete handlers
   const handleMassDelete = useCallback(() => {
-    if (selectedEntryCount > 0) {
+    if (totalSelectedItems > 0) {
       setMassDeleteConfirmVisible(true);
     }
-  }, [selectedEntryCount]);
+  }, [totalSelectedItems]);
 
   const handleMassDeleteConfirm = useCallback(async () => {
     setMassDeleteConfirmVisible(false);
-    if (selectedEntryIds.size === 0) return;
+
+    // If no entries selected and Quick Log not selected, nothing to do
+    if (selectedEntryIds.size === 0 && !(isQuickLogSelected && hasQuickLog)) return;
 
     setLoading(true);
     try {
-      // Delete all selected entries
-      const entryIdsArray = Array.from(selectedEntryIds);
-      const { error } = await supabase
-        .from('calorie_entries')
-        .delete()
-        .in('id', entryIdsArray);
+      // Delete all selected calorie_entries
+      if (selectedEntryIds.size > 0) {
+        const entryIdsArray = Array.from(selectedEntryIds);
+        const { error } = await supabase
+          .from('calorie_entries')
+          .delete()
+          .in('id', entryIdsArray);
 
-      if (error) {
-        Alert.alert(t('alerts.error_title'), t('mealtype_log.delete_entry.failed_multiple', { error: error.message }));
-        setLoading(false);
-        return;
+        if (error) {
+          Alert.alert(
+            t('alerts.error_title'),
+            t('mealtype_log.delete_entry.failed_multiple', {
+              error: error.message,
+            })
+          );
+          setLoading(false);
+          return;
+        }
       }
 
-      // Clear selection and refresh entries
+      // If Quick Log is selected, delete it using the existing helper
+      if (isQuickLogSelected && hasQuickLog) {
+        // Reuse existing Quick Log delete logic (this will also show its toast)
+        handleQuickLogDelete();
+      }
+
+      // Clear all selections and refresh entries
       clearEntrySelection();
+      setIsQuickLogSelected(false);
       await refetchEntries();
-      Alert.alert(t('alerts.success'), t('mealtype_log.delete_entry.success_multiple', { count: selectedEntryCount, entries: selectedEntryCount === 1 ? t('mealtype_log.delete_entry.entry_singular') : t('mealtype_log.delete_entry.entry_plural') }));
+
+      Alert.alert(
+        t('alerts.success'),
+        t('mealtype_log.delete_entry.success_multiple', {
+          count: totalSelectedItems,
+          entries:
+            totalSelectedItems === 1
+              ? t('mealtype_log.delete_entry.entry_singular')
+              : t('mealtype_log.delete_entry.entry_plural'),
+        })
+      );
     } catch (error: any) {
-      Alert.alert(t('alerts.error_title'), t('mealtype_log.delete_entry.failed_multiple', { error: error?.message || t('common.unexpected_error') }));
+      Alert.alert(
+        t('alerts.error_title'),
+        t('mealtype_log.delete_entry.failed_multiple', {
+          error: error?.message || t('common.unexpected_error'),
+        })
+      );
     } finally {
       setLoading(false);
     }
-  }, [selectedEntryIds, selectedEntryCount, clearEntrySelection, refetchEntries]);
+  }, [
+    selectedEntryIds,
+    isQuickLogSelected,
+    hasQuickLog,
+    handleQuickLogDelete,
+    clearEntrySelection,
+    refetchEntries,
+    t,
+    totalSelectedItems,
+  ]);
 
   const handleMassDeleteCancel = useCallback(() => {
     setMassDeleteConfirmVisible(false);
@@ -5476,37 +5536,69 @@ export default function LogFoodScreen() {
           )}
 
           {/* Select All Row - Only shown in edit mode */}
-          {entriesEditMode && entries.length > 0 && (
-            <View style={[styles.selectAllRow, { backgroundColor: colors.background, borderBottomColor: colors.separator }]}>
+          {entriesEditMode && (entries.length > 0 || hasQuickLog) && (
+            <View
+              style={[
+                styles.selectAllRow,
+                { backgroundColor: colors.background, borderBottomColor: colors.separator },
+              ]}
+            >
               <MultiSelectItem
-                isSelected={areAllEntriesSelected(entries, (entry) => entry.id)}
+                isSelected={
+                  areAllEntriesSelected(entries, (entry) => entry.id) &&
+                  (!hasQuickLog || isQuickLogSelected)
+                }
                 onToggle={() => {
-                  if (areAllEntriesSelected(entries, (entry) => entry.id)) {
+                  const allEntriesSelected = areAllEntriesSelected(entries, (entry) => entry.id);
+                  const allSelectedNow =
+                    allEntriesSelected && (!hasQuickLog || isQuickLogSelected);
+
+                  if (allSelectedNow) {
+                    // Deselect everything
                     deselectAllEntries();
+                    setIsQuickLogSelected(false);
                   } else {
+                    // Select all entries and Quick Log (if present)
                     selectAllEntries(entries, (entry) => entry.id);
+                    if (hasQuickLog) {
+                      setIsQuickLogSelected(true);
+                    }
                   }
                 }}
                 style={{ paddingVertical: 12, paddingHorizontal: 16 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flex: 1,
+                  }}
+                >
                   <ThemedText style={[styles.selectAllText, { color: colors.text }]}>
                     {t('mealtype_log.food_log.select_all')}
                   </ThemedText>
                   <TouchableOpacity
                     onPress={handleMassDelete}
-                    disabled={!hasEntrySelection}
+                    disabled={!hasAnySelection}
                     style={[
                       styles.massDeleteButton,
                       {
-                        backgroundColor: hasEntrySelection ? '#EF4444' + '20' : colors.icon + '30',
-                        borderColor: hasEntrySelection ? '#EF4444' + '40' : colors.icon + '40',
-                        opacity: hasEntrySelection ? 1 : 0.5,
+                        backgroundColor: hasAnySelection ? '#EF4444' + '20' : colors.icon + '30',
+                        borderColor: hasAnySelection ? '#EF4444' + '40' : colors.icon + '40',
+                        opacity: hasAnySelection ? 1 : 0.5,
                       },
                     ]}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.deleteButtonText, { color: hasEntrySelection ? '#EF4444' : colors.icon }]}>🗑️</Text>
+                    <Text
+                      style={[
+                        styles.deleteButtonText,
+                        { color: hasAnySelection ? '#EF4444' : colors.icon },
+                      ]}
+                    >
+                      🗑️
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </MultiSelectItem>
@@ -5554,66 +5646,90 @@ export default function LogFoodScreen() {
             </View>
           ) : (
             <>
-              {hasQuickLog && (
-                <HighlightableRow
-                  style={[
-                    styles.entryCard,
-                    {
-                      backgroundColor: 'transparent',
-                      borderColor: 'transparent',
-                      borderWidth: 0,
-                    }
-                  ]}
-                >
-                  <View style={styles.entryHeader}>
-                    <View style={styles.entryHeaderLeft}>
-                      <View style={styles.entryNameRow}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-              <TouchableOpacity
-                            onPress={() => setQuickLogEditor({ visible: true })}
-                activeOpacity={0.7}
-                            style={[
-                              styles.entryItemNameButton,
-                              { flexShrink: 1, minWidth: 0 },
-                              getMinTouchTargetStyle(),
-                              { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
-                            ]}
-                {...getButtonAccessibilityProps(
-                              t('food.quick_log.label', { defaultValue: 'Quick Log' }),
-                              'Double tap to edit Quick Log'
-                            )}
-                          >
-                            <ThemedText
-                              style={[styles.entryItemName, { color: colors.text, flexShrink: 1 }]}
-                              numberOfLines={1}
-                              ellipsizeMode="tail"
-                            >
-                              ⚡ {t('food.quick_log.label', { defaultValue: 'Quick Log' })}
-                              {currentMealMeta?.quick_log_food ? `: ${currentMealMeta.quick_log_food}` : ''}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+              {hasQuickLog &&
+                (() => {
+                  const quickLogRow = (
+                    <HighlightableRow
+                      style={[
+                        styles.entryCard,
+                        {
+                          backgroundColor: 'transparent',
+                          borderColor: 'transparent',
+                          borderWidth: 0,
+                        }
+                      ]}
+                    >
+                      <View style={styles.entryHeader}>
+                        <View style={styles.entryHeaderLeft}>
+                          <View style={styles.entryNameRow}>
+                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                              <TouchableOpacity
+                                onPress={() => setQuickLogEditor({ visible: true })}
+                                activeOpacity={0.7}
+                                style={[
+                                  styles.entryItemNameButton,
+                                  { flexShrink: 1, minWidth: 0 },
+                                  getMinTouchTargetStyle(),
+                                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                                ]}
+                                {...getButtonAccessibilityProps(
+                                  t('food.quick_log.label', { defaultValue: 'Quick Log' }),
+                                  'Double tap to edit Quick Log'
+                                )}
+                              >
+                                <ThemedText
+                                  style={[styles.entryItemName, { color: colors.text, flexShrink: 1 }]}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  ⚡ {t('food.quick_log.label', { defaultValue: 'Quick Log' })}
+                                  {currentMealMeta?.quick_log_food ? `: ${currentMealMeta.quick_log_food}` : ''}
+                                </ThemedText>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.entryHeaderRight}>
                           <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
                             {Math.round(currentMealMeta?.quick_kcal || 0)} cal
                           </ThemedText>
+                          {!hasAnySelection && (
+                            <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                              <TouchableOpacity
+                                onPress={() => setQuickLogEditor({ visible: true })}
+                                style={styles.entryIconButton}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              >
+                                <Text style={styles.entryIconButtonText}>✏️</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => setShowDeleteQuickLogConfirm(true)}
+                                style={styles.entryIconButton}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              >
+                                <Text style={styles.entryIconButtonText}>🗑️</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
                         </View>
                       </View>
-                    </View>
-                    <View style={styles.entryHeaderRight}>
-                      {!hasEntrySelection && (
-                        <TouchableOpacity
-                          style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
-                          onPress={() => setShowDeleteQuickLogConfirm(true)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                </HighlightableRow>
-              )}
+                    </HighlightableRow>
+                  );
+
+                  if (entriesEditMode) {
+                    return (
+                      <MultiSelectItem
+                        key="quick-log"
+                        isSelected={isQuickLogSelected}
+                        onToggle={() => setIsQuickLogSelected((prev) => !prev)}
+                      >
+                        {quickLogRow}
+                      </MultiSelectItem>
+                    );
+                  }
+
+                  return quickLogRow;
+                })()}
               {entries.map((entry) => {
               const isEditing = editingEntryId === entry.id;
               const entryContent = (
@@ -5763,7 +5879,7 @@ export default function LogFoodScreen() {
                       <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
                         {entry.calories_kcal} cal
                       </ThemedText>
-                      {!hasEntrySelection && !editingEntryId && (
+                      {!hasAnySelection && !editingEntryId && (
                         <TouchableOpacity
                           style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
                           onPress={() => handleDelete(entry.id, entry.item_name)}
