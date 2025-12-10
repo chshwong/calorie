@@ -127,7 +127,7 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
   return (
     <View style={style}>
       <View 
-        style={[styles.tabsRowContainer, { paddingBottom: Spacing.sm + 2 }]} // 6px padding for underline space
+        style={[styles.tabsRowContainer, { paddingBottom: Spacing.sm +1 }]} // 6px padding for underline space
         accessibilityRole="tablist"
       >
         {items.map((item) => {
@@ -240,11 +240,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.lg, // px-4 equivalent (16px)
-    paddingVertical: Spacing.xs + 2, // py-1.5 equivalent (6px) - consistent for all tabs
+    paddingHorizontal: Spacing.md, // px-3 equivalent (12px) - reduced from px-4
+    paddingVertical: Spacing.xs , // py-0.5 equivalent (2px) - MUCH shorter vertical padding
     marginHorizontal: Spacing.xs, // mx-1 equivalent (4px)
     borderRadius: BorderRadius.full,
-    minHeight: 36, // Consistent height for all tabs (AODA-friendly but not too tall)
+    // minHeight removed completely for compact iOS segmented control height
     flexShrink: 0, // Prevent compression, allow natural width
     // Explicitly remove all borders
     borderWidth: 0,
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   indicator: {
     position: 'absolute',
-    bottom: 0, // At bottom of container (which has paddingBottom for space)
+    bottom: 0, // Move it 2px lower to prevent overlap with compact pill
     height: 2, // Thin underline
     borderRadius: BorderRadius.full,
   },

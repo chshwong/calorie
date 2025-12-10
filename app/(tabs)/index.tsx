@@ -553,14 +553,12 @@ export default function FoodLogHomeScreen() {
 
   const handleQuickLog = (mealType: string) => {
     setMealMenuVisible({ mealType: null });
-    // Navigate to mealtype-log with manual mode opened
+    // Navigate to dedicated Quick Log screen
     router.push({
-      pathname: '/mealtype-log',
+      pathname: '/quick-log',
       params: {
+        date: selectedDateString,
         mealType: mealType,
-        entryDate: selectedDateString,
-        openManualMode: 'true',
-        preloadedEntries: JSON.stringify([])
       }
     });
   };

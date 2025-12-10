@@ -3610,44 +3610,20 @@ export default function LogFoodScreen() {
                   activeKey={activeTab}
                   onChange={(key) => {
                     if (key === 'manual') {
-                      // Manual+ button always opens manual mode - no expand/collapse toggle
-                      setIsManualMode(true);
-                      // Focus the item name input after a short delay to ensure form is rendered
-                      setTimeout(() => {
-                        itemNameInputRef.current?.focus();
-                      }, 300);
-                      setSelectedFood(null);
-                      setEditingEntryId(null);
-                      // Clear form fields
-                      setItemName('');
-                      setQuantity('1');
-                      setUnit('⚡');
-                      setCalories('');
-                      setProtein('');
-                      setCarbs('');
-                      setFat('');
-                      setFiber('');
-                      setSaturatedFat('');
-                      setTransFat('');
-                      setSugar('');
-                      setSodium('');
-                      setSelectedServing(null);
-                      setAvailableServings([]);
-                      setItemNameError('');
-                      setQuantityError('');
-                      setCaloriesError('');
-                      // Set active tab and ensure content is expanded
-                      if (activeTab !== 'manual') {
-                        setPreviousTabKey(activeTab);
-                        setActiveTab('manual');
-                      }
-                      setTabContentCollapsed(false);
+                      // Navigate to dedicated Quick Log screen
+                      router.push({
+                        pathname: '/quick-log',
+                        params: {
+                          date: entryDate,
+                          mealType: mealType,
+                        }
+                      });
                     } else {
                       handleTabPress(key as 'frequent' | 'recent' | 'custom' | 'bundle', () => setIsManualMode(false));
                     }
                   }}
                   onActiveTabLayout={handleActiveTabLayout}
-                  style={{ marginHorizontal: Spacing.sm }}
+                  style={{ marginHorizontal: Spacing.sm, marginTop: Spacing.xs }}
                 />
               </ScrollView>
               
@@ -6742,12 +6718,14 @@ export default function LogFoodScreen() {
                 style={styles.massDeleteMenuItem}
                 onPress={() => {
                   setMassDeleteMenuVisible(false);
-                  setIsManualMode(true);
-                  setActiveTab('manual');
-                  // Focus the item name input after a short delay to ensure form is rendered
-                  setTimeout(() => {
-                    itemNameInputRef.current?.focus();
-                  }, 300);
+                  // Navigate to dedicated Quick Log screen
+                  router.push({
+                    pathname: '/quick-log',
+                    params: {
+                      date: entryDate,
+                      mealType: mealType,
+                    }
+                  });
                 }}
                 activeOpacity={0.7}
                 {...getButtonAccessibilityProps(

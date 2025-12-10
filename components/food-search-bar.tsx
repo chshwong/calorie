@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     zIndex: 1001,
     borderWidth: 1,
     borderRadius: 10,
-    minHeight: 46,
+    minHeight: 44,
     paddingHorizontal: 12,
   },
   searchIcon: {
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    paddingVertical: 12,
+    paddingVertical: 12, // Reduced from 12 to make search bar more compact (py-1.5 equivalent)
   },
   rightControls: {
     flexDirection: 'row',
