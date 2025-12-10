@@ -23,7 +23,7 @@ import {
 type CopyMealtypeModalProps = {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (targetDate: Date, targetMealType: string, includeQuickLog: boolean, includeNotes: boolean) => void;
+  onConfirm: (targetDate: Date, targetMealType: string, includeNotes: boolean) => void;
   sourceDate: Date;
   sourceMealType: string;
   isLoading?: boolean;
@@ -62,7 +62,6 @@ export function CopyMealtypeModal({
   const [targetDate, setTargetDate] = useState<Date>(getDefaultTargetDate());
   const [targetMealType, setTargetMealType] = useState<string>(sourceMealType);
   const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => new Date(targetDate));
-  const [includeQuickLog, setIncludeQuickLog] = useState<boolean>(false); // Default: "Exclude Quick Log"
   const [includeNotes, setIncludeNotes] = useState<boolean>(false); // Default: "Exclude Notes"
 
   // Update target date and meal type when modal opens
@@ -72,7 +71,6 @@ export function CopyMealtypeModal({
       setTargetDate(defaultDate);
       setTargetMealType(sourceMealType); // Default to same meal type
       setCalendarViewMonth(new Date(defaultDate));
-      setIncludeQuickLog(false); // Reset to "Exclude Quick Log" (default)
       setIncludeNotes(false); // Reset to "Exclude Notes" (default)
     }
   }, [visible, sourceDate, sourceMealType]);
@@ -126,7 +124,7 @@ export function CopyMealtypeModal({
   };
 
   const handleConfirm = () => {
-    onConfirm(targetDate, targetMealType, includeQuickLog, includeNotes);
+    onConfirm(targetDate, targetMealType, includeNotes);
   };
 
   const formatDateLabel = (date: Date): string => {
@@ -207,90 +205,6 @@ export function CopyMealtypeModal({
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-            </View>
-
-            {/* Quick Log Radio Buttons */}
-            <View style={styles.radioSection}>
-              <View style={styles.radioContainer}>
-                <TouchableOpacity
-                  onPress={() => setIncludeQuickLog(false)}
-                  activeOpacity={0.7}
-                  style={styles.radioOption}
-                  {...getButtonAccessibilityProps(
-                    t('food.copy.exclude_quick_log', { defaultValue: 'Exclude Quick Log' })
-                  )}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: !includeQuickLog }}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      {
-                        borderColor: !includeQuickLog ? colors.tint : colors.border,
-                      },
-                    ]}
-                  >
-                    {!includeQuickLog && (
-                      <View
-                        style={[
-                          styles.radioInner,
-                          { backgroundColor: colors.tint },
-                        ]}
-                      />
-                    )}
-                  </View>
-                  <ThemedText
-                    style={[
-                      styles.radioLabel,
-                      {
-                        color: !includeQuickLog ? colors.text : colors.textSecondary,
-                        fontWeight: !includeQuickLog ? '600' : '400',
-                      },
-                    ]}
-                  >
-                    {t('food.copy.exclude_quick_log', { defaultValue: 'Exclude Quick Log' })}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setIncludeQuickLog(true)}
-                  activeOpacity={0.7}
-                  style={styles.radioOption}
-                  {...getButtonAccessibilityProps(
-                    t('food.copy.override_quick_log', { defaultValue: 'Override Quick Log' })
-                  )}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: includeQuickLog }}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      {
-                        borderColor: includeQuickLog ? colors.tint : colors.border,
-                      },
-                    ]}
-                  >
-                    {includeQuickLog && (
-                      <View
-                        style={[
-                          styles.radioInner,
-                          { backgroundColor: colors.tint },
-                        ]}
-                      />
-                    )}
-                  </View>
-                  <ThemedText
-                    style={[
-                      styles.radioLabel,
-                      {
-                        color: includeQuickLog ? colors.text : colors.textSecondary,
-                        fontWeight: includeQuickLog ? '600' : '400',
-                      },
-                    ]}
-                  >
-                    {t('food.copy.override_quick_log', { defaultValue: 'Override Quick Log' })}
-                  </ThemedText>
-                </TouchableOpacity>
               </View>
             </View>
 

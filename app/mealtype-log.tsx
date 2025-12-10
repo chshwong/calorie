@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { FoodSearchBar } from '@/components/food-search-bar';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, CategoryColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEnhancedFoodSearch } from '@/hooks/use-enhanced-food-search';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
@@ -54,8 +54,8 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { QuickLogEditor } from '@/components/quick-log-editor';
 import { NoteEditor } from '@/components/note-editor';
+import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -63,6 +63,7 @@ import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
 import { TabButton } from '@/components/ui/tab-button';
 import { TabBar } from '@/components/ui/tab-bar';
 import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
+import { SegmentedTabs, type SegmentedTabItem } from '@/components/SegmentedTabs';
 import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
 import { MultiSelectItem } from '@/components/multi-select-item';
@@ -237,98 +238,12 @@ export default function LogFoodScreen() {
     ? entryDateParam[0]
     : (entryDateParam as string) || getLocalDateString(); // Use local date, not UTC
   
-  // Quick Log hooks and state
   const selectedMealType = mealType;
   const selectedDateString = entryDate;
   const { dataByMealType } = useMealtypeMeta(selectedDateString);
   const upsertMealtypeMetaMutation = useUpsertMealtypeMeta();
-  const [quickLogEditor, setQuickLogEditor] = useState<{ visible: boolean }>({ visible: false });
-  const [showDeleteQuickLogConfirm, setShowDeleteQuickLogConfirm] = useState(false);
-  
-  // Selection state for Quick Log when in entries edit mode
-  const [isQuickLogSelected, setIsQuickLogSelected] = useState(false);
   
   const currentMealMeta = dataByMealType?.[selectedMealType] || null;
-  
-  // Quick Log exists if any of the Quick fields is non-null
-  const hasQuickLog =
-    !!currentMealMeta &&
-    (
-      currentMealMeta.quick_kcal != null ||
-      currentMealMeta.quick_protein_g != null ||
-      currentMealMeta.quick_carbs_g != null ||
-      currentMealMeta.quick_fat_g != null ||
-      currentMealMeta.quick_fiber_g != null ||
-      currentMealMeta.quick_saturated_fat_g != null ||
-      currentMealMeta.quick_trans_fat_g != null ||
-      currentMealMeta.quick_sugar_g != null ||
-      currentMealMeta.quick_sodium_mg != null
-    );
-  
-  const handleQuickLogSave = (data: {
-    quickKcal: number | null;
-    quickProteinG: number | null;
-    quickCarbsG: number | null;
-    quickFatG: number | null;
-    quickFiberG: number | null;
-    quickSaturatedFatG: number | null;
-    quickTransFatG: number | null;
-    quickSugarG: number | null;
-    quickSodiumMg: number | null;
-    quickLogFood: string | null;
-  }) => {
-    upsertMealtypeMetaMutation.mutate(
-      {
-        entryDate: selectedDateString,
-        mealType: selectedMealType,
-        quickKcal: data.quickKcal,
-        quickProteinG: data.quickProteinG,
-        quickCarbsG: data.quickCarbsG,
-        quickFatG: data.quickFatG,
-        quickFiberG: data.quickFiberG,
-        quickSaturatedFatG: data.quickSaturatedFatG,
-        quickTransFatG: data.quickTransFatG,
-        quickSugarG: data.quickSugarG,
-        quickSodiumMg: data.quickSodiumMg,
-        quickLogFood: data.quickLogFood,
-      },
-      {
-        onSuccess: () => {
-          setQuickLogEditor({ visible: false });
-        },
-      }
-    );
-  };
-  
-  const handleQuickLogDelete = () => {
-    upsertMealtypeMetaMutation.mutate(
-      {
-        entryDate: selectedDateString,
-        mealType: selectedMealType,
-        quickKcal: null,
-        quickProteinG: null,
-        quickCarbsG: null,
-        quickFatG: null,
-        quickFiberG: null,
-        quickSaturatedFatG: null,
-        quickTransFatG: null,
-        quickSugarG: null,
-        quickSodiumMg: null,
-        quickLogFood: null,
-      },
-      {
-        onSuccess: () => {
-          setShowDeleteQuickLogConfirm(false);
-          setQuickLogEditor({ visible: false });
-          showAppToast(
-            t('food.quick_log.deleted_toast', {
-              defaultValue: 'Quick Log removed.',
-            })
-          );
-        },
-      }
-    );
-  };
   
   // Handlers for Notes
   const handleNotes = () => {
@@ -542,7 +457,7 @@ export default function LogFoodScreen() {
   // Form state
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [unit, setUnit] = useState('plate');
+  const [unit, setUnit] = useState('⚡');
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const unitOptions = ['g', 'oz', 'lb', 'kg', 'serving', 'cup', 'tbsp', 'tsp', 'piece', 'slice'];
   const [calories, setCalories] = useState('');
@@ -570,7 +485,7 @@ export default function LogFoodScreen() {
   
   // Database constraints
   const MAX_QUANTITY = 100000; // Restrictive limit for serving size
-  const MAX_CALORIES = 5000; // CHECK constraint: calories_kcal <= 5000
+  const MAX_CALORIES = 10000; // CHECK constraint: calories_kcal <= 10000
   const MAX_MACRO = 9999.99; // numeric(6,2)
 
   // Edit state
@@ -722,14 +637,14 @@ export default function LogFoodScreen() {
     );
   }, [allEntriesForDay, mealType]);
   
-  // Calculate meal totals for nutrients (entries + Quick Log from mealtype_meta)
+  // Calculate meal totals for nutrients (entries only)
   // This is the single source of truth for meal totals
   const mealTotals = useMemo(
     () => calculateMealNutritionTotals(entries ?? [], currentMealMeta ?? null),
     [entries, currentMealMeta]
   );
 
-  // Calculate total cal for this meal (entries + Quick Log)
+  // Calculate total cal for this meal (entries only)
   // Use mealTotals as the single source of truth
   const mealCaloriesTotal = useMemo(() => {
     return mealTotals?.kcal ?? 0;
@@ -842,6 +757,7 @@ export default function LogFoodScreen() {
   const newlyEditedFoodId = useRef<string | undefined>(undefined); // Track which food was just edited
   const frequentFoodsFetched = useRef(false); // Track if we've fetched frequent foods
   const recentFoodsFetched = useRef(false); // Track if we've fetched recent foods
+  const itemNameInputRef = useRef<TextInput>(null); // Ref for item name input to focus when opening Quick Log
 
   // Bundle types and state
   type BundleItem = {
@@ -900,9 +816,8 @@ export default function LogFoodScreen() {
     clearSelection: clearEntrySelection,
   } = useMultiSelect<CalorieEntry>({ enabled: entriesEditMode });
   
-  // Treat Quick Log as part of "any selection"
-  const hasAnySelection = hasEntrySelection || isQuickLogSelected;
-  const totalSelectedItems = selectedEntryCount + (isQuickLogSelected ? 1 : 0);
+  const hasAnySelection = hasEntrySelection;
+  const totalSelectedItems = selectedEntryCount;
   
   // Mass delete confirmation modal state
   const [massDeleteConfirmVisible, setMassDeleteConfirmVisible] = useState(false);
@@ -1752,18 +1667,6 @@ export default function LogFoodScreen() {
     setEntryToDelete(null);
   };
 
-  // Reset Quick Log selection when leaving edit mode or when Quick Log disappears
-  useEffect(() => {
-    if (!entriesEditMode) {
-      setIsQuickLogSelected(false);
-    }
-  }, [entriesEditMode]);
-
-  useEffect(() => {
-    if (!hasQuickLog) {
-      setIsQuickLogSelected(false);
-    }
-  }, [hasQuickLog]);
 
   // Mass delete handlers
   const handleMassDelete = useCallback(() => {
@@ -1775,8 +1678,8 @@ export default function LogFoodScreen() {
   const handleMassDeleteConfirm = useCallback(async () => {
     setMassDeleteConfirmVisible(false);
 
-    // If no entries selected and Quick Log not selected, nothing to do
-    if (selectedEntryIds.size === 0 && !(isQuickLogSelected && hasQuickLog)) return;
+    // If no entries selected, nothing to do
+    if (selectedEntryIds.size === 0) return;
 
     setLoading(true);
     try {
@@ -1800,15 +1703,8 @@ export default function LogFoodScreen() {
         }
       }
 
-      // If Quick Log is selected, delete it using the existing helper
-      if (isQuickLogSelected && hasQuickLog) {
-        // Reuse existing Quick Log delete logic (this will also show its toast)
-        handleQuickLogDelete();
-      }
-
       // Clear all selections and refresh entries
       clearEntrySelection();
-      setIsQuickLogSelected(false);
       await refetchEntries();
 
       Alert.alert(
@@ -1833,9 +1729,6 @@ export default function LogFoodScreen() {
     }
   }, [
     selectedEntryIds,
-    isQuickLogSelected,
-    hasQuickLog,
-    handleQuickLogDelete,
     clearEntrySelection,
     refetchEntries,
     t,
@@ -1871,7 +1764,7 @@ export default function LogFoodScreen() {
   const handleCancel = () => {
     setItemName('');
     setQuantity('1');
-    setUnit('plate');
+    setUnit(isManualMode ? '⚡' : 'plate');
     setCalories('');
     setProtein('');
     setCarbs('');
@@ -1958,7 +1851,7 @@ export default function LogFoodScreen() {
     // Check for reasonable limits (database constraints)
     // Based on actual database constraints:
     // - quantity: restricted to 100,000 (more restrictive than database limit)
-    // - calories_kcal: numeric(6,1) with CHECK constraint <= 5000
+    // - calories_kcal: numeric(6,1) with CHECK constraint <= 10000
     // - macros: numeric(6,2) - max 9999.99
     
     if (parsedQuantity > MAX_QUANTITY) {
@@ -1969,28 +1862,14 @@ export default function LogFoodScreen() {
       return false;
     }
     
-    // CRITICAL: Check calories limit (database constraint: max 5000)
+    // CRITICAL: Check calories limit (database constraint: max 10000)
     // Use strict comparison and ensure we're checking the actual numeric value
     const caloriesValue = Number(parsedCalories);
     const maxCaloriesValue = Number(MAX_CALORIES);
     
     if (caloriesValue > maxCaloriesValue) {
-      const errorMsg = `❌ Calories Limit: ${caloriesValue.toLocaleString()} cal exceeds maximum of ${maxCaloriesValue.toLocaleString()} cal per entry. Reduce quantity or split into ${Math.ceil(caloriesValue / maxCaloriesValue)} entries.`;
+      const errorMsg = 'Cannot exceed 10,000 cal per entry.';
       setCaloriesError(errorMsg);
-      
-      const suggestedQuantity = Math.floor((maxCaloriesValue / caloriesValue) * parsedQuantity * 10) / 10;
-      const alertMessage = 
-        `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
-        `Current: ${caloriesValue.toLocaleString()} calories\n` +
-        `Maximum: ${maxCaloriesValue.toLocaleString()} calories per entry\n\n` +
-        `SOLUTIONS:\n` +
-        `• Reduce quantity to ${suggestedQuantity} (instead of ${parsedQuantity})\n` +
-        `• Split into ${Math.ceil(caloriesValue / maxCaloriesValue)} separate entries`;
-      
-      // Show alert immediately - call directly, no setTimeout
-      Alert.alert(t('alerts.calories_limit_exceeded'), alertMessage, [
-        { text: t('common.ok'), style: 'default' }
-      ]);
       
       // Ensure loading is false
       setLoading(false);
@@ -2116,21 +1995,14 @@ export default function LogFoodScreen() {
       }
 
       // Final validation check before database call
-      // Double-check calories limit (database constraint: max 5000)
-      if (parsedCalories > 5000) {
-        const errorMsg = `Calories (${parsedCalories.toLocaleString()} cal) exceed the 5,000 cal limit per entry. Please reduce quantity or split into multiple entries.`;
+      // Double-check calories limit (database constraint: max 10000)
+      if (parsedCalories > MAX_CALORIES) {
+        const errorMsg = 'Cannot exceed 10,000 cal per entry.';
         setCaloriesError(errorMsg);
         
-        const alertMessage = 
-          `⚠️ Calories Limit Exceeded\n\n` +
-          `This entry has ${parsedCalories.toLocaleString()} calories.\n` +
-          `Maximum allowed: 5,000 calories per entry.\n\n` +
-          `Solutions:\n` +
-          `• Reduce the quantity\n` +
-          `• Split into ${Math.ceil(parsedCalories / 5000)} separate entries`;
-        
-        Alert.alert(t('alerts.calories_limit_exceeded'), alertMessage);
+        // Ensure loading is false
         setLoading(false);
+        
         return false;
       }
 
@@ -2196,7 +2068,7 @@ export default function LogFoodScreen() {
             `SOLUTIONS:\n` +
             `• Reduce quantity to ${suggestedQty} (instead of ${parsedQuantity || 'current'})\n` +
             `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
-          setCaloriesError(`Calories (${currentCalories.toLocaleString()} cal) exceed the 5,000 cal limit per entry`);
+          setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
           
         } else if (errorMsg.includes('numeric') || errorMsg.includes('value too large') || errorMsg.includes('out of range') || errorCode === '22003') {
           errorMessage = 'The calculated values are too large. Please reduce the quantity or split into multiple entries.';
@@ -2290,7 +2162,7 @@ export default function LogFoodScreen() {
           `• Reduce the quantity\n` +
           `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
         
-        setCaloriesError(`Calories (${currentCalories.toLocaleString()} cal) exceed the 5,000 cal limit per entry`);
+        setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
         Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
         setLoading(false);
         return;
@@ -2581,6 +2453,11 @@ export default function LogFoodScreen() {
           // Open manual mode
           setIsManualMode(true);
           
+          // Focus the item name input after a short delay to ensure form is rendered
+          setTimeout(() => {
+            itemNameInputRef.current?.focus();
+          }, 300);
+          
           // Prefill form fields
           setItemName(entryData.item_name || '');
           setQuantity(entryData.quantity?.toString() || '');
@@ -2603,11 +2480,54 @@ export default function LogFoodScreen() {
         } catch (err) {
           console.error('[MealTypeLog] Error parsing manual entry data:', err);
         }
+      } else if (shouldOpenManual && user?.id && !manualData) {
+        // Handle case where we just want to open manual mode without prefilled data (e.g., from 3-dot menu)
+        setIsManualMode(true);
+        setSelectedFood(null);
+        setEditingEntryId(null); // Ensure no existing entry is being edited
+        // Clear form fields
+        setItemName('');
+        setQuantity('1');
+        setUnit('⚡');
+        setCalories('');
+        setProtein('');
+        setCarbs('');
+        setFat('');
+        setFiber('');
+        setSaturatedFat('');
+        setTransFat('');
+        setSugar('');
+        setSodium('');
+        setSelectedServing(null);
+        setAvailableServings([]);
+        setItemNameError('');
+        setQuantityError('');
+        setCaloriesError('');
+        
+        // Set active tab to manual if not already
+        if (activeTab !== 'manual') {
+          setActiveTab('manual');
+        }
+        setTabContentCollapsed(false); // Ensure tab content is expanded
+        setTimeout(() => {
+          itemNameInputRef.current?.focus();
+        }, 300);
       }
     };
 
     handleScannedFood();
   }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab]);
+
+  // Auto-focus item name input when manual mode opens
+  useEffect(() => {
+    if (isManualMode && !selectedFood && !editingEntryId) {
+      // Focus the item name input after a short delay to ensure form is rendered
+      const timer = setTimeout(() => {
+        itemNameInputRef.current?.focus();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isManualMode, selectedFood, editingEntryId]);
 
   // Handle openBarcodeScanner param - open scanner when navigating from scanned-item "Scan Another"
   // Use a ref to ensure we only trigger once, even on re-renders
@@ -2650,10 +2570,10 @@ export default function LogFoodScreen() {
     // Validate calories
     const parsedCalories = parseFloat(calories);
     if (!calories || calories.trim() === '' || isNaN(parsedCalories) || !isFinite(parsedCalories) || parsedCalories < 0) {
-      setCaloriesError('Calories must be a valid number');
+      // Don't show error message, but still mark as invalid
       isValid = false;
     } else if (parsedCalories > MAX_CALORIES) {
-      setCaloriesError(`Calories cannot exceed ${MAX_CALORIES.toLocaleString()} cal per entry. Current: ${parsedCalories.toLocaleString()} cal. Reduce quantity or split into ${Math.ceil(parsedCalories / MAX_CALORIES)} entries.`);
+      setCaloriesError('Cannot exceed 10,000 cal per entry.');
       isValid = false;
     }
     
@@ -2791,52 +2711,116 @@ export default function LogFoodScreen() {
   }, []);
   
   // Handle calories change with validation
+  // Strip non-digits and limit to 5 characters
   const handleCaloriesChange = useCallback((text: string) => {
-    setCalories(validateNumericInput(text));
+    // Strip all non-digit characters (no periods allowed)
+    const sanitized = text.replace(/\D/g, '');
+    // Limit to 5 characters
+    const limited = sanitized.slice(0, 5);
+    setCalories(limited);
   }, []);
 
   // Fetch servings for a selected food - uses centralized data access
   // UI dropdown still uses buildServingOptions/getDefaultServingSelection for ServingOption types
-  const fetchFoodServings = useCallback(async (foodId: string, food: FoodMaster) => {
-    try {
-      // Use centralized data access from lib/servings.ts
-      const dbServings = await getServingsForFood(foodId);
-      
-      // Build serving options using UI helper (for dropdown)
-      const options = buildServingOptions(food, dbServings);
-      setAvailableServings(options);
-      
-      // Get default serving selection for UI (uses ServingOption type for dropdown)
-      const { quantity: defaultQty, defaultOption } = getDefaultServingSelection(food, dbServings);
-      setSelectedServing(defaultOption);
-      setQuantity(defaultQty.toString());
-      calculateNutrientsFromOption(food, defaultOption, defaultQty);
-    } catch (error) {
-      // On error, still show raw unit options
-      const options = buildServingOptions(food, []);
-      setAvailableServings(options);
-      if (options.length > 0) {
-        const { quantity: defaultQty, defaultOption } = getDefaultServingSelection(food, []);
-        setSelectedServing(defaultOption);
-        setQuantity(defaultQty.toString());
-        calculateNutrientsFromOption(food, defaultOption, defaultQty);
+  const fetchFoodServings = useCallback(
+    async (
+      foodId: string,
+      food: FoodMaster,
+      displayServing?: { quantity: number; unit: string } | null
+    ) => {
+      try {
+        // Use centralized data access from lib/servings.ts (already goes through React Query + persistent cache)
+        const dbServings = await getServingsForFood(foodId);
+
+        // Build serving options using UI helper (for dropdown)
+        const options = buildServingOptions(food, dbServings);
+        setAvailableServings(options);
+
+        // Get default serving selection for UI (uses ServingOption type for dropdown)
+        const { quantity: defaultQty, defaultOption } = getDefaultServingSelection(food, dbServings);
+
+        // Start from the default selection
+        let initialQty = defaultQty;
+        let initialOption: ServingOption | null = defaultOption;
+
+        // If we have a displayServing (e.g., from a Recent item), try to match it
+        if (displayServing) {
+          const targetQty = displayServing.quantity;
+          const targetUnit = (displayServing.unit || '').trim().toLowerCase();
+
+          // First try to match a saved serving by label (for things like "cup diced (152g)")
+          const savedMatch =
+            options.find(
+              o =>
+                o.kind === 'saved' &&
+                o.label.trim().toLowerCase() === targetUnit
+            ) || null;
+
+          // If not found, try to match a raw unit option (for plain "g", "oz", "ml", etc.)
+          const rawMatch =
+            options.find(
+              o =>
+                o.kind === 'raw' &&
+                o.unit.trim().toLowerCase() === targetUnit
+            ) || null;
+
+          if (savedMatch) {
+            initialOption = savedMatch;
+            initialQty = targetQty;
+          } else if (rawMatch) {
+            initialOption = rawMatch;
+            initialQty = targetQty;
+          }
+          // If neither match is found, we silently fall back to the defaultOption/defaultQty
+        }
+
+        // Apply initial selection and compute nutrients
+        setSelectedServing(initialOption);
+        setQuantity(initialQty.toString());
+        calculateNutrientsFromOption(food, initialOption, initialQty);
+      } catch (error) {
+        // On error, fall back to existing behavior: clear servings and quantity
+        setAvailableServings([]);
+        setSelectedServing(null);
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Handle food selection from search results
-  const handleFoodSelect = async (food: FoodMaster) => {
+  const handleFoodSelect = async (food: FoodMaster | EnhancedFoodItem) => {
     // Set selected food
     setSelectedFood(food);
     setItemName(food.name + (food.brand ? ` (${food.brand})` : ''));
     setIsManualMode(false); // Close manual mode when food is selected
-    
-    // Fetch servings for this food
-    await fetchFoodServings(food.id, food);
-    
+
+    // If this came from enhanced search, try to use its display serving (recent_serving if present)
+    let displayServing: { quantity: number; unit: string } | null = null;
+    const enhanced = food as EnhancedFoodItem;
+
+    // Prefer recent_serving when available (Recent tab)
+    if (enhanced.recent_serving) {
+      displayServing = {
+        quantity: enhanced.recent_serving.quantity,
+        unit: enhanced.recent_serving.unit,
+      };
+    } else if (
+      typeof enhanced.serving_size === 'number' &&
+      enhanced.serving_unit
+    ) {
+      // Fallback: use the displayed serving_size/serving_unit from EnhancedFoodItem
+      displayServing = {
+        quantity: enhanced.serving_size,
+        unit: enhanced.serving_unit,
+      };
+    }
+
+    // Fetch servings for this food, using displayServing when available
+    await fetchFoodServings(food.id, food, displayServing);
+
     // Clear search using shared hook
     clearSearch();
-    
+
     // Auto-focus quantity input after a short delay
     setTimeout(() => {
       quantityInputRef.current?.focus();
@@ -2851,6 +2835,28 @@ export default function LogFoodScreen() {
    */
   const handleQuickAdd = async (food: FoodMaster | EnhancedFoodItem, latestEntry?: CalorieEntry) => {
     if (!user?.id) return;
+
+    const enhanced = food as EnhancedFoodItem;
+
+    let displayServing: { quantity: number; unit: string } | null = null;
+
+    // Prefer recent_serving when available (for RECENT items)
+    if (enhanced && enhanced.recent_serving) {
+      displayServing = {
+        quantity: enhanced.recent_serving.quantity,
+        unit: enhanced.recent_serving.unit,
+      };
+    } else if (
+      enhanced &&
+      typeof enhanced.serving_size === 'number' &&
+      enhanced.serving_unit
+    ) {
+      // Fallback: use whatever the search row is displaying
+      displayServing = {
+        quantity: enhanced.serving_size,
+        unit: enhanced.serving_unit,
+      };
+    }
 
     try {
       let servingQuantity: number;
@@ -2909,13 +2915,38 @@ export default function LogFoodScreen() {
         servingUnit = defaultServing.unit;
         servingId = defaultServing.serving?.id || null;
 
+        // If we have a displayServing coming from EnhancedFoodItem, override quantity/unit
+        if (displayServing) {
+          servingQuantity = displayServing.quantity;
+          servingUnit = displayServing.unit;
+          // Try to find a matching saved serving for the displayServing
+          const matchingServing = servings.find(s => 
+            s.serving_name && (
+              s.serving_name.includes(`${servingQuantity} ${servingUnit}`) ||
+              (s.weight_g && servingUnit === 'g' && Math.abs(s.weight_g - servingQuantity) < 0.01) ||
+              (s.volume_ml && servingUnit === 'ml' && Math.abs(s.volume_ml - servingQuantity) < 0.01)
+            )
+          );
+          if (matchingServing) {
+            servingId = matchingServing.id;
+          } else {
+            servingId = null;
+          }
+        }
+
         // 3. Calculate nutrients using centralized logic (SINGLE SOURCE OF TRUTH)
-        if (defaultServing.serving) {
-          // Use the saved serving for calculation
-          nutrients = computeNutrientsForFoodServing(food, defaultServing.serving, defaultServing.quantity);
+        if (servingId) {
+          const savedServing = servings.find(s => s.id === servingId);
+          if (savedServing) {
+            // Use the saved serving for calculation
+            nutrients = computeNutrientsForFoodServing(food, savedServing, servingQuantity);
+          } else {
+            // Using raw quantity/unit - calculate from food_master
+            nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
+          }
         } else {
-          // Using canonical fallback - nutrients match food_master
-          nutrients = computeNutrientsForRawQuantity(food, defaultServing.quantity, defaultServing.unit);
+          // Using raw quantity/unit - calculate from food_master
+          nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
         }
       }
 
@@ -3501,8 +3532,7 @@ export default function LogFoodScreen() {
           <>
             <View 
               ref={tabsContainerWrapperRef}
-              style={[styles.tabsContainerWrapper, { borderBottomColor: colors.icon + '15' }]} 
-              accessibilityRole="tablist"
+              style={styles.tabsContainerWrapper}
               onLayout={() => {
                 tabsContainerWrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
                   setTabsContainerWrapperLayout({ x: pageX, y: pageY, width, height });
@@ -3527,8 +3557,8 @@ export default function LogFoodScreen() {
               <ScrollView 
                 ref={tabsScrollViewRef}
                 horizontal 
-                showsHorizontalScrollIndicator={true}
-                contentContainerStyle={styles.tabsContainer}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.tabsContainer, { flexGrow: 1 }]}
                 style={styles.tabsScrollView}
                 scrollIndicatorInsets={{ bottom: -1 }}
                 onScroll={(e) => {
@@ -3539,78 +3569,59 @@ export default function LogFoodScreen() {
                 onContentSizeChange={handleTabsContentSizeChange}
                 scrollEventThrottle={16}
               >
-                <TabBar
-                  tabs={[
+                <SegmentedTabs
+                  items={[
                     {
                       key: 'frequent',
                       label: t('mealtype_log.tabs.frequent'),
-                      activeColor: getTabColor('frequent', true),
-                      inactiveColor: getTabColor('frequent', false),
                       accessibilityLabel: t('mealtype_log.accessibility.frequent_tab'),
+                      themeColor: CategoryColors.frequent,
+                      themeFillColor: getTabListBackgroundColor('frequent'),
                     },
                     {
                       key: 'recent',
                       label: t('mealtype_log.tabs.recent'),
-                      activeColor: getTabColor('recent', true),
-                      inactiveColor: getTabColor('recent', false),
                       accessibilityLabel: t('mealtype_log.accessibility.recent_tab'),
+                      themeColor: CategoryColors.recent,
+                      themeFillColor: getTabListBackgroundColor('recent'),
                     },
                     {
                       key: 'custom',
                       label: t('mealtype_log.tabs.custom'),
-                      activeColor: getTabColor('custom', true),
-                      inactiveColor: getTabColor('custom', false),
                       accessibilityLabel: t('mealtype_log.accessibility.custom_tab'),
+                      themeColor: CategoryColors.custom,
+                      themeFillColor: getTabListBackgroundColor('custom'),
                     },
                     {
                       key: 'bundle',
                       label: t('mealtype_log.tabs.bundles'),
-                      activeColor: getTabColor('bundle', true),
-                      inactiveColor: getTabColor('bundle', false),
                       accessibilityLabel: t('mealtype_log.accessibility.bundles_tab'),
+                      themeColor: CategoryColors.bundle,
+                      themeFillColor: getTabListBackgroundColor('bundle'),
                     },
                     {
                       key: 'manual',
-                      label: t('mealtype_log.tabs.manual'),
-                      activeColor: getTabColor('manual', true),
-                      inactiveColor: getTabColor('manual', false),
+                      label: '⚡Quick Log',
                       accessibilityLabel: t('mealtype_log.accessibility.manual_tab'),
-                      renderLabel: () => (
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <ThemedText style={[
-                            styles.tabText,
-                            { color: getTabColor('manual', activeTab === 'manual') }
-                          ]}>
-                            {t('mealtype_log.tabs.manual')}
-                          </ThemedText>
-                          <ThemedText style={[
-                            styles.tabText,
-                            { 
-                              color: getTabColor('manual', activeTab === 'manual'),
-                              fontSize: 20,
-                              fontWeight: 'bold',
-                              lineHeight: 20,
-                              marginLeft: 4
-                            }
-                          ]}>
-                            +
-                          </ThemedText>
-                        </View>
-                      ),
+                      themeColor: CategoryColors.manual,
+                      themeFillColor: getTabListBackgroundColor('manual'),
                     },
                   ]}
                   activeKey={activeTab}
-                  onActiveTabLayout={handleActiveTabLayout}
-                  onTabPress={(key) => {
+                  onChange={(key) => {
                     if (key === 'manual') {
                       // Manual+ button always opens manual mode - no expand/collapse toggle
                       setIsManualMode(true);
+                      // Focus the item name input after a short delay to ensure form is rendered
+                      setTimeout(() => {
+                        itemNameInputRef.current?.focus();
+                      }, 300);
                       setSelectedFood(null);
                       setEditingEntryId(null);
                       // Clear form fields
                       setItemName('');
                       setQuantity('1');
-                      setUnit('plate');
+                      setUnit('⚡');
                       setCalories('');
                       setProtein('');
                       setCarbs('');
@@ -3635,6 +3646,8 @@ export default function LogFoodScreen() {
                       handleTabPress(key as 'frequent' | 'recent' | 'custom' | 'bundle', () => setIsManualMode(false));
                     }
                   }}
+                  onActiveTabLayout={handleActiveTabLayout}
+                  style={{ marginHorizontal: Spacing.sm }}
                 />
               </ScrollView>
               
@@ -3684,7 +3697,7 @@ export default function LogFoodScreen() {
 
             {/* Tab Content - Animated with attached popover styling */}
             {!tabContentCollapsed && activeTabLayout ? (
-              <View style={{ position: 'relative', marginTop: 6 }}>
+              <View style={{ position: 'relative', marginTop: Spacing.xs }}>
                 {/* Connector pill - horizontal bridge between tab and dropdown */}
                 <View
                   style={[
@@ -4970,7 +4983,7 @@ export default function LogFoodScreen() {
                 </ThemedText>
               ) : isManualMode ? (
                 <ThemedText style={[styles.selectedFoodName, { color: colors.text, flex: 1 }]}>
-                  Manual
+                  ⚡Quick Log
                 </ThemedText>
               ) : null}
               {/* Source indicator badge - show when editing or in manual mode, but not when selectedFood exists (already shown above) */}
@@ -4988,7 +5001,7 @@ export default function LogFoodScreen() {
                       color: colors.icon,
                     }
                   ]}>
-                    {isManualMode ? 'Manual' : 'Manual'}
+                    ⚡
                   </ThemedText>
                 </View>
               )}
@@ -4996,8 +5009,535 @@ export default function LogFoodScreen() {
             
             <View style={styles.form}>
 
-            {/* Food Item and Calories on same line - Show when editing entry without food_id or in manual mode */}
-            {((editingEntryId && !selectedFood) || isManualMode) && (
+            {/* Nutrition Label Layout - Show in manual mode or when editing a manual entry (no food_id) */}
+            {(isManualMode || (editingEntryId && !selectedFood)) && (
+              <>
+                <NutritionLabelLayout
+                  hideServingRow={true}
+                  titleInput={
+                    <View>
+                      <TextInput
+                      ref={itemNameInputRef}
+                      style={[
+                        styles.nutritionLabelInput,
+                        styles.nutritionLabelTitleInput,
+                        { 
+                          borderBottomColor: itemNameError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
+                          borderBottomWidth: 1,
+                          color: '#000000',
+                          ...(Platform.OS === 'web' ? { 
+                            outline: 'none',
+                            borderBottom: itemNameError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
+                          } : {}),
+                        }
+                      ]}
+                        placeholder={t('mealtype_log.form.food_item_placeholder')}
+                        placeholderTextColor={colors.textTertiary}
+                        value={itemName}
+                        onChangeText={setItemName}
+                        autoCapitalize="words"
+                        autoFocus
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Food item name',
+                          'Enter the name of the food item',
+                          itemNameError || undefined,
+                          true
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Food item name',
+                          itemNameError ? 'item-name-error' : undefined,
+                          !!itemNameError,
+                          true
+                        )}
+                      />
+                      {itemNameError ? (
+                        <Text style={styles.errorText}>{itemNameError}</Text>
+                      ) : null}
+                    </View>
+                  }
+                  servingQuantityInput={
+                    <View>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelSmallInput,
+                          { 
+                            borderBottomColor: quantityError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: quantityError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="1"
+                        placeholderTextColor={colors.textTertiary}
+                        value={quantity}
+                        onChangeText={(text) => setQuantity(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Quantity',
+                          'Enter the quantity of food',
+                          quantityError || undefined,
+                          true
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Quantity',
+                          quantityError ? 'quantity-error' : undefined,
+                          !!quantityError,
+                          true
+                        )}
+                      />
+                      {quantityError ? (
+                        <Text style={styles.errorText}>{quantityError}</Text>
+                      ) : null}
+                    </View>
+                  }
+                  servingUnitInput={
+                    <TextInput
+                      style={[
+                        styles.nutritionLabelInput,
+                        styles.nutritionLabelSmallInput,
+                        { 
+                          borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                          borderBottomWidth: 1,
+                          color: '#000000',
+                          ...(Platform.OS === 'web' ? { 
+                            outline: 'none',
+                            borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                          } : {}),
+                        }
+                      ]}
+                      placeholder="⚡"
+                      placeholderTextColor={colors.textTertiary}
+                      value={unit}
+                      onChangeText={setUnit}
+                      maxLength={14}
+                      returnKeyType="done"
+                      onSubmitEditing={handleFormSubmit}
+                      {...getInputAccessibilityProps(
+                        'Unit',
+                        'Enter the unit of measurement'
+                      )}
+                      {...getWebAccessibilityProps(
+                        'textbox',
+                        'Unit'
+                      )}
+                    />
+                  }
+                  caloriesInput={
+                    <View>
+                      <View style={styles.nutritionLabelInputWithUnit}>
+                        <TextInput
+                          style={[
+                            styles.nutritionLabelInput,
+                            styles.nutritionLabelCaloriesInput,
+                            { 
+                              borderBottomColor: caloriesError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
+                              borderBottomWidth: 1,
+                              color: '#000000',
+                              fontWeight: '700',
+                              ...(Platform.OS === 'web' ? { 
+                                outline: 'none',
+                                borderBottom: caloriesError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
+                              } : {}),
+                            }
+                          ]}
+                          placeholder="e.g. 325"
+                          placeholderTextColor={colors.textTertiary}
+                          value={calories}
+                          onChangeText={(text) => {
+                            handleCaloriesChange(text);
+                          }}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                          returnKeyType="done"
+                          onSubmitEditing={handleFormSubmit}
+                          {...getInputAccessibilityProps(
+                            'Calories',
+                            'Enter the number of calories in kilocalories',
+                            caloriesError || undefined,
+                            true
+                          )}
+                          {...getWebAccessibilityProps(
+                            'textbox',
+                            'Calories',
+                            caloriesError ? 'calories-error' : undefined,
+                            !!caloriesError,
+                            true
+                          )}
+                        />
+                        <ThemedText
+                          style={styles.nutritionLabelUnit}
+                          lightColor="#000000"
+                          darkColor="#000000"
+                        >
+                          g
+                        </ThemedText>
+                      </View>
+                      {caloriesError ? (
+                        <Text style={styles.errorText}>{caloriesError}</Text>
+                      ) : null}
+                    </View>
+                  }
+                  fatInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={fat}
+                        onChangeText={(text) => {
+                          setFat(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Fat',
+                          'Enter fat in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Fat'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  satFatInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={saturatedFat}
+                        onChangeText={(text) => setSaturatedFat(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Saturated fat',
+                          'Enter saturated fat in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Saturated fat'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  transFatInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={transFat}
+                        onChangeText={(text) => setTransFat(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Trans fat',
+                          'Enter trans fat in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Trans fat'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  carbsInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={carbs}
+                        onChangeText={(text) => {
+                          setCarbs(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Carbohydrate',
+                          'Enter carbohydrate in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Carbohydrate'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  fiberInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={fiber}
+                        onChangeText={(text) => {
+                          setFiber(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Fiber',
+                          'Enter fiber in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Fiber'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  sugarInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={sugar}
+                        onChangeText={(text) => setSugar(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Sugar',
+                          'Enter sugar in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Sugar'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  proteinInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={protein}
+                        onChangeText={(text) => {
+                          setProtein(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Protein',
+                          'Enter protein in grams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Protein'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        g
+                      </ThemedText>
+                    </View>
+                  }
+                  sodiumInput={
+                    <View style={styles.nutritionLabelInputWithUnit}>
+                      <TextInput
+                        style={[
+                          styles.nutritionLabelInput,
+                          styles.nutritionLabelNutrientInput,
+                          { 
+                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
+                            borderBottomWidth: 1,
+                            color: '#000000',
+                            ...(Platform.OS === 'web' ? { 
+                              outline: 'none',
+                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                            } : {}),
+                          }
+                        ]}
+                        placeholder="Optional"
+                        placeholderTextColor={colors.textTertiary}
+                        value={sodium}
+                        onChangeText={(text) => setSodium(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                        maxLength={4}
+                        returnKeyType="done"
+                        onSubmitEditing={handleFormSubmit}
+                        {...getInputAccessibilityProps(
+                          'Sodium',
+                          'Enter sodium in milligrams'
+                        )}
+                        {...getWebAccessibilityProps(
+                          'textbox',
+                          'Sodium'
+                        )}
+                      />
+                      <ThemedText
+                        style={styles.nutritionLabelUnit}
+                        lightColor="#000000"
+                        darkColor="#000000"
+                      >
+                        mg
+                      </ThemedText>
+                    </View>
+                  }
+                />
+              </>
+            )}
+
+            {/* Food Item and Calories on same line - Hidden: now using NutritionLabelLayout for manual entries */}
+            {false && (
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 3, marginRight: 8 }]}>
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.food_item_required')}</ThemedText>
@@ -5077,8 +5617,8 @@ export default function LogFoodScreen() {
               </View>
             )}
 
-            {/* Quantity and Unit fields - Show when editing entry without food_id or in manual mode */}
-            {((editingEntryId && !selectedFood) || isManualMode) && (
+            {/* Quantity and Unit fields - Show when editing entry with food_id (NOT manual entry) */}
+            {(editingEntryId && selectedFood && !isManualMode) && (
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1, marginRight: 8 }]}>
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.quantity_required')}</ThemedText>
@@ -5246,6 +5786,9 @@ export default function LogFoodScreen() {
               </View>
             )}
 
+            {/* Macronutrients - Collapsible Section (only show when NOT in manual mode) */}
+            {!isManualMode && (
+              <>
             <TouchableOpacity
               style={[styles.collapsibleHeader, { borderColor: colors.icon + '20' }]}
               onPress={toggleMacros}
@@ -5435,6 +5978,8 @@ export default function LogFoodScreen() {
                   </View>
                 )}
               </View>
+                )}
+              </>
             )}
 
             <View style={styles.formActions}>
@@ -5478,7 +6023,7 @@ export default function LogFoodScreen() {
             <View style={styles.entriesHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
             <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('mealtype_log.food_log.title_with_count', { count: entries.length + (hasQuickLog ? 1 : 0) })}
+              {t('mealtype_log.food_log.title_with_count', { count: entries.length })}
             </ThemedText>
               <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
                 {` \u00B7 `}
@@ -5488,7 +6033,7 @@ export default function LogFoodScreen() {
               </ThemedText>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {!showLoadingSpinner && (entries.length > 0 || hasQuickLog) && (
+              {!showLoadingSpinner && entries.length > 0 && (
                 <View style={styles.toggleContainer}>
                   <ThemedText style={[styles.toggleLabel, { color: colors.textSecondary }]}>
                     {t('mealtype_log.food_log.details')}
@@ -5588,7 +6133,7 @@ export default function LogFoodScreen() {
           )}
           <View style={[styles.foodLogDivider, { backgroundColor: colors.separator }]} />
 
-          {/* Meal Totals - Only shown when Details toggle is ON and there are entries or Quick Log */}
+          {/* Meal Totals - Only shown when Details toggle is ON and there are entries */}
           {showEntryDetails && mealTotals && (mealTotals.kcal > 0 || (entries?.length ?? 0) > 0) && (
             <View style={[styles.mealTotalsContainer, { backgroundColor: colors.tintLight }]}>
               <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
@@ -5615,7 +6160,7 @@ export default function LogFoodScreen() {
           )}
 
           {/* Select All Row - Only shown in edit mode */}
-          {entriesEditMode && (entries.length > 0 || hasQuickLog) && (
+          {entriesEditMode && entries.length > 0 && (
             <View
               style={[
                 styles.selectAllRow,
@@ -5623,25 +6168,16 @@ export default function LogFoodScreen() {
               ]}
             >
               <MultiSelectItem
-                isSelected={
-                  areAllEntriesSelected(entries, (entry) => entry.id) &&
-                  (!hasQuickLog || isQuickLogSelected)
-                }
+                isSelected={areAllEntriesSelected(entries, (entry) => entry.id)}
                 onToggle={() => {
                   const allEntriesSelected = areAllEntriesSelected(entries, (entry) => entry.id);
-                  const allSelectedNow =
-                    allEntriesSelected && (!hasQuickLog || isQuickLogSelected);
 
-                  if (allSelectedNow) {
+                  if (allEntriesSelected) {
                     // Deselect everything
                     deselectAllEntries();
-                    setIsQuickLogSelected(false);
                   } else {
-                    // Select all entries and Quick Log (if present)
+                    // Select all entries
                     selectAllEntries(entries, (entry) => entry.id);
-                    if (hasQuickLog) {
-                      setIsQuickLogSelected(true);
-                    }
                   }
                 }}
                 style={{ paddingVertical: 12, paddingHorizontal: 16 }}
@@ -5691,7 +6227,7 @@ export default function LogFoodScreen() {
                 {t('common.loading')}
               </ThemedText>
             </View>
-          ) : entries.length === 0 && !hasQuickLog ? (
+          ) : entries.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
               <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
                 {t('mealtype_log.food_log.no_entries')}
@@ -5725,129 +6261,6 @@ export default function LogFoodScreen() {
             </View>
           ) : (
             <>
-              {hasQuickLog &&
-                (() => {
-                  const quickLogRow = (
-                    <HighlightableRow
-                      style={[
-                        styles.entryCard,
-                        {
-                          backgroundColor: 'transparent',
-                          borderColor: 'transparent',
-                          borderWidth: 0,
-                        }
-                      ]}
-                    >
-                      <View style={styles.entryHeader}>
-                        <View style={styles.entryHeaderLeft}>
-                          <View style={styles.entryNameRow}>
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-                              <TouchableOpacity
-                                onPress={() => setQuickLogEditor({ visible: true })}
-                                activeOpacity={0.7}
-                                style={[
-                                  styles.entryItemNameButton,
-                                  { flexShrink: 1, minWidth: 0 },
-                                  getMinTouchTargetStyle(),
-                                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
-                                ]}
-                                {...getButtonAccessibilityProps(
-                                  t('food.quick_log.label', { defaultValue: 'Quick Log' }),
-                                  'Double tap to edit Quick Log'
-                                )}
-                              >
-                                <ThemedText
-                                  style={[styles.entryItemName, { color: colors.text, flexShrink: 1 }]}
-                                  numberOfLines={1}
-                                  ellipsizeMode="tail"
-                                >
-                                  ⚡ {t('food.quick_log.label', { defaultValue: 'Quick Log' })}
-                                  {currentMealMeta?.quick_log_food ? `: ${currentMealMeta.quick_log_food}` : ''}
-                                </ThemedText>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                          {showEntryDetails && (
-                            <TouchableOpacity
-                              onPress={() => setQuickLogEditor({ visible: true })}
-                              activeOpacity={0.7}
-                              style={styles.entryMacros}
-                            >
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_protein_g ?? 0}g</ThemedText>
-                              </View>
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.carbs_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_carbs_g ?? 0}g</ThemedText>
-                              </View>
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fat_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_fat_g ?? 0}g</ThemedText>
-                              </View>
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_fiber_g ?? 0}g</ThemedText>
-                              </View>
-                            </TouchableOpacity>
-                          )}
-                          {showEntryDetails && (
-                            <TouchableOpacity
-                              onPress={() => setQuickLogEditor({ visible: true })}
-                              activeOpacity={0.7}
-                              style={[styles.entryMacros, { marginTop: 2 }]}
-                            >
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_saturated_fat_g ?? 0}g</ThemedText>
-                              </View>
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.trans_fat_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_trans_fat_g ?? 0}g</ThemedText>
-                              </View>
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_sugar_g ?? 0}g</ThemedText>
-                              </View>
-                              <View style={styles.entryMacroItem}>
-                                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
-                                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{currentMealMeta?.quick_sodium_mg ?? 0}mg</ThemedText>
-                              </View>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                        <View style={styles.entryHeaderRight}>
-                          <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                            {Math.round(currentMealMeta?.quick_kcal || 0)} cal
-                          </ThemedText>
-                          {!hasAnySelection && (
-                            <TouchableOpacity
-                              style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
-                              onPress={() => setShowDeleteQuickLogConfirm(true)}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </View>
-                    </HighlightableRow>
-                  );
-
-                  if (entriesEditMode) {
-                    return (
-                      <MultiSelectItem
-                        key="quick-log"
-                        isSelected={isQuickLogSelected}
-                        onToggle={() => setIsQuickLogSelected((prev) => !prev)}
-                      >
-                        {quickLogRow}
-                      </MultiSelectItem>
-                    );
-                  }
-
-                  return quickLogRow;
-                })()}
               {entries.map((entry) => {
               const isEditing = editingEntryId === entry.id;
               const entryContent = (
@@ -5916,7 +6329,7 @@ export default function LogFoodScreen() {
                                 styles.sourceBadgeText,
                                 { color: colors.icon }
                               ]}>
-                                {isMobileScreen ? 'M' : 'Manual'}
+                                ⚡
                               </ThemedText>
                             </View>
                           )}
@@ -5932,9 +6345,12 @@ export default function LogFoodScreen() {
                                 : foodBrandMap[entry.food_id]} •{' '}
                             </ThemedText>
                           )}
-                          <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>
-                            {entry.quantity} x {entry.unit}
-                          </ThemedText>
+                          {/* Only show quantity x unit for non-manual entries */}
+                          {entry.food_id && (
+                            <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>
+                              {entry.quantity} x {entry.unit}
+                            </ThemedText>
+                          )}
                         </View>
                       </View>
                       {showEntryDetails && (
@@ -6290,17 +6706,6 @@ export default function LogFoodScreen() {
         confirmButtonStyle={{ backgroundColor: '#EF4444' }}
       />
 
-      {/* Delete Quick Log Confirmation Modal */}
-      <ConfirmModal
-        visible={showDeleteQuickLogConfirm}
-        title={t('food.quick_log.delete_title', { defaultValue: 'Delete Quick Log?' })}
-        message={t('food.quick_log.delete_message', { defaultValue: 'This will remove the Quick Log for this meal.' })}
-        confirmText={t('mealtype_log.delete_entry.confirm')}
-        cancelText={t('mealtype_log.delete_entry.cancel')}
-        onConfirm={handleQuickLogDelete}
-        onCancel={() => setShowDeleteQuickLogConfirm(false)}
-        confirmButtonStyle={{ backgroundColor: '#EF4444' }}
-      />
 
       {/* Mass Delete Menu Modal */}
       <Modal
@@ -6337,16 +6742,21 @@ export default function LogFoodScreen() {
                 style={styles.massDeleteMenuItem}
                 onPress={() => {
                   setMassDeleteMenuVisible(false);
-                  setQuickLogEditor({ visible: true });
+                  setIsManualMode(true);
+                  setActiveTab('manual');
+                  // Focus the item name input after a short delay to ensure form is rendered
+                  setTimeout(() => {
+                    itemNameInputRef.current?.focus();
+                  }, 300);
                 }}
                 activeOpacity={0.7}
                 {...getButtonAccessibilityProps(
-                  `Quick Log for ${t(`home.meal_types.${selectedMealType}`)}`,
+                  `⚡Quick Log for ${t(`home.meal_types.${selectedMealType}`)}`,
                   `Add quick log for ${t(`home.meal_types.${selectedMealType}`)}`
                 )}
               >
                 <ThemedText style={[styles.massDeleteMenuItemText, { color: colors.text }]}>
-                  ⚡️ {t('food.menu.quick_log', { defaultValue: 'Quick Log' })}
+                  ⚡Quick Log
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
@@ -6365,16 +6775,16 @@ export default function LogFoodScreen() {
               <TouchableOpacity
                 style={styles.massDeleteMenuItem}
                 onPress={() => {
-                  if (entries.length > 0 || hasQuickLog) {
+                  if (entries.length > 0) {
                     setMassDeleteMenuVisible(false);
                     setEntriesEditMode(true);
                   }
                 }}
-                activeOpacity={entries.length > 0 || hasQuickLog ? 0.7 : 1}
-                disabled={entries.length === 0 && !hasQuickLog}
+                activeOpacity={entries.length > 0 ? 0.7 : 1}
+                disabled={entries.length === 0}
                 {...getButtonAccessibilityProps(
                   t('mealtype_log.food_log.mass_delete', { defaultValue: 'Mass Delete' }),
-                  entries.length > 0 || hasQuickLog
+                  entries.length > 0
                     ? t('mealtype_log.food_log.mass_delete_hint', { defaultValue: 'Double tap to enter mass delete mode' })
                     : t('mealtype_log.food_log.mass_delete_disabled_hint', { defaultValue: 'Mass delete is not available when there are no entries' })
                 )}
@@ -6382,8 +6792,8 @@ export default function LogFoodScreen() {
                 <ThemedText style={[
                   styles.massDeleteMenuItemText, 
                   { 
-                    color: (entries.length > 0 || hasQuickLog) ? colors.text : colors.textSecondary,
-                    opacity: (entries.length > 0 || hasQuickLog) ? 1 : 0.5,
+                    color: entries.length > 0 ? colors.text : colors.textSecondary,
+                    opacity: entries.length > 0 ? 1 : 0.5,
                   }
                 ]}>
                   🗑️ {t('mealtype_log.food_log.mass_delete', { defaultValue: 'Mass Delete' })}
@@ -6394,33 +6804,6 @@ export default function LogFoodScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Quick Log Editor */}
-      {(hasQuickLog || quickLogEditor.visible) && (
-        <QuickLogEditor
-          visible={quickLogEditor.visible}
-          onClose={() => setQuickLogEditor({ visible: false })}
-          onSave={handleQuickLogSave}
-          onDelete={handleQuickLogDelete}
-          initialData={
-            currentMealMeta
-              ? {
-                  quickKcal: currentMealMeta.quick_kcal ?? null,
-                  quickProteinG: currentMealMeta.quick_protein_g ?? null,
-                  quickCarbsG: currentMealMeta.quick_carbs_g ?? null,
-                  quickFatG: currentMealMeta.quick_fat_g ?? null,
-                  quickFiberG: currentMealMeta.quick_fiber_g ?? null,
-                  quickSaturatedFatG: currentMealMeta.quick_saturated_fat_g ?? null,
-                  quickTransFatG: currentMealMeta.quick_trans_fat_g ?? null,
-                  quickSugarG: currentMealMeta.quick_sugar_g ?? null,
-                  quickSodiumMg: currentMealMeta.quick_sodium_mg ?? null,
-                  quickLogFood: currentMealMeta.quick_log_food ?? null,
-                }
-              : null
-          }
-          mealTypeLabel={t(`home.meal_types.${selectedMealType}`)}
-          isLoading={upsertMealtypeMetaMutation.isPending}
-        />
-      )}
 
       {/* Note Editor */}
       {noteEditor.visible && (
@@ -6781,6 +7164,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  nutritionLabelInput: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    margin: 0,
+    fontSize: 12,
+    textAlign: 'right',
+    minWidth: 50,
+  },
+  nutritionLabelTitleInput: {
+    fontSize: 16,
+    fontWeight: '400',
+    textAlign: 'left',
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    minWidth: '100%',
+  },
+  nutritionLabelSmallInput: {
+    fontSize: 12,
+    textAlign: 'left',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    minWidth: 60,
+  },
+  nutritionLabelCaloriesInput: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'right',
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    minWidth: 60,
+  },
+  nutritionLabelNutrientInput: {
+    fontSize: 12,
+    textAlign: 'right',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    minWidth: 25,
+  },
+  nutritionLabelInputWithUnit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nutritionLabelUnit: {
+    fontSize: 12,
+    color: '#000000',
+    marginLeft: 4,
   },
   foodLogContainer: {
     marginHorizontal: -12,
@@ -7176,10 +7608,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tabsContainerWrapper: {
-    borderBottomWidth: 1,
-    marginBottom: 12,
     position: 'relative',
     overflow: 'visible',
+    marginBottom: Spacing.xs, // Minimal spacing - tightened from 12
   },
   tabsScrollView: {
     borderBottomWidth: 0,

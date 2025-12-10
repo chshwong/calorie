@@ -101,17 +101,19 @@ function convertToEnhancedFood(
     ? new Date(food.lastUsedAt) 
     : ('lastLoggedAt' in food ? new Date(food.lastLoggedAt) : null);
   
-  const enhanced = enhanceFoodItem(food, times_used, last_used_at);
-  
-  // Add serving info
-  if (isRecent && 'latestServingQty' in food) {
-    enhanced.recent_serving = {
-      quantity: food.latestServingQty,
-      unit: food.latestServingUnit,
-      calories: food.latestServingCalories,
+  // Extract latest entry info for recent foods
+  let latestEntry: { quantity: number; unit: string; calories_kcal: number } | null = null;
+  if (isRecent && 'latestEntry' in food && food.latestEntry) {
+    latestEntry = {
+      quantity: food.latestEntry.quantity,
+      unit: food.latestEntry.unit,
+      calories_kcal: food.latestEntry.calories_kcal,
     };
   }
   
+  const enhanced = enhanceFoodItem(food, times_used, last_used_at, latestEntry);
+  
+  // Add default serving info (if not already set by enhanceFoodItem)
   if ('defaultServingQty' in food) {
     enhanced.default_serving = {
       quantity: food.defaultServingQty,

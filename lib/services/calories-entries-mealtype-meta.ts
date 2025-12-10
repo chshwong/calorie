@@ -5,7 +5,7 @@
  * - Components must NOT call Supabase directly
  * - All direct Supabase calls live in this data access layer
  * 
- * This service handles metadata for meal types (Quick Log, Notes, etc.)
+ * This service handles metadata for meal types (Notes, etc.)
  */
 
 import { supabase } from '@/lib/supabase';
@@ -15,16 +15,6 @@ export interface MealtypeMeta {
   user_id: string;
   entry_date: string;
   meal_type: string;
-  quick_kcal: number | null;
-  quick_protein_g: number | null;
-  quick_carbs_g: number | null;
-  quick_fat_g: number | null;
-  quick_fiber_g: number | null;
-  quick_saturated_fat_g: number | null;
-  quick_trans_fat_g: number | null;
-  quick_sodium_mg: number | null;
-  quick_sugar_g: number | null;
-  quick_log_food: string | null;
   note: string | null;
   inserted_at: string;
   updated_at: string;
@@ -72,16 +62,6 @@ export interface UpsertMealtypeMetaParams {
   userId: string;
   entryDate: string;
   mealType: string;
-  quickKcal?: number | null;
-  quickProteinG?: number | null;
-  quickCarbsG?: number | null;
-  quickFatG?: number | null;
-  quickFiberG?: number | null;
-  quickSaturatedFatG?: number | null;
-  quickTransFatG?: number | null;
-  quickSodiumMg?: number | null;
-  quickSugarG?: number | null;
-  quickLogFood?: string | null;
   note?: string | null;
 }
 
@@ -89,7 +69,7 @@ export interface UpsertMealtypeMetaParams {
  * Upsert mealtype meta (insert or update)
  * 
  * undefined values are omitted (won't overwrite existing)
- * null values explicitly set the field to NULL (used to delete Quick Log)
+ * null values explicitly set the field to NULL
  * 
  * @param params - Upsert parameters
  * @returns The updated/inserted MealtypeMeta row, or null on error
@@ -97,7 +77,7 @@ export interface UpsertMealtypeMetaParams {
 export async function upsertMealtypeMeta(
   params: UpsertMealtypeMetaParams
 ): Promise<MealtypeMeta | null> {
-  const { userId, entryDate, mealType, quickKcal, quickProteinG, quickCarbsG, quickFatG, quickFiberG, quickSaturatedFatG, quickTransFatG, quickSodiumMg, quickSugarG, quickLogFood, note } = params;
+  const { userId, entryDate, mealType, note } = params;
 
   if (!userId || !entryDate || !mealType) {
     console.error('Missing required parameters for upsertMealtypeMeta');
@@ -108,36 +88,6 @@ export async function upsertMealtypeMeta(
     // Build update data object, only including defined fields
     const updateData: any = {};
     
-    if (quickKcal !== undefined) {
-      updateData.quick_kcal = quickKcal;
-    }
-    if (quickProteinG !== undefined) {
-      updateData.quick_protein_g = quickProteinG;
-    }
-    if (quickCarbsG !== undefined) {
-      updateData.quick_carbs_g = quickCarbsG;
-    }
-    if (quickFatG !== undefined) {
-      updateData.quick_fat_g = quickFatG;
-    }
-    if (quickFiberG !== undefined) {
-      updateData.quick_fiber_g = quickFiberG;
-    }
-    if (quickSaturatedFatG !== undefined) {
-      updateData.quick_saturated_fat_g = quickSaturatedFatG;
-    }
-    if (quickTransFatG !== undefined) {
-      updateData.quick_trans_fat_g = quickTransFatG;
-    }
-    if (quickSodiumMg !== undefined) {
-      updateData.quick_sodium_mg = quickSodiumMg;
-    }
-    if (quickSugarG !== undefined) {
-      updateData.quick_sugar_g = quickSugarG;
-    }
-    if (quickLogFood !== undefined) {
-      updateData.quick_log_food = quickLogFood;
-    }
     if (note !== undefined) {
       updateData.note = note;
     }

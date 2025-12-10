@@ -17,9 +17,9 @@ import { getMealtypeMetaByDate, upsertMealtypeMeta } from '@/lib/services/calori
 
 export interface CloneMealTypeFromPreviousDayResult {
   entriesCloned: number;
-  quickLogCopied: boolean;
+  quickLogCopied: boolean; // Always false, kept for backward compatibility
   notesCopied: boolean;
-  totalCount: number; // entries + quick log (1) + notes (1)
+  totalCount: number; // entries + notes (1)
 }
 
 export interface CloneMealTypeFromPreviousDayOptions {
@@ -80,9 +80,8 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       const sourceMetaQueryKey = ['mealtypeMeta', userId, sourceDate];
       const cachedMeta = queryClient.getQueryData<any[]>(sourceMetaQueryKey);
       
-      // Check if there's anything to copy: entries, quick log, or notes
+      // Check if there's anything to copy: entries or notes
       let hasEntries = false;
-      let hasQuickLog = false;
       let hasNotes = false;
       
       // Check entries
@@ -95,20 +94,19 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
         }
       }
       
-      // Check quick log and notes from meta
+      // Check notes from meta
       if (cachedMeta !== undefined && cachedMeta !== null) {
         const mealTypeMeta = cachedMeta.find(meta => 
           meta.meal_type?.toLowerCase() === mealType.toLowerCase()
         );
         if (mealTypeMeta) {
-          hasQuickLog = mealTypeMeta.quick_kcal != null;
           hasNotes = mealTypeMeta.note != null && mealTypeMeta.note.trim().length > 0;
         }
       }
       
       // If cache exists and there's nothing to copy, throw error
       if (cachedData !== undefined && cachedMeta !== undefined) {
-        if (!hasEntries && !hasQuickLog && !hasNotes) {
+        if (!hasEntries && !hasNotes) {
           throw new Error('NOTHING_TO_COPY');
         }
       }
@@ -117,63 +115,41 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       const entriesCloned = await cloneDayEntries('food_log', userId, sourceDate, targetDate, undefined, mealType);
 
       // After successfully cloning entries, also clone mealtype_meta if it exists
-      // Copy both quick log values and notes
+      // Copy notes
       const sourceMetaArray = await getMealtypeMetaByDate(userId, sourceDate);
       const sourceMeta = sourceMetaArray.find(meta => 
         meta.meal_type.toLowerCase() === mealType.toLowerCase()
       );
 
-      let quickLogCopied = false;
       let notesCopied = false;
 
       if (sourceMeta) {
-        const hasQuickLogValue = sourceMeta.quick_kcal != null;
         const hasNoteValue = sourceMeta.note != null && sourceMeta.note.trim().length > 0;
         
         // Only upsert if there's something to copy
-        if (hasQuickLogValue || hasNoteValue) {
+        if (hasNoteValue) {
           const upsertParams: any = {
             userId,
             entryDate: targetDate,
             mealType,
+            note: sourceMeta.note,
           };
-          
-          // Copy quick log if it exists
-          if (hasQuickLogValue) {
-            upsertParams.quickKcal = sourceMeta.quick_kcal;
-            upsertParams.quickProteinG = sourceMeta.quick_protein_g;
-            upsertParams.quickCarbsG = sourceMeta.quick_carbs_g;
-            upsertParams.quickFatG = sourceMeta.quick_fat_g;
-            upsertParams.quickFiberG = sourceMeta.quick_fiber_g;
-            upsertParams.quickSugarG = sourceMeta.quick_sugar_g;
-            upsertParams.quickSodiumMg = sourceMeta.quick_sodium_mg;
-            upsertParams.quickLogFood = sourceMeta.quick_log_food;
-            quickLogCopied = true;
-          }
-          
-          // Copy notes if they exist
-          if (hasNoteValue) {
-            upsertParams.note = sourceMeta.note;
-            notesCopied = true;
-          }
           
           const metaResult = await upsertMealtypeMeta(upsertParams);
           // Only mark as copied if upsert was successful
-          if (!metaResult) {
-            quickLogCopied = false;
-            notesCopied = false;
+          if (metaResult) {
+            notesCopied = true;
           }
         }
       }
 
       // Calculate total count
       let totalCount = entriesCloned;
-      if (quickLogCopied) totalCount += 1;
       if (notesCopied) totalCount += 1;
 
       return {
         entriesCloned,
-        quickLogCopied,
+        quickLogCopied: false,
         notesCopied,
         totalCount,
       };

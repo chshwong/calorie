@@ -11,7 +11,6 @@ export interface CopyMealtypeEntriesParams {
   sourceMealType: string;
   targetDate: string;
   targetMealType: string;
-  includeQuickLog?: boolean;
   includeNotes?: boolean;
 }
 
@@ -31,7 +30,6 @@ export function useCopyMealtypeEntries() {
         params.sourceMealType,
         params.targetDate,
         params.targetMealType,
-        params.includeQuickLog ?? false,
         params.includeNotes ?? false
       );
     },

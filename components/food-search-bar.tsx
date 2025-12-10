@@ -338,6 +338,28 @@ export function FoodSearchBar({
           >
             {searchResults.map((food, index) => {
               const isHighlighted = highlightedIndex === index;
+
+              const hasRecentServing =
+                (food as any).recent_serving &&
+                (food as any).recent_serving.quantity != null &&
+                (food as any).recent_serving.unit;
+
+              const displayQuantity = hasRecentServing
+                ? (food as any).recent_serving.quantity
+                : (food as any).serving_size;
+
+              const displayUnit = hasRecentServing
+                ? (food as any).recent_serving.unit
+                : (food as any).serving_unit;
+
+              const displayCalories = hasRecentServing
+                ? (food as any).recent_serving.calories_kcal
+                : (food as any).calories_kcal;
+
+              const nutritionInfo = `${displayQuantity} ${displayUnit} • ${Math.round(
+                displayCalories ?? 0
+              )} cal`;
+
               return (
                 <View
                   key={food.id}
@@ -400,7 +422,7 @@ export function FoodSearchBar({
                           numberOfLines={1}
                         >
                           {food.brand ? ' • ' : ''}
-                          {food.serving_size} {food.serving_unit} • {food.calories_kcal} cal
+                          {nutritionInfo}
                         </ThemedText>
                       </View>
                     </View>

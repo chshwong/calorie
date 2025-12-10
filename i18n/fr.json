@@ -905,6 +905,7 @@
       "item_name_required": "Veuillez entrer un nom d'aliment",
       "quantity_required": "Veuillez entrer une quantité valide",
       "calories_required": "Veuillez entrer les calories",
+      "calories_exceed_5000_limit": "Ne peut pas dépasser 5 000 cal par entrée.",
       "quick_add_failed": "Échec de l'ajout rapide: {{error}}"
     },
     

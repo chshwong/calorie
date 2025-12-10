@@ -912,6 +912,7 @@
       "item_name_required": "Please enter a food item name",
       "quantity_required": "Please enter a valid quantity",
       "calories_required": "Please enter calories",
+      "calories_exceed_5000_limit": "Cannot exceed 5,000 cal per entry.",
       "quick_add_failed": "Failed to quick add: {{error}}"
     },
     

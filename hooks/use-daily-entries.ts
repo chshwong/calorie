@@ -14,7 +14,7 @@ import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import type { CalorieEntry } from '@/utils/types';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
 
-const DAILY_ENTRIES_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000; // ~180 days
+const DAILY_ENTRIES_MAX_AGE_MS = 120 * 24 * 60 * 60 * 1000; // ~180 days
 
 export function useDailyEntries(entryDate: string) {
   const { user } = useAuth();

@@ -55,22 +55,7 @@ export function calculateDailyTotals(entries: CalorieEntry[], metaByMealType?: {
     ),
   };
 
-  // Add Quick Log values from mealtype_meta
-  if (metaByMealType) {
-    Object.values(metaByMealType).forEach((meta: any) => {
-      totals.calories += meta.quick_kcal ?? 0;
-      totals.protein += meta.quick_protein_g ?? 0;
-      totals.carbs += meta.quick_carbs_g ?? 0;
-      totals.fat += meta.quick_fat_g ?? 0;
-      totals.fiber += meta.quick_fiber_g ?? 0;
-      totals.saturatedFat += Math.round(meta.quick_saturated_fat_g ?? 0);
-      totals.transFat += Math.round(meta.quick_trans_fat_g ?? 0);
-      totals.sugar += meta.quick_sugar_g ?? 0;
-      totals.sodium += meta.quick_sodium_mg ?? 0;
-    });
-  }
-
-  // Round totals after adding Quick Log values
+  // Round totals
   return {
     calories: Math.round(totals.calories),
     protein: Math.round(totals.protein),
@@ -150,33 +135,16 @@ export function groupEntriesByMealType(entries: CalorieEntry[], metaByMealType?:
     group.totalSugar += entry.sugar_g || 0;
   }
 
-  // Add Quick Log values from mealtype_meta
-  if (metaByMealType) {
-    Object.entries(metaByMealType).forEach(([mealType, meta]: [string, any]) => {
-      if (!meta) return;
-
-      const normalizedMealType = normalizeMealType(mealType);
-      const group = grouped[normalizedMealType];
-      
-      group.totalCalories += meta.quick_kcal ?? 0;
-      group.totalProtein += meta.quick_protein_g ?? 0;
-      group.totalCarbs += meta.quick_carbs_g ?? 0;
-      group.totalFat += meta.quick_fat_g ?? 0;
-      group.totalFiber += meta.quick_fiber_g ?? 0;
-      group.totalSugar += meta.quick_sugar_g ?? 0;
-    });
-  }
 
   return grouped;
 }
 
 /**
  * Calculate nutrition totals for a single meal type
- * Combines entries and Quick Log values from mealtype_meta
  * 
  * @param mealEntries - Array of calorie entries for the meal
- * @param mealMeta - Optional mealtype_meta object for the meal
- * @returns Object with all nutrient totals (including Quick Log values)
+ * @param mealMeta - Optional mealtype_meta object for the meal (currently unused, kept for future use)
+ * @returns Object with all nutrient totals
  */
 export function calculateMealNutritionTotals(
   mealEntries: CalorieEntry[],
@@ -219,18 +187,6 @@ export function calculateMealNutritionTotals(
     }
   );
 
-  // Add Quick Log values from mealtype_meta
-  if (mealMeta) {
-    totals.kcal += mealMeta.quick_kcal ?? 0;
-    totals.protein_g += mealMeta.quick_protein_g ?? 0;
-    totals.carbs_g += mealMeta.quick_carbs_g ?? 0;
-    totals.fat_g += mealMeta.quick_fat_g ?? 0;
-    totals.fiber_g += mealMeta.quick_fiber_g ?? 0;
-      totals.saturated_fat_g += mealMeta.quick_saturated_fat_g ?? 0;
-      totals.trans_fat_g += mealMeta.quick_trans_fat_g ?? 0;
-      totals.sugar_g += mealMeta.quick_sugar_g ?? 0;
-      totals.sodium_mg += mealMeta.quick_sodium_mg ?? 0;
-  }
 
   // Round values
   return {

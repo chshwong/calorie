@@ -79,10 +79,10 @@ export async function searchFoodsWithUsage(
     }
 
     // Fetch usage statistics for these foods for this user
-    // Count times_used and get last_used_at from calorie_entries
+    // Count times_used, get last_used_at, and latest entry serving info from calorie_entries
     const { data: entriesData, error: entriesError } = await supabase
       .from('calorie_entries')
-      .select('food_id, created_at')
+      .select('food_id, created_at, quantity, unit, calories_kcal')
       .eq('user_id', userId)
       .in('food_id', foodIds)
       .not('food_id', 'is', null)
@@ -92,26 +92,44 @@ export async function searchFoodsWithUsage(
       // Continue without usage stats if this fails
     }
 
-    // Build usage statistics map: food_id -> { times_used, last_used_at }
-    const usageMap = new Map<string, { times_used: number; last_used_at: Date | null }>();
+    // Build usage statistics map: food_id -> { times_used, last_used_at, latestEntry }
+    const usageMap = new Map<string, { 
+      times_used: number; 
+      last_used_at: Date | null;
+      latestEntry: { quantity: number; unit: string; calories_kcal: number } | null;
+    }>();
     
     if (entriesData) {
       for (const entry of entriesData) {
         if (!entry.food_id) continue;
         
         const existing = usageMap.get(entry.food_id);
+        const entryDate = new Date(entry.created_at);
+        
         if (existing) {
           // Increment count and update last_used_at if this entry is more recent
           existing.times_used += 1;
-          const entryDate = new Date(entry.created_at);
           if (!existing.last_used_at || entryDate > existing.last_used_at) {
             existing.last_used_at = entryDate;
+            // Update latest entry if this is more recent
+            if (entry.quantity != null && entry.unit) {
+              existing.latestEntry = {
+                quantity: entry.quantity,
+                unit: entry.unit,
+                calories_kcal: entry.calories_kcal ?? 0,
+              };
+            }
           }
         } else {
-          // First entry for this food
+          // First entry for this food - this is the latest entry
           usageMap.set(entry.food_id, {
             times_used: 1,
-            last_used_at: new Date(entry.created_at),
+            last_used_at: entryDate,
+            latestEntry: (entry.quantity != null && entry.unit) ? {
+              quantity: entry.quantity,
+              unit: entry.unit,
+              calories_kcal: entry.calories_kcal ?? 0,
+            } : null,
           });
         }
       }
@@ -119,8 +137,12 @@ export async function searchFoodsWithUsage(
 
     // Enhance foods with usage statistics
     const enhancedFoods: EnhancedFoodItem[] = filteredFoods.map(food => {
-      const usage = usageMap.get(food.id) || { times_used: 0, last_used_at: null };
-      return enhanceFoodItem(food, usage.times_used, usage.last_used_at);
+      const usage = usageMap.get(food.id) || { 
+        times_used: 0, 
+        last_used_at: null,
+        latestEntry: null,
+      };
+      return enhanceFoodItem(food, usage.times_used, usage.last_used_at, usage.latestEntry);
     });
 
     return enhancedFoods;

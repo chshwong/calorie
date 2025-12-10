@@ -172,10 +172,33 @@ export function mergeFoodResults(
 export function enhanceFoodItem(
   food: FoodMaster,
   times_used: number = 0,
-  last_used_at: Date | null = null
+  last_used_at: Date | null = null,
+  latestEntry?: { quantity: number; unit: string; calories_kcal: number } | null
 ): EnhancedFoodItem {
   const is_frequent = computeIsFrequent(times_used);
   const is_recent = computeIsRecent(last_used_at);
+  
+  // Compute recentServing from latest entry if available
+  let recentServing: { quantity: number; unit: string; calories_kcal: number } | null = null;
+  
+  if (latestEntry) {
+    const quantity = latestEntry.quantity ?? null;
+    const unit = latestEntry.unit ?? null;
+    const calories_kcal = latestEntry.calories_kcal ?? food.calories_kcal ?? 0;
+    
+    if (quantity != null && unit) {
+      recentServing = {
+        quantity,
+        unit,
+        calories_kcal,
+      };
+    }
+  }
+  
+  // Use recentServing for display fields when available, otherwise fall back to food defaults
+  const serving_size = recentServing?.quantity ?? food.serving_size ?? 1;
+  const serving_unit = recentServing?.unit ?? food.serving_unit ?? '';
+  const calories_kcal = recentServing?.calories_kcal ?? food.calories_kcal ?? 0;
   
   return {
     ...food,
@@ -183,6 +206,16 @@ export function enhanceFoodItem(
     last_used_at,
     is_frequent,
     is_recent,
+    // Display fields - use recent serving when available
+    serving_size,
+    serving_unit,
+    calories_kcal,
+    // recent_serving property (note: uses 'calories' not 'calories_kcal' per interface)
+    recent_serving: recentServing ? {
+      quantity: recentServing.quantity,
+      unit: recentServing.unit,
+      calories: recentServing.calories_kcal,
+    } : null,
   };
 }
 

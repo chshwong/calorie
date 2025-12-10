@@ -17,7 +17,7 @@ import type { CalorieEntry } from '@/utils/types';
 export interface CloneMealtypeResult {
   entriesCloned: number;
   metaCloned: boolean;
-  quickLogCopied: boolean;
+  quickLogCopied: boolean; // Always false, kept for backward compatibility
   notesCopied: boolean;
 }
 
@@ -40,7 +40,6 @@ export async function cloneCaloriesEntriesForMealtype(
   sourceMealType: string,
   targetDate: string,
   targetMealType: string,
-  includeQuickLog: boolean = false,
   includeNotes: boolean = false
 ): Promise<CloneMealtypeResult> {
   if (!userId || !sourceDate || !sourceMealType || !targetDate || !targetMealType) {
@@ -110,61 +109,31 @@ export async function cloneCaloriesEntriesForMealtype(
 
     // Step 2: Clone mealtype meta if it exists
     let metaCloned = false;
-    let quickLogCopied = false;
     let notesCopied = false;
     const sourceMetaArray = await getMealtypeMetaByDate(userId, normalizedSource);
     const sourceMeta = sourceMetaArray.find(meta => 
       meta.meal_type.toLowerCase() === sourceMealType.toLowerCase()
     );
 
-    // Copy mealtype meta if quick log or notes should be included
-    if (sourceMeta && (includeQuickLog || includeNotes)) {
-      const hasQuickLog = sourceMeta.quick_kcal != null;
+    // Copy mealtype meta if notes should be included
+    if (sourceMeta && includeNotes) {
       const hasNote = sourceMeta.note != null && sourceMeta.note.trim().length > 0;
       
-      // Track what we're trying to copy
-      const willCopyQuickLog = includeQuickLog && hasQuickLog;
-      const willCopyNotes = includeNotes && hasNote;
-      
       // Only proceed if there's something to copy
-      if (willCopyQuickLog || willCopyNotes) {
-        // Build upsert params: use undefined to preserve existing values, or source values to override
+      if (hasNote) {
+        // Build upsert params
         const upsertParams: any = {
           userId,
           entryDate: normalizedTarget,
           mealType: targetMealType,
+          note: sourceMeta.note,
         };
-
-        // Handle Quick Log: only include if we're overriding
-        if (willCopyQuickLog) {
-          upsertParams.quickKcal = sourceMeta.quick_kcal;
-          upsertParams.quickProteinG = sourceMeta.quick_protein_g;
-          upsertParams.quickCarbsG = sourceMeta.quick_carbs_g;
-          upsertParams.quickFatG = sourceMeta.quick_fat_g;
-          upsertParams.quickFiberG = sourceMeta.quick_fiber_g;
-          upsertParams.quickSugarG = sourceMeta.quick_sugar_g;
-          upsertParams.quickSodiumMg = sourceMeta.quick_sodium_mg;
-          upsertParams.quickLogFood = sourceMeta.quick_log_food;
-        }
-        // If excludeQuickLog, we don't include these fields (undefined) - existing values are preserved
-
-        // Handle Notes: only include if we're overriding
-        if (willCopyNotes) {
-          upsertParams.note = sourceMeta.note;
-        }
-        // If excludeNotes, we don't include this field (undefined) - existing value is preserved
 
         const metaResult = await upsertMealtypeMeta(upsertParams);
 
         if (metaResult) {
           metaCloned = true;
-          // Only mark as copied if upsert was successful
-          if (willCopyQuickLog) {
-            quickLogCopied = true;
-          }
-          if (willCopyNotes) {
-            notesCopied = true;
-          }
+          notesCopied = true;
         } else {
           console.error('Failed to clone mealtype meta');
         }
@@ -174,7 +143,7 @@ export async function cloneCaloriesEntriesForMealtype(
     return {
       entriesCloned,
       metaCloned,
-      quickLogCopied,
+      quickLogCopied: false, // Always false, Quick Log is deprecated
       notesCopied,
     };
   } catch (error) {
