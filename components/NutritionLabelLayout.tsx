@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 4,    
-    marginRight:60,
+    marginRight:160,
   },
   caloriesLabel: {
     fontSize: 14,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   rowValueContainer: {
     marginLeft: 'auto',
-    marginRight: 80,
+    marginRight: 180,
     width: 32,
     alignItems: 'flex-end',
   },

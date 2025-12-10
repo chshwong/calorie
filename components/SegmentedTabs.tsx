@@ -159,7 +159,6 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                   ...Platform.select({
                     web: {
                       border: 'none',
-                      outline: 'none', // Remove default outline, focused state will add it back
                     },
                     default: {
                       elevation: 0, // Remove Android shadow/elevation
@@ -171,18 +170,6 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                 },
                 pressed && styles.tabPressed,
                 focused && styles.tabFocused,
-                focused && { 
-                  ...Platform.select({
-                    web: {
-                      outlineWidth: 2,
-                      outlineStyle: 'solid',
-                      outlineColor: strongColor,
-                      outlineOffset: 2,
-                      border: 'none', // Ensure no border when focused
-                    },
-                    default: {},
-                  }),
-                },
               ]}
             >
               {item.icon ? (

@@ -726,6 +726,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                   style={[
                     styles.nutritionLabelInput,
                     styles.nutritionLabelCaloriesInput,
+                    styles.nutritionLabelNumericInput,
                     { 
                       borderBottomColor: caloriesError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
                       borderBottomWidth: 1,
@@ -778,6 +779,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -822,6 +824,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -864,6 +867,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -906,6 +910,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -950,6 +955,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -994,6 +1000,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -1036,6 +1043,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -1080,6 +1088,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
+                  styles.nutritionLabelNumericInput,
                   { 
                     borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
@@ -1241,6 +1250,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     color: '#000000',
   },
+  nutritionLabelNumericInput: {
+    width: 56, // Fixed width for 5-6 characters (w-14 equivalent)
+    textAlign: 'right',
+  },
   nutritionLabelTitleInput: {
     fontSize: 14,
     fontWeight: '400',
@@ -1259,6 +1272,8 @@ const styles = StyleSheet.create({
   nutritionLabelInputWithUnit: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    width: 80, // Fixed width container for input + unit (w-20 equivalent)
     gap: 4,
   },
   nutritionLabelUnit: {

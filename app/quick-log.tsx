@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Dimensions, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { QuickLogForm } from '@/components/QuickLogForm';
@@ -30,6 +30,10 @@ export default function QuickLogScreen() {
   const date = params.date ?? getLocalDateString();
   const mealType = params.mealType ?? 'breakfast';
 
+  // Detect desktop for responsive layout
+  const screenWidth = Dimensions.get('window').width;
+  const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+
   const handleClose = () => {
     router.back();
   };
@@ -40,14 +44,16 @@ export default function QuickLogScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.cardContainer}>
-          <QuickLogForm
-            date={date}
-            mealType={mealType}
-            quickLogId={params.quickLogId}
-            onCancel={handleClose}
-            onSaved={handleClose}
-          />
+        <View style={styles.centeredContainer}>
+          <View style={[styles.cardContainer, { maxWidth: isDesktop ? 480 : '100%' }]}>
+            <QuickLogForm
+              date={date}
+              mealType={mealType}
+              quickLogId={params.quickLogId}
+              onCancel={handleClose}
+              onSaved={handleClose}
+            />
+          </View>
         </View>
       </ScrollView>
     </ThemedView>
@@ -60,10 +66,16 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+  },
+  centeredContainer: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   cardContainer: {
+    width: '100%',
     // Card styling is handled by QuickLogForm component
   },
 });

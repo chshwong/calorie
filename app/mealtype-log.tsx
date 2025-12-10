@@ -56,6 +56,7 @@ import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { NoteEditor } from '@/components/note-editor';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -1510,6 +1511,20 @@ export default function LogFoodScreen() {
 
   // Handle edit entry - load entry data into form
   const handleEditEntry = async (entry: CalorieEntry) => {
+    // If entry is a Quick Log (no food_id), navigate to dedicated Quick Log screen
+    if (!entry.food_id) {
+      router.push({
+        pathname: '/quick-log',
+        params: {
+          date: entryDate,
+          mealType: mealType,
+          quickLogId: entry.id,
+        },
+      });
+      return;
+    }
+    
+    // For entries with food_id, use the inline editor
     setEditingEntryId(entry.id);
     setIsManualMode(false); // Close manual mode when editing entry
     
@@ -2443,75 +2458,21 @@ export default function LogFoodScreen() {
       }
 
       // Handle manualEntryData - "1-time Log (Manual)" flow
+      // Now navigates to dedicated Quick Log screen instead of inline form
       const manualData = Array.isArray(manualEntryDataParam) ? manualEntryDataParam[0] : manualEntryDataParam;
       const shouldOpenManual = Array.isArray(openManualModeParam) ? openManualModeParam[0] === 'true' : openManualModeParam === 'true';
       
-      if (manualData && shouldOpenManual && user?.id) {
-        try {
-          const entryData = JSON.parse(manualData);
-          
-          // Open manual mode
-          setIsManualMode(true);
-          
-          // Focus the item name input after a short delay to ensure form is rendered
-          setTimeout(() => {
-            itemNameInputRef.current?.focus();
-          }, 300);
-          
-          // Prefill form fields
-          setItemName(entryData.item_name || '');
-          setQuantity(entryData.quantity?.toString() || '');
-          setUnit(entryData.unit || 'g');
-          setCalories(entryData.calories_kcal?.toString() || '');
-          setProtein(entryData.protein_g?.toString() || '');
-          setCarbs(entryData.carbs_g?.toString() || '');
-          setFat(entryData.fat_g?.toString() || '');
-          setFiber(entryData.fiber_g?.toString() || '');
-          setSugar(entryData.sugar_g?.toString() || '');
-          setSodium(entryData.sodium_mg?.toString() || '');
-          
-          // Clear any selected food
-          setSelectedFood(null);
-          
-          // Set active tab to manual if not already
-          if (activeTab !== 'manual') {
-            setActiveTab('manual');
-          }
-        } catch (err) {
-          console.error('[MealTypeLog] Error parsing manual entry data:', err);
-        }
-      } else if (shouldOpenManual && user?.id && !manualData) {
-        // Handle case where we just want to open manual mode without prefilled data (e.g., from 3-dot menu)
-        setIsManualMode(true);
-        setSelectedFood(null);
-        setEditingEntryId(null); // Ensure no existing entry is being edited
-        // Clear form fields
-        setItemName('');
-        setQuantity('1');
-        setUnit('⚡');
-        setCalories('');
-        setProtein('');
-        setCarbs('');
-        setFat('');
-        setFiber('');
-        setSaturatedFat('');
-        setTransFat('');
-        setSugar('');
-        setSodium('');
-        setSelectedServing(null);
-        setAvailableServings([]);
-        setItemNameError('');
-        setQuantityError('');
-        setCaloriesError('');
-        
-        // Set active tab to manual if not already
-        if (activeTab !== 'manual') {
-          setActiveTab('manual');
-        }
-        setTabContentCollapsed(false); // Ensure tab content is expanded
-        setTimeout(() => {
-          itemNameInputRef.current?.focus();
-        }, 300);
+      if (shouldOpenManual && user?.id) {
+        // Navigate to dedicated Quick Log screen
+        router.push({
+          pathname: '/quick-log',
+          params: {
+            date: entryDate,
+            mealType: mealType,
+            // If manualData exists, pass it as quickLogId for editing (though this is typically for new entries)
+            ...(manualData ? { manualData } : {}),
+          },
+        });
       }
     };
 
@@ -3343,8 +3304,9 @@ export default function LogFoodScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.headerContainer}>
+        <DesktopPageContainer>
+          {/* Header */}
+          <View style={styles.headerContainer}>
           {/* First Line: Back Arrow, Diary Title, Empty Right */}
           <View style={styles.headerTop}>
             <TouchableOpacity
@@ -4985,532 +4947,8 @@ export default function LogFoodScreen() {
             
             <View style={styles.form}>
 
-            {/* Nutrition Label Layout - Show in manual mode or when editing a manual entry (no food_id) */}
-            {(isManualMode || (editingEntryId && !selectedFood)) && (
-              <>
-                <NutritionLabelLayout
-                  hideServingRow={true}
-                  titleInput={
-                    <View>
-                      <TextInput
-                      ref={itemNameInputRef}
-                      style={[
-                        styles.nutritionLabelInput,
-                        styles.nutritionLabelTitleInput,
-                        { 
-                          borderBottomColor: itemNameError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
-                          borderBottomWidth: 1,
-                          color: '#000000',
-                          ...(Platform.OS === 'web' ? { 
-                            outline: 'none',
-                            borderBottom: itemNameError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
-                          } : {}),
-                        }
-                      ]}
-                        placeholder={t('mealtype_log.form.food_item_placeholder')}
-                        placeholderTextColor={colors.textTertiary}
-                        value={itemName}
-                        onChangeText={setItemName}
-                        autoCapitalize="words"
-                        autoFocus
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Food item name',
-                          'Enter the name of the food item',
-                          itemNameError || undefined,
-                          true
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Food item name',
-                          itemNameError ? 'item-name-error' : undefined,
-                          !!itemNameError,
-                          true
-                        )}
-                      />
-                      {itemNameError ? (
-                        <Text style={styles.errorText}>{itemNameError}</Text>
-                      ) : null}
-                    </View>
-                  }
-                  servingQuantityInput={
-                    <View>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelSmallInput,
-                          { 
-                            borderBottomColor: quantityError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: quantityError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="1"
-                        placeholderTextColor={colors.textTertiary}
-                        value={quantity}
-                        onChangeText={(text) => setQuantity(validateNumericInput(text))}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Quantity',
-                          'Enter the quantity of food',
-                          quantityError || undefined,
-                          true
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Quantity',
-                          quantityError ? 'quantity-error' : undefined,
-                          !!quantityError,
-                          true
-                        )}
-                      />
-                      {quantityError ? (
-                        <Text style={styles.errorText}>{quantityError}</Text>
-                      ) : null}
-                    </View>
-                  }
-                  servingUnitInput={
-                    <TextInput
-                      style={[
-                        styles.nutritionLabelInput,
-                        styles.nutritionLabelSmallInput,
-                        { 
-                          borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                          borderBottomWidth: 1,
-                          color: '#000000',
-                          ...(Platform.OS === 'web' ? { 
-                            outline: 'none',
-                            borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                          } : {}),
-                        }
-                      ]}
-                      placeholder="⚡"
-                      placeholderTextColor={colors.textTertiary}
-                      value={unit}
-                      onChangeText={setUnit}
-                      maxLength={14}
-                      returnKeyType="done"
-                      onSubmitEditing={handleFormSubmit}
-                      {...getInputAccessibilityProps(
-                        'Unit',
-                        'Enter the unit of measurement'
-                      )}
-                      {...getWebAccessibilityProps(
-                        'textbox',
-                        'Unit'
-                      )}
-                    />
-                  }
-                  caloriesInput={
-                    <View>
-                      <View style={styles.nutritionLabelInputWithUnit}>
-                        <TextInput
-                          style={[
-                            styles.nutritionLabelInput,
-                            styles.nutritionLabelCaloriesInput,
-                            { 
-                              borderBottomColor: caloriesError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
-                              borderBottomWidth: 1,
-                              color: '#000000',
-                              fontWeight: '700',
-                              ...(Platform.OS === 'web' ? { 
-                                outline: 'none',
-                                borderBottom: caloriesError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
-                              } : {}),
-                            }
-                          ]}
-                          placeholder="e.g. 325"
-                          placeholderTextColor={colors.textTertiary}
-                          value={calories}
-                          onChangeText={(text) => {
-                            handleCaloriesChange(text);
-                          }}
-                          keyboardType="number-pad"
-                          maxLength={4}
-                          returnKeyType="done"
-                          onSubmitEditing={handleFormSubmit}
-                          {...getInputAccessibilityProps(
-                            'Calories',
-                            'Enter the number of calories in kilocalories',
-                            caloriesError || undefined,
-                            true
-                          )}
-                          {...getWebAccessibilityProps(
-                            'textbox',
-                            'Calories',
-                            caloriesError ? 'calories-error' : undefined,
-                            !!caloriesError,
-                            true
-                          )}
-                        />
-                        <ThemedText
-                          style={styles.nutritionLabelUnit}
-                          lightColor="#000000"
-                          darkColor="#000000"
-                        >
-                          g
-                        </ThemedText>
-                      </View>
-                      {caloriesError ? (
-                        <Text style={styles.errorText}>{caloriesError}</Text>
-                      ) : null}
-                    </View>
-                  }
-                  fatInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={fat}
-                        onChangeText={(text) => {
-                          setFat(validateNumericInput(text));
-                        }}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Fat',
-                          'Enter fat in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Fat'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  satFatInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={saturatedFat}
-                        onChangeText={(text) => setSaturatedFat(validateNumericInput(text))}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Saturated fat',
-                          'Enter saturated fat in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Saturated fat'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  transFatInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={transFat}
-                        onChangeText={(text) => setTransFat(validateNumericInput(text))}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Trans fat',
-                          'Enter trans fat in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Trans fat'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  carbsInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={carbs}
-                        onChangeText={(text) => {
-                          setCarbs(validateNumericInput(text));
-                        }}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Carbohydrate',
-                          'Enter carbohydrate in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Carbohydrate'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  fiberInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={fiber}
-                        onChangeText={(text) => {
-                          setFiber(validateNumericInput(text));
-                        }}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Fiber',
-                          'Enter fiber in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Fiber'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  sugarInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={sugar}
-                        onChangeText={(text) => setSugar(validateNumericInput(text))}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Sugar',
-                          'Enter sugar in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Sugar'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  proteinInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={protein}
-                        onChangeText={(text) => {
-                          setProtein(validateNumericInput(text));
-                        }}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Protein',
-                          'Enter protein in grams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Protein'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        g
-                      </ThemedText>
-                    </View>
-                  }
-                  sodiumInput={
-                    <View style={styles.nutritionLabelInputWithUnit}>
-                      <TextInput
-                        style={[
-                          styles.nutritionLabelInput,
-                          styles.nutritionLabelNutrientInput,
-                          { 
-                            borderBottomColor: 'rgba(0, 0, 0, 0.2)', 
-                            borderBottomWidth: 1,
-                            color: '#000000',
-                            ...(Platform.OS === 'web' ? { 
-                              outline: 'none',
-                              borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
-                            } : {}),
-                          }
-                        ]}
-                        placeholder="Optional"
-                        placeholderTextColor={colors.textTertiary}
-                        value={sodium}
-                        onChangeText={(text) => setSodium(validateNumericInput(text))}
-                        keyboardType="decimal-pad"
-                        maxLength={4}
-                        returnKeyType="done"
-                        onSubmitEditing={handleFormSubmit}
-                        {...getInputAccessibilityProps(
-                          'Sodium',
-                          'Enter sodium in milligrams'
-                        )}
-                        {...getWebAccessibilityProps(
-                          'textbox',
-                          'Sodium'
-                        )}
-                      />
-                      <ThemedText
-                        style={styles.nutritionLabelUnit}
-                        lightColor="#000000"
-                        darkColor="#000000"
-                      >
-                        mg
-                      </ThemedText>
-                    </View>
-                  }
-                />
-              </>
-            )}
+            {/* Nutrition Label Layout - REMOVED: Quick Log editing now uses dedicated /quick-log screen */}
+            {/* Inline Quick Log form has been removed - all Quick Log creation/editing now goes through /quick-log screen */}
 
             {/* Food Item and Calories on same line - Hidden: now using NutritionLabelLayout for manual entries */}
             {false && (
@@ -6436,6 +5874,7 @@ export default function LogFoodScreen() {
           )}
           </View>
         </View>
+        </DesktopPageContainer>
       </ScrollView>
       
       {/* Meal Type Dropdown - Rendered at root level for proper z-index */}
@@ -6812,17 +6251,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   scrollContent: {
-    paddingHorizontal: 12,
     paddingVertical: 0,
     paddingTop: 0,
     paddingBottom: 20,
-    ...Platform.select({
-      web: {
-        maxWidth: 600,
-        alignSelf: 'center',
-        width: '100%',
-      },
-    }),
+    // DesktopPageContainer handles horizontal padding and max-width
   },
   headerContainer: {
     marginBottom: 0,
