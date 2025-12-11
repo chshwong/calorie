@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert, ActivityIndicator, Animated, Dimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert, ActivityIndicator, Animated, Easing, Dimensions, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from 'expo-secure-store';
@@ -9,7 +9,7 @@ import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, CategoryColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useEnhancedFoodSearch } from '@/hooks/use-enhanced-food-search';
+import { useFoodSearch } from '@/hooks/use-food-search';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
@@ -39,6 +39,7 @@ import {
   VOLUME_UNITS,
   type Nutrients,
   type FoodMaster as FoodMasterType,
+  type FoodMaster,
   type FoodServing as FoodServingType,
   type ServingOption,
 } from '@/utils/nutritionMath';
@@ -104,6 +105,48 @@ type CalorieEntry = {
 // Use shared types from nutritionMath (per engineering guidelines 7.4)
 type FoodMaster = FoodMasterType;
 type FoodServing = FoodServingType;
+
+// Animated component for "Tap to expand" hint
+const TapToExpandHint = ({ text, textColor }: { text: string; textColor: string }) => {
+  const translateY = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -4, // move up a bit
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0, // return to original position
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [translateY]);
+
+  return (
+    <Animated.View style={{ transform: [{ translateY }] }}>
+      <ThemedText
+        style={{
+          textAlign: 'center',
+          color: textColor,
+          fontSize: 11,
+          marginRight: 6,
+        }}
+      >
+        {text}
+      </ThemedText>
+    </Animated.View>
+  );
+};
 
 export default function LogFoodScreen() {
   const { t } = useTranslation();
@@ -672,7 +715,8 @@ export default function LogFoodScreen() {
     animationDelay: 150, // Slightly longer delay to ensure render completes
   });
 
-  // Use enhanced food search hook (per engineering guidelines 5.1)
+  // Use food search hook (DB-only) for search dropdown (per STEP 1)
+  // Note: Recent/Frequent tabs continue to use their own hooks
   const {
     searchQuery,
     searchResults,
@@ -680,15 +724,30 @@ export default function LogFoodScreen() {
     showSearchResults,
     setShowSearchResults,
     handleSearchChange,
-    handleEnterPress,
     clearSearch,
-    ensureLocalFoodsLoaded,
-    highlightedIndex,
-    setHighlightedIndex,
-  } = useEnhancedFoodSearch({
-    mealType,
+  } = useFoodSearch({
+    includeCustomFoods: true,
+    userId: user?.id,
     maxResults: 20,
   });
+
+  // Local state for keyboard navigation (highlighted index)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  // Handle Enter key press - select highlighted or first result
+  const handleEnterPress = useCallback((): FoodMaster | null => {
+    if (highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
+      return searchResults[highlightedIndex];
+    } else if (searchResults.length > 0) {
+      return searchResults[0];
+    }
+    return null;
+  }, [highlightedIndex, searchResults]);
+
+  // Ensure local foods loaded - no-op for DB-only search
+  const ensureLocalFoodsLoaded = useCallback(() => {
+    // No-op: DB-only search doesn't need to load local foods
+  }, []);
   
   // Barcode scanning state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -3456,8 +3515,7 @@ export default function LogFoodScreen() {
                 placeholder={t('mealtype_log.search_placeholder')}
                 colors={colors}
                 onQuickAdd={(food) => {
-                  const enhancedFood = food as EnhancedFoodItem;
-                  handleQuickAdd(enhancedFood);
+                  handleQuickAdd(food);
                 }}
                 quickAddLabel={t('mealtype_log.quick_add')}
                 highlightedIndex={highlightedIndex}
@@ -3621,9 +3679,7 @@ export default function LogFoodScreen() {
                 accessibilityHint={t('mealtype_log.expand_content_hint')}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <ThemedText style={[styles.collapsedHintText, { color: colors.textSecondary, fontSize: 11, marginRight: 6 }]}>
-                    {t('mealtype_log.tap_to_expand')}
-                  </ThemedText>
+                  <TapToExpandHint text={t('mealtype_log.tap_to_expand')} textColor={colors.textSecondary} />
                   <IconSymbol
                     name="chevron.down"
                     size={14}
@@ -5749,16 +5805,6 @@ export default function LogFoodScreen() {
                           )}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
-                          {entry.food_id && foodBrandMap[entry.food_id] && (
-                            <ThemedText 
-                              style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11, marginLeft: 0 }]}
-                              numberOfLines={1}
-                            >
-                              {foodBrandMap[entry.food_id]?.length > 14 
-                                ? foodBrandMap[entry.food_id]!.substring(0, 14) + '...' 
-                                : foodBrandMap[entry.food_id]} •{' '}
-                            </ThemedText>
-                          )}
                           {/* Only show quantity x unit for non-manual entries */}
                           {entry.food_id && (
                             <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>

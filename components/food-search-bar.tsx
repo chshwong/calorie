@@ -20,7 +20,6 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { FoodStatusChip } from '@/components/food-status-chip';
-import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import type { FoodMaster } from '@/utils/nutritionMath';
 
 export interface FoodSearchBarProps {
@@ -37,7 +36,7 @@ export interface FoodSearchBarProps {
   /** Handler to ensure local foods are loaded (for empty query state) */
   onEnsureLocalFoodsLoaded?: () => void;
   /** Search results to display */
-  searchResults: EnhancedFoodItem[];
+  searchResults: FoodMaster[];
   /** Whether search is loading */
   searchLoading: boolean;
   /** Whether to show search results dropdown */
@@ -339,22 +338,33 @@ export function FoodSearchBar({
             {searchResults.map((food, index) => {
               const isHighlighted = highlightedIndex === index;
 
+              // Check for recent serving (from EnhancedFoodItem) or default serving (from FoodSearchResult)
               const hasRecentServing =
                 (food as any).recent_serving &&
                 (food as any).recent_serving.quantity != null &&
                 (food as any).recent_serving.unit;
 
+              const hasDefaultServing =
+                (food as any).defaultServingQty != null &&
+                (food as any).defaultServingUnit;
+
               const displayQuantity = hasRecentServing
                 ? (food as any).recent_serving.quantity
-                : (food as any).serving_size;
+                : hasDefaultServing
+                ? (food as any).defaultServingQty
+                : food.serving_size;
 
               const displayUnit = hasRecentServing
                 ? (food as any).recent_serving.unit
-                : (food as any).serving_unit;
+                : hasDefaultServing
+                ? (food as any).defaultServingUnit
+                : food.serving_unit;
 
               const displayCalories = hasRecentServing
                 ? (food as any).recent_serving.calories_kcal
-                : (food as any).calories_kcal;
+                : hasDefaultServing
+                ? (food as any).defaultServingCalories
+                : food.calories_kcal;
 
               const nutritionInfo = `${displayQuantity} ${displayUnit} • ${Math.round(
                 displayCalories ?? 0
@@ -395,8 +405,8 @@ export function FoodSearchBar({
                         </ThemedText>
                         {/* Food status chips - Frequent/Recent */}
                         <FoodStatusChip
-                          isFrequent={food.is_frequent}
-                          isRecent={food.is_recent}
+                          isFrequent={(food as any).is_frequent ?? false}
+                          isRecent={(food as any).is_recent ?? false}
                           colors={colors}
                           marginLeft={6}
                         />
