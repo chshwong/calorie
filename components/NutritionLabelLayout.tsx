@@ -120,7 +120,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
             lightColor="#000000"
             darkColor="#000000"
           >
-            Food
+            Food *
           </ThemedText>
           <View style={styles.titleInputContainer}>
             {props.titleInput}
@@ -171,7 +171,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
           lightColor="#000000"
           darkColor="#000000"
         >
-          Calories
+          Calories *
         </ThemedText>
         <View style={styles.caloriesValueContainer}>
           {props.caloriesInput}

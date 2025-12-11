@@ -3929,250 +3929,246 @@ export default function LogFoodScreen() {
                   case 'custom':
                     return (
                       <View style={styles.tabContent}>
-                        {!searchQuery && (
-                          <>
-                            {/* Create New Custom Food Button */}
-                            <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: customFoodsLoading || customFoods.length === 0 ? 0 : 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
-                              <TouchableOpacity
-                                style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15', backgroundColor: colors.tint + '10' }]}
-                                onPress={() => {
-                                  router.push({
-                                    pathname: '/create-custom-food',
-                                    params: {
-                                      mealType: mealType || 'breakfast',
-                                      entryDate: entryDate || getLocalDateString(),
-                                    },
-                                  });
-                                }}
-                                activeOpacity={0.7}
-                              >
-                                <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
-                                  <ThemedText style={[styles.searchResultName, { color: colors.tint, fontWeight: '700', flex: 1 }]}>
-                                    {t('mealtype_log.custom_foods.create_new')}
-                                  </ThemedText>
-                                  {customFoods.length > 0 && (
-                                    <TouchableOpacity
-                                      onPress={() => {
-                                        if (customFoodEditMode) {
-                                          handleExitCustomFoodEditMode();
-                                        } else {
-                                          setCustomFoodEditMode(true);
-                                        }
-                                      }}
-                                      style={[styles.editButton, { 
-                                        backgroundColor: customFoodEditMode ? '#10B981' + '20' : colors.tint + '20', 
-                                        borderColor: customFoodEditMode ? '#10B981' + '40' : colors.tint + '40' 
-                                      }]}
-                                      activeOpacity={0.7}
-                                    >
-                                      <Text style={[styles.editButtonText, { 
-                                        color: customFoodEditMode ? '#10B981' : colors.tint 
-                                      }]}>
-                                        {customFoodEditMode ? '✓' : '✏️'}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  )}
-                                </View>
-                              </TouchableOpacity>
-                            </View>
-
-                            {customFoodsLoading ? (
-                              <View style={styles.emptyTabState}>
-                                <ActivityIndicator size="large" color={colors.tint} />
-                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 12 }]}>
-                                  {t('mealtype_log.custom_foods.loading')}
-                                </ThemedText>
-                              </View>
-                            ) : customFoods.length > 0 ? (
-                              <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
-                                <ScrollView 
-                                  style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
-                                  nestedScrollEnabled
-                                  keyboardShouldPersistTaps="handled"
-                                >
-                                  {(() => {
-                                    let sortedFoods;
+                        {/* Create New Custom Food Button (always visible) */}
+                        <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: customFoodsLoading || customFoods.length === 0 ? 0 : 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
+                          <TouchableOpacity
+                            style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15', backgroundColor: colors.tint + '10' }]}
+                            onPress={() => {
+                              router.push({
+                                pathname: '/create-custom-food',
+                                params: {
+                                  mealType: mealType || 'breakfast',
+                                  entryDate: entryDate || getLocalDateString(),
+                                },
+                              });
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
+                              <ThemedText style={[styles.searchResultName, { color: colors.tint, fontWeight: '700', flex: 1 }]}>
+                                {t('mealtype_log.custom_foods.create_new')}
+                              </ThemedText>
+                              {customFoods.length > 0 && (
+                                <TouchableOpacity
+                                  onPress={() => {
                                     if (customFoodEditMode) {
-                                      sortedFoods = [...customFoods];
-                                      const newlyAddedIndex = sortedFoods.findIndex(f => f.id === newlyAddedFoodId.current || f.id === newlyEditedFoodId.current);
-                                      if (newlyAddedIndex > 0) {
-                                        const newlyAdded = sortedFoods.splice(newlyAddedIndex, 1)[0];
-                                        sortedFoods.unshift(newlyAdded);
-                                      }
+                                      handleExitCustomFoodEditMode();
                                     } else {
-                                      sortedFoods = [...customFoods].sort((a, b) => {
-                                        if (newlyAddedFoodId.current === a.id || newlyEditedFoodId.current === a.id) return -1;
-                                        if (newlyAddedFoodId.current === b.id || newlyEditedFoodId.current === b.id) return 1;
-                                        const indexA = customFoods.findIndex(f => f.id === a.id);
-                                        const indexB = customFoods.findIndex(f => f.id === b.id);
-                                        return indexA - indexB;
-                                      });
+                                      setCustomFoodEditMode(true);
                                     }
-                                    
-                                    return sortedFoods.map((food) => {
-                                      const isNewlyAdded = newlyAddedFoodId.current === food.id;
-                                      const isNewlyEdited = newlyEditedFoodId.current === food.id;
-                                      const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
-                                      const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
-                                      const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
-                                      const rightSideText = `${brandText}${nutritionInfo}`;
-                                      
-                                      return (
-                                        <View
-                                          key={food.id}
-                                          style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                  }}
+                                  style={[styles.editButton, { 
+                                    backgroundColor: customFoodEditMode ? '#10B981' + '20' : colors.tint + '20', 
+                                    borderColor: customFoodEditMode ? '#10B981' + '40' : colors.tint + '40' 
+                                  }]}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={[styles.editButtonText, { 
+                                    color: customFoodEditMode ? '#10B981' : colors.tint 
+                                  }]}>
+                                    {customFoodEditMode ? '✓' : '✏️'}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+
+                        {customFoodsLoading ? (
+                          <View style={styles.emptyTabState}>
+                            <ActivityIndicator size="large" color={colors.tint} />
+                            <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 12 }]}>
+                              {t('mealtype_log.custom_foods.loading')}
+                            </ThemedText>
+                          </View>
+                        ) : customFoods.length > 0 ? (
+                          <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
+                            <ScrollView 
+                              style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
+                              nestedScrollEnabled
+                              keyboardShouldPersistTaps="handled"
+                            >
+                              {(() => {
+                                let sortedFoods;
+                                if (customFoodEditMode) {
+                                  sortedFoods = [...customFoods];
+                                  const newlyAddedIndex = sortedFoods.findIndex(f => f.id === newlyAddedFoodId.current || f.id === newlyEditedFoodId.current);
+                                  if (newlyAddedIndex > 0) {
+                                    const newlyAdded = sortedFoods.splice(newlyAddedIndex, 1)[0];
+                                    sortedFoods.unshift(newlyAdded);
+                                  }
+                                } else {
+                                  sortedFoods = [...customFoods].sort((a, b) => {
+                                    if (newlyAddedFoodId.current === a.id || newlyEditedFoodId.current === a.id) return -1;
+                                    if (newlyAddedFoodId.current === b.id || newlyEditedFoodId.current === b.id) return 1;
+                                    const indexA = customFoods.findIndex(f => f.id === a.id);
+                                    const indexB = customFoods.findIndex(f => f.id === b.id);
+                                    return indexA - indexB;
+                                  });
+                                }
+                                
+                                return sortedFoods.map((food) => {
+                                  const isNewlyAdded = newlyAddedFoodId.current === food.id;
+                                  const isNewlyEdited = newlyEditedFoodId.current === food.id;
+                                  const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                  const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
+                                  const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                  const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                  const rightSideText = `${brandText}${nutritionInfo}`;
+                                  
+                                  return (
+                                    <View
+                                      key={food.id}
+                                      style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                    >
+                                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                        <TouchableOpacity
+                                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, opacity: customFoodEditMode ? 0.6 : 1 }}
+                                          onPress={() => {
+                                            if (!customFoodEditMode) {
+                                              handleFoodSelect(food);
+                                            }
+                                          }}
+                                          disabled={customFoodEditMode}
+                                          activeOpacity={0.7}
                                         >
                                           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-                                            <TouchableOpacity
-                                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, opacity: customFoodEditMode ? 0.6 : 1 }}
-                                              onPress={() => {
-                                                if (!customFoodEditMode) {
-                                                  handleFoodSelect(food);
-                                                }
-                                              }}
-                                              disabled={customFoodEditMode}
-                                              activeOpacity={0.7}
+                                            <ThemedText 
+                                              style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                              numberOfLines={1}
+                                              ellipsizeMode="tail"
                                             >
-                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-                                                <ThemedText 
-                                                  style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
-                                                  numberOfLines={1}
-                                                  ellipsizeMode="tail"
-                                                >
-                                                  {truncatedName}
+                                              {truncatedName}
+                                            </ThemedText>
+                                            {isNewlyAdded && (
+                                              <View style={[styles.justAddedBadge, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
+                                                <ThemedText style={[styles.justAddedText, { color: colors.tint }]}>
+                                                  just added
                                                 </ThemedText>
-                                                {isNewlyAdded && (
-                                                  <View style={[styles.justAddedBadge, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
-                                                    <ThemedText style={[styles.justAddedText, { color: colors.tint }]}>
-                                                      just added
-                                                    </ThemedText>
-                                                  </View>
-                                                )}
-                                                {isNewlyEdited && (
-                                                  <View style={[styles.justAddedBadge, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
-                                                    <ThemedText style={[styles.justAddedText, { color: colors.tint }]}>
-                                                      just edited
-                                                    </ThemedText>
-                                                  </View>
-                                                )}
                                               </View>
-                                              {!customFoodEditMode && (
-                                                <ThemedText 
-                                                  style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
-                                                  numberOfLines={1}
-                                                >
-                                                  {rightSideText}
+                                            )}
+                                            {isNewlyEdited && (
+                                              <View style={[styles.justAddedBadge, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
+                                                <ThemedText style={[styles.justAddedText, { color: colors.tint }]}>
+                                                  just edited
                                                 </ThemedText>
-                                              )}
-                                            </TouchableOpacity>
+                                              </View>
+                                            )}
                                           </View>
-                                          {customFoodEditMode && (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
-                                              <TouchableOpacity
-                                                style={[
-                                                  styles.editButton, 
-                                                  { 
-                                                    backgroundColor: colors.icon + '20', 
-                                                    borderColor: colors.icon + '40', 
-                                                    marginRight: 4, 
-                                                    opacity: sortedFoods.findIndex(f => f.id === food.id) === 0 ? 0.5 : 1,
-                                                  }
-                                                ]}
-                                                onPress={() => handleMoveCustomFoodUp(food.id)}
-                                                disabled={sortedFoods.findIndex(f => f.id === food.id) === 0}
-                                                activeOpacity={0.7}
-                                              >
-                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
-                                              </TouchableOpacity>
-                                              <TouchableOpacity
-                                                style={[
-                                                  styles.editButton, 
-                                                  { 
-                                                    backgroundColor: colors.icon + '20', 
-                                                    borderColor: colors.icon + '40', 
-                                                    marginRight: 6, 
-                                                    opacity: sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1 ? 0.5 : 1,
-                                                  }
-                                                ]}
-                                                onPress={() => handleMoveCustomFoodDown(food.id)}
-                                                disabled={sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1}
-                                                activeOpacity={0.7}
-                                              >
-                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
-                                              </TouchableOpacity>
-                                              <TouchableOpacity
-                                                style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
-                                                onPress={() => handleDeleteCustomFood(food)}
-                                                activeOpacity={0.7}
-                                              >
-                                                <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
-                                              </TouchableOpacity>
-                                              <TouchableOpacity
-                                                style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}
-                                                onPress={() => {
-                                                  router.push({
-                                                    pathname: '/create-custom-food',
-                                                    params: {
-                                                      mealType: mealType || 'breakfast',
-                                                      entryDate: entryDate || getLocalDateString(),
-                                                      foodId: food.id,
-                                                    },
-                                                  });
-                                                }}
-                                                activeOpacity={0.7}
-                                              >
-                                                <Text style={[styles.editButtonText, { color: colors.tint }]}>✏️</Text>
-                                              </TouchableOpacity>
-                                            </View>
-                                          )}
                                           {!customFoodEditMode && (
-                                            <>
-                                              <TouchableOpacity
-                                                style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginLeft: 6 }]}
-                                                onPress={() => {
-                                                  router.push({
-                                                    pathname: '/create-custom-food',
-                                                    params: {
-                                                      mealType: mealType || 'breakfast',
-                                                      entryDate: entryDate || getLocalDateString(),
-                                                      cloneFoodId: food.id,
-                                                    },
-                                                  });
-                                                }}
-                                                activeOpacity={0.7}
-                                              >
-                                                <Text style={[styles.editButtonText, { color: colors.tint }]}>⧉</Text>
-                                              </TouchableOpacity>
-                                              <TouchableOpacity
-                                                style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                                                onPress={() => handleQuickAdd(food)}
-                                                activeOpacity={0.7}
-                                                accessibilityLabel={t('mealtype_log.quick_add')}
-                                                accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
-                                              >
-                                                <IconSymbol
-                                                  name="plus.circle.fill"
-                                                  size={22}
-                                                  color={colors.tint}
-                                                />
-                                              </TouchableOpacity>
-                                            </>
+                                            <ThemedText 
+                                              style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                              numberOfLines={1}
+                                            >
+                                              {rightSideText}
+                                            </ThemedText>
                                           )}
+                                        </TouchableOpacity>
+                                      </View>
+                                      {customFoodEditMode && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
+                                          <TouchableOpacity
+                                            style={[
+                                              styles.editButton, 
+                                              { 
+                                                backgroundColor: colors.icon + '20', 
+                                                borderColor: colors.icon + '40', 
+                                                marginRight: 4, 
+                                                opacity: sortedFoods.findIndex(f => f.id === food.id) === 0 ? 0.5 : 1,
+                                              }
+                                            ]}
+                                            onPress={() => handleMoveCustomFoodUp(food.id)}
+                                            disabled={sortedFoods.findIndex(f => f.id === food.id) === 0}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
+                                          </TouchableOpacity>
+                                          <TouchableOpacity
+                                            style={[
+                                              styles.editButton, 
+                                              { 
+                                                backgroundColor: colors.icon + '20', 
+                                                borderColor: colors.icon + '40', 
+                                                marginRight: 6, 
+                                                opacity: sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1 ? 0.5 : 1,
+                                              }
+                                            ]}
+                                            onPress={() => handleMoveCustomFoodDown(food.id)}
+                                            disabled={sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
+                                          </TouchableOpacity>
+                                          <TouchableOpacity
+                                            style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                                            onPress={() => handleDeleteCustomFood(food)}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                                          </TouchableOpacity>
+                                          <TouchableOpacity
+                                            style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}
+                                            onPress={() => {
+                                              router.push({
+                                                pathname: '/create-custom-food',
+                                                params: {
+                                                  mealType: mealType || 'breakfast',
+                                                  entryDate: entryDate || getLocalDateString(),
+                                                  foodId: food.id,
+                                                },
+                                              });
+                                            }}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Text style={[styles.editButtonText, { color: colors.tint }]}>✏️</Text>
+                                          </TouchableOpacity>
                                         </View>
-                                      );
-                                    });
-                                  })()}
-                                </ScrollView>
-                              </View>
-                            ) : (
-                              <View style={styles.emptyTabState}>
-                                <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
-                                  {t('mealtype_log.custom_foods.empty')}
-                                </ThemedText>
-                              </View>
-                            )}
-                          </>
+                                      )}
+                                      {!customFoodEditMode && (
+                                        <>
+                                          <TouchableOpacity
+                                            style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginLeft: 6 }]}
+                                            onPress={() => {
+                                              router.push({
+                                                pathname: '/create-custom-food',
+                                                params: {
+                                                  mealType: mealType || 'breakfast',
+                                                  entryDate: entryDate || getLocalDateString(),
+                                                  cloneFoodId: food.id,
+                                                },
+                                              });
+                                            }}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Text style={[styles.editButtonText, { color: colors.tint }]}>⧉</Text>
+                                          </TouchableOpacity>
+                                          <TouchableOpacity
+                                            style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                            onPress={() => handleQuickAdd(food)}
+                                            activeOpacity={0.7}
+                                            accessibilityLabel={t('mealtype_log.quick_add')}
+                                            accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                          >
+                                            <IconSymbol
+                                              name="plus.circle.fill"
+                                              size={22}
+                                              color={colors.tint}
+                                            />
+                                          </TouchableOpacity>
+                                        </>
+                                      )}
+                                    </View>
+                                  );
+                                });
+                              })()}
+                            </ScrollView>
+                          </View>
+                        ) : (
+                          <View style={styles.emptyTabState}>
+                            <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
+                              {t('mealtype_log.custom_foods.empty')}
+                            </ThemedText>
+                          </View>
                         )}
                       </View>
                     );
@@ -4612,84 +4608,164 @@ export default function LogFoodScreen() {
                     case 'custom':
                       return (
                         <View style={styles.tabContent}>
-                          {!searchQuery && (
-                            <>
-                              {customFoodsLoading ? (
-                                <View style={styles.emptyTabState}>
-                                  <ActivityIndicator size="small" color={colors.tint} />
-                                  <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
-                                    {t('mealtype_log.custom_foods.loading')}
-                                  </ThemedText>
-                                </View>
-                            ) : customFoods.length > 0 ? (
-                              <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
-                                <ScrollView 
-                                  style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
-                                  nestedScrollEnabled
-                                  keyboardShouldPersistTaps="handled"
+                          {/* Create New Custom Food Button (always visible) */}
+                          <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: customFoodsLoading || customFoods.length === 0 ? 0 : 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
+                          <TouchableOpacity
+                            style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15', backgroundColor: colors.tint + '10' }]}
+                            onPress={() => {
+                              router.push({
+                                pathname: '/create-custom-food',
+                                params: {
+                                  mealType: mealType || 'breakfast',
+                                  entryDate: entryDate || getLocalDateString(),
+                                },
+                              });
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
+                              <ThemedText style={[styles.searchResultName, { color: colors.tint, fontWeight: '700', flex: 1 }]}>
+                                {t('mealtype_log.custom_foods.create_new')}
+                              </ThemedText>
+                              {customFoods.length > 0 && (
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    if (customFoodEditMode) {
+                                      handleExitCustomFoodEditMode();
+                                    } else {
+                                      setCustomFoodEditMode(true);
+                                    }
+                                  }}
+                                  style={[styles.editButton, { 
+                                    backgroundColor: customFoodEditMode ? '#10B981' + '20' : colors.tint + '20', 
+                                    borderColor: customFoodEditMode ? '#10B981' + '40' : colors.tint + '40' 
+                                  }]}
+                                  activeOpacity={0.7}
                                 >
-                                    {customFoods.map((food) => {
-                                      const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
-                                      const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
-                                      const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
-                                      const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
-                                      const rightSideText = `${brandText}${nutritionInfo}`;
-                                      const isCustom = food.is_custom === true;
+                                  <Text style={[styles.editButtonText, { 
+                                    color: customFoodEditMode ? '#10B981' : colors.tint 
+                                  }]}>
+                                    {customFoodEditMode ? '✓' : '✏️'}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                          </View>
 
-                                      return (
-                                        <View
-                                          key={food.id}
-                                          style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                          {customFoodsLoading ? (
+                            <View style={styles.emptyTabState}>
+                              <ActivityIndicator size="small" color={colors.tint} />
+                              <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary, marginTop: 8 }]}>
+                                {t('mealtype_log.custom_foods.loading')}
+                              </ThemedText>
+                            </View>
+                          ) : customFoods.length > 0 ? (
+                            <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
+                              <ScrollView 
+                                style={[styles.searchResultsList, { backgroundColor: 'transparent' }]}
+                                nestedScrollEnabled
+                                keyboardShouldPersistTaps="handled"
+                              >
+                                {customFoods.map((food) => {
+                                  const truncatedName = food.name.length > 30 ? food.name.substring(0, 30) + '...' : food.name;
+                                  const nutritionInfo = `${food.defaultServingQty} ${food.defaultServingUnit} • ${food.defaultServingCalories} cal`;
+                                  const truncatedBrand = food.brand && food.brand.length > 14 ? food.brand.substring(0, 14) + '...' : food.brand;
+                                  const brandText = truncatedBrand ? `${truncatedBrand} • ` : '';
+                                  const rightSideText = `${brandText}${nutritionInfo}`;
+                                  const isCustom = food.is_custom === true;
+
+                                  return (
+                                    <View
+                                      key={food.id}
+                                      style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
+                                    >
+                                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+                                        <TouchableOpacity
+                                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, opacity: customFoodEditMode ? 0.6 : 1 }}
+                                          onPress={() => {
+                                            if (!customFoodEditMode) {
+                                              handleFoodSelect(food);
+                                            }
+                                          }}
+                                          disabled={customFoodEditMode}
+                                          activeOpacity={0.7}
                                         >
-                                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
-                                            <TouchableOpacity
-                                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}
-                                              onPress={() => handleFoodSelect(food)}
-                                              activeOpacity={0.7}
+                                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
+                                            <ThemedText 
+                                              style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
+                                              numberOfLines={1}
+                                              ellipsizeMode="tail"
                                             >
-                                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
-                                                <ThemedText 
-                                                  style={[styles.searchResultName, { color: colors.text, flexShrink: 1 }]}
-                                                  numberOfLines={1}
-                                                  ellipsizeMode="tail"
-                                                >
-                                                  {truncatedName}
-                                                </ThemedText>
-                                                <FoodSourceBadge
-                                                  isCustom={isCustom}
-                                                  colors={colors}
-                                                  marginLeft={6}
-                                                  containerStyle={{ marginRight: 0 }}
-                                                />
-                                              </View>
-                                              <ThemedText 
-                                                style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
-                                                numberOfLines={1}
-                                              >
-                                                {rightSideText}
-                                              </ThemedText>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                              style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                                              onPress={() => handleQuickAdd(food)}
-                                              activeOpacity={0.7}
-                                              accessibilityLabel={t('mealtype_log.quick_add')}
-                                              accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
-                                            >
-                                              <IconSymbol
-                                                name="plus.circle.fill"
-                                                size={22}
-                                                color={colors.tint}
-                                              />
-                                            </TouchableOpacity>
+                                              {truncatedName}
+                                            </ThemedText>
+                                            <FoodSourceBadge
+                                              isCustom={isCustom}
+                                              colors={colors}
+                                              marginLeft={6}
+                                              containerStyle={{ marginRight: 0 }}
+                                            />
                                           </View>
-                                        </View>
-                                      );
-                                    })}
-                                  </ScrollView>
-                                </View>
-                              ) : null}
-                            </>
+                                          <ThemedText 
+                                            style={[styles.searchResultNutrition, { color: colors.textSecondary, marginLeft: 6, fontSize: 11, flexShrink: 0 }]}
+                                            numberOfLines={1}
+                                          >
+                                            {rightSideText}
+                                          </ThemedText>
+                                        </TouchableOpacity>
+                                            {customFoodEditMode ? (
+                                              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
+                                                <TouchableOpacity
+                                                  style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                                                  onPress={() => handleDeleteCustomFood(food)}
+                                                  activeOpacity={0.7}
+                                                >
+                                                  <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                  style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}
+                                                  onPress={() => {
+                                                    router.push({
+                                                      pathname: '/create-custom-food',
+                                                      params: {
+                                                        mealType: mealType || 'breakfast',
+                                                        entryDate: entryDate || getLocalDateString(),
+                                                        foodId: food.id,
+                                                      },
+                                                    });
+                                                  }}
+                                                  activeOpacity={0.7}
+                                                >
+                                                  <Text style={[styles.editButtonText, { color: colors.tint }]}>✏️</Text>
+                                                </TouchableOpacity>
+                                              </View>
+                                            ) : (
+                                              <TouchableOpacity
+                                                style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
+                                                onPress={() => handleQuickAdd(food)}
+                                                activeOpacity={0.7}
+                                                accessibilityLabel={t('mealtype_log.quick_add')}
+                                                accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
+                                              >
+                                                <IconSymbol
+                                                  name="plus.circle.fill"
+                                                  size={22}
+                                                  color={colors.tint}
+                                                />
+                                              </TouchableOpacity>
+                                            )}
+                                      </View>
+                                    </View>
+                                  );
+                                })}
+                              </ScrollView>
+                            </View>
+                          ) : (
+                            <View style={styles.emptyTabState}>
+                              <ThemedText style={[styles.emptyTabText, { color: colors.textSecondary }]}>
+                                {t('mealtype_log.custom_foods.empty')}
+                              </ThemedText>
+                            </View>
                           )}
                         </View>
                       );

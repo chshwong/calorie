@@ -1689,6 +1689,17 @@
       "invalid": "Please enter a valid goal amount"
     },
     "edit_goal": "Edit Goal"
+  },
+  "quick_log": {
+    "header_title": "🍴 Diary",
+    "title": "⚡Quick Log",
+    "errors": {
+      "not_quick_log_entry": "This entry is not a Quick Log entry."
+    },
+    "accessibility": {
+      "cancel_hint": "Cancel and close Quick Log form",
+      "save_hint": "Save Quick Log entry"
+    }
   }
 }
 

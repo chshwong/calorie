@@ -6,7 +6,7 @@
  * - Consistent styling and behavior
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import {
   View,
   TextInput,
@@ -15,6 +15,8 @@ import {
   ActivityIndicator,
   StyleSheet,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -100,6 +102,10 @@ export function FoodSearchBar({
   const scrollViewRef = useRef<ScrollView>(null);
   const wrapperRef = useRef<View>(null);
   const isInteractingWithDropdownRef = useRef(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Animated value for focus animation (scale + shadow)
+  const focusAnim = useRef(new Animated.Value(0)).current;
 
   // Canonical clear/close function - handles all clearing and closing logic
   const handleClearAndClose = useCallback(() => {
@@ -120,6 +126,7 @@ export function FoodSearchBar({
 
   // Handle blur - close if focus moved outside the component
   const handleBlur = useCallback((e: any) => {
+    setIsFocused(false);
     // Use a small timeout to check if focus moved to an element inside the dropdown
     // This allows clicks on dropdown items to work before blur fires
     setTimeout(() => {
@@ -136,6 +143,7 @@ export function FoodSearchBar({
   // Handle focus on input
   // For MealType Log: Always open dropdown when focused, regardless of query length
   const handleFocus = useCallback(() => {
+    setIsFocused(true);
     // Reset the interaction flag when input is focused
     isInteractingWithDropdownRef.current = false;
     
@@ -245,6 +253,27 @@ export function FoodSearchBar({
     }
   }, [highlightedIndex, searchResults.length]);
 
+  // Focus animation effect
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: isFocused ? 1 : 0,
+      duration: 160,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false, // we animate shadow + scale
+    }).start();
+  }, [isFocused, focusAnim]);
+
+  // Compute animated styles
+  const containerScale = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.02],
+  });
+
+  const containerShadowOpacity = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Platform.OS === 'ios' ? 0.22 : 0.18],
+  });
+
   return (
     <View 
       ref={wrapperRef}
@@ -259,63 +288,75 @@ export function FoodSearchBar({
       }}
     >
       {/* Search Input */}
-      <View style={[styles.searchContainer, { borderColor: colors.icon + '30', backgroundColor: colors.background }]}>
-        <IconSymbol
-          name="magnifyingglass"
-          size={18}
-          color={colors.icon}
-          style={styles.searchIcon}
-        />
-        <TextInput
-          ref={inputRef}
-          style={[
-            styles.searchInput,
-            {
-              color: colors.text,
-              paddingRight: showClearButton ? 36 : (searchLoading ? 36 : 0), // Add padding when clear button or loader is visible
-            },
-          ]}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={onSearchChange}
-          onKeyPress={handleKeyPress}
-          onBlur={handleBlur}
-          onFocus={handleFocus}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <View style={styles.rightControls}>
-          {searchLoading && (
-            <ActivityIndicator
-              size="small"
-              color={colors.tint}
-              style={styles.searchLoader}
-            />
-          )}
-          {/* Clear button - visible when dropdown is open OR query is non-empty */}
-          {showClearButton && (
-            <TouchableOpacity
-              onPress={handleClear}
-              style={styles.clearButton}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              accessibilityHint="Clears the search query and closes the dropdown"
-              {...(Platform.OS === 'web' && {
-                // @ts-ignore - web-specific props
-                'aria-label': 'Clear search',
-              })}
-            >
-              <IconSymbol
-                name="xmark"
-                size={16}
-                color={colors.textSecondary}
+      <Animated.View
+        style={[
+          styles.searchOuterContainer,
+          isFocused && styles.searchOuterContainerFocused,
+          searchQuery.length > 0 && styles.searchOuterContainerActive,
+          {
+            transform: [{ scale: containerScale }],
+            shadowOpacity: containerShadowOpacity as any,
+          },
+        ]}
+      >
+        <View style={styles.searchInnerContainer}>
+          <IconSymbol
+            name="magnifyingglass"
+            size={18}
+            color={colors.icon}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            ref={inputRef}
+            style={[
+              styles.searchInput,
+              {
+                color: colors.text,
+                paddingRight: showClearButton ? 36 : (searchLoading ? 36 : 0), // Add padding when clear button or loader is visible
+              },
+            ]}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={onSearchChange}
+            onKeyPress={handleKeyPress}
+            onBlur={handleBlur}
+            onFocus={handleFocus}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={styles.rightControls}>
+            {searchLoading && (
+              <ActivityIndicator
+                size="small"
+                color={colors.tint}
+                style={styles.searchLoader}
               />
-            </TouchableOpacity>
-          )}
+            )}
+            {/* Clear button - visible when dropdown is open OR query is non-empty */}
+            {showClearButton && (
+              <TouchableOpacity
+                onPress={handleClear}
+                style={styles.clearButton}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                accessibilityHint="Clears the search query and closes the dropdown"
+                {...(Platform.OS === 'web' && {
+                  // @ts-ignore - web-specific props
+                  'aria-label': 'Clear search',
+                })}
+              >
+                <IconSymbol
+                  name="xmark"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Search Results Dropdown - Floats over content below */}
       {showSearchResults && searchResults.length > 0 && (
@@ -463,8 +504,8 @@ export function FoodSearchBar({
           </ScrollView>
         </View>
       )}
-      {/* Empty state */}
-      {showSearchResults && searchResults.length === 0 && !searchLoading && (
+      {/* Empty state - only show when there's a search query and no results */}
+      {showSearchResults && searchResults.length === 0 && !searchLoading && searchQuery.trim().length >= 3 && (
         <View
           style={[
             styles.searchResultsContainer,
@@ -490,6 +531,34 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1000,
   },
+  searchOuterContainer: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === 'ios' ? 6 : 4,
+    backgroundColor: Platform.OS === 'ios' ? '#F2F2F7' : '#F5F5F5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    shadowOpacity: 0, // animated
+    elevation: 0,
+    zIndex: 1001,
+  },
+  searchOuterContainerFocused: {
+    borderColor: '#2C98F0', // blue focus color
+    shadowColor: '#2C98F0',
+    elevation: Platform.OS === 'android' ? 2 : 0,
+  },
+  // Highlight when user is typing (iOS 17-ish subtle fill)
+  searchOuterContainerActive: {
+    backgroundColor: Platform.OS === 'ios' ? '#E5F1FF' : '#E8F0FF',
+  },
+  searchInnerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -500,13 +569,26 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 12,
   },
+
+   // NEW: ensures spinner + X are vertically centered and aligned
+   searchRightContainer: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 24,
+  },
+  
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    paddingVertical: 12, // Reduced from 12 to make search bar more compact (py-1.5 equivalent)
+    paddingVertical: Platform.OS === 'ios' ? 6 : 4,
+    paddingHorizontal: 8,
+    fontSize: 16,
   },
   rightControls: {
     flexDirection: 'row',
@@ -517,11 +599,9 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   clearButton: {
-    padding: 4,
+    padding: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 24,
-    minHeight: 24,
   },
   searchResultsContainer: {
     position: 'absolute',

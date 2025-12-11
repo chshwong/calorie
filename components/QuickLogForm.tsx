@@ -29,6 +29,7 @@ type QuickLogFormProps = {
   quickLogId?: string;           // if present, edit mode; else create
   onCancel: () => void;         // called when user taps Cancel
   onSaved: () => void;          // called after successful save/update
+  registerSubmit?: (submitFn: () => void) => void; // register submit function for header button
 };
 
 // Database constraints
@@ -36,7 +37,7 @@ const MAX_QUANTITY = 100000;
 const MAX_CALORIES = 10000;
 const MAX_MACRO = 9999.99;
 
-export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: QuickLogFormProps) {
+export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, registerSubmit }: QuickLogFormProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const colorScheme = useColorScheme();
@@ -88,7 +89,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
 
           // Only load if it's a manual entry (no food_id)
           if (entry.food_id) {
-            Alert.alert(t('alerts.error_title'), 'This entry is not a Quick Log entry.');
+            Alert.alert(t('alerts.error_title'), t('quick_log.errors.not_quick_log_entry'));
             onCancel();
             return;
           }
@@ -571,13 +572,20 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
     }
   }, [isFormValid, loading, handleSave]);
 
+  // Register submit function for header button
+  useEffect(() => {
+    if (registerSubmit) {
+      registerSubmit(handleFormSubmit);
+    }
+  }, [registerSubmit, handleFormSubmit]);
+
   return (
     <View style={styles.container}>
       {/* Header with title and badge */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <ThemedText style={[styles.title, { color: colors.text }]}>
-            ⚡Quick Log
+            {t('quick_log.title')}
           </ThemedText>
           <View style={[
             styles.sourceBadge,
@@ -620,6 +628,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                 placeholder={t('mealtype_log.form.food_item_placeholder')}
                 placeholderTextColor={colors.textTertiary}
                 value={itemName}
+                maxLength={40}
                 onChangeText={setItemName}
                 autoCapitalize="words"
                 autoFocus
@@ -738,7 +747,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                       } : {}),
                     }
                   ]}
-                  placeholder="e.g. 325"
+                  placeholder="325"
                   placeholderTextColor={colors.textTertiary}
                   value={calories}
                   onChangeText={handleCaloriesChange}
@@ -790,7 +799,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={fat}
                 onChangeText={(text) => {
@@ -835,7 +844,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={saturatedFat}
                 onChangeText={(text) => setSaturatedFat(validateNumericInput(text))}
@@ -878,7 +887,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={transFat}
                 onChangeText={(text) => setTransFat(validateNumericInput(text))}
@@ -921,7 +930,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={carbs}
                 onChangeText={(text) => {
@@ -966,7 +975,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={fiber}
                 onChangeText={(text) => {
@@ -1011,7 +1020,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={sugar}
                 onChangeText={(text) => setSugar(validateNumericInput(text))}
@@ -1054,7 +1063,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={protein}
                 onChangeText={(text) => {
@@ -1099,7 +1108,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
                     } : {}),
                   }
                 ]}
-                placeholder="Optional"
+                placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={sodium}
                 onChangeText={(text) => setSodium(validateNumericInput(text))}
@@ -1136,7 +1145,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
           activeOpacity={0.7}
           {...getButtonAccessibilityProps(
             t('mealtype_log.buttons.cancel'),
-            'Cancel and close Quick Log form'
+            t('quick_log.accessibility.cancel_hint')
           )}
         >
           <Text style={[styles.cancelButtonText, { color: colors.text }]}>
@@ -1159,7 +1168,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved }: 
             loading 
               ? (quickLogId ? t('mealtype_log.buttons.updating') : t('mealtype_log.buttons.logging'))
               : (quickLogId ? t('mealtype_log.buttons.update_log') : t('mealtype_log.buttons.log_food')),
-            'Save Quick Log entry'
+            t('quick_log.accessibility.save_hint')
           )}
         >
           {loading ? (
@@ -1190,7 +1199,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     flex: 1,
   },
@@ -1204,7 +1213,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   sourceBadgeText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   form: {
@@ -1225,7 +1234,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '500',
   },
   saveButton: {
@@ -1241,33 +1250,33 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
   nutritionLabelInput: {
-    fontSize: 12,
+    fontSize: 14,
     paddingVertical: 4,
     paddingHorizontal: 0,
     color: '#000000',
   },
   nutritionLabelNumericInput: {
-    width: 56, // Fixed width for 5-6 characters (w-14 equivalent)
+    width: 30, 
     textAlign: 'right',
   },
   nutritionLabelTitleInput: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '400',
   },
   nutritionLabelSmallInput: {
-    fontSize: 12,
+    fontSize: 14,
     minWidth: 40,
   },
   nutritionLabelCaloriesInput: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   nutritionLabelNutrientInput: {
-    fontSize: 12,
+    fontSize: 14,
   },
   nutritionLabelInputWithUnit: {
     flexDirection: 'row',
@@ -1277,12 +1286,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   nutritionLabelUnit: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '400',
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 11,
+    fontSize: 13,
     marginTop: 4,
   },
 });
