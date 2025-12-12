@@ -18,8 +18,31 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { DashboardAccents } from '@/constants/theme';
+
+type NutrientValueProps = {
+  value: React.ReactNode;
+  unit?: 'g' | 'mg';
+};
+
+function NutrientValue({ value, unit }: NutrientValueProps) {
+  return (
+    <View style={styles.valueWithUnit}>
+      <View style={styles.valueInner}>{value}</View>
+      {unit ? (
+        <ThemedText
+          style={styles.unitText}
+          lightColor="#000000"
+          darkColor="#000000"
+        >
+          {` ${unit}`}
+        </ThemedText>
+      ) : null}
+    </View>
+  );
+}
 
 type NutritionLabelDividerProps = {
   variant: 'thick' | 'medium' | 'thin';
@@ -72,6 +95,8 @@ function NutritionLabelRow({
 }
 
 export type NutritionLabelLayoutProps = {
+  /** Optional label for the food title row (defaults to "Food *") */
+  titleLabel?: string;
   /** Food name input (title) */
   titleInput: React.ReactNode;
   /** Quantity input for serving */
@@ -80,6 +105,8 @@ export type NutritionLabelLayoutProps = {
   servingUnitInput: React.ReactNode;
   /** Hide the serving row (Per, Qty, Unit) */
   hideServingRow?: boolean;
+  /** Optional label for the calories row (defaults to "Calories") */
+  caloriesLabel?: string;
   /** Calories input */
   caloriesInput: React.ReactNode;
   /** Fat input (g) */
@@ -107,6 +134,76 @@ export type NutritionLabelLayoutProps = {
  * only handles the visual layout and styling to match a nutrition label.
  */
 export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
+  // Format numeric-like nodes without mutating inputs (TextInput is left intact)
+  const formatNode = (node: React.ReactNode, decimals: 0 | 1): React.ReactNode => {
+    const formatNumber = (value: any) => {
+      const num = typeof value === 'string' ? Number(value) : Number(value);
+      if (!isFinite(num)) return value;
+      return decimals === 0 ? Math.round(num).toString() : num.toFixed(decimals);
+    };
+
+    if (typeof node === 'string' || typeof node === 'number') {
+      return formatNumber(node);
+    }
+
+    if (!React.isValidElement(node)) return node;
+
+    // Do not alter TextInput to preserve user editing behavior
+    if (node.type === TextInput) {
+      return node;
+    }
+
+    const propsAny: any = node.props || {};
+    const normalizedChildren = propsAny.children !== undefined
+      ? React.Children.map(propsAny.children, (child) => formatNode(child, decimals))
+      : propsAny.children;
+
+    return React.cloneElement(node as any, {
+      ...propsAny,
+      children: normalizedChildren,
+    });
+  };
+
+  // Apply the calories accent color recursively to any element tree
+  const applyCaloriesColor = (node: React.ReactNode): React.ReactNode => {
+    if (!React.isValidElement(node)) return node;
+
+    const normalizeStyle = (styleProp: any) => {
+      if (Array.isArray(styleProp)) return styleProp.filter(Boolean);
+      return styleProp ? [styleProp] : [];
+    };
+
+    const propsAny: any = node.props || {};
+
+    const mergedStyle = [
+      ...normalizeStyle((node.props as any)?.style),
+      styles.caloriesValueText,
+    ];
+
+    const clonedProps: any = {
+      ...propsAny,
+      style: mergedStyle,
+    };
+
+    if (propsAny && propsAny.children !== undefined) {
+      clonedProps.children = React.Children.map(propsAny.children, (child) =>
+        applyCaloriesColor(child)
+      );
+    }
+
+    return React.cloneElement(node as any, clonedProps);
+  };
+
+  const caloriesValueNode = applyCaloriesColor(formatNode(props.caloriesInput, 0));
+  const fatValueNode = formatNode(props.fatInput, 1);
+  const satFatValueNode = formatNode(props.satFatInput, 1);
+  const transFatValueNode = formatNode(props.transFatInput, 1);
+  const carbsValueNode = formatNode(props.carbsInput, 0);
+  const fiberValueNode = formatNode(props.fiberInput, 1);
+  const sugarValueNode = formatNode(props.sugarInput, 1);
+  const proteinValueNode = formatNode(props.proteinInput, 0);
+  const sodiumValueNode = formatNode(props.sodiumInput, 0);
+
   return (
     <View style={styles.container}>
       {/* Top thick bar */}
@@ -120,7 +217,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
             lightColor="#000000"
             darkColor="#000000"
           >
-            Food *
+            {props.titleLabel ?? 'Food *'}
           </ThemedText>
           <View style={styles.titleInputContainer}>
             {props.titleInput}
@@ -143,7 +240,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
             lightColor="#000000"
             darkColor="#000000"
           >
-            Qty{' '}
+            Qty *{' '}
           </ThemedText>
           <View style={styles.servingQuantityContainer}>
             {props.servingQuantityInput}
@@ -153,7 +250,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
             lightColor="#000000"
             darkColor="#000000"
           >
-            {' '}Unit{' '}
+            {' '}Unit *{' '}
           </ThemedText>
           <View style={styles.servingUnitContainer}>
             {props.servingUnitInput}
@@ -171,10 +268,10 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
           lightColor="#000000"
           darkColor="#000000"
         >
-          Calories *
+        {props.caloriesLabel ?? 'Calories'}
         </ThemedText>
         <View style={styles.caloriesValueContainer}>
-          {props.caloriesInput}
+          {caloriesValueNode}
         </View>
       </View>
 
@@ -184,17 +281,17 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Fat block */}
       <NutritionLabelRow
         label="Fat"
-        value={props.fatInput}
+        value={<NutrientValue value={fatValueNode} unit="g" />}
         bold
       />
       <NutritionLabelRow
         label="Saturated"
-        value={props.satFatInput}
+        value={<NutrientValue value={satFatValueNode} unit="g" />}
         indentLevel={1}
       />
       <NutritionLabelRow
         label="+ Trans"
-        value={props.transFatInput}
+        value={<NutrientValue value={transFatValueNode} unit="g" />}
         indentLevel={1}
       />
       <NutritionLabelDivider variant="thin" />
@@ -202,17 +299,17 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Carbohydrate block */}
       <NutritionLabelRow
         label="Carbohydrate"
-        value={props.carbsInput}
+        value={<NutrientValue value={carbsValueNode} unit="g" />}
         bold
       />
       <NutritionLabelRow
         label="Fibre"
-        value={props.fiberInput}
+        value={<NutrientValue value={fiberValueNode} unit="g" />}
         indentLevel={1}
       />
       <NutritionLabelRow
         label="Sugars"
-        value={props.sugarInput}
+        value={<NutrientValue value={sugarValueNode} unit="g" />}
         indentLevel={1}
       />
       <NutritionLabelDivider variant="thin" />
@@ -220,7 +317,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Protein */}
       <NutritionLabelRow
         label="Protein"
-        value={props.proteinInput}
+        value={<NutrientValue value={proteinValueNode} unit="g" />}
         bold
       />
       <NutritionLabelDivider variant="thin" />
@@ -228,7 +325,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Sodium */}
       <NutritionLabelRow
         label="Sodium"
-        value={props.sodiumInput}
+        value={<NutrientValue value={sodiumValueNode} unit="mg" />}
         bold
       />
     </View>
@@ -256,7 +353,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   foodLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#000000',
     marginRight: 8,
@@ -270,7 +367,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   servingText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#000000',
   },
   servingQuantityContainer: {
@@ -285,18 +382,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,    
-    marginRight:160,
+    paddingVertical: 4,
   },
   caloriesLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#000000',
     
   },
   caloriesValueContainer: {
+    marginLeft: 'auto',
+    paddingRight: 12,
+    minWidth: 80,
     alignItems: 'flex-end',
-    
+    color: DashboardAccents.food,
+  },
+  caloriesValueText: {
+    color: DashboardAccents.food,
   },
   row: {
     flexDirection: 'row',
@@ -305,7 +407,7 @@ const styles = StyleSheet.create({
     
   },
   rowLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#000000',
     fontWeight: '400',
   },
@@ -317,9 +419,23 @@ const styles = StyleSheet.create({
   },
   rowValueContainer: {
     marginLeft: 'auto',
-    marginRight: 180,
-    width: 32,
+    paddingRight: 12,
+    minWidth: 80,
     alignItems: 'flex-end',
+  },
+  valueWithUnit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  valueInner: {
+    minWidth: 48,
+    alignItems: 'flex-end',
+  },
+  unitText: {
+    fontSize: 12,
+    lineHeight: 14,
+    marginLeft: 2,
   },
 });
 

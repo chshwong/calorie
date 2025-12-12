@@ -56,7 +56,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { NoteEditor } from '@/components/note-editor';
-import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
@@ -1568,9 +1567,8 @@ export default function LogFoodScreen() {
     }, [activeTab, user?.id, refetchRecentFoods])
   );
 
-  // Handle edit entry - load entry data into form
+  // Handle edit entry - navigate to dedicated edit screens
   const handleEditEntry = async (entry: CalorieEntry) => {
-    // If entry is a Quick Log (no food_id), navigate to dedicated Quick Log screen
     if (!entry.food_id) {
       router.push({
         pathname: '/quick-log',
@@ -1582,145 +1580,15 @@ export default function LogFoodScreen() {
       });
       return;
     }
-    
-    // For entries with food_id, use the inline editor
-    setEditingEntryId(entry.id);
-    setIsManualMode(false); // Close manual mode when editing entry
-    
-    // Load basic entry data
-    setItemName(entry.item_name);
-    setQuantity(entry.quantity.toString());
-    setUnit(entry.unit);
-    setCalories(entry.calories_kcal.toString());
-    setProtein(entry.protein_g?.toString() || '');
-    setCarbs(entry.carbs_g?.toString() || '');
-    setFat(entry.fat_g?.toString() || '');
-    setFiber(entry.fiber_g?.toString() || '');
-    setSaturatedFat(entry.saturated_fat_g?.toString() || '');
-    setTransFat(entry.trans_fat_g?.toString() || '');
-    setSugar(entry.sugar_g?.toString() || '');
-    setSodium(entry.sodium_mg?.toString() || '');
-    
-    // If entry has food_id, load the food and serving data
-    if (entry.food_id) {
-      try {
-        // Fetch food data
-        const { data: foodData, error: foodError } = await supabase
-          .from('food_master')
-          .select('*')
-          .eq('id', entry.food_id)
-          .single();
 
-        if (!foodError && foodData) {
-          setSelectedFood(foodData);
-          
-          // Fetch servings for this food
-          const { data: servingsData, error: servingsError } = await supabase
-            .from('food_servings')
-            .select('*')
-            .eq('food_id', entry.food_id)
-            .order('is_default', { ascending: false })
-            .order('serving_name', { ascending: true });
-
-          // Build serving options using the new model (spec 8.2)
-          const dbServings: FoodServing[] = (!servingsError && servingsData) ? servingsData : [];
-          const options = buildServingOptions(foodData, dbServings);
-          setAvailableServings(options);
-          
-          // When editing, ALWAYS preserve the exact serving that was saved, never fall back to default
-          // Select the serving that matches entry.serving_id, or match by unit
-          let servingMatched = false;
-          
-          if (entry.serving_id) {
-            // Try to find the saved serving by serving_id
-            const matchingOption = options.find(
-              o => o.kind === 'saved' && o.serving.id === entry.serving_id
-            );
-            if (matchingOption) {
-              setSelectedServing(matchingOption);
-              calculateNutrientsFromOption(foodData, matchingOption, entry.quantity);
-              servingMatched = true;
-            } else {
-              // Serving not found in options - try to fetch it directly from DB
-              // This handles cases where the serving exists but wasn't in the options list
-              const { data: servingData, error: servingFetchError } = await supabase
-                .from('food_servings')
-                .select('*')
-                .eq('id', entry.serving_id)
-                .single();
-              
-              if (!servingFetchError && servingData) {
-                // Found the serving in DB, try to create a matching option
-                const dbServingsWithFound: FoodServing[] = [...dbServings];
-                if (!dbServings.find(s => s.id === entry.serving_id)) {
-                  dbServingsWithFound.push(servingData);
-                }
-                const updatedOptions = buildServingOptions(foodData, dbServingsWithFound);
-                setAvailableServings(updatedOptions);
-                const foundOption = updatedOptions.find(
-                  o => o.kind === 'saved' && o.serving.id === entry.serving_id
-                );
-                if (foundOption) {
-                  setSelectedServing(foundOption);
-                  calculateNutrientsFromOption(foodData, foundOption, entry.quantity);
-                  servingMatched = true;
-                }
-              }
-            }
-          }
-          
-          // If serving_id didn't match, or if entry has no serving_id, try to match by unit
-          if (!servingMatched && entry.unit) {
-            const entryUnit = entry.unit.trim().toLowerCase();
-            
-            // First try to match a saved serving by serving_name
-            const savedByNameMatch = options.find(
-              o => o.kind === 'saved' && o.label.toLowerCase() === entryUnit
-            );
-            if (savedByNameMatch) {
-              setSelectedServing(savedByNameMatch);
-              calculateNutrientsFromOption(foodData, savedByNameMatch, entry.quantity);
-              servingMatched = true;
-            } else {
-              // Try to match a raw unit option
-              const rawMatch = options.find(
-                o => o.kind === 'raw' && o.unit.toLowerCase() === entryUnit
-              );
-              if (rawMatch) {
-                setSelectedServing(rawMatch);
-                calculateNutrientsFromOption(foodData, rawMatch, entry.quantity);
-                servingMatched = true;
-              }
-            }
-          }
-          
-          // If still no match, preserve the unit from entry but don't change to default
-          // The nutrients are already set from the saved entry, so we keep those
-          if (!servingMatched) {
-            // Don't set a serving option - keep selectedServing as null
-            // The unit is already set from entry.unit above, and nutrients are already loaded
-            // This preserves the exact state that was saved
-            setSelectedServing(null);
-          }
-        }
-      } catch (error) {
-      }
-    } else {
-      // No food_id, so clear selected food
-      setSelectedFood(null);
-      setSelectedServing(null);
-      setAvailableServings([]);
-    }
-    
-    // Clear errors
-    setItemNameError('');
-    setQuantityError('');
-    setCaloriesError('');
-    
-    // Auto-focus quantity input after a short delay
-    setTimeout(() => {
-      quantityInputRef.current?.focus();
-    }, 300);
+    router.push({
+      pathname: '/food-edit',
+      params: {
+        entryId: entry.id,
+        date: entryDate,
+        mealType: mealType,
+      },
+    });
   };
 
   const handleDelete = (entryId: string, entryName: string) => {
@@ -2925,49 +2793,19 @@ export default function LogFoodScreen() {
           nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
         }
       } else {
-        // Other tabs: use default serving
+        // Other tabs / search results: use the SAME default serving as the search dropdown
         // 1. Fetch food servings using centralized data access
         const servings = await getServingsForFood(food.id);
 
-        // 2. Get default serving using centralized logic (SINGLE SOURCE OF TRUTH)
-        const defaultServing = getDefaultServingForFood(food, servings);
+        // 2. Use getDefaultServingWithNutrients so Quick Add matches search results exactly
+        const { defaultServing, nutrients: defaultNutrients } = getDefaultServingWithNutrients(food, servings);
+
         servingQuantity = defaultServing.quantity;
         servingUnit = defaultServing.unit;
         servingId = defaultServing.serving?.id || null;
 
-        // If we have a displayServing coming from EnhancedFoodItem, override quantity/unit
-        if (displayServing) {
-          servingQuantity = displayServing.quantity;
-          servingUnit = displayServing.unit;
-          // Try to find a matching saved serving for the displayServing
-          const matchingServing = servings.find(s => 
-            s.serving_name && (
-              s.serving_name.includes(`${servingQuantity} ${servingUnit}`) ||
-              (s.weight_g && servingUnit === 'g' && Math.abs(s.weight_g - servingQuantity) < 0.01) ||
-              (s.volume_ml && servingUnit === 'ml' && Math.abs(s.volume_ml - servingQuantity) < 0.01)
-            )
-          );
-          if (matchingServing) {
-            servingId = matchingServing.id;
-          } else {
-            servingId = null;
-          }
-        }
-
-        // 3. Calculate nutrients using centralized logic (SINGLE SOURCE OF TRUTH)
-        if (servingId) {
-          const savedServing = servings.find(s => s.id === servingId);
-          if (savedServing) {
-            // Use the saved serving for calculation
-            nutrients = computeNutrientsForFoodServing(food, savedServing, servingQuantity);
-          } else {
-            // Using raw quantity/unit - calculate from food_master
-            nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
-          }
-        } else {
-          // Using raw quantity/unit - calculate from food_master
-          nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
-        }
+        // 3. Use the nutrients returned from the centralized helper (single source of truth)
+        nutrients = defaultNutrients;
       }
 
       // 4. Prepare entry data

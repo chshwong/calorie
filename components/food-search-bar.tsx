@@ -291,8 +291,11 @@ export function FoodSearchBar({
       <Animated.View
         style={[
           styles.searchOuterContainer,
+          { backgroundColor: colors.background },
           isFocused && styles.searchOuterContainerFocused,
-          searchQuery.length > 0 && styles.searchOuterContainerActive,
+          searchQuery.length > 0 && {
+            backgroundColor: colors.tint + '20',
+          },
           {
             transform: [{ scale: containerScale }],
             shadowOpacity: containerShadowOpacity as any,
@@ -300,19 +303,48 @@ export function FoodSearchBar({
         ]}
       >
         <View style={styles.searchInnerContainer}>
-          <IconSymbol
-            name="magnifyingglass"
-            size={18}
-            color={colors.icon}
-            style={styles.searchIcon}
-          />
+          {searchLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.tint}
+              style={styles.searchIcon}
+            />
+          ) : (
+            <IconSymbol
+              name="magnifyingglass"
+              size={18}
+              color={colors.icon}
+              style={styles.searchIcon}
+            />
+          )}
+
+          {showClearButton && (
+            <TouchableOpacity
+              onPress={handleClear}
+              style={styles.clearButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              accessibilityHint="Clears the search query and closes the dropdown"
+              {...(Platform.OS === 'web' && {
+                // @ts-ignore - web-specific props
+                'aria-label': 'Clear search',
+              })}
+            >
+              <IconSymbol
+                name="xmark"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+
           <TextInput
             ref={inputRef}
             style={[
               styles.searchInput,
               {
                 color: colors.text,
-                paddingRight: showClearButton ? 36 : (searchLoading ? 36 : 0), // Add padding when clear button or loader is visible
               },
             ]}
             placeholder={placeholder}
@@ -325,36 +357,6 @@ export function FoodSearchBar({
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <View style={styles.rightControls}>
-            {searchLoading && (
-              <ActivityIndicator
-                size="small"
-                color={colors.tint}
-                style={styles.searchLoader}
-              />
-            )}
-            {/* Clear button - visible when dropdown is open OR query is non-empty */}
-            {showClearButton && (
-              <TouchableOpacity
-                onPress={handleClear}
-                style={styles.clearButton}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-                accessibilityHint="Clears the search query and closes the dropdown"
-                {...(Platform.OS === 'web' && {
-                  // @ts-ignore - web-specific props
-                  'aria-label': 'Clear search',
-                })}
-              >
-                <IconSymbol
-                  name="xmark"
-                  size={16}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
       </Animated.View>
 
@@ -537,7 +539,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === 'ios' ? 6 : 4,
-    backgroundColor: Platform.OS === 'ios' ? '#F2F2F7' : '#F5F5F5',
+    backgroundColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
@@ -552,7 +554,6 @@ const styles = StyleSheet.create({
   },
   // Highlight when user is typing (iOS 17-ish subtle fill)
   searchOuterContainerActive: {
-    backgroundColor: Platform.OS === 'ios' ? '#E5F1FF' : '#E8F0FF',
   },
   searchInnerContainer: {
     flexDirection: 'row',
@@ -589,14 +590,11 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 6 : 4,
     paddingHorizontal: 8,
     fontSize: 16,
-  },
-  rightControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 4,
-  },
-  searchLoader: {
-    marginRight: 4,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    outlineWidth: 0,
+    outlineColor: 'transparent',
   },
   clearButton: {
     padding: 6,

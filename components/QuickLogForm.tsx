@@ -608,6 +608,7 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
       <View style={styles.form}>
         <NutritionLabelLayout
           hideServingRow={true}
+          caloriesLabel="Calories *"
           titleInput={
             <View>
               <TextInput
@@ -769,13 +770,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                     true
                   )}
                 />
-                <ThemedText
-                  style={styles.nutritionLabelUnit}
-                  lightColor="#000000"
-                  darkColor="#000000"
-                >
-                  g
-                </ThemedText>
               </View>
               {caloriesError ? (
                 <Text style={styles.errorText}>{caloriesError}</Text>
@@ -818,13 +812,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Fat'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           satFatInput={
@@ -861,13 +848,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Saturated fat'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           transFatInput={
@@ -904,13 +884,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Trans fat'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           carbsInput={
@@ -949,13 +922,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Carbohydrate'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           fiberInput={
@@ -994,13 +960,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Fiber'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           sugarInput={
@@ -1037,13 +996,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Sugar'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           proteinInput={
@@ -1082,13 +1034,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Protein'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                g
-              </ThemedText>
             </View>
           }
           sodiumInput={
@@ -1125,13 +1070,6 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
                   'Sodium'
                 )}
               />
-              <ThemedText
-                style={styles.nutritionLabelUnit}
-                lightColor="#000000"
-                darkColor="#000000"
-              >
-                mg
-              </ThemedText>
             </View>
           }
         />

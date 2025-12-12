@@ -1,0 +1,996 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/themed-text';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
+import { Colors, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { getCurrentDateTimeUTC } from '@/utils/calculations';
+import {
+  calculateNutrientsSimple,
+  convertToMasterUnit,
+  isVolumeUnit,
+  buildServingOptions,
+  type FoodMaster,
+  type FoodServing,
+  type ServingOption,
+} from '@/utils/nutritionMath';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+
+// Hide default Expo Router header; we render our own in-screen header
+export const options = {
+  headerShown: false,
+};
+
+type FoodEditRouteParams = {
+  entryId?: string;
+  date?: string;
+  mealType?: string;
+};
+
+type CalorieEntry = {
+  id: string;
+  entry_date: string;
+  meal_type: string;
+  item_name: string;
+  food_id: string | null;
+  serving_id: string | null;
+  quantity: number;
+  unit: string;
+  calories_kcal: number;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  fiber_g: number | null;
+  saturated_fat_g: number | null;
+  trans_fat_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+};
+
+const MAX_QUANTITY = 100000;
+const MAX_CALORIES = 10000;
+const MAX_MACRO = 9999.99;
+
+export default function FoodEditScreen() {
+  const params = useLocalSearchParams<FoodEditRouteParams>();
+  const router = useRouter();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const queryClient = useQueryClient();
+  const screenWidth = Dimensions.get('window').width;
+  const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+
+  const entryId = params.entryId as string;
+  const entryDateParam = params.date as string | undefined;
+  const mealTypeParam = params.mealType as string | undefined;
+
+  const [entryDate, setEntryDate] = useState(entryDateParam ?? '');
+  const [mealType, setMealType] = useState(mealTypeParam ?? '');
+
+  const [itemName, setItemName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('⚡');
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fat, setFat] = useState('');
+  const [fiber, setFiber] = useState('');
+  const [saturatedFat, setSaturatedFat] = useState('');
+  const [transFat, setTransFat] = useState('');
+  const [sugar, setSugar] = useState('');
+  const [sodium, setSodium] = useState('');
+
+  const [itemNameError, setItemNameError] = useState('');
+  const [quantityError, setQuantityError] = useState('');
+  const [caloriesError, setCaloriesError] = useState('');
+
+  const [selectedFood, setSelectedFood] = useState<FoodMaster | null>(null);
+  const [availableServings, setAvailableServings] = useState<ServingOption[]>([]);
+  const [selectedServing, setSelectedServing] = useState<ServingOption | null>(null);
+  const [servingPickerVisible, setServingPickerVisible] = useState(false);
+  const servingButtonRef = useRef<View>(null);
+  const [servingDropdownLayout, setServingDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  const formatDateLabel = useCallback(
+    (dateString: string) => {
+      try {
+        const date = new Date(dateString + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dateOnly = new Date(date);
+        dateOnly.setHours(0, 0, 0, 0);
+
+        if (dateOnly.getTime() === today.getTime()) {
+          return t('mealtype_log.calendar.today');
+        }
+
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (dateOnly.getTime() === yesterday.getTime()) {
+          return t('mealtype_log.calendar.yesterday');
+        }
+
+        const monthNames = [
+          t('mealtype_log.calendar.months.jan'),
+          t('mealtype_log.calendar.months.feb'),
+          t('mealtype_log.calendar.months.mar'),
+          t('mealtype_log.calendar.months.apr'),
+          t('mealtype_log.calendar.months.may'),
+          t('mealtype_log.calendar.months.jun'),
+          t('mealtype_log.calendar.months.jul'),
+          t('mealtype_log.calendar.months.aug'),
+          t('mealtype_log.calendar.months.sep'),
+          t('mealtype_log.calendar.months.oct'),
+          t('mealtype_log.calendar.months.nov'),
+          t('mealtype_log.calendar.months.dec'),
+        ];
+        const month = monthNames[date.getMonth()];
+        const day = date.getDate();
+        return `${month} ${day}`;
+      } catch {
+        return dateString;
+      }
+    },
+    [t]
+  );
+
+  const mealTypeLabel = useMemo(() => {
+    const labels: Record<string, string> = {
+      breakfast: t('mealtype_log.meal_types.breakfast'),
+      lunch: t('mealtype_log.meal_types.lunch'),
+      dinner: t('mealtype_log.meal_types.dinner'),
+      afternoon_snack: t('mealtype_log.meal_types.snack'),
+      late_night: t('mealtype_log.meal_types.late_night'),
+    };
+    return labels[(mealType || '').toLowerCase()] || mealType || '';
+  }, [mealType, t]);
+
+  const dateLabel = entryDate ? formatDateLabel(entryDate) : '';
+
+  const validateNumericInput = useCallback((text: string): string => {
+    let cleaned = text.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    return cleaned;
+  }, []);
+
+  const calculateNutrientsFromOption = useCallback((food: FoodMaster, option: ServingOption, qty: number) => {
+    let masterUnits = 0;
+    if (option.kind === 'raw') {
+      try {
+        masterUnits = convertToMasterUnit(qty, option.unit, food);
+      } catch {
+        masterUnits = qty;
+      }
+    } else {
+      const servingValue = isVolumeUnit(food.serving_unit)
+        ? (option.serving.volume_ml ?? 0)
+        : (option.serving.weight_g ?? 0);
+      masterUnits = servingValue * qty;
+    }
+
+    const nutrients = calculateNutrientsSimple(food, masterUnits);
+    setCalories(nutrients.calories_kcal.toFixed(1));
+    setProtein(nutrients.protein_g != null ? nutrients.protein_g.toFixed(1) : '');
+    setCarbs(nutrients.carbs_g != null ? nutrients.carbs_g.toFixed(1) : '');
+    setFat(nutrients.fat_g != null ? nutrients.fat_g.toFixed(1) : '');
+    setFiber(nutrients.fiber_g != null ? nutrients.fiber_g.toFixed(1) : '');
+    setSaturatedFat(nutrients.saturated_fat_g != null ? nutrients.saturated_fat_g.toFixed(1) : '');
+    const transFatValue = (nutrients as any).trans_fat_g ?? (nutrients as any).transFat_g;
+    setTransFat(transFatValue != null ? transFatValue.toFixed(1) : '');
+    setSugar(nutrients.sugar_g != null ? nutrients.sugar_g.toFixed(1) : '');
+    setSodium(nutrients.sodium_mg != null ? nutrients.sodium_mg.toFixed(1) : '');
+  }, []);
+
+  const handleServingSelect = useCallback(
+    (option: ServingOption) => {
+      setSelectedServing(option);
+      setServingPickerVisible(false);
+      if (selectedFood) {
+        const qty = parseFloat(quantity) || 1;
+        calculateNutrientsFromOption(selectedFood, option, qty);
+      }
+    },
+    [calculateNutrientsFromOption, quantity, selectedFood]
+  );
+
+  const handleCaloriesChange = useCallback((text: string) => {
+    const sanitized = text.replace(/\D/g, '');
+    const limited = sanitized.slice(0, 5);
+    setCalories(limited);
+  }, []);
+
+  const handleQuantityChange = useCallback(
+    (text: string) => {
+      const cleaned = validateNumericInput(text);
+      setQuantity(cleaned);
+      if (selectedFood && selectedServing && cleaned) {
+        const qty = parseFloat(cleaned) || 0;
+        if (qty > 0) {
+          calculateNutrientsFromOption(selectedFood, selectedServing, qty);
+        }
+      }
+    },
+    [calculateNutrientsFromOption, selectedFood, selectedServing, validateNumericInput]
+  );
+
+  useEffect(() => {
+    if (!entryId || !user?.id) {
+      return;
+    }
+
+    const loadEntry = async () => {
+      try {
+        setLoading(true);
+        const { data: entry, error } = await supabase
+          .from('calorie_entries')
+          .select('*')
+          .eq('id', entryId)
+          .eq('user_id', user.id)
+          .single<CalorieEntry>();
+
+        if (error || !entry) {
+          Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
+          router.back();
+          return;
+        }
+
+        setEntryDate(entry.entry_date);
+        setMealType(entry.meal_type);
+
+        if (!entry.food_id) {
+          router.replace({
+            pathname: '/quick-log',
+            params: {
+              quickLogId: entry.id,
+              date: entry.entry_date,
+              mealType: entry.meal_type,
+            },
+          });
+          return;
+        }
+
+        setItemName(entry.item_name);
+        setQuantity(entry.quantity.toString());
+        setUnit(entry.unit);
+        setCalories(entry.calories_kcal.toString());
+        setProtein(entry.protein_g?.toString() || '');
+        setCarbs(entry.carbs_g?.toString() || '');
+        setFat(entry.fat_g?.toString() || '');
+        setFiber(entry.fiber_g?.toString() || '');
+        setSaturatedFat(entry.saturated_fat_g?.toString() || '');
+        setTransFat(entry.trans_fat_g?.toString() || '');
+        setSugar(entry.sugar_g?.toString() || '');
+        setSodium(entry.sodium_mg?.toString() || '');
+
+        const { data: foodData, error: foodError } = await supabase
+          .from('food_master')
+          .select('*')
+          .eq('id', entry.food_id)
+          .single<FoodMaster>();
+
+        if (foodError || !foodData) {
+          Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.food_not_found'));
+          return;
+        }
+
+        setSelectedFood(foodData);
+
+        const { data: servingsData, error: servingsError } = await supabase
+          .from('food_servings')
+          .select('*')
+          .eq('food_id', entry.food_id)
+          .order('is_default', { ascending: false })
+          .order('serving_name', { ascending: true });
+
+        const dbServings: FoodServing[] = (!servingsError && servingsData) ? servingsData : [];
+        const options = buildServingOptions(foodData, dbServings);
+        setAvailableServings(options);
+
+        let servingMatched = false;
+
+        if (entry.serving_id) {
+          const matchingOption = options.find(
+            (option) => option.kind === 'saved' && option.serving.id === entry.serving_id
+          );
+          if (matchingOption) {
+            setSelectedServing(matchingOption);
+            calculateNutrientsFromOption(foodData, matchingOption, entry.quantity);
+            servingMatched = true;
+          } else {
+            const { data: servingData, error: servingFetchError } = await supabase
+              .from('food_servings')
+              .select('*')
+              .eq('id', entry.serving_id)
+              .single<FoodServing>();
+
+            if (!servingFetchError && servingData) {
+              const mergedServings = dbServings.find((s) => s.id === servingData.id)
+                ? dbServings
+                : [...dbServings, servingData];
+              const updatedOptions = buildServingOptions(foodData, mergedServings);
+              setAvailableServings(updatedOptions);
+              const foundOption = updatedOptions.find(
+                (option) => option.kind === 'saved' && option.serving.id === servingData.id
+              );
+              if (foundOption) {
+                setSelectedServing(foundOption);
+                calculateNutrientsFromOption(foodData, foundOption, entry.quantity);
+                servingMatched = true;
+              }
+            }
+          }
+        }
+
+        if (!servingMatched && entry.unit) {
+          const entryUnit = entry.unit.trim().toLowerCase();
+          const savedMatch = options.find(
+            (option) => option.kind === 'saved' && option.label.toLowerCase() === entryUnit
+          );
+          if (savedMatch) {
+            setSelectedServing(savedMatch);
+            calculateNutrientsFromOption(foodData, savedMatch, entry.quantity);
+            servingMatched = true;
+          } else {
+            const rawMatch = options.find(
+              (option) => option.kind === 'raw' && option.unit.toLowerCase() === entryUnit
+            );
+            if (rawMatch) {
+              setSelectedServing(rawMatch);
+              calculateNutrientsFromOption(foodData, rawMatch, entry.quantity);
+              servingMatched = true;
+            }
+          }
+        }
+
+        if (!servingMatched) {
+          setSelectedServing(null);
+        }
+      } catch (error: any) {
+        Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+        router.back();
+      } finally {
+        setLoading(false);
+        setInitializing(false);
+      }
+    };
+
+    loadEntry();
+  }, [calculateNutrientsFromOption, entryId, router, t, user?.id]);
+
+  const isFormValid = useCallback(() => {
+    return itemName.trim().length > 0 && quantity && parseFloat(quantity) > 0 && calories && parseFloat(calories) >= 0;
+  }, [calories, itemName, quantity]);
+
+  const handleSaveEntry = useCallback(async () => {
+    if (loading) {
+      return;
+    }
+
+    setItemNameError('');
+    setQuantityError('');
+    setCaloriesError('');
+
+    let hasErrors = false;
+
+    if (!itemName.trim()) {
+      setItemNameError(t('mealtype_log.errors.item_name_required'));
+      hasErrors = true;
+    }
+
+    if (!quantity || parseFloat(quantity) <= 0) {
+      setQuantityError(t('mealtype_log.errors.quantity_required'));
+      hasErrors = true;
+    }
+
+    if (!calories || calories.trim() === '' || parseFloat(calories) < 0) {
+      setCaloriesError(t('mealtype_log.errors.calories_required'));
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fix_errors'));
+      return;
+    }
+
+    if (!user?.id || !entryId) {
+      Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.user_not_found'));
+      return;
+    }
+
+    const parsedQuantity = parseFloat(quantity);
+    const parsedCalories = parseFloat(calories);
+
+    if (isNaN(parsedQuantity) || !isFinite(parsedQuantity)) {
+      setQuantityError(t('mealtype_log.errors.quantity_invalid'));
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.quantity_invalid'));
+      return;
+    }
+
+    if (isNaN(parsedCalories) || !isFinite(parsedCalories)) {
+      setCaloriesError(t('mealtype_log.errors.calories_invalid'));
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.calories_invalid'));
+      return;
+    }
+
+    // Enforce 5,000 calorie limit (match Quick Log behavior)
+    if (parsedCalories > 5000) {
+      const errorMsg = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
+        `Current: ${parsedCalories.toLocaleString()} calories\n` +
+        `Maximum: 5,000 calories per entry\n\n` +
+        `SOLUTIONS:\n` +
+        `• Reduce the quantity\n` +
+        `• Split into ${Math.ceil(parsedCalories / 5000)} separate entries`;
+
+      setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
+      Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
+      return;
+    }
+
+    if (parsedQuantity > MAX_QUANTITY) {
+      const errorMsg = `Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}.`;
+      setQuantityError(errorMsg);
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: MAX_QUANTITY.toLocaleString() }));
+      return;
+    }
+
+    if (parsedCalories > MAX_CALORIES) {
+      const errorMsg = 'Cannot exceed 10,000 cal per entry.';
+      setCaloriesError(errorMsg);
+      return;
+    }
+
+    if (protein && parseFloat(protein) > MAX_MACRO) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.protein_too_large', { max: MAX_MACRO.toLocaleString() }));
+      return;
+    }
+    if (carbs && parseFloat(carbs) > MAX_MACRO) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.carbs_too_large', { max: MAX_MACRO.toLocaleString() }));
+      return;
+    }
+    if (fat && parseFloat(fat) > MAX_MACRO) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fat_too_large', { max: MAX_MACRO.toLocaleString() }));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const dateString = entryDate || entryDateParam || '';
+      const eatenAt = getCurrentDateTimeUTC();
+
+      const entryData: Record<string, any> = {
+        entry_date: dateString,
+        meal_type: (mealType || mealTypeParam || '').toLowerCase(),
+        item_name: itemName.trim(),
+        quantity: parsedQuantity,
+        unit: selectedServing?.label || unit,
+        calories_kcal: parsedCalories,
+        protein_g: protein && protein.trim() !== '' ? parseFloat(protein) : null,
+        carbs_g: carbs && carbs.trim() !== '' ? parseFloat(carbs) : null,
+        fat_g: fat && fat.trim() !== '' ? parseFloat(fat) : null,
+        fiber_g: fiber && fiber.trim() !== '' ? parseFloat(fiber) : null,
+        eaten_at: eatenAt,
+      };
+
+      if (selectedFood) {
+        entryData.food_id = selectedFood.id;
+      }
+      if (selectedServing && selectedServing.kind === 'saved') {
+        entryData.serving_id = selectedServing.serving.id;
+      }
+
+      if (saturatedFat && saturatedFat.trim() !== '') {
+        const parsed = parseFloat(saturatedFat);
+        if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
+          entryData.saturated_fat_g = Math.round(parsed * 100) / 100;
+        }
+      }
+      if (transFat && transFat.trim() !== '') {
+        const parsed = parseFloat(transFat);
+        if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
+          entryData.trans_fat_g = Math.round(parsed * 100) / 100;
+        }
+      }
+      if (sugar && sugar.trim() !== '') {
+        const parsed = parseFloat(sugar);
+        if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
+          entryData.sugar_g = Math.round(parsed * 100) / 100;
+        }
+      }
+      if (sodium && sodium.trim() !== '') {
+        const parsed = parseFloat(sodium);
+        if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
+          entryData.sodium_mg = Math.round(parsed * 100) / 100;
+        }
+      }
+
+      const cleanedEntryData: Record<string, any> = {};
+      const allowedFields = [
+        'entry_date',
+        'meal_type',
+        'item_name',
+        'quantity',
+        'unit',
+        'calories_kcal',
+        'protein_g',
+        'carbs_g',
+        'fat_g',
+        'fiber_g',
+        'saturated_fat_g',
+        'trans_fat_g',
+        'sugar_g',
+        'sodium_mg',
+        'food_id',
+        'serving_id',
+        'eaten_at',
+      ];
+
+      for (const key of allowedFields) {
+        if (entryData.hasOwnProperty(key) && entryData[key] !== undefined) {
+          cleanedEntryData[key] = entryData[key];
+        }
+      }
+
+      const { error } = await supabase
+        .from('calorie_entries')
+        .update(cleanedEntryData)
+        .eq('id', entryId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Food edit update error', error);
+        Alert.alert(t('alerts.error_title'), error.message || t('common.unexpected_error'));
+        return;
+      }
+
+      if (entryDate || entryDateParam) {
+        queryClient.invalidateQueries({
+          queryKey: ['entries', user.id, entryDate || entryDateParam],
+        });
+      }
+
+      router.back();
+    } catch (error: any) {
+      Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    calories,
+    carbs,
+    entryDate,
+    entryDateParam,
+    entryId,
+    fat,
+    fiber,
+    itemName,
+    mealType,
+    mealTypeParam,
+    protein,
+    queryClient,
+    router,
+    saturatedFat,
+    selectedFood,
+    selectedServing,
+    sodium,
+    sugar,
+    t,
+    transFat,
+    unit,
+    user?.id,
+    quantity,
+    loading,
+  ]);
+
+  if (initializing) {
+    return (
+      <DesktopPageContainer>
+        <ThemedView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </ThemedView>
+      </DesktopPageContainer>
+    );
+  }
+
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <DesktopPageContainer>
+      <ThemedView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <ThemedText style={[styles.backButtonText, { color: colors.tint }]}>←</ThemedText>
+          </TouchableOpacity>
+          <View style={styles.titleContainer}>
+            <ThemedText style={[styles.title, { color: colors.text }]}>
+              {t('quick_log.header_title')}
+            </ThemedText>
+            <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {mealTypeLabel} · {dateLabel}
+            </ThemedText>
+          </View>
+          <TouchableOpacity
+            style={styles.checkmarkButton}
+            onPress={handleSaveEntry}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              name="checkmark"
+              size={24}
+              color={colors.tint}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: Spacing.md, paddingBottom: Spacing.lg }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[styles.centeredContainer, { maxWidth: isDesktop ? 520 : '100%' }]}>
+            <View style={styles.formHeader}>
+              <ThemedText style={[styles.formTitle, { color: colors.text }]}>
+                Edit Food Log
+              </ThemedText>
+            </View>
+            <NutritionLabelLayout
+              hideServingRow={false}
+              titleLabel="Food"
+              titleInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {itemName || '-'}
+                </ThemedText>
+              }
+              servingQuantityInput={
+                <TextInput
+                  style={[styles.nutritionLabelInput, styles.nutritionLabelSmallInput, { borderColor: quantityError ? '#EF4444' : '#000000' }]}
+                  value={quantity}
+                  onChangeText={handleQuantityChange}
+                  keyboardType="numeric"
+                  maxLength={4}
+                  returnKeyType="done"
+                />
+              }
+              servingUnitInput={
+                <TouchableOpacity
+                  ref={servingButtonRef}
+                  style={[styles.servingUnitButton, { borderColor: '#000000' }]}
+                  onPress={() => {
+                    servingButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+                      setServingDropdownLayout({ x, y, width, height });
+                      setServingPickerVisible(true);
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={styles.servingUnitText}>
+                    {selectedServing ? selectedServing.label : unit}
+                  </ThemedText>
+                </TouchableOpacity>
+              }
+              caloriesInput={
+                <View style={{ alignItems: 'flex-end' }}>
+                  <ThemedText style={styles.nutritionValueText}>
+                    {calories || '0'}
+                  </ThemedText>
+                  {caloriesError ? (
+                    <ThemedText style={styles.errorText}>
+                      {caloriesError}
+                    </ThemedText>
+                  ) : null}
+                </View>
+              }
+              fatInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {fat || '0'}
+                </ThemedText>
+              }
+              satFatInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {saturatedFat || '0'}
+                </ThemedText>
+              }
+              transFatInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {transFat || '0'}
+                </ThemedText>
+              }
+              carbsInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {carbs || '0'}
+                </ThemedText>
+              }
+              fiberInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {fiber || '0'}
+                </ThemedText>
+              }
+              sugarInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {sugar || '0'}
+                </ThemedText>
+              }
+              proteinInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {protein || '0'}
+                </ThemedText>
+              }
+              sodiumInput={
+                <ThemedText style={styles.nutritionValueText}>
+                  {sodium || '0'}
+                </ThemedText>
+              }
+            />
+
+            <View style={styles.formActions}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+              >
+                <ThemedText style={[styles.cancelButtonText, { color: colors.text }]}>
+                  {t('mealtype_log.buttons.cancel')}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  {
+                    backgroundColor: loading || !isFormValid() ? colors.icon : colors.tint,
+                    opacity: loading || !isFormValid() ? 0.5 : 1,
+                  },
+                ]}
+                onPress={handleSaveEntry}
+                disabled={loading || !isFormValid()}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <ThemedText style={styles.saveButtonText}>
+                    {t('mealtype_log.buttons.update_log')}
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+
+        <Modal
+          visible={servingPickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setServingPickerVisible(false)}
+        >
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setServingPickerVisible(false)} />
+          <View
+            style={[
+              styles.dropdownContainer,
+              {
+                backgroundColor: colors.background,
+                top: servingDropdownLayout ? servingDropdownLayout.y + servingDropdownLayout.height + 4 : undefined,
+                left: servingDropdownLayout ? servingDropdownLayout.x : undefined,
+                width: servingDropdownLayout ? servingDropdownLayout.width : undefined,
+              },
+            ]}
+          >
+            <ScrollView>
+              {availableServings.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={styles.modalItem}
+                  onPress={() => handleServingSelect(option)}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={{ color: colors.text }}>
+                    {option.label}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </Modal>
+      </ThemedView>
+      </DesktopPageContainer>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    paddingTop: 20,
+    paddingBottom: 8,
+    paddingHorizontal: Spacing.md,
+    minHeight: 64,
+  },
+  backButton: {
+    marginRight: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 16,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  checkmarkButton: {
+    marginLeft: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  centeredContainer: {
+    width: '100%',
+  },
+  formHeader: {
+    marginBottom: 12,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  formActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  nutritionLabelInput: {
+    fontSize: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    color: '#000000',
+    borderBottomWidth: 1,
+  },
+  nutritionLabelTitleInput: {
+    fontSize: 18,
+    fontWeight: '400',
+  },
+  nutritionLabelSmallInput: {
+    fontSize: 16,
+    minWidth: 40,
+  },
+  nutritionLabelCaloriesInput: {
+    fontSize: 18,
+    fontWeight: '700',
+    minWidth: 60,
+  },
+  nutritionLabelNutrientInput: {
+    fontSize: 16,
+  },
+  nutritionLabelNumericInput: {
+    width: 30,
+    textAlign: 'right',
+  },
+  nutritionLabelInputWithUnit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    width: 80,
+    gap: 4,
+  },
+  nutritionLabelUnit: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  nutritionValueText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'right',
+    minWidth: 40,
+  },
+  servingUnitButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderRadius: 4,
+  },
+  servingUnitText: {
+    color: '#000000',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: '#00000055',
+  },
+  modalContent: {
+    position: 'absolute',
+  },
+  modalItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#00000010',
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    borderRadius: 12,
+    paddingVertical: 8,
+    maxHeight: 300,
+    borderWidth: 1,
+    borderColor: '#00000020',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    minWidth: 160,
+  },
+  errorText: {
+    color: '#EF4444',
+    marginTop: 8,
+    fontSize: 14,
+  },
+});
+

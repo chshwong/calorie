@@ -11,17 +11,6 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type FoodMaster } from '@/utils/nutritionMath';
 import { getServingsForFoods, getDefaultServingWithNutrients } from '@/lib/servings';
-import {
-  getPersistentCache,
-  setPersistentCache,
-  DEFAULT_CACHE_MAX_AGE_MS,
-} from '@/lib/persistentCache';
-
-// Cache up to 180 days by default per engineering guidelines.
-const FOOD_SEARCH_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS ?? 180 * 24 * 60 * 60 * 1000;
-
-// Prefix for persistent cache keys so they are namespaced
-const FOOD_SEARCH_CACHE_PREFIX = 'food-search:';
 
 /**
  * Search result with pre-computed default serving info
@@ -81,7 +70,7 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Search food_master table using Supabase RPC
@@ -109,21 +98,8 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
     setSearchLoading(true);
     setShowSearchResults(true);
 
-    const cacheKey = `${FOOD_SEARCH_CACHE_PREFIX}${userId}:${normalized.toLowerCase()}`;
-
     try {
-      // 1) Try persistent cache first
-      const cached = await getPersistentCache<FoodSearchResult[]>(cacheKey, FOOD_SEARCH_CACHE_MAX_AGE_MS);
-
-      if (cached && Array.isArray(cached)) {
-        setSearchResults(cached);
-        setSearchLoading(false);
-        return;
-      }
-
-      // 2) If not in cache, call Supabase RPC
-      // Use Supabase RPC - server handles normalization using combined name+brand field
-      // Client sends raw user input - no client-side normalization
+      // Call Supabase RPC directly for every search (no persistent cache)
       const { data: foodsData, error: rpcError } = await supabase.rpc('search_food_master', {
         search_term: normalized, // Normalized query - server normalizes using combined name+brand field
         limit_rows: maxResults * 2, // Get more results for client-side sorting/filtering
@@ -202,9 +178,6 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
       setSearchResults(resultsWithServings);
       setShowSearchResults(true);
       setSearchLoading(false);
-
-      // Persist successful result
-      await setPersistentCache(cacheKey, resultsWithServings);
       return;
     } catch (error) {
       console.error('Error searching foods:', error);
