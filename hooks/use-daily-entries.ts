@@ -24,15 +24,29 @@ export function useDailyEntries(entryDate: string) {
   const cacheKey = entriesCacheKey(userId, entryDate);
 
   // NEW: read persistent snapshot once when hook is created
+  const cacheReadStart = performance.now();
   const snapshot =
     cacheKey !== null
       ? getPersistentCache<CalorieEntry[]>(cacheKey, DAILY_ENTRIES_MAX_AGE_MS)
       : null;
+  if (snapshot) {
+    console.log(
+      `[useDailyEntries] persistent cache hit for ${cacheKey} in ${Math.round(
+        performance.now() - cacheReadStart
+      )}ms (count=${snapshot.length})`
+    );
+  } else if (cacheKey) {
+    console.log(
+      `[useDailyEntries] persistent cache miss for ${cacheKey} (took ${Math.round(
+        performance.now() - cacheReadStart
+      )}ms)`
+    );
+  }
 
   return useQuery<CalorieEntry[]>({
     queryKey: ['entries', userId, entryDate],
-    // CHANGED: make queryFn async and write to persistent cache on success
     queryFn: async () => {
+      const networkStart = performance.now();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -42,12 +56,19 @@ export function useDailyEntries(entryDate: string) {
         setPersistentCache(cacheKey, data);
       }
 
+      console.log(
+        `[useDailyEntries] network fetch for ${cacheKey} returned ${data.length} rows in ${Math.round(
+          performance.now() - networkStart
+        )}ms`
+      );
+
       return data;
     },
     enabled: !!userId && !!entryDate,
-    staleTime: 3 * 60 * 1000, // 3 minutes (per engineering guidelines)
+    staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
     // UPDATED: use previousData, then in-memory cache, then persistent snapshot
     placeholderData: (previousData) => {
       // 1) If we have previous data from the same query within this runtime, use it

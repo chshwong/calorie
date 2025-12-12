@@ -19,6 +19,7 @@ import {
   createExerciseLog,
   updateExerciseLog,
   deleteExerciseLog,
+  RecentFrequentDayRange,
   type ExerciseLog,
 } from '@/lib/services/exerciseLogs';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
@@ -139,7 +140,7 @@ export function useExerciseSummaryForRecentDays(days: number = 7) {
  * Hook to fetch recent and frequent exercises for Quick Add
  * Returns combined list: frequent (top 8) + recent (top 8, excluding frequent), max 10 total
  */
-export function useRecentAndFrequentExercises(days: number = 60) {
+export function useRecentAndFrequentExercises(days: number = RecentFrequentDayRange) {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
@@ -192,7 +193,7 @@ export function useRecentAndFrequentExercises(days: number = 60) {
  * @deprecated Use useRecentAndFrequentExercises instead
  * Kept for backwards compatibility
  */
-export function useRecentFrequentExercises(days: number = 60) {
+export function useRecentFrequentExercises(days: number = RecentFrequentDayRange) {
   const { user } = useAuth();
   const userId = user?.id;
 

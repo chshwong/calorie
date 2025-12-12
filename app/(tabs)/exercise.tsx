@@ -35,6 +35,7 @@ import {
   useUpdateExerciseLog,
   useDeleteExerciseLog,
 } from '@/hooks/use-exercise-logs';
+import { RecentFrequentDayRange } from '@/lib/services/exerciseLogs';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -409,7 +410,7 @@ export default function ExerciseHomeScreen() {
   // Data fetching hooks
   const { data: exerciseLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useExerciseLogsForDate(selectedDateString);
   const { data: recentDaysSummary = [] } = useExerciseSummaryForRecentDays(7);
-  const { data: recentAndFrequentExercises = [], isLoading: isLoadingRecentFrequent } = useRecentAndFrequentExercises(60);
+  const { data: recentAndFrequentExercises = [], isLoading: isLoadingRecentFrequent } = useRecentAndFrequentExercises(RecentFrequentDayRange);
 
   // Mutations
   const createMutation = useCreateExerciseLog();

@@ -32,6 +32,12 @@ const EXERCISE_LOG_COLUMNS = `
   created_at
 `;
 
+// Configurable limits for recent/frequent chips
+export const RecentFrequentDayRange = 45;
+export const FrequentChipMax = 16;
+export const RecentChipMax = 16;
+export const FrequentRecentChipMax = 22;
+
 /**
  * Fetch exercise logs for a specific date
  * 
@@ -158,7 +164,7 @@ export async function getExerciseSummaryForRecentDays(
  */
 export async function getRecentAndFrequentExercises(
   userId: string,
-  days: number = 60
+  days: number = RecentFrequentDayRange
 ): Promise<Array<{ name: string; minutes: number | null }>> {
   if (!userId) {
     return [];
@@ -249,7 +255,7 @@ export async function getRecentAndFrequentExercises(
         }
         return b.last_at.localeCompare(a.last_at); // More recent first
       })
-      .slice(0, 8)
+      .slice(0, FrequentChipMax)
       .map(({ name, last_minutes }) => ({ name, minutes: last_minutes }));
 
     // 2. Recent list: top 8 by recency, excluding frequent items
@@ -257,11 +263,11 @@ export async function getRecentAndFrequentExercises(
     const recent = allExercises
       .filter((e) => !frequentNames.has(e.name))
       .sort((a, b) => b.last_at.localeCompare(a.last_at)) // Most recent first
-      .slice(0, 8)
+      .slice(0, RecentChipMax)
       .map(({ name, last_minutes }) => ({ name, minutes: last_minutes }));
 
     // 3. Combine: frequent first, then recent, max 10 total
-    const combined = [...frequent, ...recent].slice(0, 10);
+    const combined = [...frequent, ...recent].slice(0, FrequentRecentChipMax);
 
     return combined;
   } catch (error) {
@@ -276,7 +282,7 @@ export async function getRecentAndFrequentExercises(
  */
 export async function getRecentFrequentExercises(
   userId: string,
-  days: number = 60
+  days: number = RecentFrequentDayRange
 ): Promise<Array<{ name: string; minutes: number | null; last_used: string; count: number }>> {
   if (!userId) {
     return [];

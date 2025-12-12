@@ -10,18 +10,24 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQueryClient } from '@tanstack/react-query';
-import { getCurrentDateTimeUTC } from '@/utils/calculations';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CalorieEntry } from '@/utils/types';
+import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
 import {
   calculateNutrientsSimple,
   convertToMasterUnit,
   isVolumeUnit,
   buildServingOptions,
+  getDefaultServingSelection,
   type FoodMaster,
   type FoodServing,
   type ServingOption,
 } from '@/utils/nutritionMath';
+import { getServingsForFood } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { getEntriesForDate } from '@/lib/services/calorieEntries';
+import { getFoodMasterById } from '@/lib/services/foodMaster';
+import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
 
 // Hide default Expo Router header; we render our own in-screen header
 export const options = {
@@ -29,34 +35,18 @@ export const options = {
 };
 
 type FoodEditRouteParams = {
-  entryId?: string;
+  entryId?: string; // edit mode
+  foodId?: string;  // create mode
   date?: string;
   mealType?: string;
-};
-
-type CalorieEntry = {
-  id: string;
-  entry_date: string;
-  meal_type: string;
-  item_name: string;
-  food_id: string | null;
-  serving_id: string | null;
-  quantity: number;
-  unit: string;
-  calories_kcal: number;
-  protein_g: number | null;
-  carbs_g: number | null;
-  fat_g: number | null;
-  fiber_g: number | null;
-  saturated_fat_g: number | null;
-  trans_fat_g: number | null;
-  sugar_g: number | null;
-  sodium_mg: number | null;
+  entryPayload?: string;
 };
 
 const MAX_QUANTITY = 100000;
 const MAX_CALORIES = 10000;
 const MAX_MACRO = 9999.99;
+const ENTRY_STALE_MS = 15 * 60 * 1000; // 15 minutes
+const LONG_CACHE_MS = 180 * 24 * 60 * 60 * 1000; // ~180 days for stable by-id data
 
 export default function FoodEditScreen() {
   const params = useLocalSearchParams<FoodEditRouteParams>();
@@ -69,12 +59,31 @@ export default function FoodEditScreen() {
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = Platform.OS === 'web' && screenWidth > 768;
 
-  const entryId = params.entryId as string;
-  const entryDateParam = params.date as string | undefined;
-  const mealTypeParam = params.mealType as string | undefined;
+  const entryId = (Array.isArray(params.entryId) ? params.entryId[0] : params.entryId) as string | undefined;
+  const foodIdParam = (Array.isArray(params.foodId) ? params.foodId[0] : params.foodId) as string | undefined;
+  const entryDateParam = (Array.isArray(params.date) ? params.date[0] : params.date) as string | undefined;
+  const mealTypeParam = (Array.isArray(params.mealType) ? params.mealType[0] : params.mealType) as string | undefined;
+  const entryPayloadParam = Array.isArray(params.entryPayload) ? params.entryPayload[0] : params.entryPayload;
 
-  const [entryDate, setEntryDate] = useState(entryDateParam ?? '');
-  const [mealType, setMealType] = useState(mealTypeParam ?? '');
+  const initialEntry = useMemo<CalorieEntry | null>(() => {
+    if (!entryPayloadParam) return null;
+    try {
+      return JSON.parse(entryPayloadParam) as CalorieEntry;
+    } catch (error) {
+      console.warn('Failed to parse entry payload for food-edit:', error);
+      return null;
+    }
+  }, [entryPayloadParam]);
+
+  const entryDateFallback = entryDateParam ?? initialEntry?.entry_date ?? getLocalDateString();
+  const mealTypeFallback = mealTypeParam ?? initialEntry?.meal_type ?? 'breakfast';
+  const foodId = foodIdParam;
+
+  const [entryDate, setEntryDate] = useState(entryDateFallback);
+  const [mealType, setMealType] = useState(mealTypeFallback);
+
+  const mode: 'edit' | 'create' = entryId ? 'edit' : 'create';
+  const isCreateMode = mode === 'create';
 
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -98,10 +107,134 @@ export default function FoodEditScreen() {
   const [selectedServing, setSelectedServing] = useState<ServingOption | null>(null);
   const [servingPickerVisible, setServingPickerVisible] = useState(false);
   const servingButtonRef = useRef<View>(null);
+  const quantityInputRef = useRef<TextInput>(null);
   const [servingDropdownLayout, setServingDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const entryHydratedRef = useRef(false);
+  const foodHydratedRef = useRef(false);
 
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(mode === 'create');
+
+  useEffect(() => {
+    if (!user?.id || !initialEntry) return;
+    const cacheKey: [string, string, string] = ['entries', user.id, initialEntry.entry_date];
+    queryClient.setQueryData<CalorieEntry[]>(cacheKey, (existing) => {
+      if (!existing || existing.length === 0) {
+        return [initialEntry];
+      }
+      const hasEntry = existing.some((entry) => entry.id === initialEntry.id);
+      if (hasEntry) {
+        return existing.map((entry) => (entry.id === initialEntry.id ? initialEntry : entry));
+      }
+      return [...existing, initialEntry];
+    });
+  }, [initialEntry, queryClient, user?.id]);
+
+  const entriesQueryKey: [string, string | undefined, string] = ['entries', user?.id, entryDate];
+  const entriesSnapshot = useMemo(() => {
+    if (!user?.id || !entryDate) return null;
+    return getPersistentCache<CalorieEntry[]>(
+      `dailyEntries:${user.id}:${entryDate}`,
+      LONG_CACHE_MS
+    );
+  }, [entryDate, user?.id]);
+  const {
+    data: entriesFromQuery = [],
+    isSuccess: entriesLoaded,
+  } = useQuery<CalorieEntry[]>({
+    queryKey: entriesQueryKey,
+    queryFn: () => {
+      if (!user?.id || !entryDate) {
+        throw new Error('User not authenticated');
+      }
+      return getEntriesForDate(user.id, entryDate);
+    },
+    enabled: !!user?.id && !!entryDate,
+    initialData: useMemo(() => {
+      const cached = queryClient.getQueryData<CalorieEntry[]>(entriesQueryKey);
+      if (cached && cached.length > 0) {
+        return cached;
+      }
+      if (initialEntry && initialEntry.entry_date === entryDate) {
+        return [initialEntry];
+      }
+      if (entriesSnapshot) {
+        return entriesSnapshot;
+      }
+      return undefined;
+    }, [entriesQueryKey, initialEntry, entryDate, entriesSnapshot, queryClient]),
+    staleTime: ENTRY_STALE_MS,
+    gcTime: LONG_CACHE_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  useEffect(() => {
+    if (!user?.id || !entryDate) return;
+    if (!entriesFromQuery || entriesFromQuery.length === 0) return;
+    setPersistentCache(`dailyEntries:${user.id}:${entryDate}`, entriesFromQuery);
+  }, [entriesFromQuery, entryDate, user?.id]);
+
+  const entryFromQuery = useMemo(() => {
+    if (!entryId) return null;
+    return entriesFromQuery.find((entry) => entry.id === entryId) ?? null;
+  }, [entriesFromQuery, entryId]);
+
+  const targetFoodId = useMemo(() => {
+    if (entryFromQuery?.food_id) return entryFromQuery.food_id;
+    if (initialEntry?.food_id) return initialEntry.food_id;
+    return foodId ?? null;
+  }, [entryFromQuery?.food_id, foodId, initialEntry?.food_id]);
+
+  const {
+    data: foodMasterData = null,
+  } = useQuery<FoodMaster | null>({
+    queryKey: ['foodMasterFull', targetFoodId],
+    queryFn: () => (targetFoodId ? getFoodMasterById(targetFoodId) : Promise.resolve(null)),
+    enabled: !!targetFoodId,
+    initialData: () => {
+      if (!targetFoodId) return undefined;
+      const cached = queryClient.getQueryData<FoodMaster>(['foodMasterFull', targetFoodId]);
+      if (cached) return cached;
+      const persisted = getPersistentCache<FoodMaster>(`foodMasterFull:${targetFoodId}`, LONG_CACHE_MS);
+      return persisted ?? undefined;
+    },
+    staleTime: ENTRY_STALE_MS,
+    gcTime: LONG_CACHE_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  useEffect(() => {
+    if (!targetFoodId || !foodMasterData) return;
+    setPersistentCache(`foodMasterFull:${targetFoodId}`, foodMasterData);
+  }, [foodMasterData, targetFoodId]);
+
+  const {
+    data: servingsData = [],
+  } = useQuery<FoodServing[]>({
+    queryKey: ['foodServings', targetFoodId],
+    queryFn: () => (targetFoodId ? getServingsForFood(targetFoodId) : Promise.resolve([])),
+    enabled: !!targetFoodId,
+    initialData: () => {
+      if (!targetFoodId) return undefined;
+      const cached = queryClient.getQueryData<FoodServing[]>(['foodServings', targetFoodId]);
+      if (cached && cached.length > 0) {
+        return cached;
+      }
+      const persisted = getPersistentCache<FoodServing[]>(`foodServings:${targetFoodId}`, LONG_CACHE_MS);
+      return persisted ?? undefined;
+    },
+    staleTime: ENTRY_STALE_MS,
+    gcTime: LONG_CACHE_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  useEffect(() => {
+    if (!targetFoodId || !servingsData) return;
+    setPersistentCache(`foodServings:${targetFoodId}`, servingsData);
+  }, [servingsData, targetFoodId]);
 
   const formatDateLabel = useCallback(
     (dateString: string) => {
@@ -168,6 +301,51 @@ export default function FoodEditScreen() {
     return cleaned;
   }, []);
 
+  const hydratedEntry = entryFromQuery ?? initialEntry;
+
+  useEffect(() => {
+    if (entryHydratedRef.current || mode === 'create') return;
+
+    if (entryId && entriesLoaded && !hydratedEntry) {
+      Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
+      router.back();
+      return;
+    }
+
+    if (!hydratedEntry) return;
+
+    setEntryDate(hydratedEntry.entry_date);
+    setMealType(hydratedEntry.meal_type);
+
+    if (!hydratedEntry.food_id) {
+      router.replace({
+        pathname: '/quick-log',
+        params: {
+          quickLogId: hydratedEntry.id,
+          date: hydratedEntry.entry_date,
+          mealType: hydratedEntry.meal_type,
+        },
+      });
+      return;
+    }
+
+    setItemName(hydratedEntry.item_name);
+    setQuantity(hydratedEntry.quantity.toString());
+    setUnit(hydratedEntry.unit);
+    setCalories(hydratedEntry.calories_kcal.toString());
+    setProtein(hydratedEntry.protein_g?.toString() || '');
+    setCarbs(hydratedEntry.carbs_g?.toString() || '');
+    setFat(hydratedEntry.fat_g?.toString() || '');
+    setFiber(hydratedEntry.fiber_g?.toString() || '');
+    setSaturatedFat(hydratedEntry.saturated_fat_g?.toString() || '');
+    setTransFat(hydratedEntry.trans_fat_g?.toString() || '');
+    setSugar(hydratedEntry.sugar_g?.toString() || '');
+    setSodium(hydratedEntry.sodium_mg?.toString() || '');
+
+    entryHydratedRef.current = true;
+    setInitializing(false);
+  }, [entriesLoaded, entryId, hydratedEntry, mode, router, t]);
+
   const calculateNutrientsFromOption = useCallback((food: FoodMaster, option: ServingOption, qty: number) => {
     let masterUnits = 0;
     if (option.kind === 'raw') {
@@ -228,137 +406,48 @@ export default function FoodEditScreen() {
     [calculateNutrientsFromOption, selectedFood, selectedServing, validateNumericInput]
   );
 
-  useEffect(() => {
-    if (!entryId || !user?.id) {
-      return;
-    }
-
-    const loadEntry = async () => {
+  const initializeFromFoodMaster = useCallback(
+    async (targetFoodId: string, date: string, targetMealType: string) => {
       try {
         setLoading(true);
-        const { data: entry, error } = await supabase
-          .from('calorie_entries')
-          .select('*')
-          .eq('id', entryId)
-          .eq('user_id', user.id)
-          .single<CalorieEntry>();
+        const foodData = await getFoodMasterById(targetFoodId);
 
-        if (error || !entry) {
-          Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
+        if (!foodData) {
+          Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.food_not_found'));
           router.back();
           return;
         }
 
-        setEntryDate(entry.entry_date);
-        setMealType(entry.meal_type);
-
-        if (!entry.food_id) {
-          router.replace({
-            pathname: '/quick-log',
-            params: {
-              quickLogId: entry.id,
-              date: entry.entry_date,
-              mealType: entry.meal_type,
-            },
-          });
-          return;
-        }
-
-        setItemName(entry.item_name);
-        setQuantity(entry.quantity.toString());
-        setUnit(entry.unit);
-        setCalories(entry.calories_kcal.toString());
-        setProtein(entry.protein_g?.toString() || '');
-        setCarbs(entry.carbs_g?.toString() || '');
-        setFat(entry.fat_g?.toString() || '');
-        setFiber(entry.fiber_g?.toString() || '');
-        setSaturatedFat(entry.saturated_fat_g?.toString() || '');
-        setTransFat(entry.trans_fat_g?.toString() || '');
-        setSugar(entry.sugar_g?.toString() || '');
-        setSodium(entry.sodium_mg?.toString() || '');
-
-        const { data: foodData, error: foodError } = await supabase
-          .from('food_master')
-          .select('*')
-          .eq('id', entry.food_id)
-          .single<FoodMaster>();
-
-        if (foodError || !foodData) {
-          Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.food_not_found'));
-          return;
-        }
-
         setSelectedFood(foodData);
+        setItemName(foodData.name + (foodData.brand ? ` (${foodData.brand})` : ''));
+        setEntryDate(date);
+        setMealType(targetMealType);
 
-        const { data: servingsData, error: servingsError } = await supabase
-          .from('food_servings')
-          .select('*')
-          .eq('food_id', entry.food_id)
-          .order('is_default', { ascending: false })
-          .order('serving_name', { ascending: true });
-
-        const dbServings: FoodServing[] = (!servingsError && servingsData) ? servingsData : [];
+        const dbServings = await getServingsForFood(targetFoodId);
         const options = buildServingOptions(foodData, dbServings);
         setAvailableServings(options);
 
-        let servingMatched = false;
+        const { quantity: defaultQty, defaultOption } = getDefaultServingSelection(foodData, dbServings);
+        const appliedQty = defaultQty || 1;
+        const appliedOption = defaultOption || options[0] || null;
 
-        if (entry.serving_id) {
-          const matchingOption = options.find(
-            (option) => option.kind === 'saved' && option.serving.id === entry.serving_id
-          );
-          if (matchingOption) {
-            setSelectedServing(matchingOption);
-            calculateNutrientsFromOption(foodData, matchingOption, entry.quantity);
-            servingMatched = true;
-          } else {
-            const { data: servingData, error: servingFetchError } = await supabase
-              .from('food_servings')
-              .select('*')
-              .eq('id', entry.serving_id)
-              .single<FoodServing>();
-
-            if (!servingFetchError && servingData) {
-              const mergedServings = dbServings.find((s) => s.id === servingData.id)
-                ? dbServings
-                : [...dbServings, servingData];
-              const updatedOptions = buildServingOptions(foodData, mergedServings);
-              setAvailableServings(updatedOptions);
-              const foundOption = updatedOptions.find(
-                (option) => option.kind === 'saved' && option.serving.id === servingData.id
-              );
-              if (foundOption) {
-                setSelectedServing(foundOption);
-                calculateNutrientsFromOption(foodData, foundOption, entry.quantity);
-                servingMatched = true;
-              }
-            }
-          }
+        setQuantity(appliedQty.toString());
+        if (appliedOption?.kind === 'raw') {
+          setUnit(appliedOption.unit);
+        } else if (appliedOption?.kind === 'saved') {
+          setUnit(appliedOption.label || foodData.serving_unit || 'g');
+        } else {
+          setUnit(foodData.serving_unit || 'g');
         }
+        setSelectedServing(appliedOption || null);
 
-        if (!servingMatched && entry.unit) {
-          const entryUnit = entry.unit.trim().toLowerCase();
-          const savedMatch = options.find(
-            (option) => option.kind === 'saved' && option.label.toLowerCase() === entryUnit
-          );
-          if (savedMatch) {
-            setSelectedServing(savedMatch);
-            calculateNutrientsFromOption(foodData, savedMatch, entry.quantity);
-            servingMatched = true;
-          } else {
-            const rawMatch = options.find(
-              (option) => option.kind === 'raw' && option.unit.toLowerCase() === entryUnit
-            );
-            if (rawMatch) {
-              setSelectedServing(rawMatch);
-              calculateNutrientsFromOption(foodData, rawMatch, entry.quantity);
-              servingMatched = true;
-            }
-          }
-        }
-
-        if (!servingMatched) {
-          setSelectedServing(null);
+        if (appliedOption) {
+          calculateNutrientsFromOption(foodData, appliedOption, appliedQty);
+        } else {
+          const baseQty = foodData.serving_size || 1;
+          setQuantity(baseQty.toString());
+          setUnit(foodData.serving_unit || 'g');
+          calculateNutrientsFromOption(foodData, { kind: 'raw', unit: foodData.serving_unit || 'g' } as any, baseQty);
         }
       } catch (error: any) {
         Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
@@ -367,10 +456,106 @@ export default function FoodEditScreen() {
         setLoading(false);
         setInitializing(false);
       }
+    },
+    [calculateNutrientsFromOption, router, t]
+  );
+
+  useEffect(() => {
+    if (mode === 'create') return;
+    if (foodHydratedRef.current) return;
+    if (!hydratedEntry || !foodMasterData) return;
+
+    const dbServings = servingsData ?? [];
+    const options = buildServingOptions(foodMasterData, dbServings);
+    setSelectedFood(foodMasterData);
+    setAvailableServings(options);
+
+    let servingMatched = false;
+
+    if (hydratedEntry.serving_id) {
+      const matchingOption = options.find(
+        (option) => option.kind === 'saved' && option.serving.id === hydratedEntry.serving_id
+      );
+      if (matchingOption) {
+        setSelectedServing(matchingOption);
+        calculateNutrientsFromOption(foodMasterData, matchingOption, hydratedEntry.quantity);
+        servingMatched = true;
+      } else {
+        const fallbackServing = dbServings.find((s) => s.id === hydratedEntry.serving_id);
+        if (fallbackServing) {
+          const mergedOptions = buildServingOptions(foodMasterData, [...dbServings, fallbackServing]);
+          setAvailableServings(mergedOptions);
+          const mergedMatch = mergedOptions.find(
+            (option) => option.kind === 'saved' && option.serving.id === fallbackServing.id
+          );
+          if (mergedMatch) {
+            setSelectedServing(mergedMatch);
+            calculateNutrientsFromOption(foodMasterData, mergedMatch, hydratedEntry.quantity);
+            servingMatched = true;
+          }
+        }
+      }
+    }
+
+    if (!servingMatched && hydratedEntry.unit) {
+      const entryUnit = hydratedEntry.unit.trim().toLowerCase();
+      const savedMatch = options.find(
+        (option) => option.kind === 'saved' && option.label.toLowerCase() === entryUnit
+      );
+      if (savedMatch) {
+        setSelectedServing(savedMatch);
+        calculateNutrientsFromOption(foodMasterData, savedMatch, hydratedEntry.quantity);
+        servingMatched = true;
+      } else {
+        const rawMatch = options.find(
+          (option) => option.kind === 'raw' && option.unit.toLowerCase() === entryUnit
+        );
+        if (rawMatch) {
+          setSelectedServing(rawMatch);
+          calculateNutrientsFromOption(foodMasterData, rawMatch, hydratedEntry.quantity);
+          servingMatched = true;
+        }
+      }
+    }
+
+    if (!servingMatched) {
+      const { quantity: defaultQty, defaultOption } = getDefaultServingSelection(foodMasterData, dbServings);
+      const appliedQty = defaultQty || hydratedEntry.quantity || 1;
+      const appliedOption = defaultOption || options[0] || null;
+      setSelectedServing(appliedOption || null);
+      if (appliedOption) {
+        calculateNutrientsFromOption(foodMasterData, appliedOption, appliedQty);
+      }
+    }
+
+    foodHydratedRef.current = true;
+    setInitializing(false);
+  }, [
+    calculateNutrientsFromOption,
+    foodMasterData,
+    hydratedEntry,
+    mode,
+    servingsData,
+  ]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (mode === 'create' && foodId) {
+        await initializeFromFoodMaster(foodId, entryDateFallback, mealTypeFallback);
+      }
     };
 
-    loadEntry();
-  }, [calculateNutrientsFromOption, entryId, router, t, user?.id]);
+    load();
+  }, [entryDateFallback, foodId, initializeFromFoodMaster, mealTypeFallback, mode]);
+
+  // Always focus quantity when the screen is ready
+  useEffect(() => {
+    if (!initializing) {
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+      }, 300);
+    }
+  }, [initializing]);
 
   const isFormValid = useCallback(() => {
     return itemName.trim().length > 0 && quantity && parseFloat(quantity) > 0 && calories && parseFloat(calories) >= 0;
@@ -407,7 +592,7 @@ export default function FoodEditScreen() {
       return;
     }
 
-    if (!user?.id || !entryId) {
+    if (!user?.id) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.user_not_found'));
       return;
     }
@@ -518,7 +703,7 @@ export default function FoodEditScreen() {
         }
       }
 
-      const cleanedEntryData: Record<string, any> = {};
+    const cleanedEntryData: Record<string, any> = {};
       const allowedFields = [
         'entry_date',
         'meal_type',
@@ -545,25 +730,36 @@ export default function FoodEditScreen() {
         }
       }
 
-      const { error } = await supabase
+    let error;
+    if (mode === 'edit' && entryId) {
+      const updateResult = await supabase
         .from('calorie_entries')
         .update(cleanedEntryData)
         .eq('id', entryId)
         .eq('user_id', user.id);
+      error = updateResult.error;
+    } else if (mode === 'create' && foodId) {
+      const insertResult = await supabase
+        .from('calorie_entries')
+        .insert({ ...cleanedEntryData, user_id: user.id })
+        .select('id')
+        .single();
+      error = insertResult.error;
+    }
 
-      if (error) {
-        console.error('Food edit update error', error);
-        Alert.alert(t('alerts.error_title'), error.message || t('common.unexpected_error'));
-        return;
-      }
+    if (error) {
+      console.error('Food edit save error', error);
+      Alert.alert(t('alerts.error_title'), error.message || t('common.unexpected_error'));
+      return;
+    }
 
-      if (entryDate || entryDateParam) {
-        queryClient.invalidateQueries({
-          queryKey: ['entries', user.id, entryDate || entryDateParam],
-        });
-      }
+    if (entryDate || entryDateParam) {
+      queryClient.invalidateQueries({
+        queryKey: ['entries', user.id, entryDate || entryDateParam],
+      });
+    }
 
-      router.back();
+    router.back();
     } catch (error: any) {
       Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
     } finally {
@@ -647,7 +843,7 @@ export default function FoodEditScreen() {
           <View style={[styles.centeredContainer, { maxWidth: isDesktop ? 520 : '100%' }]}>
             <View style={styles.formHeader}>
               <ThemedText style={[styles.formTitle, { color: colors.text }]}>
-                Edit Food Log
+                {isCreateMode ? 'What did you eat?' : 'Edit Food Log'}
               </ThemedText>
             </View>
             <NutritionLabelLayout
@@ -660,6 +856,7 @@ export default function FoodEditScreen() {
               }
               servingQuantityInput={
                 <TextInput
+                  ref={quantityInputRef}
                   style={[styles.nutritionLabelInput, styles.nutritionLabelSmallInput, { borderColor: quantityError ? '#EF4444' : '#000000' }]}
                   value={quantity}
                   onChangeText={handleQuantityChange}
@@ -765,7 +962,7 @@ export default function FoodEditScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <ThemedText style={styles.saveButtonText}>
-                    {t('mealtype_log.buttons.update_log')}
+                    {isCreateMode ? 'Log New' : t('mealtype_log.buttons.update_log')}
                   </ThemedText>
                 )}
               </TouchableOpacity>

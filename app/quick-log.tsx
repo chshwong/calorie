@@ -8,7 +8,7 @@
  * - Quick Log tab in mealtype-log
  */
 
-import React, { useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Dimensions, Platform, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +19,15 @@ import { QuickLogForm } from '@/components/QuickLogForm';
 import { getLocalDateString } from '@/utils/calculations';
 import { Spacing, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import type { CalorieEntry } from '@/utils/types';
 
 type QuickLogRouteParams = {
   date?: string;
   mealType?: string;
   quickLogId?: string;
+  entryPayload?: string;
 };
 
 // Hide default Expo Router header - we use custom header instead
@@ -37,10 +41,44 @@ export default function QuickLogScreen() {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const entryPayloadParam = Array.isArray(params.entryPayload) ? params.entryPayload[0] : params.entryPayload;
+
+  const initialEntry = useMemo<CalorieEntry | null>(() => {
+    if (!entryPayloadParam) return null;
+    try {
+      return JSON.parse(entryPayloadParam) as CalorieEntry;
+    } catch (error) {
+      console.warn('Failed to parse entry payload for quick-log:', error);
+      return null;
+    }
+  }, [entryPayloadParam]);
 
   // Fallbacks: if params are missing, use today and a default mealType
-  const date = params.date ?? getLocalDateString();
-  const mealType = params.mealType ?? 'breakfast';
+  const dateParam = Array.isArray(params.date) ? params.date[0] : params.date;
+  const mealTypeParam = Array.isArray(params.mealType) ? params.mealType[0] : params.mealType;
+  const quickLogId = Array.isArray(params.quickLogId) ? params.quickLogId[0] : params.quickLogId;
+
+  const date = dateParam ?? initialEntry?.entry_date ?? getLocalDateString();
+  const mealType = mealTypeParam ?? initialEntry?.meal_type ?? 'breakfast';
+
+  // Seed the entries cache so the form can hydrate instantly from cache
+  useEffect(() => {
+    if (!user?.id || !initialEntry) return;
+    const cacheKey: [string, string, string] = ['entries', user.id, initialEntry.entry_date];
+    queryClient.setQueryData<CalorieEntry[]>(cacheKey, (existing) => {
+      if (!existing || existing.length === 0) {
+        return [initialEntry];
+      }
+      const hasEntry = existing.some((e) => e.id === initialEntry.id);
+      if (hasEntry) {
+        return existing.map((e) => (e.id === initialEntry.id ? initialEntry : e));
+      }
+      return [...existing, initialEntry];
+    });
+  }, [initialEntry, queryClient, user?.id]);
 
   // Detect desktop for responsive layout
   const screenWidth = Dimensions.get('window').width;
@@ -152,7 +190,8 @@ export default function QuickLogScreen() {
             <QuickLogForm
               date={date}
               mealType={mealType}
-              quickLogId={params.quickLogId}
+              quickLogId={quickLogId}
+              initialEntry={initialEntry ?? undefined}
               onCancel={handleClose}
               onSaved={handleClose}
               registerSubmit={(fn) => { submitRef.current = fn; }}

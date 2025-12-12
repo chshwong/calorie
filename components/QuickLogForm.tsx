@@ -5,7 +5,7 @@
  * Handles manual entry creation and editing (entries without food_id).
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
@@ -15,18 +15,21 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getCurrentDateTimeUTC } from '@/utils/calculations';
 import { supabase } from '@/lib/supabase';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import type { CalorieEntry } from '@/utils/types';
+import { getEntriesForDate } from '@/lib/services/calorieEntries';
+import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
 
 type QuickLogFormProps = {
   date: string;                 // ISO date string (YYYY-MM-DD)
   mealType: string;             // meal type key (breakfast, lunch, etc.)
   quickLogId?: string;           // if present, edit mode; else create
+  initialEntry?: CalorieEntry | null;
   onCancel: () => void;         // called when user taps Cancel
   onSaved: () => void;          // called after successful save/update
   registerSubmit?: (submitFn: () => void) => void; // register submit function for header button
@@ -36,8 +39,9 @@ type QuickLogFormProps = {
 const MAX_QUANTITY = 100000;
 const MAX_CALORIES = 10000;
 const MAX_MACRO = 9999.99;
+const ENTRIES_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS;
 
-export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, registerSubmit }: QuickLogFormProps) {
+export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCancel, onSaved, registerSubmit }: QuickLogFormProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const colorScheme = useColorScheme();
@@ -69,63 +73,107 @@ export function QuickLogForm({ date, mealType, quickLogId, onCancel, onSaved, re
   const [fatError, setFatError] = useState('');
   const [fiberError, setFiberError] = useState('');
 
-  // Load entry data if editing
+  const effectiveDate = initialEntry?.entry_date ?? date;
+  const entriesQueryKey: [string, string | undefined, string | undefined] = ['entries', user?.id, effectiveDate];
+
+  const entriesSnapshot = useMemo(() => {
+    if (!user?.id || !effectiveDate) return null;
+    return getPersistentCache<CalorieEntry[]>(
+      `dailyEntries:${user.id}:${effectiveDate}`,
+      ENTRIES_CACHE_MAX_AGE_MS
+    );
+  }, [effectiveDate, user?.id]);
+
+  const {
+    data: entriesFromQuery = [],
+    isSuccess: entriesLoaded,
+  } = useQuery<CalorieEntry[]>({
+    queryKey: entriesQueryKey,
+    queryFn: () => {
+      if (!user?.id || !effectiveDate) {
+        throw new Error('User not authenticated');
+      }
+      return getEntriesForDate(user.id, effectiveDate);
+    },
+    enabled: !!user?.id && !!effectiveDate,
+    initialData: useMemo(() => {
+      const cached = queryClient.getQueryData<CalorieEntry[]>(entriesQueryKey);
+      if (cached && cached.length > 0) {
+        return cached;
+      }
+      if (initialEntry && initialEntry.entry_date === effectiveDate) {
+        return [initialEntry];
+      }
+      if (entriesSnapshot) {
+        return entriesSnapshot;
+      }
+      return undefined;
+    }, [entriesQueryKey, initialEntry, effectiveDate, entriesSnapshot, queryClient]),
+    staleTime: 15 * 60 * 1000, // 15 minutes for edit hydration
+    gcTime: 180 * 24 * 60 * 60 * 1000, // ~180 days to align with persistent cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
   useEffect(() => {
-    if (quickLogId && user?.id) {
-      const loadEntry = async () => {
-        try {
-          const { data: entry, error } = await supabase
-            .from('calorie_entries')
-            .select('*')
-            .eq('id', quickLogId)
-            .eq('user_id', user.id)
-            .single();
+    if (!user?.id || !effectiveDate) return;
+    if (!entriesFromQuery || entriesFromQuery.length === 0) return;
+    setPersistentCache(`dailyEntries:${user.id}:${effectiveDate}`, entriesFromQuery);
+  }, [effectiveDate, entriesFromQuery, user?.id]);
 
-          if (error || !entry) {
-            Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
-            onCancel();
-            return;
-          }
+  const entryFromQuery = useMemo(() => {
+    if (!quickLogId) return null;
+    return entriesFromQuery.find((entry) => entry.id === quickLogId) ?? null;
+  }, [entriesFromQuery, quickLogId]);
 
-          // Only load if it's a manual entry (no food_id)
-          if (entry.food_id) {
-            Alert.alert(t('alerts.error_title'), t('quick_log.errors.not_quick_log_entry'));
-            onCancel();
-            return;
-          }
+  const hydratedEntry = entryFromQuery ?? initialEntry ?? null;
+  const entryHydratedRef = useRef(false);
 
-          // Load entry data into form
-          setItemName(entry.item_name);
-          setQuantity(entry.quantity.toString());
-          setUnit(entry.unit);
-          setCalories(entry.calories_kcal.toString());
-          setProtein(entry.protein_g?.toString() || '');
-          setCarbs(entry.carbs_g?.toString() || '');
-          setFat(entry.fat_g?.toString() || '');
-          setFiber(entry.fiber_g?.toString() || '');
-          setSaturatedFat(entry.saturated_fat_g?.toString() || '');
-          setTransFat(entry.trans_fat_g?.toString() || '');
-          setSugar(entry.sugar_g?.toString() || '');
-          setSodium(entry.sodium_mg?.toString() || '');
+  useEffect(() => {
+    if (entryHydratedRef.current) return;
 
-          // Focus the item name input after a short delay
-          setTimeout(() => {
-            itemNameInputRef.current?.focus();
-          }, 300);
-        } catch (error: any) {
-          Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
-          onCancel();
-        }
-      };
+    if (hydratedEntry) {
+      // Only hydrate if it's a manual entry
+      if (hydratedEntry.food_id) {
+        Alert.alert(t('alerts.error_title'), t('quick_log.errors.not_quick_log_entry'));
+        onCancel();
+        return;
+      }
 
-      loadEntry();
-    } else if (!quickLogId) {
-      // New entry - focus item name input
+      setItemName(hydratedEntry.item_name);
+      setQuantity(hydratedEntry.quantity.toString());
+      setUnit(hydratedEntry.unit);
+      setCalories(hydratedEntry.calories_kcal.toString());
+      setProtein(hydratedEntry.protein_g?.toString() || '');
+      setCarbs(hydratedEntry.carbs_g?.toString() || '');
+      setFat(hydratedEntry.fat_g?.toString() || '');
+      setFiber(hydratedEntry.fiber_g?.toString() || '');
+      setSaturatedFat(hydratedEntry.saturated_fat_g?.toString() || '');
+      setTransFat(hydratedEntry.trans_fat_g?.toString() || '');
+      setSugar(hydratedEntry.sugar_g?.toString() || '');
+      setSodium(hydratedEntry.sodium_mg?.toString() || '');
+
+      entryHydratedRef.current = true;
       setTimeout(() => {
         itemNameInputRef.current?.focus();
-      }, 300);
+      }, 200);
+      return;
     }
-  }, [quickLogId, user?.id, t, onCancel]);
+
+    if (!quickLogId) {
+      entryHydratedRef.current = true;
+      setTimeout(() => {
+        itemNameInputRef.current?.focus();
+      }, 200);
+    }
+  }, [hydratedEntry, onCancel, quickLogId, t]);
+
+  useEffect(() => {
+    if (quickLogId && entriesLoaded && !hydratedEntry) {
+      Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
+      onCancel();
+    }
+  }, [entriesLoaded, hydratedEntry, onCancel, quickLogId, t]);
 
   // Validate numeric input
   const validateNumericInput = (text: string): string => {

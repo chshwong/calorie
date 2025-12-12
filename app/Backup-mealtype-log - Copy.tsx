@@ -22,18 +22,31 @@ import { useFoodMasterByIds } from '@/hooks/use-food-master-by-ids';
 import { useQueryClient } from '@tanstack/react-query';
 import { validateAndNormalizeBarcode } from '@/lib/barcode';
 import { supabase } from '@/lib/supabase';
-import {
+import { 
+  calculateMasterUnitsForDisplay,
+  getAllowedUnitsFor,
+  isWeightUnit,
   isVolumeUnit,
+  convertToMasterUnit,
+  getUnitDisplayName,
+  getMasterUnitsFromServingOption,
+  buildServingOptions,
+  formatUnitLabel,
+  formatServingLabel,
+  WEIGHT_UNITS,
+  VOLUME_UNITS,
   type FoodMaster as FoodMasterType,
+  type FoodMaster,
   type FoodServing as FoodServingType,
+  type ServingOption,
 } from '@/utils/nutritionMath';
 import {
   getServingsForFood,
+  getServingsForFoods,
+  getDefaultServingForFood,
   getDefaultServingWithNutrients,
-  computeNutrientsForFoodServing,
-  computeNutrientsForRawQuantity,
+  FOOD_SERVING_COLUMNS,
 } from '@/lib/servings';
-import { getFoodMasterById } from '@/lib/services/foodMaster';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -119,8 +132,8 @@ const TapToExpandHint = ({ text, textColor }: { text: string; textColor: string 
         style={{
           textAlign: 'center',
           color: textColor,
-          fontSize: 16,
-          marginRight: 2,
+          fontSize: 11,
+          marginRight: 6,
         }}
       >
         {text}
@@ -147,7 +160,8 @@ export default function LogFoodScreen() {
       frequent: '#3B82F6', // Blue
       recent: '#10B981', // Green
       custom: '#8B5CF6', // Purple
-      bundle: '#F59E0B', // Orange,
+      bundle: '#F59E0B', // Orange
+      manual: '#6B7280', // Dark Grey
     };
     
     const baseColor = shades[tab as keyof typeof shades] || colors.tint;
@@ -180,7 +194,8 @@ export default function LogFoodScreen() {
       frequent: '#3B82F6', // Blue
       recent: '#10B981', // Green
       custom: '#8B5CF6', // Purple
-      bundle: '#F59E0B', // Orange (fallback),
+      bundle: '#F59E0B', // Orange (fallback)
+      manual: '#6B7280', // Dark Grey
     };
     
     const baseColor = shades[tab as keyof typeof shades] || colors.tint;
@@ -216,17 +231,15 @@ export default function LogFoodScreen() {
     tabsContentWidthRef.current = contentWidth;
     // Delay to ensure layout is calculated, then check scroll state
     setTimeout(() => {
-      const ref = tabsScrollViewRef.current as unknown as {
-        measure?: (
-          cb: (x: number, y: number, width: number, height: number, pageX: number, pageY: number) => void
-        ) => void;
-      };
-      if (ref && contentWidth > 0) {
-        ref.measure?.((x, y, width) => {
+      if (tabsScrollViewRef.current && contentWidth > 0) {
+        // Get scroll view width by measuring
+        tabsScrollViewRef.current.measure((x, y, width, height, pageX, pageY) => {
           tabsScrollViewWidthRef.current = width;
+          // Check initial scroll state
           if (contentWidth > width) {
+            // Can scroll right initially
             setCanScrollRight(true);
-            setCanScrollLeft(false);
+            setCanScrollLeft(false); // Start at left
           } else {
             setCanScrollRight(false);
             setCanScrollLeft(false);
@@ -479,8 +492,40 @@ export default function LogFoodScreen() {
     return date.getTime() === selected.getTime();
   };
 
-  // Loading state reused across actions (mass delete, bundle insert, etc.)
+  // Edit state (now handled via navigation to /food-edit or /quick-log)
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const isManualMode = false;
+  const setIsManualMode = () => {};
+
+  // Legacy inline form state (kept to avoid runtime errors while creation/editing is routed out)
+  const [itemName, setItemName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('g');
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+  const unitOptions = ['g', 'oz', 'lb', 'kg', 'serving', 'cup', 'tbsp', 'tsp', 'piece', 'slice'];
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fat, setFat] = useState('');
+  const [fiber, setFiber] = useState('');
+  const [saturatedFat, setSaturatedFat] = useState('');
+  const [transFat, setTransFat] = useState('');
+  const [sugar, setSugar] = useState('');
+  const [sodium, setSodium] = useState('');
   const [loading, setLoading] = useState(false);
+  const [macrosExpanded, setMacrosExpanded] = useState(false);
+  const [fattyAcidsExpanded, setFattyAcidsExpanded] = useState(false);
+  const [loadingPreference, setLoadingPreference] = useState(true);
+  const [itemNameError, setItemNameError] = useState('');
+  const [quantityError, setQuantityError] = useState('');
+  const [caloriesError, setCaloriesError] = useState('');
+  const [proteinError, setProteinError] = useState('');
+  const [carbsError, setCarbsError] = useState('');
+  const [fatError, setFatError] = useState('');
+  const [fiberError, setFiberError] = useState('');
+  const MAX_QUANTITY = 100000;
+  const MAX_CALORIES = 10000;
+  const MAX_MACRO = 9999.99;
   
   // Delete confirmation modal state
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
@@ -697,7 +742,7 @@ export default function LogFoodScreen() {
   const openManualModeParam = params.openManualMode; // Flag to open manual mode
   const openBarcodeScannerParam = params.openBarcodeScanner; // Flag to open barcode scanner
   const openFoodSearchParam = params.openFoodSearch; // Flag to open food search expanded
-  const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle')
+  const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual')
     ? activeTabParam
     : 'frequent';
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
@@ -746,6 +791,7 @@ export default function LogFoodScreen() {
   const newlyEditedFoodId = useRef<string | undefined>(undefined); // Track which food was just edited
   const frequentFoodsFetched = useRef(false); // Track if we've fetched frequent foods
   const recentFoodsFetched = useRef(false); // Track if we've fetched recent foods
+  const itemNameInputRef = useRef<TextInput>(null); // Ref for item name input to focus when opening Quick Log
 
   // Bundle types and state
   type BundleItem = {
@@ -816,8 +862,12 @@ export default function LogFoodScreen() {
   // Note editor state
   const [noteEditor, setNoteEditor] = useState<{ visible: boolean }>({ visible: false });
   
-  // Inline add/edit form removed; keep minimal placeholder for legacy conditional
-  const editingEntryId: string | null = null;
+  // Selected food and serving state
+  const [selectedFood, setSelectedFood] = useState<FoodMaster | null>(null);
+  const [availableServings, setAvailableServings] = useState<ServingOption[]>([]);
+  const [selectedServing, setSelectedServing] = useState<ServingOption | null>(null);
+  const [showServingDropdown, setShowServingDropdown] = useState(false);
+  
   // Map to store food source types (custom vs database) for entries
  
   //Commented out to fix infinite loop on empty mealtype_log screen
@@ -842,6 +892,88 @@ export default function LogFoodScreen() {
     });
     return map;
   }, [foodMasterData]);
+
+  // Ref for quantity input to auto-focus
+  const quantityInputRef = useRef<TextInput>(null);
+  
+  // Ref and state for serving dropdown positioning
+  const servingButtonRef = useRef<View>(null);
+  const [servingDropdownLayout, setServingDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  // Helper function to validate numeric input (numbers and one period only)
+  const validateNumericInput = (text: string): string => {
+    // Remove any characters that aren't numbers or periods
+    let cleaned = text.replace(/[^0-9.]/g, '');
+    
+    // Ensure only one period
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      // If more than one period, keep only the first one
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    return cleaned;
+  };
+
+  // Load user preference for macros and other nutrients expansion
+  // useEffect(() => {
+  //   const loadPreference = async () => {
+  //     try {
+  //       if (Platform.OS === 'web') {
+  //         const macrosStored = localStorage.getItem('macrosExpanded');
+  //         if (macrosStored !== null) {
+  //           setMacrosExpanded(macrosStored === 'true');
+  //         }
+  //         const fattyAcidsStored = localStorage.getItem('fattyAcidsExpanded');
+  //         if (fattyAcidsStored !== null) {
+  //           setFattyAcidsExpanded(fattyAcidsStored === 'true');
+  //         }
+  //       } else {
+  //         const macrosStored = await SecureStore.getItemAsync('macrosExpanded');
+  //         if (macrosStored !== null) {
+  //           setMacrosExpanded(macrosStored === 'true');
+  //         }
+  //         const fattyAcidsStored = await SecureStore.getItemAsync('fattyAcidsExpanded');
+  //         if (fattyAcidsStored !== null) {
+  //           setFattyAcidsExpanded(fattyAcidsStored === 'true');
+  //         }
+  //       }
+  //   } catch (error) {
+  //     // Error loading preference - silently fail
+  //   } finally {
+  //       setLoadingPreference(false);
+  //     }
+  //   };
+  //   loadPreference();
+  // }, []);
+
+  const toggleMacros = async () => {
+    const newValue = !macrosExpanded;
+    setMacrosExpanded(newValue);
+    try {
+      if (Platform.OS === 'web') {
+        localStorage.setItem('macrosExpanded', String(newValue));
+      } else {
+        await SecureStore.setItemAsync('macrosExpanded', String(newValue));
+      }
+    } catch (error) {
+      // Error saving preference - silently fail
+    }
+  };
+
+  const toggleFattyAcids = async () => {
+    const newValue = !fattyAcidsExpanded;
+    setFattyAcidsExpanded(newValue);
+    try {
+      if (Platform.OS === 'web') {
+        localStorage.setItem('fattyAcidsExpanded', String(newValue));
+      } else {
+        await SecureStore.setItemAsync('fattyAcidsExpanded', String(newValue));
+      }
+    } catch (error) {
+      // Error saving preference - silently fail
+    }
+  };
 
   // Build food source and brand maps from food master data
   // This runs whenever foodMasterData changes
@@ -884,9 +1016,9 @@ export default function LogFoodScreen() {
       foodsMap = new Map();
     }
 
-    const items = bundle.items ?? [];
-    return items
+    return bundle.items
       .map((item) => {
+        // Get food name
         let foodName = item.item_name || t('mealtype_log.food_log.unknown_food');
         if (item.food_id && foodsMap.has(item.food_id)) {
           const food = foodsMap.get(item.food_id);
@@ -903,17 +1035,8 @@ export default function LogFoodScreen() {
 
   // Helper function to actually add bundle entries (extracted for reuse)
   const addBundleEntries = useCallback(async (bundle: Bundle) => {
-    if (!bundle.items?.length || !user?.id) return;
     setLoading(true);
     try {
-      const servingsCache = new Map<string, FoodServing[]>();
-      const getServingsForFoodCached = async (foodId: string) => {
-        if (servingsCache.has(foodId)) return servingsCache.get(foodId)!;
-        const list = await getServingsForFood(foodId);
-        servingsCache.set(foodId, list);
-        return list;
-      };
-
       // Fetch food details for all items
       const foodIds = bundle.items
         .filter(item => item.food_id)
@@ -937,17 +1060,6 @@ export default function LogFoodScreen() {
       // Prepare entries to insert
       const entriesToInsert = await Promise.all(
         bundle.items.map(async (item) => {
-          let itemName = item.item_name || t('mealtype_log.food_log.unknown_food');
-
-          // Validate quantity and unit early
-          const parsedQuantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(String(item.quantity || '0'));
-          if (isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) {
-            throw new Error(`Invalid quantity for item: ${itemName}`);
-          }
-
-          const resolvedUnit = item.unit && typeof item.unit === 'string' ? item.unit : 'g';
-
-          // Default nutrient values
           let calories = 0;
           let protein = 0;
           let carbs = 0;
@@ -957,30 +1069,63 @@ export default function LogFoodScreen() {
           let transFat = 0;
           let sugar = 0;
           let sodium = 0;
+          let itemName = item.item_name || t('mealtype_log.food_log.unknown_food');
 
           if (item.food_id && foodsMap.has(item.food_id)) {
             const food = foodsMap.get(item.food_id)!;
             itemName = food.name;
+            let multiplier = 1;
 
-            const servings = await getServingsForFoodCached(food.id);
-            const servingId = item.serving_id ?? null;
-            const serving = servingId ? servings.find((s) => s.id === servingId) : null;
+            if (item.serving_id) {
+              const { data: servingData, error: servingError } = await supabase
+                .from('food_servings')
+                .select('weight_g, volume_ml')
+                .eq('id', item.serving_id)
+                .single();
 
-            const nutrients = serving
-              ? computeNutrientsForFoodServing(food, serving, parsedQuantity)
-              : computeNutrientsForRawQuantity(food, parsedQuantity, resolvedUnit);
+              if (servingError || !servingData) {
+                // Fallback to unit-based calculation
+                if (item.unit === 'g' || item.unit === 'ml') {
+                  multiplier = item.quantity / 100;
+                } else {
+                  multiplier = (item.quantity * food.serving_size) / 100;
+                }
+              } else {
+                // Use weight_g or volume_ml from the serving
+                const servingValue = servingData.weight_g ?? servingData.volume_ml ?? 0;
+                multiplier = (item.quantity * servingValue) / 100;
+              }
+            } else {
+              // Unit-based serving (1g or 1ml) or other units
+              if (item.unit === 'g' || item.unit === 'ml') {
+                multiplier = item.quantity / 100;
+              } else {
+                multiplier = (item.quantity * food.serving_size) / 100;
+              }
+            }
 
-            calories = nutrients.calories_kcal || 0;
-            protein = nutrients.protein_g || 0;
-            carbs = nutrients.carbs_g || 0;
-            fat = nutrients.fat_g || 0;
-            fiber = nutrients.fiber_g || 0;
-            saturatedFat = (nutrients as any).saturated_fat_g || 0;
-            transFat = (nutrients as any).trans_fat_g || 0;
-            sugar = nutrients.sugar_g || 0;
-            sodium = nutrients.sodium_mg || 0;
+            calories = (food.calories_kcal || 0) * multiplier;
+            protein = (food.protein_g || 0) * multiplier;
+            carbs = (food.carbs_g || 0) * multiplier;
+            fat = (food.fat_g || 0) * multiplier;
+            fiber = (food.fiber_g || 0) * multiplier;
+            saturatedFat = (food.saturated_fat_g || 0) * multiplier;
+            transFat = (food.trans_fat_g || 0) * multiplier;
+            sugar = (food.sugar_g || 0) * multiplier;
+            sodium = (food.sodium_mg || 0) * multiplier;
           }
 
+          // Validate quantity and unit
+          const parsedQuantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(String(item.quantity || '0'));
+          if (isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) {
+            throw new Error(`Invalid quantity for item: ${itemName}`);
+          }
+
+          if (!item.unit || typeof item.unit !== 'string') {
+            throw new Error(`Invalid unit for item: ${itemName}`);
+          }
+
+          // Validate calculated values
           const validatedCalories = isNaN(calories) || !isFinite(calories) ? 0 : Math.round(calories * 100) / 100;
           const validatedProtein = (protein > 0 && isFinite(protein)) ? Math.round(protein * 100) / 100 : null;
           const validatedCarbs = (carbs > 0 && isFinite(carbs)) ? Math.round(carbs * 100) / 100 : null;
@@ -999,7 +1144,7 @@ export default function LogFoodScreen() {
             meal_type: mealType.toLowerCase(),
             item_name: itemName.trim(),
             quantity: parsedQuantity,
-            unit: resolvedUnit,
+            unit: item.unit,
             calories_kcal: validatedCalories,
             protein_g: validatedProtein,
             carbs_g: validatedCarbs,
@@ -1150,6 +1295,17 @@ export default function LogFoodScreen() {
   const handleBundleDeleteCancel = useCallback(() => {
     setBundleDeleteConfirmVisible(false);
     setBundleToDelete(null);
+  }, []);
+
+  // Move bundle up in order - removed (bundles are now read-only from React Query)
+  // If reordering is needed, it should be done via mutations that update the database
+  const handleMoveBundleUp = useCallback((bundleId: string) => {
+    // Reordering removed - bundles are managed by React Query
+  }, []);
+
+  // Move bundle down in order - removed (bundles are now read-only from React Query)
+  const handleMoveBundleDown = useCallback((bundleId: string) => {
+    // Reordering removed - bundles are managed by React Query
   }, []);
 
   // Save bundle order to database
@@ -1386,69 +1542,26 @@ export default function LogFoodScreen() {
     }, [activeTab, user?.id, refetchRecentFoods])
   );
 
-  const FOOD_DATA_STALE_MS = 30 * 60 * 1000; // 30 minutes
-  const FOOD_DATA_CACHE_MS = 180 * 24 * 60 * 60 * 1000; // ~180 days for stable metadata
-
-  const mergeEntryIntoCache = useCallback(
-    (entry: CalorieEntry) => {
-      if (!user?.id) return;
-      const cacheKey: [string, string, string] = ['entries', user.id, entry.entry_date];
-      queryClient.setQueryData<CalorieEntry[]>(cacheKey, (existing) => {
-        if (!existing || existing.length === 0) {
-          return [entry];
-        }
-        const hasEntry = existing.some((e) => e.id === entry.id);
-        if (hasEntry) {
-          return existing.map((e) => (e.id === entry.id ? entry : e));
-        }
-        return [...existing, entry];
-      });
-    },
-    [queryClient, user?.id]
-  );
-
   // Handle edit entry - navigate to dedicated edit screens
   const handleEditEntry = async (entry: CalorieEntry) => {
-    const entryPayload = JSON.stringify(entry);
-
-    // Seed the entries cache so the edit screen renders immediately, even offline
-    mergeEntryIntoCache(entry);
-
     if (!entry.food_id) {
       router.push({
         pathname: '/quick-log',
         params: {
-          date: entry.entry_date || entryDate,
-          mealType: entry.meal_type || mealType,
+          date: entryDate,
+          mealType: mealType,
           quickLogId: entry.id,
-          entryPayload,
         },
       });
       return;
     }
 
-    // Prefetch dependent data so the food-edit screen can hydrate instantly
-    const foodId = entry.food_id;
-    queryClient.prefetchQuery({
-      queryKey: ['foodMasterFull', foodId],
-      queryFn: () => getFoodMasterById(foodId),
-      staleTime: FOOD_DATA_STALE_MS,
-      gcTime: FOOD_DATA_CACHE_MS,
-    });
-    queryClient.prefetchQuery({
-      queryKey: ['foodServings', foodId],
-      queryFn: () => getServingsForFood(foodId),
-      staleTime: FOOD_DATA_STALE_MS,
-      gcTime: FOOD_DATA_CACHE_MS,
-    });
-
     router.push({
       pathname: '/food-edit',
       params: {
         entryId: entry.id,
-        date: entry.entry_date || entryDate,
-        mealType: entry.meal_type || mealType,
-        entryPayload,
+        date: entryDate,
+        mealType: mealType,
       },
     });
   };
@@ -1509,7 +1622,6 @@ export default function LogFoodScreen() {
 
       // Clear all selections and refresh entries
       clearEntrySelection();
-      setEntriesEditMode(false);
       await refetchEntries();
 
       Alert.alert(
@@ -1554,12 +1666,427 @@ export default function LogFoodScreen() {
       if (error) {
         Alert.alert(t('alerts.error_title'), t('mealtype_log.delete_entry.failed', { error: error.message }));
       } else {
+        // If the deleted entry was being edited, clear the form
+        if (editingEntryId === entryId) {
+          handleCancel();
+        }
         await refetchEntries();
       }
     } catch (error) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.unexpected_error'));
     }
   };
+
+  // Clear form
+  const handleCancel = () => {
+    setSelectedFood(null);
+    setSelectedServing(null);
+    setAvailableServings([]);
+    setEditingEntryId(null);
+  };
+
+  const saveEntry = async (showSuccessAlert = true): Promise<boolean> => {
+    if (loading) {
+      return false;
+    }
+    
+    // Clear previous errors
+    setItemNameError('');
+    setQuantityError('');
+    setCaloriesError('');
+    
+    let hasErrors = false;
+    
+    if (!itemName.trim()) {
+      setItemNameError(t('mealtype_log.errors.item_name_required'));
+      hasErrors = true;
+    }
+
+    if (!quantity || parseFloat(quantity) <= 0) {
+      setQuantityError(t('mealtype_log.errors.quantity_required'));
+      hasErrors = true;
+    }
+
+    if (!calories || calories.trim() === '' || parseFloat(calories) < 0) {
+      setCaloriesError(t('mealtype_log.errors.calories_required'));
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      // Show alert if validation failed
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fix_errors'));
+      return false;
+    }
+
+    if (!user?.id) {
+      Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.user_not_found'));
+      return false;
+    }
+
+    // Check if editing and entry still exists
+    if (editingEntryId && !entries.find(e => e.id === editingEntryId)) {
+      Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
+      handleCancel();
+      return false;
+    }
+
+    // Validate calculated values before saving
+    const parsedQuantity = parseFloat(quantity);
+    const parsedCalories = parseFloat(calories);
+    
+    // Check for invalid numbers
+    if (isNaN(parsedQuantity) || !isFinite(parsedQuantity)) {
+      setQuantityError(t('mealtype_log.errors.quantity_invalid'));
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.quantity_invalid'));
+      setLoading(false);
+      return false;
+    }
+    
+    if (isNaN(parsedCalories) || !isFinite(parsedCalories)) {
+      setCaloriesError(t('mealtype_log.errors.calories_invalid'));
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.calories_invalid'));
+      setLoading(false);
+      return false;
+    }
+    
+    // Check for reasonable limits (database constraints)
+    // Based on actual database constraints:
+    // - quantity: restricted to 100,000 (more restrictive than database limit)
+    // - calories_kcal: numeric(6,1) with CHECK constraint <= 10000
+    // - macros: numeric(6,2) - max 9999.99
+    
+    if (parsedQuantity > MAX_QUANTITY) {
+      const errorMsg = `Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}. Please reduce the quantity or split into multiple entries.`;
+      setQuantityError(errorMsg);
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: MAX_QUANTITY.toLocaleString() }));
+      setLoading(false);
+      return false;
+    }
+    
+    // CRITICAL: Check calories limit (database constraint: max 10000)
+    // Use strict comparison and ensure we're checking the actual numeric value
+    const caloriesValue = Number(parsedCalories);
+    const maxCaloriesValue = Number(MAX_CALORIES);
+    
+    if (caloriesValue > maxCaloriesValue) {
+      const errorMsg = 'Cannot exceed 10,000 cal per entry.';
+      setCaloriesError(errorMsg);
+      
+      // Ensure loading is false
+      setLoading(false);
+      
+      return false;
+    }
+    
+    // Check macros if they exist
+    if (protein && parseFloat(protein) > MAX_MACRO) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.protein_too_large', { max: MAX_MACRO.toLocaleString() }));
+      return false;
+    }
+    if (carbs && parseFloat(carbs) > MAX_MACRO) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.carbs_too_large', { max: MAX_MACRO.toLocaleString() }));
+      return false;
+    }
+    if (fat && parseFloat(fat) > MAX_MACRO) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fat_too_large', { max: MAX_MACRO.toLocaleString() }));
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      // Store time in UTC for database (standard practice)
+      // Will be converted back to user's local timezone when displayed
+      const eatenAt = getCurrentDateTimeUTC();
+      const dateString = entryDate;
+
+      // Build entry data - only include fields that are allowed in calorie_entries table
+      const entryData: any = {
+        user_id: user.id,
+        entry_date: dateString,
+        eaten_at: eatenAt,
+        meal_type: mealType.toLowerCase(),
+        item_name: itemName.trim(), // Keep for backward compatibility
+        quantity: parsedQuantity,
+        unit: selectedServing?.label || unit, // Use serving label if available
+        calories_kcal: parsedCalories,
+        protein_g: protein && protein.trim() !== '' ? parseFloat(protein) : null,
+        carbs_g: carbs && carbs.trim() !== '' ? parseFloat(carbs) : null,
+        fat_g: fat && fat.trim() !== '' ? parseFloat(fat) : null,
+        fiber_g: fiber && fiber.trim() !== '' ? parseFloat(fiber) : null,
+      };
+
+      // Only include food_id if food was selected from food_master (like Bundle does)
+      if (selectedFood) {
+        entryData.food_id = selectedFood.id;
+      }
+      
+      // Only include serving_id if it's a saved serving from the database (not a raw unit option)
+      if (selectedServing && selectedServing.kind === 'saved') {
+        entryData.serving_id = selectedServing.serving.id;
+      }
+
+      // Only include saturated_fat_g if it has a value greater than 0 (match Bundle logic)
+      if (saturatedFat && saturatedFat.trim() !== '') {
+        const parsedSaturatedFat = parseFloat(saturatedFat);
+        if (!isNaN(parsedSaturatedFat) && isFinite(parsedSaturatedFat) && parsedSaturatedFat > 0) {
+          entryData.saturated_fat_g = Math.round(parsedSaturatedFat * 100) / 100;
+        }
+      }
+      
+      // Only include trans_fat_g if it has a value greater than 0
+      if (transFat && transFat.trim() !== '') {
+        const parsedTransFat = parseFloat(transFat);
+        if (!isNaN(parsedTransFat) && isFinite(parsedTransFat) && parsedTransFat > 0) {
+          entryData.trans_fat_g = Math.round(parsedTransFat * 100) / 100;
+        }
+      }
+      
+      // Only include sugar_g if it has a value greater than 0 (match Bundle logic - don't include if 0)
+      if (sugar && sugar.trim() !== '') {
+        const parsedSugar = parseFloat(sugar);
+        if (!isNaN(parsedSugar) && isFinite(parsedSugar) && parsedSugar > 0) {
+          entryData.sugar_g = Math.round(parsedSugar * 100) / 100;
+        }
+      }
+      
+      // Only include sodium_mg if it has a value greater than 0 (match Bundle logic - don't include if 0)
+      if (sodium && sodium.trim() !== '') {
+        const parsedSodium = parseFloat(sodium);
+        if (!isNaN(parsedSodium) && isFinite(parsedSodium) && parsedSodium > 0) {
+          entryData.sodium_mg = Math.round(parsedSodium * 100) / 100;
+        }
+      }
+      
+      // Validate all macro fields
+      if (protein) {
+        const parsedProtein = parseFloat(protein);
+        if (isNaN(parsedProtein) || !isFinite(parsedProtein)) {
+          Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.protein_invalid'));
+          setLoading(false);
+          return false;
+        }
+        entryData.protein_g = parsedProtein;
+      }
+      if (carbs) {
+        const parsedCarbs = parseFloat(carbs);
+        if (isNaN(parsedCarbs) || !isFinite(parsedCarbs)) {
+          Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.carbs_invalid'));
+          setLoading(false);
+          return false;
+        }
+        entryData.carbs_g = parsedCarbs;
+      }
+      if (fat) {
+        const parsedFat = parseFloat(fat);
+        if (isNaN(parsedFat) || !isFinite(parsedFat)) {
+          Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fat_invalid'));
+          setLoading(false);
+          return false;
+        }
+        entryData.fat_g = parsedFat;
+      }
+      if (fiber) {
+        const parsedFiber = parseFloat(fiber);
+        if (isNaN(parsedFiber) || !isFinite(parsedFiber)) {
+          Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fiber_invalid'));
+          setLoading(false);
+          return false;
+        }
+        entryData.fiber_g = parsedFiber;
+      }
+
+      // Final validation check before database call
+      // Double-check calories limit (database constraint: max 10000)
+      if (parsedCalories > MAX_CALORIES) {
+        const errorMsg = 'Cannot exceed 10,000 cal per entry.';
+        setCaloriesError(errorMsg);
+        
+        // Ensure loading is false
+        setLoading(false);
+        
+        return false;
+      }
+
+      // Clean entryData - remove any undefined values and ensure only valid fields are included
+      // Only keep fields that are valid for calorie_entries table
+      const cleanedEntryData: any = {};
+      const allowedFields = [
+        'user_id', 'entry_date', 'eaten_at', 'meal_type', 'item_name', 'quantity', 'unit',
+        'calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g',
+        'saturated_fat_g', 'trans_fat_g', 'sugar_g', 'sodium_mg', 'food_id', 'serving_id'
+      ];
+      
+      for (const key of allowedFields) {
+        if (entryData.hasOwnProperty(key) && entryData[key] !== undefined) {
+          cleanedEntryData[key] = entryData[key];
+        }
+      }
+
+
+      let error;
+      let result;
+      if (editingEntryId) {
+        // Update existing entry - use cleaned data
+        const updateResult = await supabase
+          .from('calorie_entries')
+          .update(cleanedEntryData)
+          .eq('id', editingEntryId);
+        error = updateResult.error;
+        result = updateResult;
+      } else {
+        // Insert new entry - use cleaned data
+        const insertResult = await supabase
+          .from('calorie_entries')
+          .insert(cleanedEntryData)
+          .select('id')
+          .single();
+        error = insertResult.error;
+        result = insertResult;
+        
+        // Capture the newly added entry ID for highlight animation
+        if (!error && insertResult.data?.id) {
+          markAsNewlyAdded(insertResult.data.id);
+        }
+      }
+
+      if (error) {
+        // Parse error message to provide user-friendly feedback
+        let errorMessage = `Failed to ${editingEntryId ? 'update' : 'save'} food entry.`;
+        const errorMsg = error.message || '';
+        const errorCode = error.code || '';
+        const errorDetails = error.details || '';
+        const errorHint = error.hint || '';
+        
+        // Check for common database constraint violations
+        // PostgreSQL error code 23514 = check_violation
+        if (errorCode === '23514' || errorMsg.includes('calories_kcal_check') || errorMsg.includes('calories_kcal') || (errorMsg.includes('check') && (errorMsg.includes('5000') || errorMsg.includes('calories')))) {
+          // Specific check for calories_kcal constraint violation
+          const currentCalories = parsedCalories || (entryData.calories_kcal ? parseFloat(entryData.calories_kcal.toString()) : 0);
+          const suggestedQty = parsedQuantity ? Math.floor((5000 / currentCalories) * parsedQuantity * 10) / 10 : 0;
+          errorMessage = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
+            `Current: ${currentCalories.toLocaleString()} calories\n` +
+            `Maximum: 5,000 calories per entry\n\n` +
+            `SOLUTIONS:\n` +
+            `• Reduce quantity to ${suggestedQty} (instead of ${parsedQuantity || 'current'})\n` +
+            `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
+          setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
+          
+        } else if (errorMsg.includes('numeric') || errorMsg.includes('value too large') || errorMsg.includes('out of range') || errorCode === '22003') {
+          errorMessage = 'The calculated values are too large. Please reduce the quantity or split into multiple entries.';
+          setQuantityError('Quantity or calculated calories exceed database limits');
+          setCaloriesError('Calculated calories exceed database limits');
+        } else if (errorMsg.includes('constraint') || errorMsg.includes('violates') || errorCode === '23514') {
+          errorMessage = 'Invalid data detected. Please check your input values.';
+          if (errorDetails) {
+            errorMessage += `\n\nDetails: ${errorDetails}`;
+          }
+        } else if (errorMsg.includes('null value') || errorMsg.includes('not null') || errorCode === '23502') {
+          errorMessage = 'Required fields are missing. Please fill in all required information.';
+          if (errorDetails) {
+            errorMessage += `\n\nMissing field: ${errorDetails}`;
+          }
+        } else if (errorMsg || errorDetails) {
+          errorMessage = `${errorMessage}\n\nError: ${errorMsg || errorDetails}`;
+          if (errorHint) {
+            errorMessage += `\n\nHint: ${errorHint}`;
+          }
+        } else {
+          errorMessage = `${errorMessage}\n\nPlease check your input values and try again.`;
+        }
+        
+        // Always include full error details in console and alert for debugging
+        console.error('=== FULL DATABASE ERROR ===');
+        console.error('Error Object:', error);
+        console.error('Cleaned Entry Data that failed:', JSON.stringify(cleanedEntryData, null, 2));
+        console.error('Error Message:', errorMessage);
+        
+        // Show detailed error to user
+        const userErrorMessage = errorMessage + 
+          (errorDetails ? `\n\nTechnical Details: ${errorDetails}` : '') +
+          (errorHint ? `\n\nHint: ${errorHint}` : '') +
+          (errorCode ? `\n\nError Code: ${errorCode}` : '');
+        
+        Alert.alert(t('alerts.error_title'), userErrorMessage);
+        return false;
+      } else {
+        // Refresh entries to show the updated/newly saved entry
+        await refetchEntries();
+        
+        // Clear highlight state if we were editing (not adding)
+        if (editingEntryId) {
+          clearNewlyAdded();
+        }
+        // For new entries, markAsNewlyAdded was already called, and the hook will handle animation
+        
+        // Clear form
+        handleCancel();
+        if (showSuccessAlert) {
+          Alert.alert(t('alerts.success'), t('mealtype_log.success.entry_saved', { action: editingEntryId ? t('mealtype_log.success.action_updated') : t('mealtype_log.success.action_saved') }));
+        }
+        return true;
+      }
+    } catch (error: any) {
+      
+      // Parse exception error message
+      let errorMessage = 'An unexpected error occurred.';
+      const errorMsg = error?.message || '';
+      
+      if (errorMsg.includes('numeric') || errorMsg.includes('value too large') || errorMsg.includes('out of range')) {
+        errorMessage = 'The calculated values are too large. Please reduce the quantity or split into multiple entries.';
+        setQuantityError('Values exceed database limits');
+        setCaloriesError('Calculated calories exceed database limits');
+      } else if (errorMsg) {
+        errorMessage = `${errorMessage}\n\nError details: ${errorMsg}`;
+      }
+      
+      Alert.alert(t('alerts.error_title'), errorMessage);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
+    try {
+      // Check calories before even calling saveEntry
+      const currentCalories = parseFloat(calories);
+      if (!isNaN(currentCalories) && currentCalories > 5000) {
+        const errorMsg = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
+          `Current: ${currentCalories.toLocaleString()} calories\n` +
+          `Maximum: 5,000 calories per entry\n\n` +
+          `SOLUTIONS:\n` +
+          `• Reduce the quantity\n` +
+          `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
+        
+        setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
+        Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
+        setLoading(false);
+        return;
+      }
+      
+      const result = await saveEntry(true);
+      if (!result) {
+        // If saveEntry returned false, it should have shown an error
+        // But if for some reason it didn't, show a generic error as safety net
+        // Show a generic error message as a fallback
+        Alert.alert(
+          t('alerts.save_failed'), 
+          t('mealtype_log.errors.save_failed_checklist') + `\n\nCurrent calories: ${currentCalories.toLocaleString()} cal`
+        );
+        setLoading(false);
+      }
+    } catch (error: any) {
+      // Catch any unexpected errors that might not be caught by saveEntry
+      Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.save_unexpected', { error: error?.message || t('common.unexpected_error') }));
+      setLoading(false);
+    }
+  };
+
 
   // Delete custom food - check for bundle references first
   const handleDeleteCustomFood = async (food: FoodMaster) => {
@@ -1679,7 +2206,7 @@ export default function LogFoodScreen() {
 
   // Track if we need to refresh custom foods (set to true after create/delete operations)
   const shouldRefreshCustomFoods = useRef(false);
-  const previousActiveTab = useRef<TabKey>(initialTab);
+  const previousActiveTab = useRef<'frequent' | 'recent' | 'custom' | 'bundle'>(initialTab);
 
   // Clear "just added/edited" labels when switching away from custom tab
   useEffect(() => {
@@ -1832,6 +2359,17 @@ export default function LogFoodScreen() {
     handleScannedFood();
   }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab]);
 
+  // Auto-focus item name input when manual mode opens
+  useEffect(() => {
+    if (isManualMode && !selectedFood && !editingEntryId) {
+      // Focus the item name input after a short delay to ensure form is rendered
+      const timer = setTimeout(() => {
+        itemNameInputRef.current?.focus();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isManualMode, selectedFood, editingEntryId]);
+
   // Handle openBarcodeScanner param - open scanner when navigating from scanned-item "Scan Another"
   // Use a ref to ensure we only trigger once, even on re-renders
   const hasAutoOpenedScanner = useRef(false);
@@ -1848,7 +2386,247 @@ export default function LogFoodScreen() {
     }
   }, [openBarcodeScannerParam, showBarcodeScanner]);
 
-  // Inline add/edit form is removed; quantities and servings are now handled in dedicated quick-log/food-edit screens.
+  // Real-time validation function
+  const validateFields = useCallback(() => {
+    // Clear previous errors
+    setQuantityError('');
+    setCaloriesError('');
+    setProteinError('');
+    setCarbsError('');
+    setFatError('');
+    setFiberError('');
+    
+    let isValid = true;
+    
+    // Validate quantity
+    const parsedQuantity = parseFloat(quantity);
+    if (!quantity || isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setQuantityError('Serving size must be a valid number greater than 0');
+      isValid = false;
+    } else if (parsedQuantity > MAX_QUANTITY) {
+      setQuantityError(`Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}. Please reduce the quantity or split into multiple entries.`);
+      isValid = false;
+    }
+    
+    // Validate calories
+    const parsedCalories = parseFloat(calories);
+    if (!calories || calories.trim() === '' || isNaN(parsedCalories) || !isFinite(parsedCalories) || parsedCalories < 0) {
+      // Don't show error message, but still mark as invalid
+      isValid = false;
+    } else if (parsedCalories > MAX_CALORIES) {
+      setCaloriesError('Cannot exceed 10,000 cal per entry.');
+      isValid = false;
+    }
+    
+    // Validate macros (if provided)
+    if (protein) {
+      const parsedProtein = parseFloat(protein);
+      if (isNaN(parsedProtein) || !isFinite(parsedProtein)) {
+        setProteinError('Protein must be a valid number');
+        isValid = false;
+      } else if (parsedProtein > MAX_MACRO) {
+        setProteinError(`Protein cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+        isValid = false;
+      }
+    }
+    
+    if (carbs) {
+      const parsedCarbs = parseFloat(carbs);
+      if (isNaN(parsedCarbs) || !isFinite(parsedCarbs)) {
+        setCarbsError('Carbs must be a valid number');
+        isValid = false;
+      } else if (parsedCarbs > MAX_MACRO) {
+        setCarbsError(`Carbs cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+        isValid = false;
+      }
+    }
+    
+    if (fat) {
+      const parsedFat = parseFloat(fat);
+      if (isNaN(parsedFat) || !isFinite(parsedFat)) {
+        setFatError('Fat must be a valid number');
+        isValid = false;
+      } else if (parsedFat > MAX_MACRO) {
+        setFatError(`Fat cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+        isValid = false;
+      }
+    }
+    
+    if (fiber) {
+      const parsedFiber = parseFloat(fiber);
+      if (isNaN(parsedFiber) || !isFinite(parsedFiber)) {
+        setFiberError('Fiber must be a valid number');
+        isValid = false;
+      } else if (parsedFiber > MAX_MACRO) {
+        setFiberError(`Fiber cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+        isValid = false;
+      }
+    }
+    
+    return isValid;
+  }, [quantity, calories, protein, carbs, fat, fiber, MAX_QUANTITY, MAX_CALORIES, MAX_MACRO]);
+  
+  // Run validation whenever values change
+  useEffect(() => {
+    validateFields();
+  }, [quantity, calories, protein, carbs, fat, fiber]);
+  
+  // Check if form is valid (for Save button) - don't call validateFields to avoid infinite loop
+  const isFormValid = useCallback(() => {
+    if (!itemName.trim()) return false;
+    
+    const parsedQuantity = parseFloat(quantity);
+    if (!quantity || isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) return false;
+    if (parsedQuantity > MAX_QUANTITY) return false;
+    
+    const parsedCalories = parseFloat(calories);
+    if (!calories || calories.trim() === '' || isNaN(parsedCalories) || !isFinite(parsedCalories) || parsedCalories < 0) return false;
+    if (parsedCalories > MAX_CALORIES) return false;
+    
+    // Check macros if provided
+    if (protein) {
+      const parsedProtein = parseFloat(protein);
+      if (isNaN(parsedProtein) || !isFinite(parsedProtein) || parsedProtein > MAX_MACRO) return false;
+    }
+    if (carbs) {
+      const parsedCarbs = parseFloat(carbs);
+      if (isNaN(parsedCarbs) || !isFinite(parsedCarbs) || parsedCarbs > MAX_MACRO) return false;
+    }
+    if (fat) {
+      const parsedFat = parseFloat(fat);
+      if (isNaN(parsedFat) || !isFinite(parsedFat) || parsedFat > MAX_MACRO) return false;
+    }
+    if (fiber) {
+      const parsedFiber = parseFloat(fiber);
+      if (isNaN(parsedFiber) || !isFinite(parsedFiber) || parsedFiber > MAX_MACRO) return false;
+    }
+    
+    return true;
+  }, [itemName, quantity, calories, protein, carbs, fat, fiber, MAX_QUANTITY, MAX_CALORIES, MAX_MACRO]);
+
+  // Handle Enter key press to submit form
+  const handleFormSubmit = useCallback(() => {
+    if (isFormValid() && !loading) {
+      handleSave();
+    }
+  }, [isFormValid, loading]);
+  
+  // Calculate nutrients from ServingOption (new model per spec 8)
+  // IMPORTANT: All nutrients in food_master are stored per serving_size × serving_unit
+  // Example: skim milk with serving_size=250, serving_unit="ml", calories_kcal=85
+  //          means 250 ml = 85 cal, so 1 ml = 0.34 cal
+  const calculateNutrientsFromOption = useCallback((food: FoodMaster, option: ServingOption, qty: number) => {
+    let masterUnits: number;
+    
+    if (option.kind === 'raw') {
+      // For raw unit: convert quantity from selected unit to master unit
+      try {
+        masterUnits = convertToMasterUnit(qty, option.unit, food);
+      } catch {
+        // If conversion fails (shouldn't happen with proper unit filtering), use quantity directly
+        masterUnits = qty;
+      }
+    } else {
+      // For saved servings: use the correct field based on food's base unit type
+      // - Weight-based foods (g, kg, oz, lb): use weight_g only
+      // - Volume-based foods (ml, L, cup, tbsp, tsp, floz): use volume_ml only
+      const servingValue = isVolumeUnit(food.serving_unit)
+        ? (option.serving.volume_ml ?? 0)
+        : (option.serving.weight_g ?? 0);
+      masterUnits = servingValue * qty;
+    }
+    
+    // Use the centralized calculation from nutritionMath
+    const nutrients = calculateNutrientsSimple(food, masterUnits);
+    
+    // Update state with calculated values
+    setCalories(nutrients.calories_kcal.toFixed(1));
+    setProtein(nutrients.protein_g != null ? nutrients.protein_g.toFixed(1) : '');
+    setCarbs(nutrients.carbs_g != null ? nutrients.carbs_g.toFixed(1) : '');
+    setFat(nutrients.fat_g != null ? nutrients.fat_g.toFixed(1) : '');
+    setFiber(nutrients.fiber_g != null ? nutrients.fiber_g.toFixed(1) : '');
+    setSaturatedFat(nutrients.saturated_fat_g != null ? nutrients.saturated_fat_g.toFixed(1) : '');
+    setTransFat(nutrients.trans_fat_g != null ? nutrients.trans_fat_g.toFixed(1) : '');
+    setSugar(nutrients.sugar_g != null ? nutrients.sugar_g.toFixed(1) : '');
+    setSodium(nutrients.sodium_mg != null ? nutrients.sodium_mg.toFixed(1) : '');
+  }, []);
+  
+  // Handle calories change with validation
+  // Strip non-digits and limit to 5 characters
+  const handleCaloriesChange = useCallback((text: string) => {
+    // Strip all non-digit characters (no periods allowed)
+    const sanitized = text.replace(/\D/g, '');
+    // Limit to 5 characters
+    const limited = sanitized.slice(0, 5);
+    setCalories(limited);
+  }, []);
+
+  // Fetch servings for a selected food - uses centralized data access
+  // UI dropdown still uses buildServingOptions/getDefaultServingSelection for ServingOption types
+  const fetchFoodServings = useCallback(
+    async (
+      foodId: string,
+      food: FoodMaster,
+      displayServing?: { quantity: number; unit: string } | null
+    ) => {
+      try {
+        // Use centralized data access from lib/servings.ts (already goes through React Query + persistent cache)
+        const dbServings = await getServingsForFood(foodId);
+
+        // Build serving options using UI helper (for dropdown)
+        const options = buildServingOptions(food, dbServings);
+        setAvailableServings(options);
+
+        // Get default serving selection for UI (uses ServingOption type for dropdown)
+        const { quantity: defaultQty, defaultOption } = getDefaultServingSelection(food, dbServings);
+
+        // Start from the default selection
+        let initialQty = defaultQty;
+        let initialOption: ServingOption | null = defaultOption;
+
+        // If we have a displayServing (e.g., from a Recent item), try to match it
+        if (displayServing) {
+          const targetQty = displayServing.quantity;
+          const targetUnit = (displayServing.unit || '').trim().toLowerCase();
+
+          // First try to match a saved serving by label (for things like "cup diced (152g)")
+          const savedMatch =
+            options.find(
+              o =>
+                o.kind === 'saved' &&
+                o.label.trim().toLowerCase() === targetUnit
+            ) || null;
+
+          // If not found, try to match a raw unit option (for plain "g", "oz", "ml", etc.)
+          const rawMatch =
+            options.find(
+              o =>
+                o.kind === 'raw' &&
+                o.unit.trim().toLowerCase() === targetUnit
+            ) || null;
+
+          if (savedMatch) {
+            initialOption = savedMatch;
+            initialQty = targetQty;
+          } else if (rawMatch) {
+            initialOption = rawMatch;
+            initialQty = targetQty;
+          }
+          // If neither match is found, we silently fall back to the defaultOption/defaultQty
+        }
+
+        // Apply initial selection and compute nutrients
+        setSelectedServing(initialOption);
+        setQuantity(initialQty.toString());
+        calculateNutrientsFromOption(food, initialOption, initialQty);
+      } catch (error) {
+        // On error, fall back to existing behavior: clear servings and quantity
+        setAvailableServings([]);
+        setSelectedServing(null);
+      }
+    },
+    []
+  );
 
   // Handle food selection from search results/lists → open food-edit create flow
   const handleFoodSelect = async (food: FoodMaster | EnhancedFoodItem) => {
@@ -1895,14 +2673,10 @@ export default function LogFoodScreen() {
     }
 
     try {
-      // Fetch servings once and derive defaults up front
-      const servings = await getServingsForFood(food.id);
-      const { defaultServing, nutrients: defaultNutrients } = getDefaultServingWithNutrients(food, servings);
-
-      let servingQuantity: number = defaultServing.quantity;
-      let servingUnit: string = defaultServing.unit;
-      let servingId: string | null = defaultServing.serving?.id || null;
-      let nutrients = defaultNutrients;
+      let servingQuantity: number;
+      let servingUnit: string;
+      let servingId: string | null = null;
+      let nutrients: Nutrients;
 
       // Check if this is an EnhancedFoodItem with recent_serving
       const enhancedFood = food as EnhancedFoodItem;
@@ -1911,7 +2685,9 @@ export default function LogFoodScreen() {
         servingQuantity = enhancedFood.recent_serving.quantity;
         servingUnit = enhancedFood.recent_serving.unit;
         
-        // Find matching saved serving if present
+        // Calculate nutrients based on recent serving
+        // Fetch servings to find matching serving if it was a saved serving
+        const servings = await getServingsForFood(food.id);
         const matchingServing = servings.find(s => 
           s.serving_name && (
             s.serving_name.includes(`${servingQuantity} ${servingUnit}`) ||
@@ -1922,6 +2698,10 @@ export default function LogFoodScreen() {
         
         if (matchingServing) {
           servingId = matchingServing.id;
+          nutrients = computeNutrientsForFoodServing(food, matchingServing, servingQuantity);
+        } else {
+          // Using raw quantity/unit - calculate from food_master
+          nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
         }
       } else if (latestEntry) {
         // Fallback: Recent tab with latestEntry (for compatibility)
@@ -1929,11 +2709,29 @@ export default function LogFoodScreen() {
         servingUnit = latestEntry.unit;
         servingId = latestEntry.serving_id || null;
         
-        // Try to confirm saved serving
+        // Calculate nutrients based on the latest entry's portion
+        const servings = await getServingsForFood(food.id);
         const savedServing = servingId ? servings.find(s => s.id === servingId) : null;
+        
         if (savedServing) {
-          servingId = savedServing.id;
+          nutrients = computeNutrientsForFoodServing(food, savedServing, servingQuantity);
+        } else {
+          nutrients = computeNutrientsForRawQuantity(food, servingQuantity, servingUnit);
         }
+      } else {
+        // Other tabs / search results: use the SAME default serving as the search dropdown
+        // 1. Fetch food servings using centralized data access
+        const servings = await getServingsForFood(food.id);
+
+        // 2. Use getDefaultServingWithNutrients so Quick Add matches search results exactly
+        const { defaultServing, nutrients: defaultNutrients } = getDefaultServingWithNutrients(food, servings);
+
+        servingQuantity = defaultServing.quantity;
+        servingUnit = defaultServing.unit;
+        servingId = defaultServing.serving?.id || null;
+
+        // 3. Use the nutrients returned from the centralized helper (single source of truth)
+        nutrients = defaultNutrients;
       }
 
       // 4. Prepare entry data
@@ -1965,8 +2763,8 @@ export default function LogFoodScreen() {
       if (nutrients.saturated_fat_g !== null && nutrients.saturated_fat_g > 0) {
         entryData.saturated_fat_g = Math.round(nutrients.saturated_fat_g * 100) / 100;
       }
-      if ((nutrients as any).trans_fat_g !== null && (nutrients as any).trans_fat_g > 0) {
-        entryData.trans_fat_g = Math.round((nutrients as any).trans_fat_g * 100) / 100;
+      if (nutrients.trans_fat_g !== null && nutrients.trans_fat_g > 0) {
+        entryData.trans_fat_g = Math.round(nutrients.trans_fat_g * 100) / 100;
       }
       if (nutrients.sugar_g !== null && nutrients.sugar_g > 0) {
         entryData.sugar_g = Math.round(nutrients.sugar_g * 100) / 100;
@@ -2120,6 +2918,57 @@ export default function LogFoodScreen() {
       setBarcodeScanning(false);
     }
   }, [scanned, barcodeScanning, mealType, entryDate, router, t]);
+
+  // Handle serving selection per spec 8.4
+  const handleServingSelect = (option: ServingOption) => {
+    setSelectedServing(option);
+    setShowServingDropdown(false);
+    
+    if (selectedFood) {
+      if (option.kind === 'raw') {
+        // For raw units: keep current quantity, just change unit
+        const qty = parseFloat(quantity) || 1;
+        calculateNutrientsFromOption(selectedFood, option, qty);
+      } else {
+        // For saved servings: optionally reset quantity to 1
+        const qty = parseFloat(quantity) || 1;
+        calculateNutrientsFromOption(selectedFood, option, qty);
+      }
+    }
+  };
+
+  // Handle quantity change - recalculate nutrients if food and serving are selected
+  const handleQuantityChange = useCallback((text: string) => {
+    const cleaned = validateNumericInput(text);
+    setQuantity(cleaned);
+    if (selectedFood && selectedServing && cleaned) {
+      const qty = parseFloat(cleaned) || 0;
+      if (qty > 0) {
+        calculateNutrientsFromOption(selectedFood, selectedServing, qty);
+      }
+    }
+  }, [selectedFood, selectedServing, calculateNutrientsFromOption]);
+
+  // Calculate weight/volume in master units for display
+  const calculatedWeight = selectedFood && selectedServing && quantity
+    ? (() => {
+        const qty = parseFloat(quantity || '0');
+        if (selectedServing.kind === 'raw') {
+          // For raw units: convert to master unit
+          try {
+            return convertToMasterUnit(qty, selectedServing.unit, selectedFood).toFixed(1);
+          } catch {
+            return qty.toFixed(1);
+          }
+        } else {
+          // For saved servings: use volume_ml for volume-based foods, weight_g for weight-based
+          const servingValue = isVolumeUnit(selectedFood.serving_unit)
+            ? (selectedServing.serving.volume_ml ?? 0)
+            : (selectedServing.serving.weight_g ?? 0);
+          return (servingValue * qty).toFixed(1);
+        }
+      })()
+    : '';
 
   return (
     <ThemedView style={styles.container}>
@@ -2290,7 +3139,15 @@ export default function LogFoodScreen() {
                 { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
               ]}
               onPress={() => {
-                router.back();
+                // If there's an active form (editing, adding food, or manual mode),
+                // just cancel it and stay on mealtype-log screen
+                if (selectedFood || editingEntryId || isManualMode) {
+                  handleCancel();
+                  // Don't navigate - just clear the form to show the main screen
+                } else {
+                  // No active form - go back one layer
+                  router.back();
+                }
               }}
               activeOpacity={0.7}
               {...getButtonAccessibilityProps(
@@ -2303,7 +3160,29 @@ export default function LogFoodScreen() {
             <View style={styles.titleCenter}>
               <ThemedText style={[styles.mainTitle, { color: colors.text }]}>🍴 {t('mealtype_log.title')}</ThemedText>
             </View>
-            <View style={styles.headerRight} />
+            <View style={styles.headerRight}>
+              {editingEntryId || (!editingEntryId && selectedFood) || isManualMode ? (
+                <TouchableOpacity
+                  style={[
+                    styles.checkmarkButton,
+                    {
+                      opacity: (loading || !isFormValid()) ? 0.4 : 1,
+                    }
+                  ]}
+                  onPress={handleSave}
+                  disabled={loading || !isFormValid()}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol 
+                    name="checkmark" 
+                    size={24} 
+                    color={(loading || !isFormValid()) ? colors.icon : colors.tint}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.placeholder} />
+              )}
+            </View>
           </View>
           
           {/* Second Line: Meal Type and Date - Centered */}
@@ -2320,17 +3199,27 @@ export default function LogFoodScreen() {
                 style={[
                   getMinTouchTargetStyle(),
                   { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                  (editingEntryId || selectedFood || isManualMode) && { opacity: 0.5 }
                 ]}
                 onPress={() => {
+                  // Lock meal type when editing/adding
+                  if (editingEntryId || selectedFood || isManualMode) {
+                    return;
+                  }
                   mealTypeButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
                     setMealTypeDropdownLayout({ x: pageX, y: pageY + height, width, height });
                     setShowMealTypeDropdown(!showMealTypeDropdown);
                   });
                 }}
-                activeOpacity={0.7}
+                activeOpacity={(editingEntryId || selectedFood || isManualMode) ? 1 : 0.7}
+                disabled={!!(editingEntryId || selectedFood || isManualMode)}
                 {...getButtonAccessibilityProps(
-                  `Change meal type, currently ${mealTypeLabel}`,
-                  'Double tap to change meal type'
+                  (editingEntryId || selectedFood || isManualMode) 
+                    ? `Meal type locked: ${mealTypeLabel}`
+                    : `Change meal type, currently ${mealTypeLabel}`,
+                  (editingEntryId || selectedFood || isManualMode)
+                    ? 'Meal type is locked while editing or adding an entry'
+                    : 'Double tap to change meal type'
                 )}
               >
                 <ThemedText style={[styles.subHeaderMealType, { color: colors.tint }]}>{mealTypeLabel} ▼</ThemedText>
@@ -2341,12 +3230,24 @@ export default function LogFoodScreen() {
               style={[
                 getMinTouchTargetStyle(),
                 { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                (editingEntryId || selectedFood || isManualMode) && { opacity: 0.5 }
               ]}
-              onPress={() => setShowDatePicker(true)}
-              activeOpacity={0.7}
+              onPress={() => {
+                // Lock date when editing/adding
+                if (editingEntryId || selectedFood || isManualMode) {
+                  return;
+                }
+                setShowDatePicker(true);
+              }}
+              activeOpacity={(editingEntryId || selectedFood || isManualMode) ? 1 : 0.7}
+              disabled={!!(editingEntryId || selectedFood || isManualMode)}
               {...getButtonAccessibilityProps(
-                `Change date, currently ${formattedDate}`,
-                'Double tap to change the date'
+                (editingEntryId || selectedFood || isManualMode)
+                  ? `Date locked: ${formattedDate}`
+                  : `Change date, currently ${formattedDate}`,
+                (editingEntryId || selectedFood || isManualMode)
+                  ? 'Date is locked while editing or adding an entry'
+                  : 'Double tap to change the date'
               )}
             >
               <ThemedText style={[styles.subHeaderDate, { color: colors.tint }]}>{formattedDate}</ThemedText>
@@ -2354,8 +3255,8 @@ export default function LogFoodScreen() {
           </View>
         </View>
 
-        {/* Search Bar */}
-        {true && (
+        {/* Search Bar - Hide when editing, when food is selected, or when in manual mode */}
+        {!editingEntryId && !selectedFood && !isManualMode && (
           <View style={styles.searchContainer}>
             <View style={styles.searchBarWrapper}>
               <FoodSearchBar
@@ -2410,12 +3311,12 @@ export default function LogFoodScreen() {
           </View>
         )}
 
-        {/* Tabs */}
-        {true && (
+        {/* Tabs - Hide when food is selected, editing, or in manual mode */}
+        {!selectedFood && !editingEntryId && !isManualMode && (
           <>
-              <View 
-                ref={tabsContainerWrapperRef}
-               style={[styles.tabsContainerWrapper, { flexDirection: 'row', alignItems: 'center' }]}
+            <View 
+              ref={tabsContainerWrapperRef}
+              style={styles.tabsContainerWrapper}
               onLayout={() => {
                 tabsContainerWrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
                   setTabsContainerWrapperLayout({ x: pageX, y: pageY, width, height });
@@ -2441,7 +3342,7 @@ export default function LogFoodScreen() {
                 ref={tabsScrollViewRef}
                 horizontal 
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.tabsContainer, { flexGrow: 1, alignItems: 'center', paddingLeft: 36, paddingRight: 36 }]}
+                contentContainerStyle={[styles.tabsContainer, { flexGrow: 1 }]}
                 style={styles.tabsScrollView}
                 scrollIndicatorInsets={{ bottom: -1 }}
                 onScroll={(e) => {
@@ -2475,34 +3376,35 @@ export default function LogFoodScreen() {
                       themeColor: CategoryColors.custom,
                       themeFillColor: getTabListBackgroundColor('custom'),
                     },
-          {
-            key: 'bundle',
-            label: t('mealtype_log.tabs.bundles'),
-            accessibilityLabel: t('mealtype_log.accessibility.bundles_tab'),
-            themeColor: CategoryColors.bundle,
-            themeFillColor: getTabListBackgroundColor('bundle'),
-          },
-          {
-            key: 'manual',
-            label: '⚡Quick Log',
-            accessibilityLabel: t('mealtype_log.accessibility.manual_tab'),
-            themeColor: colors.tint,
-            themeFillColor: colors.tint + '10',
-          },
+                    {
+                      key: 'bundle',
+                      label: t('mealtype_log.tabs.bundles'),
+                      accessibilityLabel: t('mealtype_log.accessibility.bundles_tab'),
+                      themeColor: CategoryColors.bundle,
+                      themeFillColor: getTabListBackgroundColor('bundle'),
+                    },
+                    {
+                      key: 'manual',
+                      label: '⚡Quick Log',
+                      accessibilityLabel: t('mealtype_log.accessibility.manual_tab'),
+                      themeColor: CategoryColors.manual,
+                      themeFillColor: getTabListBackgroundColor('manual'),
+                    },
                   ]}
                   activeKey={activeTab}
                   onChange={(key) => {
-          if (key === 'manual') {
-            router.push({
-              pathname: '/quick-log',
-              params: {
-                date: entryDate,
-                mealType: mealType,
-              },
-            });
-            return;
-          }
-          handleTabPress(key as TabKey);
+                    if (key === 'manual') {
+                      // Navigate to dedicated Quick Log screen
+                      router.push({
+                        pathname: '/quick-log',
+                        params: {
+                          date: entryDate,
+                          mealType: mealType,
+                        }
+                      });
+                    } else {
+                      handleTabPress(key as 'frequent' | 'recent' | 'custom' | 'bundle', () => setIsManualMode(false));
+                    }
                   }}
                   onActiveTabLayout={handleActiveTabLayout}
                   style={{ marginHorizontal: Spacing.sm, marginTop: Spacing.xs }}
@@ -3127,7 +4029,7 @@ export default function LogFoodScreen() {
                                 <HighlightableRow
                                   key={bundle.id}
                                   isNew={isBundleNewlyAdded(bundle.id)}
-                                  style={StyleSheet.flatten([styles.searchResultItem, { borderBottomColor: colors.icon + '15' }])}
+                                  style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
                                 >
                                   {!bundleEditMode ? (
                                     <TouchableOpacity
@@ -3222,7 +4124,23 @@ export default function LogFoodScreen() {
                                         </ThemedText>
                                       </View>
                                       <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-<TouchableOpacity
+                                        <TouchableOpacity
+                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4 }]}
+                                          onPress={() => handleMoveBundleUp(bundle.id)}
+                                          disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                          style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6 }]}
+                                          onPress={() => handleMoveBundleDown(bundle.id)}
+                                          disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
                                           style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
                                           onPress={() => handleDeleteBundle(bundle)}
                                           activeOpacity={0.7}
@@ -3264,6 +4182,9 @@ export default function LogFoodScreen() {
                         )}
                       </View>
                     );
+                  
+                  case 'manual':
+                    return null; // Manual mode is handled separately
                   
                   default:
                     return null;
@@ -3694,7 +4615,7 @@ export default function LogFoodScreen() {
                                       <HighlightableRow
                                         key={bundle.id}
                                         isNew={isBundleNewlyAdded(bundle.id)}
-                                        style={StyleSheet.flatten([styles.searchResultItem, { borderBottomColor: colors.icon + '15' }])}
+                                        style={[styles.searchResultItem, { borderBottomColor: colors.icon + '15' }]}
                                       >
                                         {!bundleEditMode ? (
                                           <TouchableOpacity
@@ -3789,7 +4710,23 @@ export default function LogFoodScreen() {
                                               </ThemedText>
                                             </View>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-<TouchableOpacity
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4 }]}
+                                                onPress={() => handleMoveBundleUp(bundle.id)}
+                                                disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
+                                                style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6 }]}
+                                                onPress={() => handleMoveBundleDown(bundle.id)}
+                                                disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
+                                              </TouchableOpacity>
+                                              <TouchableOpacity
                                                 style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
                                                 onPress={() => handleDeleteBundle(bundle)}
                                                 activeOpacity={0.7}
@@ -3834,6 +4771,9 @@ export default function LogFoodScreen() {
                         </View>
                       );
                     
+                    case 'manual':
+                      return null; // Manual mode is handled separately
+                    
                     default:
                       return null;
                   }
@@ -3841,6 +4781,550 @@ export default function LogFoodScreen() {
               />
             )}
           </>
+        )}
+
+        {/* Add/Edit Form - Show when a food is selected, when editing, or in manual mode */}
+        {(selectedFood || editingEntryId || isManualMode) && (
+          <View style={[styles.formCard, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              {selectedFood ? (
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <ThemedText style={[styles.selectedFoodName, { color: colors.text }]}>
+                      {selectedFood.name}{selectedFood.brand ? ` (${selectedFood.brand})` : ''}
+                    </ThemedText>
+                    {/* Source indicator badge - show when food is selected */}
+                    {(() => {
+                      // Simple check: is_custom === true
+                      const isCustom = selectedFood.is_custom === true;
+                      return (
+                        <FoodSourceBadge
+                          isCustom={isCustom}
+                          colors={colors}
+                          marginLeft={8}
+                        />
+                      );
+                    })()}
+                  </View>
+                  {/* Default serving info - uses centralized default serving logic */}
+                  <ThemedText style={{ fontSize: 11, color: colors.icon, marginTop: -2 }}>
+                    {quantity} × {selectedServing?.label || `${selectedFood.serving_size} ${selectedFood.serving_unit}`} = {calories || selectedFood.calories_kcal} cal
+                  </ThemedText>
+                </View>
+              ) : editingEntryId ? (
+                <ThemedText style={[styles.selectedFoodName, { color: colors.text, flex: 1 }]}>
+                  Edit Entry
+                </ThemedText>
+              ) : isManualMode ? (
+                <ThemedText style={[styles.selectedFoodName, { color: colors.text, flex: 1 }]}>
+                  ⚡Quick Log
+                </ThemedText>
+              ) : null}
+              {/* Source indicator badge - show when editing or in manual mode, but not when selectedFood exists (already shown above) */}
+              {(editingEntryId || isManualMode) && !selectedFood && (
+                <View style={[
+                  styles.sourceBadge,
+                  {
+                    backgroundColor: colors.icon + '20',
+                    borderColor: colors.icon + '40',
+                  }
+                ]}>
+                  <ThemedText style={[
+                    styles.sourceBadgeText,
+                    {
+                      color: colors.icon,
+                    }
+                  ]}>
+                    ⚡
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+            
+            <View style={styles.form}>
+
+            {/* Nutrition Label Layout - REMOVED: Quick Log editing now uses dedicated /quick-log screen */}
+            {/* Inline Quick Log form has been removed - all Quick Log creation/editing now goes through /quick-log screen */}
+
+            {/* Food Item and Calories on same line - Hidden: now using NutritionLabelLayout for manual entries */}
+            {false && (
+              <View style={styles.row}>
+                <View style={[styles.field, { flex: 3, marginRight: 8 }]}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.food_item_required')}</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { 
+                        borderColor: itemNameError ? '#EF4444' : colors.icon + '20', 
+                        color: colors.text,
+                        borderRadius: 10,
+                        ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                      }
+                    ]}
+                    placeholder={t('mealtype_log.form.food_item_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    value={itemName}
+                    onChangeText={setItemName}
+                    autoCapitalize="words"
+                    returnKeyType="done"
+                    onSubmitEditing={handleFormSubmit}
+                    {...getInputAccessibilityProps(
+                      'Food item name',
+                      'Enter the name of the food item',
+                      itemNameError || undefined,
+                      true
+                    )}
+                    {...getWebAccessibilityProps(
+                      'textbox',
+                      'Food item name',
+                      itemNameError ? 'item-name-error' : undefined,
+                      !!itemNameError,
+                      true
+                    )}
+                  />
+                  {itemNameError ? (
+                    <Text style={styles.errorText}>{itemNameError}</Text>
+                  ) : null}
+                </View>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.calories_required')}</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { 
+                        borderColor: caloriesError ? '#EF4444' : colors.icon + '20', 
+                        color: colors.text,
+                        ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                      }
+                    ]}
+                    placeholder="0"
+                    placeholderTextColor={colors.textSecondary}
+                    value={calories}
+                    onChangeText={(text) => {
+                      handleCaloriesChange(text);
+                    }}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={handleFormSubmit}
+                    {...getInputAccessibilityProps(
+                      'Calories',
+                      'Enter the number of calories in kilocalories',
+                      caloriesError || undefined,
+                      true
+                    )}
+                    {...getWebAccessibilityProps(
+                      'textbox',
+                      'Calories',
+                      caloriesError ? 'calories-error' : undefined,
+                      !!caloriesError,
+                      true
+                    )}
+                  />
+                  {caloriesError ? (
+                    <Text style={styles.errorText}>{caloriesError}</Text>
+                  ) : null}
+                </View>
+              </View>
+            )}
+
+            {/* Quantity and Unit fields - Show when editing entry with food_id (NOT manual entry) */}
+            {(editingEntryId && selectedFood && !isManualMode) && (
+              <View style={styles.row}>
+                <View style={[styles.field, { flex: 1, marginRight: 8 }]}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.quantity_required')}</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { 
+                        borderColor: quantityError ? '#EF4444' : colors.icon + '20', 
+                        color: colors.text,
+                        ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                      }
+                    ]}
+                    placeholder="1"
+                    placeholderTextColor={colors.textSecondary}
+                    value={quantity}
+                    onChangeText={(text) => setQuantity(validateNumericInput(text))}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={handleFormSubmit}
+                    {...getInputAccessibilityProps(
+                      'Quantity',
+                      'Enter the quantity of food',
+                      quantityError || undefined,
+                      true
+                    )}
+                    {...getWebAccessibilityProps(
+                      'textbox',
+                      'Quantity',
+                      quantityError ? 'quantity-error' : undefined,
+                      !!quantityError,
+                      true
+                    )}
+                  />
+                  {quantityError ? (
+                    <Text style={styles.errorText}>{quantityError}</Text>
+                  ) : null}
+                </View>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.unit')}</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input, 
+                      { 
+                        borderColor: colors.icon + '20', 
+                        color: colors.text,
+                        ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                      }
+                    ]}
+                    placeholder="plate"
+                    placeholderTextColor={colors.textSecondary}
+                    value={unit}
+                    onChangeText={setUnit}
+                    maxLength={14}
+                    returnKeyType="done"
+                    onSubmitEditing={handleFormSubmit}
+                    {...getInputAccessibilityProps(
+                      'Unit',
+                      'Enter the unit of measurement'
+                    )}
+                    {...getWebAccessibilityProps(
+                      'textbox',
+                      'Unit'
+                    )}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Qty and Serving on the same line - inline - Only show when food is selected */}
+            {selectedFood && (
+              <View style={styles.field}>
+              <View style={[styles.inlineRow, { alignItems: 'center', gap: 6 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
+                    Qty *
+                  </ThemedText>
+                  <TextInput
+                    ref={quantityInputRef}
+                    style={[
+                      styles.inlineInput,
+                      { 
+                        borderColor: quantityError ? '#EF4444' : colors.icon + '30', 
+                        color: colors.text,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        paddingHorizontal: 4,
+                        paddingVertical: 6,
+                        width: 45,
+                        textAlign: 'center',
+                      }
+                    ]}
+                    placeholder="1"
+                    placeholderTextColor={colors.textSecondary}
+                    value={quantity}
+                    onChangeText={handleQuantityChange}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={handleFormSubmit}
+                  />
+                </View>
+                
+                {/* Multiplier symbol between qty and serving */}
+                {selectedFood && availableServings.length > 0 && (
+                  <ThemedText style={{ color: colors.icon, fontSize: 14 }}>×</ThemedText>
+                )}
+                
+                {/* Serving Selection (if food from food_master is selected) */}
+                {selectedFood && availableServings.length > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    {editingEntryId && (
+                      <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
+                        Unit
+                      </ThemedText>
+                    )}
+                    <View
+                      ref={servingButtonRef}
+                      style={{ flex: 1, minWidth: 150 }}
+                      onLayout={() => {
+                        servingButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                          setServingDropdownLayout({ x: pageX, y: pageY + height, width, height });
+                        });
+                      }}
+                    >
+                      <TouchableOpacity
+                        style={[styles.input, styles.dropdownButton, { borderColor: colors.icon + '30' }]}
+                        onPress={() => {
+                          servingButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                            setServingDropdownLayout({ x: pageX, y: pageY + height, width, height });
+                            setShowServingDropdown(!showServingDropdown);
+                          });
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <ThemedText style={[styles.dropdownButtonText, { color: colors.text }]}>
+                          {selectedServing ? selectedServing.label : 'Select serving...'}
+                        </ThemedText>
+                        <ThemedText style={[styles.dropdownArrow, { color: colors.icon }]}>
+                          ▼
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+              {quantityError ? (
+                <Text style={styles.errorText}>{quantityError}</Text>
+              ) : null}
+            </View>
+            )}
+
+            {/* Weight/Volume and Calories on the same line - inline display */}
+            {selectedFood && selectedServing && (
+              <View style={styles.field}>
+                <View style={styles.inlineRow}>
+                  <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
+                    {isVolumeUnit(selectedFood.serving_unit) ? 'Volume (ml)' : 'Weight (g)'}: <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{calculatedWeight || '0.0'}</ThemedText>
+                  </ThemedText>
+                  <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                    Calories (cal): <ThemedText style={[styles.inlineValue, { color: caloriesError ? '#EF4444' : colors.text }]}>{calories || '0'}</ThemedText>
+                  </ThemedText>
+                </View>
+                {caloriesError ? (
+                  <Text style={styles.errorText}>{caloriesError}</Text>
+                ) : null}
+              </View>
+            )}
+
+            {/* Macronutrients - Collapsible Section (only show when NOT in manual mode) */}
+            {!isManualMode && (
+              <>
+            <TouchableOpacity
+              style={[styles.collapsibleHeader, { borderColor: colors.icon + '20' }]}
+              onPress={toggleMacros}
+              activeOpacity={0.7}
+            >
+              <ThemedText style={[styles.sectionTitleText, { color: colors.textSecondary }]}>
+                Macronutrients
+              </ThemedText>
+              <ThemedText style={[styles.expandIcon, { color: colors.textSecondary }]}>
+                {macrosExpanded ? '▲' : '▼'}
+              </ThemedText>
+            </TouchableOpacity>
+
+            {macrosExpanded && (
+              <View style={styles.macrosContent}>
+                {selectedFood ? (
+                  // Inline display for calculated values
+                  <>
+                    <View style={styles.inlineRow}>
+                      <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
+                        Protein (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{protein || '0'}</ThemedText>
+                      </ThemedText>
+                      <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                        Carbs (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{carbs || '0'}</ThemedText>
+                      </ThemedText>
+                    </View>
+                    <View style={[styles.inlineRow, { marginTop: 8 }]}>
+                      <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
+                        Fat (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{fat || '0'}</ThemedText>
+                      </ThemedText>
+                      <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                        Fiber (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{fiber || '0'}</ThemedText>
+                      </ThemedText>
+                    </View>
+                  </>
+                ) : (
+                  // Input fields for custom entries - all 4 macros on one line
+                  <View style={styles.row}>
+                    <View style={[styles.field, { flex: 0.85, marginRight: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.protein')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: proteinError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={protein}
+                        onChangeText={(text) => {
+                          setProtein(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                      />
+                      {proteinError ? (
+                        <Text style={styles.errorText}>{proteinError}</Text>
+                      ) : null}
+                    </View>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.carbs')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: carbsError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={carbs}
+                        onChangeText={(text) => {
+                          setCarbs(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                      />
+                      {carbsError ? (
+                        <Text style={styles.errorText}>{carbsError}</Text>
+                      ) : null}
+                    </View>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.fat')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: fatError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={fat}
+                        onChangeText={(text) => {
+                          setFat(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                      />
+                      {fatError ? (
+                        <Text style={styles.errorText}>{fatError}</Text>
+                      ) : null}
+                    </View>
+                    <View style={[styles.field, { flex: 0.85, marginLeft: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text, fontSize: 12 }]}>{t('mealtype_log.form.fiber')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: fiberError ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={fiber}
+                        onChangeText={(text) => {
+                          setFiber(validateNumericInput(text));
+                        }}
+                        keyboardType="decimal-pad"
+                      />
+                      {fiberError ? (
+                        <Text style={styles.errorText}>{fiberError}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Other Nutrients - Collapsible Section */}
+            <TouchableOpacity
+              style={[styles.collapsibleHeader, { borderColor: colors.icon + '20' }]}
+              onPress={toggleFattyAcids}
+              activeOpacity={0.7}
+            >
+              <ThemedText style={[styles.sectionTitleText, { color: colors.textSecondary }]}>
+                Other Nutrients
+              </ThemedText>
+              <ThemedText style={[styles.expandIcon, { color: colors.textSecondary }]}>
+                {fattyAcidsExpanded ? '▲' : '▼'}
+              </ThemedText>
+            </TouchableOpacity>
+
+            {fattyAcidsExpanded && (
+              <View style={styles.macrosContent}>
+                {selectedFood ? (
+                  // Inline display for calculated values - all on one line
+                  <View style={styles.inlineRow}>
+                    <ThemedText style={[styles.inlineLabel, { color: colors.text }]}>
+                      Sat Fat (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{saturatedFat || '0'}</ThemedText>
+                    </ThemedText>
+                    <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                      Trans Fat (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{transFat || '0'}</ThemedText>
+                    </ThemedText>
+                    <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                      Sugar (g): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{sugar || '0'}</ThemedText>
+                    </ThemedText>
+                    <ThemedText style={[styles.inlineLabel, { color: colors.text, marginLeft: 16 }]}>
+                      Sodium (mg): <ThemedText style={[styles.inlineValue, { color: colors.text }]}>{sodium || '0'}</ThemedText>
+                    </ThemedText>
+                  </View>
+                ) : (
+                  // Input fields for custom entries - all in one row
+                  <View style={styles.row}>
+                    <View style={[styles.field, { flex: 0.85, marginRight: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.saturated_fat')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={saturatedFat}
+                        onChangeText={(text) => setSaturatedFat(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.trans_fat')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={transFat}
+                        onChangeText={(text) => setTransFat(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                    <View style={[styles.field, { flex: 0.85, marginHorizontal: 4 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.sugar')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={sugar}
+                        onChangeText={(text) => setSugar(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                    <View style={[styles.field, { flex: 0.85, marginLeft: 8 }]}>
+                      <ThemedText style={[styles.label, { color: colors.text }]}>{t('mealtype_log.form.sodium')}</ThemedText>
+                      <TextInput
+                        style={[styles.input, { borderColor: colors.icon + '30', color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={sodium}
+                        onChangeText={(text) => setSodium(validateNumericInput(text))}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  </View>
+                )}
+              </View>
+                )}
+              </>
+            )}
+
+            <View style={styles.formActions}>
+              {(editingEntryId || selectedFood || isManualMode) && (
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
+                  onPress={handleCancel}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('mealtype_log.buttons.cancel')}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  { 
+                    backgroundColor: (loading || !isFormValid()) ? colors.icon : colors.tint,
+                    opacity: (loading || !isFormValid()) ? 0.5 : 1
+                  },
+                  (loading || !isFormValid()) && styles.saveButtonDisabled
+                ]}
+                onPress={handleSave}
+                disabled={loading || !isFormValid()}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.saveButtonText}>
+                  {loading 
+                    ? (editingEntryId ? t('mealtype_log.buttons.updating') : t('mealtype_log.buttons.logging'))
+                    : (editingEntryId ? t('mealtype_log.buttons.update_log') : t('mealtype_log.buttons.log_food'))
+                  }
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          </View>
         )}
 
         {/* Food Log */}
@@ -3994,16 +5478,16 @@ export default function LogFoodScreen() {
               ]}
             >
               <MultiSelectItem
-                isSelected={areAllEntriesSelected(entries as CalorieEntry[], (entry) => entry.id)}
+                isSelected={areAllEntriesSelected(entries, (entry) => entry.id)}
                 onToggle={() => {
-                  const allEntriesSelected = areAllEntriesSelected(entries as CalorieEntry[], (entry) => entry.id);
+                  const allEntriesSelected = areAllEntriesSelected(entries, (entry) => entry.id);
 
                   if (allEntriesSelected) {
                     // Deselect everything
                     deselectAllEntries();
                   } else {
                     // Select all entries
-                    selectAllEntries(entries as CalorieEntry[], (entry) => entry.id);
+                    selectAllEntries(entries, (entry) => entry.id);
                   }
                 }}
                 style={{ paddingVertical: 12, paddingHorizontal: 16 }}
@@ -4088,24 +5572,25 @@ export default function LogFoodScreen() {
           ) : (
             <>
               {entries.map((entry) => {
+              const isEditing = editingEntryId === entry.id;
               const entryContent = (
-              <HighlightableRow
-                isNew={isNewlyAdded(entry.id)}
-                style={StyleSheet.flatten([
-                  styles.entryCard, 
-                  { 
-                    backgroundColor: 'transparent',
-                    borderColor: 'transparent',
-                    borderWidth: 0,
-                  }
-                ])}
-              >
+                <HighlightableRow
+                  isNew={isNewlyAdded(entry.id)}
+                  style={[
+                    styles.entryCard, 
+                    { 
+                      backgroundColor: 'transparent',
+                      borderColor: 'transparent',
+                      borderWidth: 0,
+                    }
+                  ]}
+                >
                   <View style={styles.entryHeader}>
                     <View style={styles.entryHeaderLeft}>
                       <View style={styles.entryNameRow}>
                         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
                           <TouchableOpacity
-                            onPress={() => handleEditEntry(entry as CalorieEntry)}
+                            onPress={() => handleEditEntry(entry)}
                             activeOpacity={0.7}
                             style={[
                               styles.entryItemNameButton,
@@ -4170,9 +5655,9 @@ export default function LogFoodScreen() {
                       </View>
                       {showEntryDetails && (
                         <TouchableOpacity
-                          onPress={() => handleEditEntry(entry as CalorieEntry)}
+                          onPress={() => handleEditEntry(entry)}
                           activeOpacity={0.7}
-                          disabled={false}
+                          disabled={isEditing}
                           style={styles.entryMacros}
                         >
                           <View style={styles.entryMacroItem}>
@@ -4195,9 +5680,9 @@ export default function LogFoodScreen() {
                       )}
                       {showEntryDetails && (
                         <TouchableOpacity
-                          onPress={() => handleEditEntry(entry as CalorieEntry)}
+                          onPress={() => handleEditEntry(entry)}
                           activeOpacity={0.7}
-                          disabled={false}
+                          disabled={isEditing}
                           style={[styles.entryMacros, { marginTop: 2 }]}
                         >
                           <View style={styles.entryMacroItem}>
@@ -4220,16 +5705,29 @@ export default function LogFoodScreen() {
                       )}
                     </View>
                     <View style={styles.entryHeaderRight}>
+                      {/* Editing badge - Show when entry is being edited */}
+                      {isEditing && (
+                        <View style={[
+                          styles.sourceBadge,
+                          {
+                            backgroundColor: colors.tint + '30',
+                            borderColor: colors.tint + '60',
+                            marginRight: 8,
+                          }
+                        ]}>
+                          <ThemedText style={[
+                            styles.sourceBadgeText,
+                            { color: colors.tint, fontWeight: '700' }
+                          ]}>
+                            Editing
+                          </ThemedText>
+                        </View>
+                      )}
                       {/* Kcal value */}
-                      {(() => {
-                        const displayCalories = entry?.calories_kcal ?? 0;
-                        return (
                       <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                        {displayCalories} cal
+                        {entry.calories_kcal} cal
                       </ThemedText>
-                        );
-                      })()}
-                      {!hasAnySelection && (
+                      {!hasAnySelection && !editingEntryId && (
                         <TouchableOpacity
                           style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
                           onPress={() => handleDelete(entry.id, entry.item_name)}
@@ -4379,6 +5877,63 @@ export default function LogFoodScreen() {
           </View>
         </ThemedView>
       </Modal>
+
+      {/* Serving Dropdown - Rendered at root level for proper z-index */}
+      {showServingDropdown && servingDropdownLayout && (
+        <>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowServingDropdown(false)}
+          />
+          <View 
+            style={[
+              styles.dropdown,
+              styles.servingDropdown,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.icon + '30',
+                position: 'absolute',
+                top: servingDropdownLayout.y,
+                left: servingDropdownLayout.x,
+                width: servingDropdownLayout.width,
+                zIndex: 99999,
+                elevation: 99999,
+              }
+            ]}
+          >
+            <ScrollView 
+              style={styles.dropdownScroll} 
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {availableServings.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.dropdownItem,
+                    selectedServing?.id === option.id && { backgroundColor: colors.tint + '20' },
+                    { borderBottomColor: colors.icon + '15' }
+                  ]}
+                  onPress={() => {
+                    handleServingSelect(option);
+                    setShowServingDropdown(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={[
+                    styles.dropdownItemText,
+                    { color: colors.text },
+                    selectedServing?.id === option.id && { color: colors.tint, fontWeight: '600' }
+                  ]}>
+                    {option.label}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </>
+      )}
 
       {/* Delete Entry Confirmation Modal */}
       <ConfirmModal
@@ -5359,6 +6914,7 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 0,
+    paddingRight: 40,
   },
   tabsFadeOverlay: {
     position: 'absolute',
@@ -5398,13 +6954,11 @@ const styles = StyleSheet.create({
   },
   tabsScrollArrowLeft: {
     left: 0,
-    paddingLeft: 0,
-    paddingVertical: 0,
+    paddingLeft: 4,
   },
   tabsScrollArrowRight: {
     right: 0,
-    paddingRight: 0,
-    paddingVertical: 0,
+    paddingRight: 4,
   },
   tabsScrollArrowText: {
     fontSize: 28,

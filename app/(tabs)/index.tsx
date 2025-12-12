@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, RefreshControl, Alert } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +37,8 @@ import {
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
+import { getEntriesForDate } from '@/lib/services/calorieEntries';
+import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-meta';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -228,6 +230,8 @@ export default function FoodLogHomeScreen() {
     today,
   } = useSelectedDate();
 
+  const queryClient = useQueryClient();
+
   // Fetch mealtype meta
   const { dataByMealType } = useMealtypeMeta(selectedDateString);
   
@@ -247,17 +251,49 @@ export default function FoodLogHomeScreen() {
     setCalendarViewMonth(new Date(selectedDate));
   }, [selectedDate]);
 
-  // Helper function to navigate with new date (updates URL param)
-  const navigateWithDate = useCallback((date: Date) => {
-    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    // Use replace to update URL params - ensure it works on mobile web
-    router.replace({
-      pathname: '/',
-      params: { date: dateString }
-    });
-  }, [router]);
+  const prefetchDateData = useCallback(
+    (dateString: string) => {
+      if (!user?.id) return;
+      const entriesKey = ['entries', user.id, dateString];
+      if (!queryClient.getQueryData(entriesKey)) {
+        queryClient.prefetchQuery({
+          queryKey: entriesKey,
+          queryFn: () => getEntriesForDate(user.id, dateString),
+          staleTime: 10 * 60 * 1000,
+          gcTime: 24 * 60 * 60 * 1000,
+          refetchOnWindowFocus: false,
+          refetchOnMount: false,
+        });
+      }
 
-  const queryClient = useQueryClient();
+      const metaKey = ['mealtypeMeta', user.id, dateString];
+      if (!queryClient.getQueryData(metaKey)) {
+        queryClient.prefetchQuery({
+          queryKey: metaKey,
+          queryFn: () => getMealtypeMetaByDate(user.id!, dateString),
+          staleTime: 10 * 60 * 1000,
+          gcTime: 24 * 60 * 60 * 1000,
+          refetchOnWindowFocus: false,
+          refetchOnMount: false,
+        });
+      }
+    },
+    [queryClient, user?.id]
+  );
+
+  // Helper function to navigate with new date (updates URL param)
+  const navigateWithDate = useCallback(
+    (date: Date) => {
+      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      prefetchDateData(dateString);
+      router.replace({
+        pathname: '/',
+        params: { date: dateString }
+      });
+    },
+    [prefetchDateData, router]
+  );
+
   const { data: profile, isLoading: profileLoading } = useUserProfile();
 
   const {
@@ -516,11 +552,16 @@ export default function FoodLogHomeScreen() {
     );
   }
 
-  // Calculate daily totals using domain utility (includes Quick Log values from mealtype_meta)
-  const dailyTotals = calculateDailyTotals(entries, dataByMealType);
-
-  // Group entries by meal type using domain utility (includes Quick Log values from mealtype_meta)
-  const groupedEntries = groupEntriesByMealType(entries, dataByMealType);
+  const { dailyTotals, groupedEntries } = useMemo(() => {
+    const transformStart = performance.now();
+    const totals = calculateDailyTotals(entries, dataByMealType);
+    const grouped = groupEntriesByMealType(entries, dataByMealType);
+    const transformMs = Math.round(performance.now() - transformStart);
+    console.log(
+      `[Home] transform ${selectedDateString} entries=${entries.length} ms=${transformMs}`
+    );
+    return { dailyTotals: totals, groupedEntries: grouped };
+  }, [dataByMealType, entries, selectedDateString]);
 
   // Use meal type order from shared types
   const sortedMealTypes = MEAL_TYPE_ORDER;

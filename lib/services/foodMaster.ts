@@ -9,12 +9,38 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import type { FoodMaster } from '@/utils/nutritionMath';
 
 export type FoodMasterMetadata = {
   id: string;
   is_custom: boolean;
   brand: string | null;
 };
+
+/**
+ * Fetch full food_master row by ID
+ */
+export async function getFoodMasterById(foodId: string): Promise<FoodMaster | null> {
+  if (!foodId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('food_master')
+      .select('*')
+      .eq('id', foodId)
+      .single<FoodMaster>();
+
+    if (error) {
+      console.error('Error fetching food master by id:', error);
+      return null;
+    }
+
+    return data ?? null;
+  } catch (error) {
+    console.error('Exception fetching food master by id:', error);
+    return null;
+  }
+}
 
 /**
  * Fetch food master metadata for multiple food IDs
