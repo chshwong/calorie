@@ -59,8 +59,9 @@ export async function updateProfile(
     gender?: 'male' | 'female' | 'not_telling' | null;
     height_cm?: number | null;
     weight_lb?: number | null;
+    body_fat_percent?: number | null;
     height_unit?: 'cm' | 'ft' | null;
-    weight_unit?: 'lbs' | 'kg' | null;
+    weight_unit?: 'lb' | 'lbs' | 'kg' | null;
     goal_type?: 'lose' | 'maintain' | 'gain' | 'recomp' | null;
     onboarding_complete?: boolean | null;
     [key: string]: any;

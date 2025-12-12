@@ -8,21 +8,65 @@
  */
 
 /**
+ * Round helpers
+ * Use simple decimal rounding to avoid floating point drift in UI
+ */
+export function roundTo1(x: number): number {
+  return Math.round(x * 10) / 10;
+}
+
+export function roundTo2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
+
+export function roundTo3(x: number): number {
+  return Math.round(x * 1000) / 1000;
+}
+
+/**
  * Convert kilograms to pounds
  * @param kg - Weight in kilograms
  * @returns Weight in pounds
  */
-export function kgToLbs(kg: number): number {
+export function kgToLb(kg: number): number {
   return kg * 2.20462;
 }
 
 /**
  * Convert pounds to kilograms
- * @param lbs - Weight in pounds
+ * @param lb - Weight in pounds
  * @returns Weight in kilograms
  */
-export function lbsToKg(lbs: number): number {
-  return lbs / 2.20462;
+export function lbToKg(lb: number): number {
+  return lb / 2.20462;
+}
+
+// Back-compat aliases used by existing code
+export const kgToLbs = kgToLb;
+export const lbsToKg = lbToKg;
+
+// Lightweight inline roundtrip checks to ensure UI-level stability at 1 decimal
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  const roundTripValues = [70, 82.5, 100];
+  roundTripValues.forEach((value) => {
+    const displayKg = roundTo1(lbToKg(roundTo3(kgToLb(value))));
+    const expected = roundTo1(value);
+    console.assert(
+      displayKg === expected,
+      `kg->lb->kg roundtrip mismatch: input ${value}kg, got ${displayKg}kg`
+    );
+  });
+
+  const bfValues = [12.3, 18.7, 24.95];
+  bfValues.forEach((value) => {
+    const stored = roundTo2(value);
+    const display = roundTo1(stored);
+    const expected = roundTo1(value);
+    console.assert(
+      display === expected,
+      `body fat round mismatch: input ${value}%, stored ${stored}%, display ${display}%`
+    );
+  });
 }
 
 /**

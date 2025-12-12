@@ -145,6 +145,7 @@ export interface UserProfile {
   gender: Gender;
   height_cm: number;
   weight_lb: number;
+  body_fat_percent?: number | null;
   is_active: boolean;
   is_admin: boolean;
   onboarding_complete: boolean;

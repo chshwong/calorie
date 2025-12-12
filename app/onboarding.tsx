@@ -38,11 +38,13 @@ import {
 } from '@/utils/validation';
 import { 
   convertHeightToCm, 
-  convertWeightToKg, 
   ftInToCm, 
   cmToFtIn, 
-  kgToLbs, 
-  lbsToKg 
+  kgToLb, 
+  lbToKg,
+  roundTo1,
+  roundTo2,
+  roundTo3,
 } from '@/utils/bodyMetrics';
 import { 
   filterNumericInput, 
@@ -57,6 +59,7 @@ import {
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
+import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
 
 type Gender = 'male' | 'female' | 'not_telling';
 
@@ -172,6 +175,7 @@ export default function OnboardingScreen() {
   const [showYearMonthPicker, setShowYearMonthPicker] = useState(false);
   const yearScrollViewRef = useRef<ScrollView>(null);
   const monthScrollViewRef = useRef<ScrollView>(null);
+  const weightsPrefilledRef = useRef(false);
   
   // Auto-scroll to current year/month when picker opens
   useEffect(() => {
@@ -195,12 +199,13 @@ export default function OnboardingScreen() {
   // Step 5: Current Weight
   const [currentWeightKg, setCurrentWeightKg] = useState('');
   const [currentWeightLb, setCurrentWeightLb] = useState('');
-  const [currentWeightUnit, setCurrentWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  const [currentWeightUnit, setCurrentWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [currentBodyFatPercent, setCurrentBodyFatPercent] = useState('');
   
   // Step 7: Goal Weight
   const [goalWeightKg, setGoalWeightKg] = useState('');
   const [goalWeightLb, setGoalWeightLb] = useState('');
-  const [goalWeightUnit, setGoalWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  const [goalWeightUnit, setGoalWeightUnit] = useState<'kg' | 'lb'>('kg');
   
   // Step 8: Timeline
   const [timelineOption, setTimelineOption] = useState<'3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date' | ''>('');
@@ -209,7 +214,7 @@ export default function OnboardingScreen() {
   // Legacy state for old steps (will be reorganized later)
   const [weightLb, setWeightLb] = useState('');
   const [weightKg, setWeightKg] = useState('');
-  const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>('lbs');
+  const [weightUnit, setWeightUnit] = useState<'lb' | 'kg'>('lb');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,6 +263,39 @@ export default function OnboardingScreen() {
       }
     }
   }, [profile]);
+
+  // Prefill weight from profile.weight_lb (weight_kg is intentionally ignored)
+  useEffect(() => {
+    if (!profile || weightsPrefilledRef.current) return;
+
+    const preferredUnit: 'kg' | 'lb' = profile.weight_unit === 'kg' ? 'kg' : 'lb';
+    const hasExistingInput = Boolean(currentWeightKg || currentWeightLb);
+
+    // Respect any in-progress user input
+    if (hasExistingInput) {
+      weightsPrefilledRef.current = true;
+      return;
+    }
+
+    setCurrentWeightUnit(preferredUnit);
+    setGoalWeightUnit(preferredUnit);
+    setWeightUnit(preferredUnit);
+
+    if (profile.weight_lb !== null && profile.weight_lb !== undefined) {
+      const displayLb = roundTo1(profile.weight_lb);
+      const displayKg = roundTo1(lbToKg(profile.weight_lb));
+
+      setCurrentWeightLb(displayLb.toString());
+      setCurrentWeightKg(displayKg.toString());
+    }
+
+    if (profile.body_fat_percent !== null && profile.body_fat_percent !== undefined) {
+      const displayBf = roundTo1(profile.body_fat_percent);
+      setCurrentBodyFatPercent(displayBf.toString());
+    }
+
+    weightsPrefilledRef.current = true;
+  }, [profile, currentWeightKg, currentWeightLb]);
   
   // Prefill sex from profile if available
   useEffect(() => {
@@ -359,15 +397,333 @@ export default function OnboardingScreen() {
     return convertHeightToCm(heightUnit, heightCm, heightFt, heightIn);
   };
   
-  const getWeightInKg = (unit: 'kg' | 'lbs', kgValue: string, lbsValue: string): number | null => {
-    return convertWeightToKg(unit, kgValue, lbsValue);
+  const getWeightInKg = (unit: 'kg' | 'lb', kgValue: string, lbValue: string): number | null => {
+    const raw = unit === 'kg' ? parseFloat(kgValue) : parseFloat(lbValue);
+    if (isNaN(raw) || raw <= 0) return null;
+    return unit === 'kg' ? raw : lbToKg(raw);
   };
   
-  const getWeightInLbs = (unit: 'kg' | 'lbs', kgValue: string, lbsValue: string): number | null => {
-    const kg = convertWeightToKg(unit, kgValue, lbsValue);
-    if (kg === null) return null;
-    return kgToLbs(kg);
+  const getWeightInLbs = (unit: 'kg' | 'lb', kgValue: string, lbValue: string): number | null => {
+    const raw = unit === 'kg' ? parseFloat(kgValue) : parseFloat(lbValue);
+    if (isNaN(raw) || raw <= 0) return null;
+    return unit === 'kg' ? kgToLb(raw) : raw;
   };
+
+  const limitToOneDecimal = (text: string): string => {
+    const filtered = filterNumericInput(text);
+    const parts = filtered.split('.');
+    if (parts.length <= 1) return filtered;
+    return `${parts[0]}.${parts[1].slice(0, 1)}`;
+  };
+
+  const limitWeightInput = (text: string): string => {
+    const oneDecimal = limitToOneDecimal(text);
+    const [intPart, decPart] = oneDecimal.split('.');
+    const limitedInt = intPart.slice(0, 3); // max 3 digits before decimal
+    return decPart !== undefined ? `${limitedInt}.${decPart}` : limitedInt;
+  };
+
+  const limitBodyFatInput = (text: string): string => {
+    const oneDecimal = limitToOneDecimal(text);
+    const [intPart, decPart] = oneDecimal.split('.');
+    const limitedInt = intPart.slice(0, 2); // max 2 digits before decimal
+    return decPart !== undefined ? `${limitedInt}.${decPart}` : limitedInt;
+  };
+
+  // Decorative scale icon for weight step (fallback-friendly on native & web)
+
+  const GenderIllustration = () => (
+    <View
+      style={{
+        width: 172,
+        height: 172,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${onboardingColors.primary}0F`,
+        shadowColor: '#000',
+        shadowOpacity: Platform.OS === 'web' ? 0 : 0.08,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 16,
+        elevation: 4,
+      }}
+    >
+      <View
+        style={{
+          width: 148,
+          height: 148,
+          borderRadius: 24,
+          backgroundColor: '#fff',
+          borderWidth: 2,
+          borderColor: `${onboardingColors.primary}50`,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 12,
+          paddingVertical: 16,
+        }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'center', width: '88%', gap: 14 }}>
+          {[
+            { bg: `${onboardingColors.primary}12`, color: onboardingColors.primary, symbol: '♀' },
+            { bg: `${onboardingColors.primary}10`, color: onboardingColors.primaryDark, symbol: '♂' },
+          ].map((item, idx) => (
+            <View
+              key={idx}
+              style={{
+                width: 60,
+                height: 96,
+                borderRadius: 18,
+                backgroundColor: item.bg,
+                borderWidth: 2,
+                borderColor: `${onboardingColors.primary}40`,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 10,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 32,
+                  color: item.color,
+                  lineHeight: 38,
+                  fontWeight: '600',
+                }}
+              >
+                {item.symbol}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
+  const HeightIllustration = () => (
+    <View
+      style={{
+        width: 172,
+        height: 172,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${onboardingColors.primary}0F`,
+        shadowColor: '#000',
+        shadowOpacity: Platform.OS === 'web' ? 0 : 0.08,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 16,
+        elevation: 4,
+      }}
+    >
+      <View
+        style={{
+          width: 148,
+          height: 148,
+          borderRadius: 24,
+          backgroundColor: '#fff',
+          borderWidth: 2,
+          borderColor: `${onboardingColors.primary}50`,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 12,
+        }}
+      >
+        {/* Ruler */}
+        <View
+          style={{
+            width: 16,
+            height: 118,
+            borderRadius: 10,
+            backgroundColor: `${onboardingColors.primary}12`,
+            borderWidth: 2,
+            borderColor: `${onboardingColors.primary}60`,
+            marginRight: 16,
+            justifyContent: 'space-between',
+            paddingVertical: 10,
+            paddingHorizontal: 4,
+          }}
+        >
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View
+              key={i}
+              style={{
+                height: 2,
+                backgroundColor: onboardingColors.primary,
+                opacity: i % 2 === 0 ? 0.9 : 0.6,
+              }}
+            />
+          ))}
+        </View>
+
+        {/* Person silhouette */}
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            width: 82,
+            height: 118,
+            position: 'relative',
+          }}
+        >
+          {/* Head */}
+          <View
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: onboardingColors.primary,
+              marginBottom: 6,
+            }}
+          />
+          {/* Torso */}
+          <View
+            style={{
+              width: 14,
+              height: 44,
+              borderRadius: 10,
+              backgroundColor: onboardingColors.primary,
+            }}
+          />
+          {/* Arms */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 44,
+              width: 72,
+              height: 12,
+              borderRadius: 10,
+              backgroundColor: `${onboardingColors.primary}85`,
+              transform: [{ rotate: '-10deg' }],
+            }}
+          />
+          {/* Legs */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: 62,
+            }}
+          >
+            {[0, 1].map((i) => (
+              <View
+                key={i}
+                style={{
+                  width: 14,
+                  height: 44,
+                  borderRadius: 10,
+                  backgroundColor: i === 0 ? onboardingColors.primary : `${onboardingColors.primary}75`,
+                  transform: [{ rotate: i === 0 ? 6 : -6 }],
+                }}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const ActivityIllustration = () => (
+    <View
+      style={{
+        width: 172,
+        height: 172,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${onboardingColors.primary}0F`,
+        shadowColor: '#000',
+        shadowOpacity: Platform.OS === 'web' ? 0 : 0.08,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 16,
+        elevation: 4,
+      }}
+    >
+      <View
+        style={{
+          width: 148,
+          height: 148,
+          borderRadius: 24,
+          backgroundColor: '#fff',
+          borderWidth: 2,
+          borderColor: `${onboardingColors.primary}50`,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Head */}
+        <View
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            backgroundColor: onboardingColors.primary,
+            marginBottom: 6,
+          }}
+        />
+        {/* Torso */}
+        <View
+          style={{
+            width: 10,
+            height: 40,
+            borderRadius: 8,
+            backgroundColor: onboardingColors.primary,
+            transform: [{ rotate: '-5deg' }],
+          }}
+        />
+        {/* Arms */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 70,
+            width: 60,
+            height: 10,
+            borderRadius: 8,
+            backgroundColor: `${onboardingColors.primary}90`,
+            transform: [{ rotate: '-20deg' }],
+          }}
+        />
+        {/* Front Leg */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 34,
+            left: 70,
+            width: 14,
+            height: 54,
+            borderRadius: 10,
+            backgroundColor: onboardingColors.primary,
+            transform: [{ rotate: 22 }],
+          }}
+        />
+        {/* Back Leg */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 28,
+            right: 66,
+            width: 12,
+            height: 46,
+            borderRadius: 10,
+            backgroundColor: `${onboardingColors.primary}70`,
+            transform: [{ rotate: -18 }],
+          }}
+        />
+        {/* Ground */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 18,
+            width: 96,
+            height: 8,
+            borderRadius: 6,
+            backgroundColor: `${onboardingColors.primary}12`,
+          }}
+        />
+      </View>
+    </View>
+  );
   
   const validateStep1 = (): string | null => {
     if (!firstName || firstName.trim().length === 0) {
@@ -563,7 +919,16 @@ export default function OnboardingScreen() {
   const validateCurrentWeight = (): string | null => {
     const weightKgValue = getWeightInKg(currentWeightUnit, currentWeightKg, currentWeightLb);
     const errorKey = validateWeightKgUtil(weightKgValue);
-    return errorKey ? t(errorKey) : null;
+    if (errorKey) return t(errorKey);
+
+    if (currentBodyFatPercent) {
+      const bf = parseFloat(currentBodyFatPercent);
+      if (isNaN(bf) || bf <= 0 || bf > 80) {
+        return 'Body fat percentage must be between 0 and 80.';
+      }
+    }
+
+    return null;
   };
   
   const validateGoalWeight = (): string | null => {
@@ -813,26 +1178,45 @@ export default function OnboardingScreen() {
       return;
     }
     
-    // Convert weight to kg and save to profile
+    // Convert weight to lb and save via weight log
     setLoading(true);
     try {
-      let weightKgValue: number;
+      let weightLbValue: number;
       
       if (currentWeightUnit === 'kg') {
-        weightKgValue = parseFloat(currentWeightKg);
+        const kg = parseFloat(currentWeightKg);
+        weightLbValue = kgToLb(kg);
       } else {
-        const lbs = parseFloat(currentWeightLb);
-        weightKgValue = lbs / 2.20462;
+        weightLbValue = parseFloat(currentWeightLb);
       }
-      
-      const updatedProfile = await updateProfile(user.id, {
-        weight_kg: weightKgValue,
-        weight_lb: weightKgValue * 2.20462,
-        weight_unit: currentWeightUnit,
-      });
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save profile');
+
+      const storedWeightLb = roundTo3(weightLbValue);
+      const storedBodyFat =
+        currentBodyFatPercent && currentBodyFatPercent.trim().length > 0
+          ? roundTo2(parseFloat(currentBodyFatPercent))
+          : null;
+
+      try {
+        await insertWeightLogAndUpdateProfile({
+          userId: user.id,
+          weighedAt: new Date(),
+          weightLb: storedWeightLb,
+          bodyFatPercent: storedBodyFat,
+          weightUnit: currentWeightUnit,
+        });
+      } catch (logError) {
+        console.error('Weight log insert failed, falling back to direct profile update', logError);
+        const fallbackUpdates: Record<string, any> = {
+          weight_lb: storedWeightLb,
+          weight_unit: currentWeightUnit === 'lb' ? 'lbs' : 'kg',
+        };
+        if (storedBodyFat !== null) {
+          fallbackUpdates.body_fat_percent = storedBodyFat;
+        }
+        const updatedProfile = await updateProfile(user.id, fallbackUpdates);
+        if (!updatedProfile) {
+          throw new Error('Failed to save profile');
+        }
       }
       
       // Refresh profile to get updated data
@@ -866,18 +1250,19 @@ export default function OnboardingScreen() {
     // Convert goal weight to kg and save to profile
     setLoading(true);
     try {
-      let goalWeightKgValue: number;
+      let goalWeightLbValue: number;
       
       if (goalWeightUnit === 'kg') {
-        goalWeightKgValue = parseFloat(goalWeightKg);
+        const kg = parseFloat(goalWeightKg);
+        goalWeightLbValue = kgToLb(kg);
       } else {
-        const lbs = parseFloat(goalWeightLb);
-        goalWeightKgValue = lbs / 2.20462;
+        goalWeightLbValue = parseFloat(goalWeightLb);
       }
+
+      const storedGoalWeightLb = roundTo3(goalWeightLbValue);
       
       const updatedProfile = await updateProfile(user.id, {
-        goal_weight_kg: goalWeightKgValue,
-        goal_weight_lb: goalWeightKgValue * 2.20462,
+        goal_weight_lb: storedGoalWeightLb,
       });
       
       if (!updatedProfile) {
@@ -954,8 +1339,13 @@ export default function OnboardingScreen() {
       } else {
         const lbs = parseFloat(currentWeightLb);
         if (isNaN(lbs) || lbs <= 0) return true;
-        const kgValue = lbs / 2.20462;
+        const kgValue = lbToKg(lbs);
         return kgValue < 35 || kgValue > 250;
+      }
+
+      if (currentBodyFatPercent) {
+        const bf = parseFloat(currentBodyFatPercent);
+        if (isNaN(bf) || bf <= 0 || bf > 80) return true;
       }
     } else if (currentStep === 6) {
       return !goal;
@@ -967,7 +1357,7 @@ export default function OnboardingScreen() {
       } else {
         const lbs = parseFloat(goalWeightLb);
         if (isNaN(lbs) || lbs <= 0) return true;
-        const kgValue = lbs / 2.20462;
+        const kgValue = lbToKg(lbs);
         return kgValue < 35 || kgValue > 250;
       }
     } else if (currentStep === 8) {
@@ -1017,13 +1407,13 @@ export default function OnboardingScreen() {
       if (currentWeightUnit === 'kg') {
         currentWeightKgValue = parseFloat(currentWeightKg);
       } else {
-        currentWeightKgValue = parseFloat(currentWeightLb) / 2.20462;
+        currentWeightKgValue = lbToKg(parseFloat(currentWeightLb));
       }
       
       if (goalWeightUnit === 'kg') {
         goalWeightKgValue = parseFloat(goalWeightKg);
       } else {
-        goalWeightKgValue = parseFloat(goalWeightLb) / 2.20462;
+        goalWeightKgValue = lbToKg(parseFloat(goalWeightLb));
       }
       
       if (!ageNum || !heightCmValue || !currentWeightKgValue || !goalWeightKgValue || !activityLevel || !sex || !goal) {
@@ -1151,8 +1541,9 @@ export default function OnboardingScreen() {
     try {
       const heightCmValue = getHeightInCm();
       const weightLbValue = getWeightInLbs(weightUnit, weightKg, weightLb);
+      const storedWeightLb = typeof weightLbValue === 'number' ? roundTo3(weightLbValue) : null;
       
-      if (!heightCmValue || !weightLbValue) {
+      if (!heightCmValue || !storedWeightLb) {
         throw new Error('Height and Weight are required');
       }
       
@@ -1170,9 +1561,9 @@ export default function OnboardingScreen() {
           p_date_of_birth: dateOfBirth,
           p_gender: gender,
           p_height_cm: heightCmValue,
-          p_weight_lb: weightLbValue,
+          p_weight_lb: storedWeightLb,
           p_height_unit: dbHeightUnit,
-          p_weight_unit: weightUnit,
+          p_weight_unit: weightUnit === 'lb' ? 'lbs' : 'kg',
           p_onboarding_complete: true, // Complete onboarding
         });
         
@@ -1195,9 +1586,9 @@ export default function OnboardingScreen() {
           date_of_birth: dateOfBirth,
           gender,
           height_cm: heightCmValue,
-          weight_lb: weightLbValue,
+          weight_lb: storedWeightLb,
           height_unit: dbHeightUnit,
-          weight_unit: weightUnit,
+          weight_unit: weightUnit === 'lb' ? 'lbs' : 'kg',
           is_active: true,
           onboarding_complete: true, // Complete onboarding
         };
@@ -1484,20 +1875,7 @@ export default function OnboardingScreen() {
       <View style={styles.stepContentAnimated}>
         {/* SVG Illustration */}
         <View style={styles.stepIllustration}>
-          {Platform.OS === 'web' ? (
-              <View
-              style={{
-                width: 48,
-                height: 48,
-              }}
-              // @ts-ignore - web-specific prop
-              dangerouslySetInnerHTML={{
-                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><circle cx="17" cy="7" r="4"/><path d="M5 21v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/><path d="M13 21v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>`,
-              }}
-            />
-          ) : (
-            <IconSymbol name="person.2.fill" size={48} color={onboardingColors.primary} />
-          )}
+          <GenderIllustration />
         </View>
         
         {/* Title */}
@@ -1605,20 +1983,7 @@ export default function OnboardingScreen() {
       <View style={styles.stepContentAnimated}>
         {/* SVG Illustration */}
         <View style={styles.stepIllustration}>
-          {Platform.OS === 'web' ? (
-            <View
-              style={{
-                width: 48,
-                height: 48,
-              }}
-              // @ts-ignore - web-specific prop
-              dangerouslySetInnerHTML={{
-                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18V3z"/><path d="M3 8h18"/><path d="M3 12h18"/><path d="M3 16h18"/><path d="M8 3v18M16 3v18"/></svg>`,
-              }}
-            />
-          ) : (
-            <IconSymbol name="ruler.fill" size={48} color={onboardingColors.primary} />
-          )}
+          <HeightIllustration />
         </View>
         
         {/* Title */}
@@ -1825,20 +2190,7 @@ export default function OnboardingScreen() {
     <View style={styles.stepContentAnimated}>
       {/* SVG Illustration */}
       <View style={styles.stepIllustration}>
-        {Platform.OS === 'web' ? (
-          <View
-            style={{
-              width: 48,
-              height: 48,
-            }}
-            // @ts-ignore - web-specific prop
-            dangerouslySetInnerHTML={{
-              __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
-            }}
-          />
-        ) : (
-          <IconSymbol name="bolt.fill" size={48} color={onboardingColors.primary} />
-        )}
+        <ActivityIllustration />
       </View>
       
       {/* Title */}
@@ -1949,20 +2301,99 @@ export default function OnboardingScreen() {
       <View style={styles.stepContentAnimated}>
         {/* SVG Illustration */}
         <View style={styles.stepIllustration}>
-          {Platform.OS === 'web' ? (
+          <View
+            style={{
+              width: 172,
+              height: 172,
+              borderRadius: 28,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: `${onboardingColors.primary}0F`,
+              shadowColor: '#000',
+              shadowOpacity: Platform.OS === 'web' ? 0 : 0.08,
+              shadowOffset: { width: 0, height: 8 },
+              shadowRadius: 16,
+              elevation: 4,
+            }}
+          >
             <View
               style={{
-                width: 48,
-                height: 48,
+                width: 148,
+                height: 148,
+                borderRadius: 24,
+                backgroundColor: '#fff',
+                borderWidth: 2,
+                borderColor: `${onboardingColors.primary}50`,
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                paddingTop: 18,
+                overflow: 'hidden',
               }}
-              // @ts-ignore - web-specific prop
-              dangerouslySetInnerHTML={{
-                __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`,
-              }}
-            />
-          ) : (
-            <IconSymbol name="scalemass" size={48} color={onboardingColors.primary} />
-          )}
+            >
+              {/* Scale window */}
+              <View
+                style={{
+                  width: 96,
+                  height: 42,
+                  borderRadius: 12,
+                  backgroundColor: `${onboardingColors.primary}12`,
+                  borderWidth: 2,
+                  borderColor: `${onboardingColors.primary}50`,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    width: 70,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: `${onboardingColors.primary}30`,
+                    position: 'absolute',
+                    top: 10,
+                  }}
+                />
+                <View
+                  style={{
+                    width: 2,
+                    height: 22,
+                    backgroundColor: onboardingColors.primary,
+                    borderRadius: 2,
+                    transform: [{ rotate: '-8deg' }],
+                  }}
+                />
+              </View>
+
+              {/* Foot pads */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  width: '72%',
+                  marginTop: 22,
+                }}
+              >
+                {[0, 1].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: 46,
+                      height: 62,
+                      borderRadius: 18,
+                      backgroundColor: `${onboardingColors.primary}14`,
+                      borderWidth: 1.5,
+                      borderColor: `${onboardingColors.primary}30`,
+                      shadowColor: '#000',
+                      shadowOpacity: Platform.OS === 'web' ? 0 : 0.05,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowRadius: 6,
+                      elevation: 2,
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
         </View>
         
         {/* Title */}
@@ -1977,7 +2408,7 @@ export default function OnboardingScreen() {
         <View style={styles.unitToggleModern}>
           {[
             { value: 'kg', label: 'kg' },
-            { value: 'lbs', label: 'lbs' },
+            { value: 'lb', label: 'lbs' },
           ].map((unitOption) => {
             const selected = currentWeightUnit === unitOption.value;
             
@@ -2012,14 +2443,14 @@ export default function OnboardingScreen() {
                   if (unitOption.value === 'kg') {
                     setCurrentWeightUnit('kg');
                     if (currentWeightLb) {
-                      const kg = parseFloat(currentWeightLb) / 2.20462;
-                      setCurrentWeightKg(kg.toFixed(1));
+                      const kg = roundTo1(lbToKg(parseFloat(currentWeightLb)));
+                      setCurrentWeightKg(kg.toString());
                     }
                   } else {
-                    setCurrentWeightUnit('lbs');
+                    setCurrentWeightUnit('lb');
                     if (currentWeightKg) {
-                      const lbs = parseFloat(currentWeightKg) * 2.20462;
-                      setCurrentWeightLb(lbs.toFixed(1));
+                      const lbs = roundTo1(kgToLb(parseFloat(currentWeightKg)));
+                      setCurrentWeightLb(lbs.toString());
                     }
                   }
                   setError(null);
@@ -2064,7 +2495,7 @@ export default function OnboardingScreen() {
                 placeholderTextColor={colors.textSecondary}
                 value={currentWeightKg}
                 onChangeText={(text) => {
-                  setCurrentWeightKg(filterNumericInput(text));
+                  setCurrentWeightKg(limitWeightInput(text));
                   setError(null);
                 }}
                 keyboardType="numeric"
@@ -2091,7 +2522,7 @@ export default function OnboardingScreen() {
                 placeholderTextColor={colors.textSecondary}
                 value={currentWeightLb}
                 onChangeText={(text) => {
-                  setCurrentWeightLb(filterNumericInput(text));
+                  setCurrentWeightLb(limitWeightInput(text));
                   setError(null);
                 }}
                 keyboardType="numeric"
@@ -2107,11 +2538,51 @@ export default function OnboardingScreen() {
             <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>
               {currentWeightUnit}
             </Text>
+        </View>
+
+        {/* Body Fat % (optional) */}
+        <View style={{ width: '100%', marginTop: 16 }}>
+          <ThemedText style={[styles.label, { color: colors.text, marginBottom: 8 }]}>
+            Body Fat % (optional)
+          </ThemedText>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={[
+                styles.inputModern,
+                {
+                  borderColor:
+                    error && currentBodyFatPercent && (parseFloat(currentBodyFatPercent) <= 0 || parseFloat(currentBodyFatPercent) > 80)
+                      ? '#EF4444'
+                      : '#E5E7EB',
+                  color: colors.text,
+                  backgroundColor: '#FFFFFF',
+                },
+                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
+              ]}
+              placeholder="Optional (e.g., 18.5)"
+              placeholderTextColor={colors.textSecondary}
+              value={currentBodyFatPercent}
+              onChangeText={(text) => {
+                setCurrentBodyFatPercent(limitBodyFatInput(text));
+                setError(null);
+              }}
+              maxLength={4}
+              keyboardType="numeric"
+              editable={!loading}
+              {...getInputAccessibilityProps(
+                'Body fat percentage',
+                'Enter your body fat percentage',
+                undefined,
+                false
+              )}
+            />
+            <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>%</Text>
           </View>
         </View>
       </View>
-    );
-  };
+    </View>
+  );
+};
   
   const renderGoalWeightStep = () => {
     return (
@@ -2146,7 +2617,7 @@ export default function OnboardingScreen() {
         <View style={styles.unitToggleModern}>
           {[
             { value: 'kg', label: 'kg' },
-            { value: 'lbs', label: 'lbs' },
+            { value: 'lb', label: 'lbs' },
           ].map((unitOption) => {
             const selected = goalWeightUnit === unitOption.value;
             
@@ -2181,14 +2652,14 @@ export default function OnboardingScreen() {
                   if (unitOption.value === 'kg') {
                     setGoalWeightUnit('kg');
                     if (goalWeightLb) {
-                      const kg = parseFloat(goalWeightLb) / 2.20462;
-                      setGoalWeightKg(kg.toFixed(1));
+                      const kg = roundTo1(lbToKg(parseFloat(goalWeightLb)));
+                      setGoalWeightKg(kg.toString());
                     }
                   } else {
-                    setGoalWeightUnit('lbs');
+                    setGoalWeightUnit('lb');
                     if (goalWeightKg) {
-                      const lbs = parseFloat(goalWeightKg) * 2.20462;
-                      setGoalWeightLb(lbs.toFixed(1));
+                      const lbs = roundTo1(kgToLb(parseFloat(goalWeightKg)));
+                      setGoalWeightLb(lbs.toString());
                     }
                   }
                   setError(null);
@@ -2233,7 +2704,7 @@ export default function OnboardingScreen() {
                 placeholderTextColor={colors.textSecondary}
                 value={goalWeightKg}
                 onChangeText={(text) => {
-                  setGoalWeightKg(filterNumericInput(text));
+                  setGoalWeightKg(limitWeightInput(text));
                   setError(null);
                 }}
                 keyboardType="numeric"
@@ -2260,7 +2731,7 @@ export default function OnboardingScreen() {
                 placeholderTextColor={colors.textSecondary}
                 value={goalWeightLb}
                 onChangeText={(text) => {
-                  setGoalWeightLb(filterNumericInput(text));
+                  setGoalWeightLb(limitWeightInput(text));
                   setError(null);
                 }}
                 keyboardType="numeric"
@@ -2289,13 +2760,13 @@ export default function OnboardingScreen() {
     
     if (currentWeightUnit === 'kg' && currentWeightKg) {
       currentWeightDisplay = `${currentWeightKg} kg`;
-    } else if (currentWeightUnit === 'lbs' && currentWeightLb) {
+    } else if (currentWeightUnit === 'lb' && currentWeightLb) {
       currentWeightDisplay = `${currentWeightLb} lb`;
     }
     
     if (goalWeightUnit === 'kg' && goalWeightKg) {
       goalWeightDisplay = `${goalWeightKg} kg`;
-    } else if (goalWeightUnit === 'lbs' && goalWeightLb) {
+    } else if (goalWeightUnit === 'lb' && goalWeightLb) {
       goalWeightDisplay = `${goalWeightLb} lb`;
     }
     
@@ -2676,18 +3147,18 @@ export default function OnboardingScreen() {
               style={[
                 styles.unitButton,
                 { borderColor: colors.border },
-                weightUnit === 'lbs' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
+              weightUnit === 'lb' && { backgroundColor: onboardingColors.primary, borderColor: onboardingColors.primary },
               ]}
               onPress={() => {
-                setWeightUnit('lbs');
+              setWeightUnit('lb');
                 if (weightKg) {
-                  const lbs = parseFloat(weightKg) * 2.20462;
-                  setWeightLb(lbs.toFixed(1));
+                const lbs = roundTo1(kgToLb(parseFloat(weightKg)));
+                setWeightLb(lbs.toString());
                 }
               }}
               disabled={loading}
             >
-              <Text style={[styles.unitButtonText, { color: weightUnit === 'lbs' ? '#fff' : colors.text }]}>
+            <Text style={[styles.unitButtonText, { color: weightUnit === 'lb' ? '#fff' : colors.text }]}>
                 lbs
               </Text>
             </TouchableOpacity>
@@ -2700,8 +3171,8 @@ export default function OnboardingScreen() {
               onPress={() => {
                 setWeightUnit('kg');
                 if (weightLb) {
-                  const kg = parseFloat(weightLb) / 2.20462;
-                  setWeightKg(kg.toFixed(1));
+                const kg = roundTo1(lbToKg(parseFloat(weightLb)));
+                setWeightKg(kg.toString());
                 }
               }}
               disabled={loading}
@@ -2712,7 +3183,7 @@ export default function OnboardingScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        {weightUnit === 'lbs' ? (
+      {weightUnit === 'lb' ? (
           <TextInput
             style={[
               styles.input,
@@ -2726,7 +3197,7 @@ export default function OnboardingScreen() {
             placeholder="45 to 1200"
             placeholderTextColor={colors.textSecondary}
             value={weightLb}
-            onChangeText={(text) => setWeightLb(filterNumericInput(text))}
+            onChangeText={(text) => setWeightLb(limitWeightInput(text))}
             keyboardType="numeric"
             editable={!loading}
             {...getInputAccessibilityProps('Weight in pounds', 'Enter your weight in pounds', error && !weightLb ? error : undefined, true)}
@@ -2745,7 +3216,7 @@ export default function OnboardingScreen() {
             placeholder="20 to 544"
             placeholderTextColor={colors.textSecondary}
             value={weightKg}
-            onChangeText={(text) => setWeightKg(filterNumericInput(text))}
+            onChangeText={(text) => setWeightKg(limitWeightInput(text))}
             keyboardType="numeric"
             editable={!loading}
             {...getInputAccessibilityProps('Weight in kilograms', 'Enter your weight in kilograms', error && !weightKg ? error : undefined, true)}

@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ageFromDob } from '@/utils/calculations';
+import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
 import { supabase } from '@/lib/supabase';
 import {
   getButtonAccessibilityProps,
@@ -77,12 +78,15 @@ export default function EditProfileScreen() {
         setHeightIn(inches.toString());
       }
       
-      const weightLbValue = profileData.weight_lb?.toString() || '';
-      setWeightLb(weightLbValue);
-      // Convert lbs to kg for display
-      if (weightLbValue) {
-        const kgValue = (parseFloat(weightLbValue) / 2.20462).toFixed(1);
-        setWeightKg(kgValue);
+      const weightLbValue = typeof profileData.weight_lb === 'number' ? profileData.weight_lb : null;
+      if (weightLbValue !== null) {
+        const displayLb = roundTo1(weightLbValue);
+        const displayKg = roundTo1(lbToKg(weightLbValue));
+        setWeightLb(displayLb.toString());
+        setWeightKg(displayKg.toString());
+      } else {
+        setWeightLb('');
+        setWeightKg('');
       }
       
       // Initialize selectedDate from dateOfBirth
@@ -190,6 +194,21 @@ export default function EditProfileScreen() {
     return filtered;
   };
 
+  // Limit to a single decimal place for weight inputs
+  const limitToOneDecimal = (text: string): string => {
+    const filtered = filterNumericInput(text);
+    const parts = filtered.split('.');
+    if (parts.length <= 1) return filtered;
+    return `${parts[0]}.${parts[1].slice(0, 1)}`;
+  };
+
+  const limitWeightInput = (text: string): string => {
+    const oneDecimal = limitToOneDecimal(text);
+    const [intPart, decPart] = oneDecimal.split('.');
+    const limitedInt = intPart.slice(0, 3); // max 3 digits before decimal
+    return decPart !== undefined ? `${limitedInt}.${decPart}` : limitedInt;
+  };
+
   // Conversion functions
   const convertHeightToCm = (): number | null => {
     if (heightUnit === 'cm') {
@@ -210,7 +229,7 @@ export default function EditProfileScreen() {
       return isNaN(lbs) ? null : lbs;
     } else {
       const kg = parseFloat(weightKg);
-      return isNaN(kg) ? null : kg * 2.20462;
+      return isNaN(kg) ? null : kgToLb(kg);
     }
   };
 
@@ -310,7 +329,7 @@ export default function EditProfileScreen() {
         date_of_birth: dateOfBirth,
         gender,
         height_cm: heightCmValue,
-        weight_lb: weightLbValue,
+        weight_lb: roundTo3(weightLbValue),
         height_unit: heightUnit,
         weight_unit: weightUnit,
       };
@@ -587,8 +606,8 @@ export default function EditProfileScreen() {
                     saveUnitPreference('weight', 'lbs');
                     // Convert kg to lbs when switching
                     if (weightKg) {
-                      const lbs = parseFloat(weightKg) * 2.20462;
-                      setWeightLb(lbs.toFixed(1));
+                  const lbs = roundTo1(kgToLb(parseFloat(weightKg)));
+                  setWeightLb(lbs.toString());
                     }
                   }}
                 >
@@ -608,8 +627,8 @@ export default function EditProfileScreen() {
                     saveUnitPreference('weight', 'kg');
                     // Convert lbs to kg when switching
                     if (weightLb) {
-                      const kg = parseFloat(weightLb) / 2.20462;
-                      setWeightKg(kg.toFixed(1));
+                  const kg = roundTo1(lbToKg(parseFloat(weightLb)));
+                  setWeightKg(kg.toString());
                     }
                   }}
                 >
@@ -625,7 +644,7 @@ export default function EditProfileScreen() {
                 placeholder="45 to 1200"
                 placeholderTextColor={colors.textSecondary}
                 value={weightLb}
-                onChangeText={(text) => setWeightLb(filterNumericInput(text))}
+            onChangeText={(text) => setWeightLb(limitWeightInput(text))}
                 keyboardType="numeric"
               />
             ) : (
@@ -634,7 +653,7 @@ export default function EditProfileScreen() {
                 placeholder="20 to 544"
                 placeholderTextColor={colors.textSecondary}
                 value={weightKg}
-                onChangeText={(text) => setWeightKg(filterNumericInput(text))}
+            onChangeText={(text) => setWeightKg(limitWeightInput(text))}
                 keyboardType="numeric"
               />
             )}
