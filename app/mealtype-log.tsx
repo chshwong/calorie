@@ -12,6 +12,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFoodSearch } from '@/hooks/use-food-search';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
+import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
 import { useFrequentFoods } from '@/hooks/use-frequent-foods';
 import { useRecentFoods } from '@/hooks/use-recent-foods';
@@ -269,6 +271,62 @@ export default function LogFoodScreen() {
   const upsertMealtypeMetaMutation = useUpsertMealtypeMeta();
   
   const currentMealMeta = dataByMealType?.[selectedMealType] || null;
+
+  // Copy from yesterday hook (reuse home behaviour)
+  const { isCopyingFromYesterday, runCopyFromYesterday } = useCopyFromYesterday();
+
+  // Determine if the selected date is today (local)
+  const isSelectedDateToday = useMemo(() => {
+    const today = getLocalDateString();
+    return selectedDateString === today;
+  }, [selectedDateString]);
+
+  // Clone entries from previous day for this meal type
+  const { cloneMealTypeFromPreviousDay, isLoading: isCloningFromPreviousDay } = useCloneMealTypeFromPreviousDay({
+    currentDate: new Date(selectedDateString),
+    mealType: selectedMealType,
+    onSuccess: async (result) => {
+      // Refresh entries after copy
+      await refetchEntries();
+      if (result.totalCount > 0) {
+        const itemsLabel = result.totalCount === 1 ? t('home.previous_day_copy.item_one') : t('home.previous_day_copy.item_other');
+        showAppToast(t('home.previous_day_copy.success_message', { count: result.totalCount, items: itemsLabel }));
+      }
+    },
+    onError: (error: Error) => {
+      if (error.message === 'NOTHING_TO_COPY') {
+        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+      if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
+        Alert.alert(
+          t('home.previous_day_copy.error_title'),
+          t('home.previous_day_copy.same_date_error')
+        );
+      } else {
+        Alert.alert(
+          t('home.previous_day_copy.error_title'),
+          t('home.previous_day_copy.error_message', {
+            error: error.message || t('common.unexpected_error'),
+          })
+        );
+      }
+    },
+  });
+
+  const handleCopyFromPreviousDay = useCallback(() => {
+    runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
+  }, [cloneMealTypeFromPreviousDay, runCopyFromYesterday]);
+
+  const handleEmptyQuickLog = useCallback(() => {
+    router.push({
+      pathname: '/quick-log',
+      params: {
+        date: selectedDateString,
+        mealType: selectedMealType,
+      },
+    });
+  }, [router, selectedDateString, selectedMealType]);
   
   // Handlers for Notes
   const handleNotes = () => {
@@ -4055,9 +4113,14 @@ export default function LogFoodScreen() {
             </View>
           ) : entries.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
-              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                {t('mealtype_log.food_log.no_entries')}
-              </ThemedText>
+              <View style={{ alignItems: 'center' }}>
+                <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary, fontWeight: '600' }]}>
+                  Log your first entry for this meal!
+                </ThemedText>
+                <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary, marginTop: 2 }]}>
+                  Search for your food above.
+                </ThemedText>
+              </View>
               <TouchableOpacity
                 style={[styles.barcodeButton, { 
                   backgroundColor: colors.tint + '15', 
@@ -4082,6 +4145,57 @@ export default function LogFoodScreen() {
                 />
                 <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
                   {t('mealtype_log.scanner.title', 'Scan Barcode')}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.barcodeButton,
+                  {
+                    backgroundColor: colors.tint + '12',
+                    borderColor: colors.tint + '30',
+                    marginTop: 12,
+                    flexDirection: 'row',
+                    gap: 8,
+                  },
+                ]}
+                onPress={handleCopyFromPreviousDay}
+                activeOpacity={0.7}
+                disabled={isCopyingFromYesterday || isCloningFromPreviousDay}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <IconSymbol
+                  name="doc.on.doc"
+                  size={20}
+                  color={colors.tint}
+                  decorative={true}
+                />
+                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
+                  {isSelectedDateToday ? 'Copy from yesterday' : 'Copy from previous day'}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.barcodeButton,
+                  {
+                    backgroundColor: colors.tint + '12',
+                    borderColor: colors.tint + '30',
+                    marginTop: 12,
+                    flexDirection: 'row',
+                    gap: 8,
+                  },
+                ]}
+                onPress={handleEmptyQuickLog}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <IconSymbol
+                  name="bolt.fill"
+                  size={20}
+                  color={colors.tint}
+                  decorative={true}
+                />
+                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
+                  ⚡ Quick Log
                 </ThemedText>
               </TouchableOpacity>
             </View>
