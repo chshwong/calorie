@@ -20,6 +20,7 @@ type AuthContextType = {
   isPasswordRecovery: () => boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfileState: (profile: any | null) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   isPasswordRecovery: () => false,
   signOut: async () => {},
   refreshProfile: async () => {},
+  updateProfileState: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -387,7 +389,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const onboardingComplete = profile?.onboarding_complete === true;
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, retrying, isAdmin, onboardingComplete, isPasswordRecovery, signOut, refreshProfile }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        profile,
+        loading,
+        retrying,
+        isAdmin,
+        onboardingComplete,
+        isPasswordRecovery,
+        signOut,
+        refreshProfile,
+        updateProfileState: (profileData) => {
+          setProfile(profileData);
+          saveProfileSnapshot(profileData);
+        },
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

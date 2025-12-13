@@ -14,6 +14,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloneDayEntries, type CloneEntityType } from '@/lib/services/cloneDayEntries';
+import { getLocalDateKey } from '@/utils/dateTime';
 
 /**
  * Helper to get query key for entity type
@@ -80,8 +81,8 @@ export function useCloneFromPreviousDay(options: CloneFromPreviousDayOptions) {
       previousDay.setDate(previousDay.getDate() - 1);
       
       // Format dates as YYYY-MM-DD
-      const sourceDate = previousDay.toISOString().split('T')[0];
-      const targetDate = currentDate.toISOString().split('T')[0];
+      const sourceDate = getLocalDateKey(previousDay);
+      const targetDate = getLocalDateKey(currentDate);
 
       // Check cache first - if no entries exist, throw special error
       const sourceQueryKey = getQueryKeyForEntityType(entityType, userId, sourceDate);

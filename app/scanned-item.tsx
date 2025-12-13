@@ -16,6 +16,7 @@ import {
   promoteToFoodMaster,
   calculateNutritionForServing,
 } from '@/services/barcode-lookup';
+import { getLocalDateKey } from '@/utils/dateTime';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -91,7 +92,7 @@ export default function ScannedItemScreen() {
       pathname: '/mealtype-log',
       params: {
         mealType: mealType || 'breakfast',
-        entryDate: entryDate || new Date().toISOString().split('T')[0],
+        entryDate: entryDate || getLocalDateKey(new Date()),
         openBarcodeScanner: 'true',
       },
     });

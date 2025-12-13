@@ -23,6 +23,7 @@ import {
 } from '@/lib/services/waterLogs';
 import { WaterUnit, toMl, fromMl } from '@/utils/waterUnits';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+import { getLocalDateKey } from '@/utils/dateTime';
 
 
 
@@ -173,9 +174,9 @@ export function useWaterDaily(options?: {
   const endDate = new Date(targetDate);
   endDate.setDate(endDate.getDate() + daysForward);
 
-  const startDateString = startDate.toISOString().split('T')[0];
-  const endDateString = endDate.toISOString().split('T')[0];
-  const targetDateString = targetDate.toISOString().split('T')[0];
+  const startDateString = getLocalDateKey(startDate);
+  const endDateString = getLocalDateKey(endDate);
+  const targetDateString = getLocalDateKey(targetDate);
 
   // Fetch range data
   const rangeQuery = useWaterDailyForDateRange(startDateString, endDateString);
@@ -421,7 +422,7 @@ export function useWaterDaily(options?: {
       // Check if this was today's goal update
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayString = today.toISOString().split('T')[0];
+    const todayString = getLocalDateKey(today);
       const isToday = variables.dateString === todayString;
 
       // Refetch to ensure consistency

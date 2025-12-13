@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { getLocalDateKey } from '@/utils/dateTime';
 
 // Type definition for med log
 // Note: 'other' type is deprecated but may exist in legacy data (displayed as 'med')
@@ -98,8 +99,8 @@ export async function getMedSummaryForRecentDays(
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - (days - 1));
 
-    const startDateString = startDate.toISOString().split('T')[0];
-    const endDateString = endDate.toISOString().split('T')[0];
+    const startDateString = getLocalDateKey(startDate);
+    const endDateString = getLocalDateKey(endDate);
 
     const { data, error } = await supabase
       .from('med_log')
@@ -162,7 +163,7 @@ export async function getRecentAndFrequentMeds(
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - days);
 
-    const startDateString = startDate.toISOString().split('T')[0];
+    const startDateString = getLocalDateKey(startDate);
 
     const { data, error } = await supabase
       .from('med_log')

@@ -14,7 +14,7 @@
  */
 
 import { useRef } from 'react';
-import { TouchableOpacity, Animated, Platform, StyleSheet } from 'react-native';
+import { TouchableOpacity, Animated, Platform, StyleSheet, StyleProp, TextStyle } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
@@ -27,9 +27,10 @@ type QuickAddChipProps = {
   metadata?: string | null;
   colors: typeof Colors.light;
   onPress: () => void;
+  textStyle?: StyleProp<TextStyle>;
 };
 
-export function QuickAddChip({ label, icon, metadata, colors, onPress }: QuickAddChipProps) {
+export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle }: QuickAddChipProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Visual feedback only - scale down on press in
@@ -77,7 +78,7 @@ export function QuickAddChip({ label, icon, metadata, colors, onPress }: QuickAd
             style={{ marginRight: Spacing.xs }} 
           />
         )}
-        <ThemedText style={[styles.chipText, { color: colors.text }]}>
+        <ThemedText style={[styles.chipText, { color: colors.text }, textStyle]}>
           {label}
           {metadata && ` – ${metadata}`}
         </ThemedText>
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     marginRight: Spacing.sm,

@@ -29,6 +29,7 @@ import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import {
@@ -1453,7 +1454,7 @@ export default function MedsHomeScreen() {
                 // Check cache for previous day before cloning
                 const previousDay = new Date(selectedDate);
                 previousDay.setDate(previousDay.getDate() - 1);
-                const previousDateString = previousDay.toISOString().split('T')[0];
+                const previousDateString = getLocalDateKey(previousDay);
                 
                 // Use React Query cache to check if previous day has entries
                 const previousDayQueryKey = ['medLogs', user?.id, previousDateString];
@@ -1831,7 +1832,7 @@ export default function MedsHomeScreen() {
           }
           
           showAppToast(t('meds.clone.toast_cloning'));
-          const targetDateString = targetDate.toISOString().split('T')[0];
+          const targetDateString = getLocalDateKey(targetDate);
           cloneMutation.mutate(
             {
               sourceDate: selectedDateString,

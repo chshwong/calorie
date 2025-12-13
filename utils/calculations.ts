@@ -1,3 +1,5 @@
+import { getLocalDateKey } from './dateTime';
+
 /**
  * TIMEZONE HANDLING STRATEGY:
  * 
@@ -125,8 +127,7 @@ export const getLastNDays = (today: Date, days: number = 7): string[] => {
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    const dateString = date.toISOString().split('T')[0];
-    dateStrings.push(dateString);
+    dateStrings.push(getLocalDateKey(date));
   }
   return dateStrings;
 };
@@ -191,7 +192,7 @@ export const formatDateForDisplay = (
  * @returns Date string in YYYY-MM-DD format
  */
 export const getDateString = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  return getLocalDateKey(date);
 };
 
 /**

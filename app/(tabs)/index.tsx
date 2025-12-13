@@ -18,6 +18,7 @@ import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
@@ -93,7 +94,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     // Check cache for previous day before cloning
     const previousDay = new Date(selectedDate);
     previousDay.setDate(previousDay.getDate() - 1);
-    const previousDateString = previousDay.toISOString().split('T')[0];
+    const previousDateString = getLocalDateKey(previousDay);
     
     // Use React Query cache to check if previous day has entries or notes for this meal type
     const previousDayQueryKey = ['entries', user?.id, previousDateString];
@@ -496,61 +497,9 @@ export default function FoodLogHomeScreen() {
     }, [user?.id, refetchEntries])
   );
 
-  // Only show error if profile is truly missing after all attempts (not loading, not retrying, and user exists)
-  // Otherwise, keep UI visible and let background loading/retries happen silently
-  if (!cachedProfile && !isProfileLoading && !loading && !retrying && user) {
-    return (
-      <ThemedView style={[styles.container, styles.centerContent]}>
-        <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center' }}>
-          {t('home.profile_not_found.title')}
-        </ThemedText>
-        <ThemedText style={{ marginBottom: 24, textAlign: 'center', paddingHorizontal: 20 }}>
-          {t('home.profile_not_found.message')}
-        </ThemedText>
-        <TouchableOpacity
-          style={[styles.errorLogoutButton, { backgroundColor: colors.tint, minWidth: 150 }]}
-          onPress={signOut}
-        >
-          <Text style={styles.errorLogoutButtonText}>{t('home.profile_not_found.logout_button')}</Text>
-        </TouchableOpacity>
-      </ThemedView>
-    );
-  }
+  const profileNotFound = !cachedProfile && !isProfileLoading && !loading && !retrying && user;
 
   const showLoadingModal = !cachedProfile && isProfileLoading;
-
-  if (!cachedProfile && isProfileLoading) {
-    return (
-      <ThemedView style={styles.container}>
-        <Modal
-          transparent
-          animationType="fade"
-          visible={showLoadingModal}
-          onRequestClose={() => {}}
-        >
-          <View
-            style={[styles.loadingModalOverlay, { backgroundColor: colors.overlay }]}
-            pointerEvents="none"
-          >
-            <View
-              style={[styles.loadingModalContent, { backgroundColor: colors.card }]}
-            >
-              <ActivityIndicator size="small" color={colors.tint} />
-            </View>
-          </View>
-        </Modal>
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.scrollContent}>
-            {/* Empty state – UI will populate when profile loads */}
-          </View>
-        </ScrollView>
-      </ThemedView>
-    );
-  }
 
   const { dailyTotals, groupedEntries } = useMemo(() => {
     const transformStart = performance.now();
@@ -610,7 +559,7 @@ export default function FoodLogHomeScreen() {
   };
 
   const handleCopyConfirm = (mealType: string, targetDate: Date, targetMealType: string, includeNotes: boolean) => {
-    const targetDateString = targetDate.toISOString().split('T')[0];
+    const targetDateString = getLocalDateKey(targetDate);
     
     // Helper to check if two dates are the same day
     const isSameDay = (date1: string, date2: string): boolean => {

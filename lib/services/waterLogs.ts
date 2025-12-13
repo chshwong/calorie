@@ -11,6 +11,7 @@
 import { supabase } from '@/lib/supabase';
 import { getUserProfile, updateUserProfile } from '@/lib/services/profile';
 import { WaterUnit, toMl, fromMl, toGoalTripletFromMl, getEffectiveGoal } from '@/utils/waterUnits';
+import { getLocalDateKey } from '@/utils/dateTime';
 
 // Type definition for water daily log
 export type WaterDaily = {
@@ -257,7 +258,7 @@ export async function setWaterGoal(
     // Check if this is today's date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayString = today.toISOString().split('T')[0];
+    const todayString = getLocalDateKey(today);
     const isToday = dateString === todayString;
 
     // Get or create record (ensures it exists)
@@ -400,7 +401,7 @@ export async function syncTodayWaterWithProfile(
     // Get today's date string
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayString = today.toISOString().split('T')[0];
+    const todayString = getLocalDateKey(today);
 
     // Try to get existing record for today
     const existing = await getWaterDailyForDate(userId, todayString);

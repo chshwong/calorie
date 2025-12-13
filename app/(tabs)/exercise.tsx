@@ -25,6 +25,7 @@ import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
 import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import {
@@ -579,6 +580,7 @@ export default function ExerciseHomeScreen() {
   }, [exerciseLogs]);
 
   // Handle quick add (from chips)
+  const chipTextStyle = { fontSize: FontSize.base + 2 };
   const handleQuickAdd = useCallback((name: string, minutes: number | null) => {
     if (!user?.id) return;
 
@@ -890,7 +892,7 @@ export default function ExerciseHomeScreen() {
                 }
                 rightContent={
                   !logsLoading && (
-                    <View style={styles.headerButtons}>
+                    <View style={[styles.headerButtons, styles.headerButtonsAlignRight]}>
                       {!editMode ? (
                         <>
                           {/* Clone button */}
@@ -1092,7 +1094,7 @@ export default function ExerciseHomeScreen() {
                 // Check cache for previous day before cloning
                 const previousDay = new Date(selectedDate);
                 previousDay.setDate(previousDay.getDate() - 1);
-                const previousDateString = previousDay.toISOString().split('T')[0];
+                const previousDateString = getLocalDateKey(previousDay);
                 
                 // Use React Query cache to check if previous day has entries
                 const previousDayQueryKey = ['exerciseLogs', user?.id, previousDateString];
@@ -1147,6 +1149,7 @@ export default function ExerciseHomeScreen() {
                       label={exercise.name}
                       metadata={minutesText}
                       colors={colors}
+                      textStyle={chipTextStyle}
                       onPress={() => handleQuickAdd(exercise.name, exercise.minutes)}
                     />
                   );
@@ -1187,6 +1190,7 @@ export default function ExerciseHomeScreen() {
                   key={`default-${exercise.i18nKey}`}
                   label={translatedName}
                   colors={colors}
+                  textStyle={chipTextStyle}
                   onPress={() => handleQuickAdd(translatedName, null)}
                 />
               );
@@ -1407,7 +1411,7 @@ export default function ExerciseHomeScreen() {
           }
           
           showAppToast(t('exercise.clone.toast_cloning'));
-          const targetDateString = targetDate.toISOString().split('T')[0];
+          const targetDateString = getLocalDateKey(targetDate);
           cloneMutation.mutate(
             {
               sourceDate: selectedDateString,
@@ -1489,7 +1493,7 @@ const styles = StyleSheet.create({
   // Responsive container for exercise sections
   responsiveContainer: {
     width: '100%',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   responsiveContainerLarge: {
     maxWidth: 900,
@@ -1499,7 +1503,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing['2xl'],
+    marginBottom: Spacing['xl'],
   },
   pageTitle: {
     fontSize: FontSize['3xl'],
@@ -1549,7 +1553,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.none,
   },
   previousDayButton: {
     flexDirection: 'row',
@@ -1581,12 +1585,12 @@ const styles = StyleSheet.create({
   },
   // Exercise list styles
   exerciseList: {
-    marginTop: Spacing.xs,
+    marginTop: Spacing.none,
   },
   exerciseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.xs,
     paddingRight: Spacing.sm,
   },
   exerciseRowContent: {
@@ -1622,7 +1626,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   minutesBadgeText: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     fontWeight: '600',
   },
   // Inline minutes editor styles
@@ -1674,7 +1678,7 @@ const styles = StyleSheet.create({
     // 3 rows: (40px * 3) + (8px * 2) = 136px, rounded to 140px with buffer
     // This is a layout constraint, not a spacing token, so hardcoded value is acceptable per guideline 8.1
     maxHeight: 140,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.none,
     ...(Platform.OS === 'web' && {
       overflowY: 'auto',
       overflowX: 'hidden',
@@ -1689,7 +1693,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.md,
+    padding: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     gap: Spacing.sm,
@@ -1697,7 +1701,7 @@ const styles = StyleSheet.create({
     ...getMinTouchTargetStyle(),
   },
   customButtonText: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.md,
     fontWeight: '600',
   },
   // Clone edit mode styles
@@ -1719,6 +1723,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+  },
+  headerButtonsAlignRight: {
+    marginRight: -Spacing.sm, // Nudge action icons right to align with row trash icons
   },
   deleteButton: {
     width: 36,

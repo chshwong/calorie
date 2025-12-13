@@ -241,7 +241,7 @@ export const BorderRadius = {
 export const FontSize = {
   xs: 10,
   sm: 12,
-  base: 14,
+  base: 11,
   md: 16,
   lg: 18,
   xl: 20,

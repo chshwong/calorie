@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { getLocalDateKey } from '@/utils/dateTime';
 
 // Type definition for exercise log
 export type ExerciseLog = {
@@ -99,8 +100,8 @@ export async function getExerciseSummaryForRecentDays(
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - (days - 1));
 
-    const startDateString = startDate.toISOString().split('T')[0];
-    const endDateString = endDate.toISOString().split('T')[0];
+    const startDateString = getLocalDateKey(startDate);
+    const endDateString = getLocalDateKey(endDate);
 
     const { data, error } = await supabase
       .from('exercise_log')
@@ -177,7 +178,7 @@ export async function getRecentAndFrequentExercises(
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - days);
 
-    const startDateString = startDate.toISOString().split('T')[0];
+    const startDateString = getLocalDateKey(startDate);
 
     // Fetch all logs in the time window
     const { data, error } = await supabase
@@ -294,7 +295,7 @@ export async function getRecentFrequentExercises(
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - days);
 
-    const startDateString = startDate.toISOString().split('T')[0];
+    const startDateString = getLocalDateKey(startDate);
 
     const { data, error } = await supabase
       .from('exercise_log')

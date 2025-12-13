@@ -1,6 +1,12 @@
-import { supabase } from '@/lib/supabase';
-import { updateProfile } from './profileService';
 import { roundTo2, roundTo3 } from '@/utils/bodyMetrics';
+import { updateProfile } from './profileService';
+import {
+  fetchLatestBodyFatTimestamp,
+  fetchLatestWeighInTimestamp,
+  insertWeightLogRow,
+  updateProfileBodyFat,
+  updateProfileWeightLb,
+} from './weightLogs';
 
 type WeightEntryInput = {
   userId: string;
@@ -15,7 +21,7 @@ type WeightEntryInput = {
  * based on most recent weighed_at ordering.
  */
 export async function insertWeightLogAndUpdateProfile(input: WeightEntryInput) {
-  const weighed_at = new Date(input.weighedAt).toISOString();
+  const weighedAtDate = new Date(input.weighedAt);
   const weight_lb = roundTo3(input.weightLb);
   const body_fat_percent =
     input.bodyFatPercent !== undefined && input.bodyFatPercent !== null
@@ -23,20 +29,18 @@ export async function insertWeightLogAndUpdateProfile(input: WeightEntryInput) {
       : null;
   const weight_unit = input.weightUnit === 'lb' ? 'lbs' : input.weightUnit || null;
 
-  // Insert log row
-  const insertPayload: Record<string, any> = {
-    user_id: input.userId,
-    weighed_at,
-    weight_lb,
-    body_fat_percent,
-  };
-  // Only send weight_unit if the column exists; some deployments may not have it
-  // Keep it out of the payload to avoid "column does not exist" errors.
-  const { error: insertError } = await supabase.from('weight_log').insert(insertPayload);
+  let insertedWeighedAt = weighedAtDate.toISOString();
 
-  if (insertError) {
+  try {
+    const inserted = await insertWeightLogRow({
+      userId: input.userId,
+      weighedAt: weighedAtDate,
+      weightLb: weight_lb,
+      bodyFatPercent: body_fat_percent ?? undefined,
+    });
+    insertedWeighedAt = inserted.weighed_at ?? insertedWeighedAt;
+  } catch (insertError) {
     console.error('Error inserting weight_log (skipping profile sync)', insertError);
-    // Fallback: directly update profile with provided values (no recency guard possible)
     const fallbackUpdates: Record<string, any> = {};
     if (weight_unit) fallbackUpdates.weight_unit = weight_unit;
     fallbackUpdates.weight_lb = weight_lb;
@@ -49,51 +53,46 @@ export async function insertWeightLogAndUpdateProfile(input: WeightEntryInput) {
     return;
   }
 
-  // If we cannot fetch latest entries (e.g., table lacks columns), silently exit after insert
-  // Fetch most recent weight entry to guard profile updates
-  const { data: latestWeight, error: weightFetchError } = await supabase
-    .from('weight_log')
-    .select('weighed_at, weight_lb')
-    .eq('user_id', input.userId)
-    .order('weighed_at', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
+  const [latestWeightAt, latestBodyFatAt] = await Promise.all([
+    fetchLatestWeighInTimestamp(input.userId),
+    body_fat_percent !== null ? fetchLatestBodyFatTimestamp(input.userId) : Promise.resolve(null),
+  ]);
 
-  if (weightFetchError) {
-    console.error('Error fetching latest weight_log', weightFetchError);
-  }
-
-  // Fetch most recent body-fat entry where body_fat_percent is present
-  const { data: latestBodyFat, error: bodyFetchError } = await supabase
-    .from('weight_log')
-    .select('weighed_at, body_fat_percent')
-    .eq('user_id', input.userId)
-    .not('body_fat_percent', 'is', null)
-    .order('weighed_at', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (bodyFetchError) {
-    console.error('Error fetching latest body_fat entry', bodyFetchError);
-  }
-
-  const profileUpdates: Record<string, any> = {};
+  const updates: Record<string, any> = {};
   if (weight_unit) {
-    profileUpdates.weight_unit = weight_unit;
+    updates.weight_unit = weight_unit;
   }
 
-  if (latestWeight?.weighed_at === weighed_at) {
-    profileUpdates.weight_lb = weight_lb;
+  const insertedMs = new Date(insertedWeighedAt).getTime();
+
+  if (latestWeightAt && insertedMs >= new Date(latestWeightAt).getTime()) {
+    updates.weight_lb = weight_lb;
   }
 
-  if (body_fat_percent !== null && latestBodyFat?.weighed_at === weighed_at) {
-    profileUpdates.body_fat_percent = body_fat_percent;
+  if (
+    body_fat_percent !== null &&
+    latestBodyFatAt &&
+    insertedMs >= new Date(latestBodyFatAt).getTime()
+  ) {
+    updates.body_fat_percent = body_fat_percent;
   }
 
-  if (Object.keys(profileUpdates).length === 0) {
+  if (Object.keys(updates).length === 0) {
     return;
   }
 
-  await updateProfile(input.userId, profileUpdates);
+  if (updates.weight_lb !== undefined) {
+    await updateProfileWeightLb(input.userId, updates.weight_lb);
+    delete updates.weight_lb;
+  }
+
+  if (updates.body_fat_percent !== undefined) {
+    await updateProfileBodyFat(input.userId, updates.body_fat_percent);
+    delete updates.body_fat_percent;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await updateProfile(input.userId, updates);
+  }
 }
 

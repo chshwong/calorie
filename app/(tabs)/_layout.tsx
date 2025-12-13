@@ -8,7 +8,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { PlusButtonTab } from '@/components/plus-button-tab';
 import { MoreButtonTab } from '@/components/more-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
@@ -133,6 +133,11 @@ function TabLayoutContent() {
     router.push('/(tabs)/meds');
   };
 
+  const handleMoreWeight = () => {
+    setMoreMenuVisible(false);
+    router.push('/(tabs)/weight');
+  };
+
   const handleMoreWater = () => {
     setMoreMenuVisible(false);
     router.push('/(tabs)/water');
@@ -227,6 +232,14 @@ function TabLayoutContent() {
     });
   };
 
+  const openWeightEntryForToday = () => {
+    const todayString = getLocalDateString();
+    router.replace({
+      pathname: '/weight/entry',
+      params: { date: todayString },
+    });
+  };
+
   const renderQuickAddModuleCard = (config: typeof module1Config) => {
     const moduleIconMap: Record<FocusModule, string> = {
       'Food': '🍽️',
@@ -283,8 +296,9 @@ function TabLayoutContent() {
           // Handle Scan Barcode card - navigate to mealtype-log with auto-scan
           if (label === 'Scan Barcode') {
             openMealTypeLogForNow(true);
+          } else if (label === 'Enter Weight') {
+            openWeightEntryForToday();
           }
-          // Enter Weight and other cards can be handled here in the future
         }}
       >
         <View style={styles.quickAddCardIconCircle}>
@@ -309,6 +323,9 @@ function TabLayoutContent() {
               backgroundColor: colors.background,
               borderTopColor: colors.border,
               height: 54,
+            },
+            tabBarLabelStyle: {
+              fontSize: FontSize.base, // increased by ~2 points from default
             },
           }}>
         <Tabs.Screen
@@ -346,6 +363,18 @@ function TabLayoutContent() {
           name="water"
           options={{
             href: null, // Hide from tab bar
+          }}
+        />
+        <Tabs.Screen
+          name="weight/index"
+          options={{
+            href: null, // Hide weight home from tab bar
+          }}
+        />
+        <Tabs.Screen
+          name="weight/entry"
+          options={{
+            href: null, // Hide weight entry from tab bar
           }}
         />
         <Tabs.Screen
@@ -452,6 +481,10 @@ function TabLayoutContent() {
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreExercise}>
                 <Text style={styles.moreMenuItemText}>Exercise</Text>
+              </Pressable>
+
+              <Pressable style={styles.moreMenuItem} onPress={handleMoreWeight}>
+                <Text style={styles.moreMenuItemText}>Weight</Text>
               </Pressable>
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreMeds}>

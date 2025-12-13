@@ -75,9 +75,10 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.head.appendChild(style);
 }
 
-export const unstable_settings = {
-  initialRouteName: 'index',
-};
+// avoid refreshing back to home every time
+// export const unstable_settings = {
+//   initialRouteName: 'index',
+// };
 
 export default function RootLayout() {
   const mountRef = useRef(false);

@@ -13,6 +13,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloneDayEntries } from '@/lib/services/cloneDayEntries';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { getMealtypeMetaByDate, upsertMealtypeMeta } from '@/lib/services/calories-entries-mealtype-meta';
 
 export interface CloneMealTypeFromPreviousDayResult {
@@ -69,8 +70,8 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       previousDay.setDate(previousDay.getDate() - 1);
       
       // Format dates as YYYY-MM-DD
-      const sourceDate = previousDay.toISOString().split('T')[0];
-      const targetDate = currentDate.toISOString().split('T')[0];
+      const sourceDate = getLocalDateKey(previousDay);
+      const targetDate = getLocalDateKey(currentDate);
 
       // Check cache first - check for entries, quick log, or notes
       const sourceQueryKey = ['entries', userId, sourceDate];

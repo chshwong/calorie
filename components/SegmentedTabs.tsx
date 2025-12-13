@@ -169,7 +169,6 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                   }),
                 },
                 pressed && styles.tabPressed,
-                focused && styles.tabFocused,
               ]}
             >
               {item.icon ? (
@@ -272,7 +271,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabText: {
-    fontSize: FontSize.base, // 14px - WCAG AA minimum readable text size
+    fontSize: FontSize.base + 4, // +2 for larger mealtype tabs
     textAlign: 'center',
     flexShrink: 0, // Prevent text compression
   },

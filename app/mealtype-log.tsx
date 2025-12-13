@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { getCurrentDateTimeUTC, getLocalDateString, formatUTCDateTime, formatUTCDate } from '@/utils/calculations';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { useFrequentFoods } from '@/hooks/use-frequent-foods';
 import { useRecentFoods } from '@/hooks/use-recent-foods';
 import { useCustomFoods } from '@/hooks/use-custom-foods';
@@ -3116,7 +3117,7 @@ export default function LogFoodScreen() {
                                 pathname: '/create-bundle',
                                 params: {
                                   mealType: mealType || 'breakfast',
-                                  entryDate: entryDate || new Date().toISOString().split('T')[0],
+                                  entryDate: entryDate || getLocalDateKey(new Date()),
                                 },
                               });
                             }}
