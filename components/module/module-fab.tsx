@@ -149,7 +149,7 @@ export function ModuleFAB({ module, onPress, icon, iconText }: ModuleFABProps) {
     } else if (module === 'food') {
       const mealType = getMealTypeFromCurrentTime();
       router.push({
-        pathname: '/mealtype-log',
+        pathname: '/(tabs)/mealtype-log',
         params: {
           entryDate: todayString,
           mealType: mealType,

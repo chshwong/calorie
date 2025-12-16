@@ -1,0 +1,46 @@
+// src/constants/constraints.ts
+
+
+// truth in code
+export const PROFILES = {
+    WEIGHT_LB: { MIN: 45, MAX: 880 },     // DB: profiles_weight_lb_check, NOT NULL
+    HEIGHT_CM: { MIN: 50, MAX: 260 },     // DB: profiles_height_cm_check, NOT NULL
+    BODY_FAT_PERCENT: { MIN_EXCLUSIVE: 2, MAX: 80 }, // DB: profiles_body_fat_percent_range (nullable)
+    WATER_GOAL_ML: { MIN: 500, MAX: 5000 }, // DB: water_goal_ml_range (nullable)
+  } as const;
+// truth in Database
+// export const PROFILES = {
+//     WEIGHT_LB: { MIN: 45, MAX: 880 },     // DB: profiles_weight_lb_check, NOT NULL
+//     HEIGHT_CM: { MIN: 50, MAX: 260 },     // DB: profiles_height_cm_check, NOT NULL
+//     BODY_FAT_PERCENT: { MIN_EXCLUSIVE: 0, MAX: 80 }, // DB: profiles_body_fat_percent_range (nullable)
+//     WATER_GOAL_ML: { MIN: 500, MAX: 5000 }, // DB: water_goal_ml_range (nullable)
+//   } as const;
+  // Optional: derived ranges (always derive from the LB constraint so it can’t drift)
+  export const DERIVED = {
+    WEIGHT_KG: {
+      MIN: PROFILES.WEIGHT_LB.MIN / 2.2046226218,
+      MAX: PROFILES.WEIGHT_LB.MAX / 2.2046226218,
+    },
+  } as const;
+  
+  export const TEXT_LIMITS = {
+    BUNDLES_NAME: { MIN_LEN: 1, MAX_LEN: 40 },  // DB: bundles_name_check
+    EXERCISE_NAME_MAX_LEN: 30,                  // DB: exercise_log name_length
+    NOTES_MAX_LEN: 200,                         // DB: exercise_log_notes_length, med_log_notes_length
+    MED_NAME_MAX_LEN: 30,                       // DB: med_log_name_length
+    MED_DOSE_UNIT_MAX_LEN: 10,                  // DB: med_log_dose_unit_length
+  } as const;
+  
+  export const RANGES = {
+    CALORIES_KCAL: { MIN: 0, MAX: 5000 },       // DB: calorie_entries_calories_kcal_check
+    EXERCISE_MINUTES: { MIN: 0, MAX: 999 },     // DB: minutes_range (nullable)
+    MED_DOSE_AMOUNT: { MIN: 0, MAX: 9999 },     // DB: med_log_dose_amount_range (nullable)
+    WATER_PRESET_SLOT: { MIN: 1, MAX: 5 },      // DB: water_quick_presets_slot_check
+  } as const;
+  
+  // Policy (not shown in DB constraints you pasted) — keep separate and label clearly
+  export const POLICY = {
+    DOB: { MIN_AGE_YEARS: 13, MAX_AGE_YEARS: 120 },
+    NAME: { MIN_LEN: 1, MAX_LEN: 50 }, // No contraint in DB
+  } as const;
+  

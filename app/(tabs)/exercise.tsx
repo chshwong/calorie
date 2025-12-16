@@ -25,6 +25,7 @@ import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
 import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
+import { TEXT_LIMITS, RANGES } from '@/constants/constraints';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
@@ -85,7 +86,7 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
-  // Handle minutes input change - only allow integers in range 0-999
+  // Handle minutes input change - only allow integers within configured range
   const handleMinutesInputChange = (text: string) => {
     const numericOnly = text.replace(/[^0-9]/g, '');
     
@@ -97,11 +98,11 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
     
     const numValue = parseInt(numericOnly, 10);
     
-    if (!isNaN(numValue) && numValue >= 0 && numValue <= 999) {
+    if (!isNaN(numValue) && numValue >= RANGES.EXERCISE_MINUTES.MIN && numValue <= RANGES.EXERCISE_MINUTES.MAX) {
       setMinutesInput(numericOnly);
       setMinutesInputError(false);
-    } else if (!isNaN(numValue) && numValue > 999) {
-      setMinutesInput('999');
+    } else if (!isNaN(numValue) && numValue > RANGES.EXERCISE_MINUTES.MAX) {
+      setMinutesInput(RANGES.EXERCISE_MINUTES.MAX.toString());
       setMinutesInputError(false);
     }
   };
@@ -261,7 +262,7 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
                 onBlur={saveMinutes}
                 onSubmitEditing={saveMinutes}
                 keyboardType="number-pad"
-                maxLength={3}
+                maxLength={RANGES.EXERCISE_MINUTES.MAX.toString().length}
                 selectTextOnFocus
               />
               <TouchableOpacity
@@ -624,7 +625,7 @@ export default function ExerciseHomeScreen() {
     setFormNotes('');
   };
 
-  // Handle minutes input change - only allow integers in range 0-999
+  // Handle minutes input change - only allow integers within configured range
   const handleMinutesChange = (text: string) => {
     // Remove any non-numeric characters
     const numericOnly = text.replace(/[^0-9]/g, '');
@@ -639,12 +640,12 @@ export default function ExerciseHomeScreen() {
     const numValue = parseInt(numericOnly, 10);
     
     // If valid number and within range, set it
-    if (!isNaN(numValue) && numValue >= 0 && numValue <= 999) {
+    if (!isNaN(numValue) && numValue >= RANGES.EXERCISE_MINUTES.MIN && numValue <= RANGES.EXERCISE_MINUTES.MAX) {
       setFormMinutes(numericOnly);
     }
-    // If number is > 999, cap it at 999
-    else if (!isNaN(numValue) && numValue > 999) {
-      setFormMinutes('999');
+    // If number is above max, cap it
+    else if (!isNaN(numValue) && numValue > RANGES.EXERCISE_MINUTES.MAX) {
+      setFormMinutes(RANGES.EXERCISE_MINUTES.MAX.toString());
     }
     // Otherwise, don't update (invalid input)
   };
@@ -666,7 +667,7 @@ export default function ExerciseHomeScreen() {
       return;
     }
 
-    if (name.length > 30) {
+    if (name.length > TEXT_LIMITS.EXERCISE_NAME_MAX_LEN) {
       Alert.alert(t('exercise.form.name_max_length'));
       return;
     }
@@ -677,13 +678,13 @@ export default function ExerciseHomeScreen() {
         Alert.alert(t('exercise.form.minutes_range'));
         return;
       }
-      if (minutes < 0 || minutes > 999) {
+      if (minutes < RANGES.EXERCISE_MINUTES.MIN || minutes > RANGES.EXERCISE_MINUTES.MAX) {
         Alert.alert(t('exercise.form.minutes_range'));
         return;
       }
     }
 
-    if (notes && notes.length > 200) {
+    if (notes && notes.length > TEXT_LIMITS.NOTES_MAX_LEN) {
       Alert.alert(t('exercise.form.notes_max_length'));
       return;
     }
@@ -1314,7 +1315,7 @@ export default function ExerciseHomeScreen() {
                     onChangeText={setFormName}
                     placeholder={t('exercise.form.name_placeholder')}
                     placeholderTextColor={colors.textSecondary}
-                    maxLength={30}
+                    maxLength={TEXT_LIMITS.EXERCISE_NAME_MAX_LEN}
                     autoFocus
                   />
                 </View>
@@ -1330,7 +1331,7 @@ export default function ExerciseHomeScreen() {
                     placeholder={t('exercise.form.minutes_placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="number-pad"
-                    maxLength={3}
+                    maxLength={RANGES.EXERCISE_MINUTES.MAX.toString().length}
                   />
                   <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
                     {t('exercise.form.minutes_range')}
@@ -1349,7 +1350,7 @@ export default function ExerciseHomeScreen() {
                     placeholderTextColor={colors.textSecondary}
                     multiline
                     numberOfLines={4}
-                    maxLength={200}
+                    maxLength={TEXT_LIMITS.NOTES_MAX_LEN}
                     textAlignVertical="top"
                   />
                   <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>

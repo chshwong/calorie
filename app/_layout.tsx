@@ -180,7 +180,6 @@ function ThemeProviderWrapper() {
           <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
           <Stack.Screen name="reset-password" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="mealtype-log" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="quick-log" options={{ headerShown: false, presentation: 'modal' }} />

@@ -29,6 +29,7 @@ import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
+import { TEXT_LIMITS, RANGES } from '@/constants/constraints';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
@@ -94,7 +95,7 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
-  // Handle dose amount input change - only allow integers in range 0-9999
+  // Handle dose amount input change - only allow integers within configured range
   const handleDoseAmountInputChange = (text: string) => {
     const numericOnly = text.replace(/[^0-9]/g, '');
     
@@ -106,11 +107,11 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
     
     const numValue = parseInt(numericOnly, 10);
     
-    if (!isNaN(numValue) && numValue >= 0 && numValue <= 9999) {
+    if (!isNaN(numValue) && numValue >= RANGES.MED_DOSE_AMOUNT.MIN && numValue <= RANGES.MED_DOSE_AMOUNT.MAX) {
       setDoseAmountInput(numericOnly);
       setDoseInputError(false);
-    } else if (!isNaN(numValue) && numValue > 9999) {
-      setDoseAmountInput('9999');
+    } else if (!isNaN(numValue) && numValue > RANGES.MED_DOSE_AMOUNT.MAX) {
+      setDoseAmountInput(RANGES.MED_DOSE_AMOUNT.MAX.toString());
       setDoseInputError(false);
     }
   };
@@ -153,7 +154,7 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
     const unit = doseUnitInput.trim() || null;
 
     // Validate
-    if (amountValue && (isNaN(amount!) || amount! < 0 || amount! > 9999)) {
+    if (amountValue && (isNaN(amount!) || amount! < RANGES.MED_DOSE_AMOUNT.MIN || amount! > RANGES.MED_DOSE_AMOUNT.MAX)) {
       setDoseInputError(true);
       isSavingRef.current = false;
       return;
@@ -311,7 +312,7 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
                   doseUnitInputRef.current?.focus();
                 }}
                 keyboardType="number-pad"
-                maxLength={4}
+                maxLength={RANGES.MED_DOSE_AMOUNT.MAX.toString().length}
                 selectTextOnFocus
                 placeholder={t('meds.form.dose_amount_placeholder')}
               />
@@ -330,7 +331,7 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
                 onBlur={handleUnitBlur}
                 onSubmitEditing={saveDose}
                 placeholder={t('meds.form.dose_unit_placeholder')}
-                maxLength={10}
+                maxLength={TEXT_LIMITS.MED_DOSE_UNIT_MAX_LEN}
               />
               <TouchableOpacity
                 onPress={saveDose}
@@ -768,18 +769,18 @@ export default function MedsHomeScreen() {
       return;
     }
 
-    if (formName.trim().length > 30) {
+    if (formName.trim().length > TEXT_LIMITS.MED_NAME_MAX_LEN) {
       Alert.alert(t('meds.form.name_max_length'));
       return;
     }
 
     const doseAmount = formDoseAmount.trim() ? parseInt(formDoseAmount.trim(), 10) : null;
-    if (doseAmount !== null && (isNaN(doseAmount) || doseAmount < 0 || doseAmount > 9999)) {
+    if (doseAmount !== null && (isNaN(doseAmount) || doseAmount < RANGES.MED_DOSE_AMOUNT.MIN || doseAmount > RANGES.MED_DOSE_AMOUNT.MAX)) {
       Alert.alert(t('meds.form.dose_amount_range'));
       return;
     }
 
-    if (formNotes.length > 200) {
+    if (formNotes.length > TEXT_LIMITS.NOTES_MAX_LEN) {
       Alert.alert(t('meds.form.notes_max_length'));
       return;
     }
@@ -921,10 +922,10 @@ export default function MedsHomeScreen() {
     
     const numValue = parseInt(numericOnly, 10);
     
-    if (!isNaN(numValue) && numValue >= 0 && numValue <= 9999) {
+    if (!isNaN(numValue) && numValue >= RANGES.MED_DOSE_AMOUNT.MIN && numValue <= RANGES.MED_DOSE_AMOUNT.MAX) {
       setFormDoseAmount(numericOnly);
-    } else if (!isNaN(numValue) && numValue > 9999) {
-      setFormDoseAmount('9999');
+    } else if (!isNaN(numValue) && numValue > RANGES.MED_DOSE_AMOUNT.MAX) {
+      setFormDoseAmount(RANGES.MED_DOSE_AMOUNT.MAX.toString());
     }
   };
 
@@ -1691,7 +1692,7 @@ export default function MedsHomeScreen() {
                     onChangeText={setFormName}
                     placeholder={t('meds.form.name_placeholder')}
                     placeholderTextColor={colors.textSecondary}
-                    maxLength={30}
+                    maxLength={TEXT_LIMITS.MED_NAME_MAX_LEN}
                     autoFocus
                   />
                 </View>
@@ -1740,7 +1741,7 @@ export default function MedsHomeScreen() {
                       placeholder={t('meds.form.dose_amount_placeholder')}
                       placeholderTextColor={colors.textSecondary}
                       keyboardType="number-pad"
-                      maxLength={4}
+                      maxLength={RANGES.MED_DOSE_AMOUNT.MAX.toString().length}
                     />
                     <TextInput
                       style={[styles.doseUnitInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
@@ -1748,7 +1749,7 @@ export default function MedsHomeScreen() {
                       onChangeText={setFormDoseUnit}
                       placeholder={t('meds.form.dose_unit_placeholder')}
                       placeholderTextColor={colors.textSecondary}
-                      maxLength={10}
+                      maxLength={TEXT_LIMITS.MED_DOSE_UNIT_MAX_LEN}
                     />
                   </View>
                   <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
@@ -1768,7 +1769,7 @@ export default function MedsHomeScreen() {
                     placeholderTextColor={colors.textSecondary}
                     multiline
                     numberOfLines={4}
-                    maxLength={200}
+                    maxLength={TEXT_LIMITS.NOTES_MAX_LEN}
                     textAlignVertical="top"
                   />
                   <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>

@@ -615,9 +615,6 @@ function BarcodeScannerModal({
 
   return (
     <ThemedView style={styles.container}>
-      <Pressable onPress={handleClose} style={styles.closeButton}>
-        <Text style={[styles.closeButtonText, { color: closeButtonTextColor }]}>✕</Text>
-      </Pressable>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -625,6 +622,9 @@ function BarcodeScannerModal({
       >
         <View style={[styles.cardContainer, { maxWidth: isDesktop ? 420 : '100%' }]}>
           <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Pressable onPress={handleClose} style={styles.closeButtonOnCard}>
+              <Text style={[styles.closeButtonText, { color: colors.text }]}>✕</Text>
+            </Pressable>
             {/* Title */}
             <ThemedText 
               type="title" 
@@ -717,7 +717,7 @@ function BarcodeScannerModal({
             )}
 
             {/* Error message */}
-            {scanError && (
+            {false && scanError && (
               <View 
                 style={[
                   styles.errorContainer, 
@@ -822,7 +822,7 @@ function BarcodeScannerModal({
             )}
 
             {/* Manual Barcode Entry (always visible on both desktop and mobile web) */}
-            <View style={[styles.manualEntrySection, { borderTopColor: colors.border }]}>
+            <View style={styles.manualEntrySection}>
               <View style={styles.manualEntryDivider}>
                 <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
                 <ThemedText style={[styles.dividerText, { color: colors.textSecondary }]}>
@@ -1017,8 +1017,7 @@ const styles = StyleSheet.create({
   },
   manualEntrySection: {
     marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
+    paddingTop: 16,
   },
   manualEntryDivider: {
     flexDirection: 'row',
@@ -1072,6 +1071,12 @@ const styles = StyleSheet.create({
     top: 20,
     right: 20,
     zIndex: 50,
+  },
+  closeButtonOnCard: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
   },
   closeButtonText: {
     fontSize: 26,

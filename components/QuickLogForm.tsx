@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
+import { RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getCurrentDateTimeUTC } from '@/utils/calculations';
 import { supabase } from '@/lib/supabase';
@@ -37,9 +38,21 @@ type QuickLogFormProps = {
 
 // Database constraints
 const MAX_QUANTITY = 100000;
-const MAX_CALORIES = 10000;
+const MAX_CALORIES = RANGES.CALORIES_KCAL.MAX;
 const MAX_MACRO = 9999.99;
 const ENTRIES_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS;
+
+// Limit numeric inputs to 4 digits before decimal and 2 after
+const formatNumberInput = (text: string): string => {
+  const cleaned = text.replace(/[^0-9.]/g, '');
+  const [rawInt = '', rawFrac = ''] = cleaned.split('.');
+  const intPart = rawInt.slice(0, 4);
+  const fracPart = rawFrac.slice(0, 2);
+  if (cleaned.includes('.')) {
+    return `${intPart || '0'}${fracPart ? `.${fracPart}` : '.'}`;
+  }
+  return intPart;
+};
 
 export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCancel, onSaved, registerSubmit }: QuickLogFormProps) {
   const { t } = useTranslation();
@@ -175,27 +188,21 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     }
   }, [entriesLoaded, hydratedEntry, onCancel, quickLogId, t]);
 
-  // Validate numeric input
-  const validateNumericInput = (text: string): string => {
-    // Remove any characters that aren't numbers or periods
-    let cleaned = text.replace(/[^0-9.]/g, '');
-    
-    // Ensure only one period
-    const parts = cleaned.split('.');
-    if (parts.length > 2) {
-      cleaned = parts[0] + '.' + parts.slice(1).join('');
+  // Validate numeric input: 4 digits max before decimal, 2 after
+  const formatNumberInput = (text: string): string => {
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    const [rawInt = '', rawFrac = ''] = cleaned.split('.');
+    const intPart = rawInt.slice(0, 4);
+    const fracPart = rawFrac.slice(0, 2);
+    if (cleaned.includes('.')) {
+      return `${intPart || '0'}${fracPart ? `.${fracPart}` : '.'}`;
     }
-    
-    return cleaned;
+    return intPart;
   };
 
   // Handle calories change with validation
   const handleCaloriesChange = useCallback((text: string) => {
-    // Strip all non-digit characters (no periods allowed for calories)
-    const sanitized = text.replace(/\D/g, '');
-    // Limit to 4 characters
-    const limited = sanitized.slice(0, 4);
-    setCalories(limited);
+    setCalories(formatNumberInput(text));
   }, []);
 
   // Real-time validation
@@ -532,15 +539,15 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
         const errorMsg = error.message || '';
         const errorCode = error.code || '';
         
-        if (errorCode === '23514' || errorMsg.includes('calories_kcal_check') || errorMsg.includes('calories_kcal') || (errorMsg.includes('check') && (errorMsg.includes('5000') || errorMsg.includes('calories')))) {
+        if (errorCode === '23514' || errorMsg.includes('calories_kcal_check') || errorMsg.includes('calories_kcal') || (errorMsg.includes('check') && (errorMsg.includes(MAX_CALORIES.toString()) || errorMsg.includes('calories')))) {
           const currentCalories = parsedCalories || 0;
-          const suggestedQty = parsedQuantity ? Math.floor((5000 / currentCalories) * parsedQuantity * 10) / 10 : 0;
+          const suggestedQty = parsedQuantity ? Math.floor((MAX_CALORIES / currentCalories) * parsedQuantity * 10) / 10 : 0;
           errorMessage = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
             `Current: ${currentCalories.toLocaleString()} calories\n` +
-            `Maximum: 5,000 calories per entry\n\n` +
+            `Maximum: ${MAX_CALORIES.toLocaleString()} calories per entry\n\n` +
             `SOLUTIONS:\n` +
             `• Reduce quantity to ${suggestedQty} (instead of ${parsedQuantity || 'current'})\n` +
-            `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
+            `• Split into ${Math.ceil(currentCalories / MAX_CALORIES)} separate entries`;
           setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
         } else if (errorMsg.includes('numeric') || errorMsg.includes('value too large') || errorMsg.includes('out of range') || errorCode === '22003') {
           errorMessage = 'The calculated values are too large. Please reduce the quantity or split into multiple entries.';
@@ -593,13 +600,13 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     try {
       // Check calories before even calling saveEntry
       const currentCalories = parseFloat(calories);
-      if (!isNaN(currentCalories) && currentCalories > 5000) {
+      if (!isNaN(currentCalories) && currentCalories > MAX_CALORIES) {
         const errorMsg = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
           `Current: ${currentCalories.toLocaleString()} calories\n` +
-          `Maximum: 5,000 calories per entry\n\n` +
+          `Maximum: ${MAX_CALORIES.toLocaleString()} calories per entry\n\n` +
           `SOLUTIONS:\n` +
           `• Reduce the quantity\n` +
-          `• Split into ${Math.ceil(currentCalories / 5000)} separate entries`;
+          `• Split into ${Math.ceil(currentCalories / MAX_CALORIES)} separate entries`;
         
         setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
         Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
@@ -721,9 +728,9 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="1"
                 placeholderTextColor={colors.textTertiary}
                 value={quantity}
-                onChangeText={(text) => setQuantity(validateNumericInput(text))}
+                onChangeText={(text) => setQuantity(formatNumberInput(text))}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -845,10 +852,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholderTextColor={colors.textTertiary}
                 value={fat}
                 onChangeText={(text) => {
-                  setFat(validateNumericInput(text));
+                  setFat(formatNumberInput(text));
                 }}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -882,9 +889,9 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={saturatedFat}
-                onChangeText={(text) => setSaturatedFat(validateNumericInput(text))}
+                onChangeText={(text) => setSaturatedFat(formatNumberInput(text))}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -918,9 +925,9 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={transFat}
-                onChangeText={(text) => setTransFat(validateNumericInput(text))}
+                onChangeText={(text) => setTransFat(formatNumberInput(text))}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -955,10 +962,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholderTextColor={colors.textTertiary}
                 value={carbs}
                 onChangeText={(text) => {
-                  setCarbs(validateNumericInput(text));
+                  setCarbs(formatNumberInput(text));
                 }}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -993,10 +1000,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholderTextColor={colors.textTertiary}
                 value={fiber}
                 onChangeText={(text) => {
-                  setFiber(validateNumericInput(text));
+                  setFiber(formatNumberInput(text));
                 }}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1030,9 +1037,9 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={sugar}
-                onChangeText={(text) => setSugar(validateNumericInput(text))}
+                onChangeText={(text) => setSugar(formatNumberInput(text))}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1067,10 +1074,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholderTextColor={colors.textTertiary}
                 value={protein}
                 onChangeText={(text) => {
-                  setProtein(validateNumericInput(text));
+                  setProtein(formatNumberInput(text));
                 }}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1104,9 +1111,9 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={sodium}
-                onChangeText={(text) => setSodium(validateNumericInput(text))}
+                onChangeText={(text) => setSodium(formatNumberInput(text))}
                 keyboardType="decimal-pad"
-                maxLength={4}
+                maxLength={7}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(

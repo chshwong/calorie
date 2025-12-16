@@ -31,11 +31,13 @@ import {
   validateHeightCm as validateHeightCmUtil, 
   validateActivityLevel as validateActivityLevelUtil, 
   validateWeightKg as validateWeightKgUtil, 
+  validateBodyFatPercent as validateBodyFatPercentUtil,
   validateGoalWeight as validateGoalWeightUtil, 
   validateTimeline as validateTimelineUtil, 
   validateSex as validateSexUtil, 
   validateGoal as validateGoalUtil 
 } from '@/utils/validation';
+import { POLICY } from '@/constants/constraints';
 import { 
   convertHeightToCm, 
   ftInToCm, 
@@ -726,41 +728,34 @@ export default function OnboardingScreen() {
   );
   
   const validateStep1 = (): string | null => {
-    if (!firstName || firstName.trim().length === 0) {
+    const trimmed = firstName.trim();
+    if (!trimmed) {
       return 'Preferred Name is required';
     }
-    
-    if (firstName.length > 40) {
-      return 'Preferred Name must be 40 characters or less';
+
+    if (trimmed.length > POLICY.NAME.MAX_LEN) {
+      return `Preferred Name must be ${POLICY.NAME.MAX_LEN} characters or less`;
     }
-    
+
+    const nameValidation = validatePreferredName(trimmed);
+    if (!nameValidation.valid) {
+      return nameValidation.error || 'Preferred Name is invalid';
+    }
+
     if (!dateOfBirth) {
       return 'Date of birth is required';
     }
-    
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(dateOfBirth)) {
-      return 'Date of birth must be in YYYY-MM-DD format';
+
+    const dobError = validateDateOfBirth(dateOfBirth, POLICY.DOB.MIN_AGE_YEARS, POLICY.DOB.MAX_AGE_YEARS);
+    if (dobError) {
+      // Map error keys to simple strings used in legacy Step1 path
+      if (dobError === 'onboarding.name_age.error_dob_format') return 'Date of birth must be in YYYY-MM-DD format';
+      if (dobError === 'onboarding.name_age.error_dob_future') return 'Date of birth cannot be in the future';
+      if (dobError === 'onboarding.name_age.error_age_minimum') return `You must be at least ${POLICY.DOB.MIN_AGE_YEARS} years old`;
+      if (dobError === 'onboarding.name_age.error_age_maximum') return `Date of birth cannot be more than ${POLICY.DOB.MAX_AGE_YEARS} years ago`;
+      return dobError;
     }
-    
-    const dobDate = new Date(dateOfBirth + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (dobDate > today) {
-      return 'Date of birth cannot be in the future';
-    }
-    
-    const actualAge = ageFromDob(dateOfBirth);
-    
-    if (actualAge < 13) {
-      return 'You must be at least 13 years old';
-    }
-    
-    if (actualAge > 150) {
-      return 'Date of birth cannot be more than 150 years ago';
-    }
-    
+
     return null;
   };
   
@@ -921,12 +916,9 @@ export default function OnboardingScreen() {
     const errorKey = validateWeightKgUtil(weightKgValue);
     if (errorKey) return t(errorKey);
 
-    if (currentBodyFatPercent) {
-      const bf = parseFloat(currentBodyFatPercent);
-      if (isNaN(bf) || bf <= 0 || bf > 80) {
-        return 'Body fat percentage must be between 0 and 80.';
-      }
-    }
+    const bf = currentBodyFatPercent.trim().length > 0 ? parseFloat(currentBodyFatPercent) : null;
+    const bfError = validateBodyFatPercentUtil(bf);
+    if (bfError) return bfError;
 
     return null;
   };

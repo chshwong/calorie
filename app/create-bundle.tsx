@@ -8,6 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { Colors } from '@/constants/theme';
+import { TEXT_LIMITS } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFoodSearch } from '@/hooks/use-food-search';
 import { useAuth } from '@/contexts/AuthContext';
@@ -556,13 +557,13 @@ export default function CreateBundleScreen() {
             style={[styles.searchInput, { borderColor: colors.icon + '30', color: colors.text, backgroundColor: colors.background }]}
             value={bundleName}
             onChangeText={(text) => {
-              if (text.length <= 40) {
+              if (text.length <= TEXT_LIMITS.BUNDLES_NAME.MAX_LEN) {
                 setBundleName(text);
               }
             }}
             placeholder={t('create_bundle.bundle_name_placeholder')}
             placeholderTextColor={colors.textSecondary}
-            maxLength={40}
+            maxLength={TEXT_LIMITS.BUNDLES_NAME.MAX_LEN}
           />
         </View>
         <ThemedText style={[styles.helperText, { color: colors.textSecondary, marginBottom: 12 }]}>

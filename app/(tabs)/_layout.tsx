@@ -194,7 +194,7 @@ function TabLayoutContent() {
     
     // Navigate to mealtype-log with the same params structure as the FAB
     router.push({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params
     });
   };
@@ -361,6 +361,12 @@ function TabLayoutContent() {
         />
         <Tabs.Screen
           name="water"
+          options={{
+            href: null, // Hide from tab bar
+          }}
+        />
+        <Tabs.Screen
+          name="mealtype-log"
           options={{
             href: null, // Hide from tab bar
           }}

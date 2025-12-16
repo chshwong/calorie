@@ -5,6 +5,11 @@
  * No React/browser/UI imports allowed
  */
 
+// constants/constraints.ts is where lives all the constraints constants that his file refers to.
+// to change ranges or other constraints, refer to constants/constraints
+
+import { PROFILES, DERIVED, POLICY } from '@/constants/constraints';
+
 export type ValidationResult = {
   valid: boolean;
   error?: string;
@@ -14,76 +19,89 @@ export type ValidationResult = {
  * Validates preferred name with visible rules only:
  * - Must not be empty after trimming
  * - Must contain at least 2 letters
- * 
+ *
  * Note: Other rules (max length, invalid characters, emojis) are enforced silently
  * in the UI via onChangeText filtering.
  */
 export function validatePreferredName(rawValue: string): ValidationResult {
   const value = rawValue.trim();
-  if (!value) return { valid: false, error: "Please enter a name." };
+  if (!value) return { valid: false, error: 'Please enter a name.' };
+
   const chars = Array.from(value);
   let letterCount = 0;
   for (const ch of chars) {
     if (/\p{L}/u.test(ch)) letterCount += 1;
   }
-  if (letterCount < 2) return { valid: false, error: "Name must contain at least 2 letters." };
+
+  if (letterCount < 2) {
+    return { valid: false, error: 'Name must contain at least 2 letters.' };
+  }
+
   return { valid: true };
 }
 
 /**
  * Validates date of birth in YYYY-MM-DD format
  * @param dob - Date of birth string in YYYY-MM-DD format
- * @param minAge - Minimum age in years (default: 18)
- * @param maxAge - Maximum age in years (default: 100)
+ * @param minAge - Minimum age in years (default: 13)
+ * @param maxAge - Maximum age in years (default: 120)
  * @returns Error message key or null if valid
  */
-export function validateDateOfBirth(dob: string, minAge: number = 18, maxAge: number = 100): string | null {
+export function validateDateOfBirth(
+  dob: string,
+  minAge: number = POLICY.DOB.MIN_AGE_YEARS,
+  maxAge: number = POLICY.DOB.MAX_AGE_YEARS
+): string | null {
   if (!dob || dob.trim().length === 0) {
     return 'onboarding.name_age.error_dob_required';
   }
-  
+
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(dob)) {
     return 'onboarding.name_age.error_dob_format';
   }
-  
+
   const dobDate = new Date(dob + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   if (dobDate > today) {
     return 'onboarding.name_age.error_dob_future';
   }
-  
+
   const age = Math.floor((Date.now() - dobDate.getTime()) / (365.25 * 24 * 3600 * 1000));
-  
+
   if (age < minAge) {
     return 'onboarding.name_age.error_age_minimum';
   }
-  
+
   if (age > maxAge) {
     return 'onboarding.name_age.error_age_maximum';
   }
-  
+
   return null;
 }
 
 /**
  * Validates height in centimeters
  * @param heightCm - Height in centimeters
- * @param minCm - Minimum height in cm (default: 120)
- * @param maxCm - Maximum height in cm (default: 230)
+ * @param minCm - Minimum height in cm (default: 50)
+ * @param maxCm - Maximum height in cm (default: 260)
  * @returns Error message key or null if valid
  */
-export function validateHeightCm(heightCm: number | null, minCm: number = 120, maxCm: number = 230): string | null {
+export function validateHeightCm(
+  heightCm: number | null,
+  minCm: number = PROFILES.HEIGHT_CM.MIN,
+  maxCm: number = PROFILES.HEIGHT_CM.MAX
+): string | null {
   if (heightCm === null || isNaN(heightCm) || heightCm <= 0) {
     return 'onboarding.height.error_height_required';
   }
-  
+
   if (heightCm < minCm || heightCm > maxCm) {
     return 'onboarding.height.error_height_invalid';
   }
-  
+
   return null;
 }
 
@@ -103,19 +121,50 @@ export function validateActivityLevel(activityLevel: string | null): string | nu
 /**
  * Validates weight in kilograms
  * @param weightKg - Weight in kilograms
- * @param minKg - Minimum weight in kg (default: 35)
- * @param maxKg - Maximum weight in kg (default: 250)
+ * @param minKg - Minimum weight in kg (default: derived from profiles.weight_lb)
+ * @param maxKg - Maximum weight in kg (default: derived from profiles.weight_lb)
  * @returns Error message key or null if valid
  */
-export function validateWeightKg(weightKg: number | null, minKg: number = 35, maxKg: number = 250): string | null {
+export function validateWeightKg(
+  weightKg: number | null,
+  minKg: number = DERIVED.WEIGHT_KG.MIN,
+  maxKg: number = DERIVED.WEIGHT_KG.MAX
+): string | null {
   if (weightKg === null || isNaN(weightKg) || weightKg <= 0) {
     return 'onboarding.current_weight.error_weight_required';
   }
-  
+
   if (weightKg < minKg || weightKg > maxKg) {
     return 'onboarding.current_weight.error_weight_invalid';
   }
-  
+
+  return null;
+}
+
+/**
+ * Validates body fat percentage (optional field)
+ * @param bodyFatPercent - Body fat percentage value (null/undefined means skip)
+ * @param minExclusivePercent - Exclusive lower bound (default from constraints)
+ * @param maxPercent - Inclusive upper bound (default from constraints)
+ * @returns A human-readable error message or null if valid/absent
+ */
+export function validateBodyFatPercent(
+  bodyFatPercent: number | null | undefined,
+  minExclusivePercent: number = PROFILES.BODY_FAT_PERCENT.MIN_EXCLUSIVE,
+  maxPercent: number = PROFILES.BODY_FAT_PERCENT.MAX
+): string | null {
+  if (bodyFatPercent === null || bodyFatPercent === undefined) {
+    return null; // Optional field: empty is allowed
+  }
+
+  if (isNaN(bodyFatPercent)) {
+    return 'Body fat percentage must be a number.';
+  }
+
+  if (bodyFatPercent <= minExclusivePercent || bodyFatPercent > maxPercent) {
+    return `Body fat percentage must be greater than ${minExclusivePercent} and at most ${maxPercent}.`;
+  }
+
   return null;
 }
 
@@ -124,49 +173,47 @@ export function validateWeightKg(weightKg: number | null, minKg: number = 35, ma
  * @param goalWeightKg - Goal weight in kilograms
  * @param currentWeightKg - Current weight in kilograms
  * @param goalType - Goal type: 'lose', 'gain', 'maintain', 'recomp'
- * @param minKg - Minimum weight in kg (default: 35)
- * @param maxKg - Maximum weight in kg (default: 250)
+ * @param minKg - Minimum weight in kg (default: derived from profiles.weight_lb)
+ * @param maxKg - Maximum weight in kg (default: derived from profiles.weight_lb)
  * @returns Error message key or null if valid
  */
 export function validateGoalWeight(
   goalWeightKg: number | null,
   currentWeightKg: number | null,
   goalType: string | null,
-  minKg: number = 35,
-  maxKg: number = 250
+  minKg: number = DERIVED.WEIGHT_KG.MIN,
+  maxKg: number = DERIVED.WEIGHT_KG.MAX
 ): string | null {
   if (goalWeightKg === null || isNaN(goalWeightKg) || goalWeightKg <= 0) {
     return 'onboarding.goal_weight.error_weight_required';
   }
-  
+
   if (goalWeightKg < minKg || goalWeightKg > maxKg) {
     return 'onboarding.goal_weight.error_weight_invalid';
   }
-  
+
   if (currentWeightKg === null || isNaN(currentWeightKg) || currentWeightKg <= 0) {
     // Can't validate goal relative to current if current is invalid
     return null;
   }
-  
-  // Validate based on goal type
+
+  // Validate goal weight based on goal type
   if (goalType === 'lose') {
-    // Goal weight must be lower than current weight (allow 0.5 kg tolerance for rounding)
-    if (goalWeightKg >= currentWeightKg - 0.5) {
-      return 'onboarding.goal_weight.error_lose_too_high';
+    if (goalWeightKg >= currentWeightKg) {
+      return 'onboarding.goal_weight.error_lose_not_lower';
     }
   } else if (goalType === 'gain') {
-    // Goal weight must be higher than current weight (allow 0.5 kg tolerance for rounding)
-    if (goalWeightKg <= currentWeightKg + 0.5) {
-      return 'onboarding.goal_weight.error_gain_too_low';
+    if (goalWeightKg <= currentWeightKg) {
+      return 'onboarding.goal_weight.error_gain_not_higher';
     }
   } else if (goalType === 'maintain' || goalType === 'recomp') {
-    // Goal weight should be close to current weight (within 5 kg)
-    const difference = Math.abs(goalWeightKg - currentWeightKg);
-    if (difference > 5) {
+    // For maintain/recomp, goal weight should be close to current (within 5%)
+    const tolerance = currentWeightKg * 0.05;
+    if (Math.abs(goalWeightKg - currentWeightKg) > tolerance) {
       return 'onboarding.goal_weight.error_maintain_too_different';
     }
   }
-  
+
   return null;
 }
 
@@ -176,16 +223,34 @@ export function validateGoalWeight(
  * @param customTargetDate - Custom target date if timeline is 'custom_date'
  * @returns Error message key or null if valid
  */
-export function validateTimeline(timelineOption: string | null, customTargetDate: string | null = null): string | null {
+export function validateTimeline(
+  timelineOption: string | null,
+  customTargetDate: string | null = null
+): string | null {
   const validOptions = ['3_months', '6_months', '12_months', 'no_deadline', 'custom_date'];
   if (!timelineOption || !validOptions.includes(timelineOption)) {
     return 'onboarding.timeline.error_select_timeline';
   }
-  
-  if (timelineOption === 'custom_date' && !customTargetDate) {
-    return 'onboarding.timeline.error_select_timeline';
+
+  if (timelineOption === 'custom_date') {
+    if (!customTargetDate) {
+      return 'onboarding.timeline.error_custom_date_required';
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(customTargetDate)) {
+      return 'onboarding.timeline.error_custom_date_format';
+    }
+
+    const targetDate = new Date(customTargetDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (targetDate <= today) {
+      return 'onboarding.timeline.error_custom_date_future';
+    }
   }
-  
+
   return null;
 }
 

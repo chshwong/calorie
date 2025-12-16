@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Colors } from '@/constants/theme';
+import { RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -122,7 +123,7 @@ export default function CreateCustomFoodScreen() {
   const MAX_NAME_LENGTH = 50;
   const MAX_BRAND_LENGTH = 30;
   const MAX_QUANTITY = 100000;
-  const MAX_CALORIES = 5000;
+  const MAX_CALORIES = RANGES.CALORIES_KCAL.MAX;
   const MAX_MACRO = 2000;
 
   // Clear foodName error on mount to ensure clean start (no initial error message)
@@ -365,14 +366,19 @@ export default function CreateCustomFoodScreen() {
     }
   };
 
-  // Helper function to validate numeric input (numbers and one period only)
-  const validateNumericInput = (text: string): string => {
+  // Helper: keep only digits/one dot, cap at 4 digits before and 2 after decimal
+  const formatNumberInput = (text: string): string => {
     const cleaned = text.replace(/[^0-9.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length > 2) {
-      return parts[0] + '.' + parts.slice(1).join('');
+    const [rawInt = '', rawFrac = ''] = cleaned.split('.');
+
+    const intPart = rawInt.slice(0, 4);
+    const fracPart = rawFrac.slice(0, 2);
+
+    if (cleaned.includes('.')) {
+      return `${intPart || '0'}${fracPart ? `.${fracPart}` : '.'}`;
     }
-    return cleaned;
+
+    return intPart;
   };
 
   // Calculate grams from weight unit
@@ -785,7 +791,7 @@ export default function CreateCustomFoodScreen() {
       // Navigate back to mealtype-log page with custom tab selected
       // Use push instead of replace to ensure params are updated
       router.push({
-        pathname: '/mealtype-log',
+        pathname: '/(tabs)/mealtype-log',
         params: {
           mealType,
           entryDate,
@@ -964,7 +970,7 @@ export default function CreateCustomFoodScreen() {
                       placeholderTextColor={colors.textSecondary}
                       value={weightQuantity}
                       onChangeText={(text) => {
-                        setWeightQuantity(validateNumericInput(text));
+                        setWeightQuantity(formatNumberInput(text));
                       }}
                       keyboardType="decimal-pad"
                     />
@@ -1008,7 +1014,7 @@ export default function CreateCustomFoodScreen() {
                       placeholderTextColor={colors.textSecondary}
                       value={weightCalories}
                       onChangeText={(text) => {
-                        setWeightCalories(validateNumericInput(text));
+                        setWeightCalories(formatNumberInput(text));
                       }}
                       keyboardType="decimal-pad"
                     />
@@ -1033,7 +1039,7 @@ export default function CreateCustomFoodScreen() {
                       placeholderTextColor={colors.textSecondary}
                       value={volumeQuantity}
                       onChangeText={(text) => {
-                        setVolumeQuantity(validateNumericInput(text));
+                        setVolumeQuantity(formatNumberInput(text));
                       }}
                       keyboardType="decimal-pad"
                     />
@@ -1077,7 +1083,7 @@ export default function CreateCustomFoodScreen() {
                       placeholderTextColor={colors.textSecondary}
                       value={volumeCalories}
                       onChangeText={(text) => {
-                        setVolumeCalories(validateNumericInput(text));
+                        setVolumeCalories(formatNumberInput(text));
                       }}
                       keyboardType="decimal-pad"
                     />
@@ -1098,7 +1104,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightProtein}
-                    onChangeText={(text) => setWeightProtein(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightProtein(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightProtein && <Text style={styles.errorText}>{errors.weightProtein}</Text>}
@@ -1110,7 +1116,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightCarbs}
-                    onChangeText={(text) => setWeightCarbs(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightCarbs(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightCarbs && <Text style={styles.errorText}>{errors.weightCarbs}</Text>}
@@ -1122,7 +1128,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightFat}
-                    onChangeText={(text) => setWeightFat(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightFat(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightFat && <Text style={styles.errorText}>{errors.weightFat}</Text>}
@@ -1134,7 +1140,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightFiber}
-                    onChangeText={(text) => setWeightFiber(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightFiber(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightFiber && <Text style={styles.errorText}>{errors.weightFiber}</Text>}
@@ -1153,7 +1159,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightSaturatedFat}
-                    onChangeText={(text) => setWeightSaturatedFat(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightSaturatedFat(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightSaturatedFat && <Text style={styles.errorText}>{errors.weightSaturatedFat}</Text>}
@@ -1165,7 +1171,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightTransFat}
-                    onChangeText={(text) => setWeightTransFat(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightTransFat(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightTransFat && <Text style={styles.errorText}>{errors.weightTransFat}</Text>}
@@ -1177,7 +1183,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightSugar}
-                    onChangeText={(text) => setWeightSugar(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightSugar(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightSugar && <Text style={styles.errorText}>{errors.weightSugar}</Text>}
@@ -1189,7 +1195,7 @@ export default function CreateCustomFoodScreen() {
                     placeholder={t('create_custom_food.other_nutrients.placeholder')}
                     placeholderTextColor={colors.textSecondary}
                     value={weightSodium}
-                    onChangeText={(text) => setWeightSodium(validateNumericInput(text))}
+                    onChangeText={(text) => setWeightSodium(formatNumberInput(text))}
                     keyboardType="decimal-pad"
                   />
                   {errors.weightSodium && <Text style={styles.errorText}>{errors.weightSodium}</Text>}

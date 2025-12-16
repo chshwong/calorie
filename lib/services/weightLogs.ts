@@ -210,4 +210,50 @@ export async function updateProfileBodyFat(userId: string, bodyFatPercent: numbe
   await updateUserProfile(userId, { body_fat_percent: roundTo2(bodyFatPercent) });
 }
 
+export async function deleteWeightLogById(id: string) {
+  if (!id) throw new Error('Missing weight_log id');
+
+  const { error } = await supabase.from('weight_log').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting weight_log', error);
+    throw error;
+  }
+}
+
+export async function recomputeProfileWeightAndBodyFat(userId: string) {
+  if (!userId) throw new Error('User ID is required to recompute profile weight/body fat');
+
+  const { data: latestWeight, error: latestWeightError } = await supabase
+    .from('weight_log')
+    .select('weight_lb, weighed_at')
+    .eq('user_id', userId)
+    .order('weighed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestWeightError) {
+    console.error('Error fetching latest weight for recompute', latestWeightError);
+    throw latestWeightError;
+  }
+
+  const { data: latestBodyFat, error: latestBodyFatError } = await supabase
+    .from('weight_log')
+    .select('body_fat_percent, weighed_at')
+    .eq('user_id', userId)
+    .not('body_fat_percent', 'is', null)
+    .order('weighed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestBodyFatError) {
+    console.error('Error fetching latest body fat for recompute', latestBodyFatError);
+    throw latestBodyFatError;
+  }
+
+  await updateUserProfile(userId, {
+    weight_lb: latestWeight?.weight_lb ?? null,
+    body_fat_percent: latestBodyFat?.body_fat_percent ?? null,
+  });
+}
+
 

@@ -905,7 +905,7 @@ export default function FoodLogHomeScreen() {
                               );
                               // Always go to mealtype-log page (whether entries exist or not)
                               router.push({
-                                pathname: '/mealtype-log',
+                                pathname: '/(tabs)/mealtype-log',
                                 params: { 
                                   mealType: mealType,
                                   entryDate: selectedDateString,
@@ -949,7 +949,7 @@ export default function FoodLogHomeScreen() {
                                 );
                                 // Always go to mealtype-log page (whether entries exist or not)
                                 router.push({
-                                  pathname: '/mealtype-log',
+                                  pathname: '/(tabs)/mealtype-log',
                                   params: { 
                                     mealType: mealType,
                                     entryDate: selectedDateString,
@@ -986,7 +986,7 @@ export default function FoodLogHomeScreen() {
                                 );
                                 // Always go to mealtype-log page (whether entries exist or not)
                                 router.push({
-                                  pathname: '/mealtype-log',
+                                  pathname: '/(tabs)/mealtype-log',
                                   params: { 
                                     mealType: mealType,
                                     entryDate: selectedDateString,
@@ -1066,7 +1066,7 @@ export default function FoodLogHomeScreen() {
                                   );
                                   // Always go to mealtype-log page (whether entries exist or not)
                                   router.push({
-                                    pathname: '/mealtype-log',
+                                    pathname: '/(tabs)/mealtype-log',
                                     params: { 
                                       mealType: mealType,
                                       entryDate: selectedDateString,

@@ -132,6 +132,7 @@ const TapToExpandHint = ({ text, textColor }: { text: string; textColor: string 
   );
 };
 
+
 export default function LogFoodScreen() {
   const { t } = useTranslation();
   
@@ -143,6 +144,24 @@ export default function LogFoodScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  
+  const handleBackPress = useCallback(() => {
+    const r: any = router;
+    const canGoBack =
+      typeof r?.canGoBack === 'function' ? r.canGoBack() : false;
+  
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+  
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+  
+    router.replace('/');
+  }, [router]);
   
   // Helper function to get unique shade for each tab
   const getTabColor = (tab: string, isSelected: boolean) => {
@@ -466,7 +485,7 @@ export default function LogFoodScreen() {
     
     // Navigate to the same page with new date
     router.replace({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params: {
         mealType: mealType,
         entryDate: newDateString,
@@ -2348,9 +2367,9 @@ export default function LogFoodScreen() {
                 getMinTouchTargetStyle(),
                 { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
               ]}
-              onPress={() => {
-                router.back();
-              }}
+              onPress={handleBackPress}
+
+              
               activeOpacity={0.7}
               {...getButtonAccessibilityProps(
                 'Go back',
@@ -4410,7 +4429,7 @@ export default function LogFoodScreen() {
                 onPress={() => {
                   setShowMealTypeDropdown(false);
                   router.replace({
-                    pathname: '/mealtype-log',
+                    pathname: '/(tabs)/mealtype-log',
                     params: {
                       mealType: key,
                       entryDate: entryDate || getLocalDateString(),
@@ -4446,7 +4465,7 @@ export default function LogFoodScreen() {
       <Modal
         visible={showBarcodeScanner}
         animationType="slide"
-        transparent={false}
+        transparent
         onRequestClose={() => {
           setShowBarcodeScanner(false);
           setScanned(false);
@@ -4454,24 +4473,6 @@ export default function LogFoodScreen() {
         }}
       >
         <ThemedView style={styles.scannerContainer}>
-          <View style={styles.scannerHeader}>
-            <TouchableOpacity
-              style={styles.scannerCloseButton}
-              onPress={() => {
-                setShowBarcodeScanner(false);
-                setScanned(false);
-                setBarcodeScanning(false);
-              }}
-              activeOpacity={0.7}
-            >
-              <IconSymbol name="xmark" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <ThemedText style={[styles.scannerTitle, { color: colors.text }]}>
-              {t('mealtype_log.scanner.title')}
-            </ThemedText>
-            <View style={styles.scannerCloseButton} />
-          </View>
-          
           <View style={styles.scannerContent}>
             {/* UniversalBarcodeScanner always receives the same props regardless of entries.length */}
             <UniversalBarcodeScanner
@@ -5388,7 +5389,7 @@ const styles = StyleSheet.create({
   },
   scannerContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   scannerHeader: {
     flexDirection: 'row',

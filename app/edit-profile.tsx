@@ -17,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
+import { POLICY } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ageFromDob } from '@/utils/calculations';
 import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
@@ -449,11 +450,11 @@ export default function EditProfileScreen() {
             placeholderTextColor={colors.textSecondary}
             value={firstName}
             onChangeText={(text) => {
-              if (text.length <= 40) {
+              if (text.length <= POLICY.NAME.MAX_LEN) {
                 setFirstName(text);
               }
             }}
-            maxLength={40}
+            maxLength={POLICY.NAME.MAX_LEN}
             autoCapitalize="words"
           />
 

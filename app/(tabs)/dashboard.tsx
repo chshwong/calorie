@@ -294,7 +294,7 @@ export default function DashboardScreen() {
   const handleQuickAction = (action: 'food' | 'exercise' | 'med' | 'scan') => {
     if (action === 'food') {
       const mealType = getMealTypeFromCurrentTime();
-      router.push(`/mealtype-log?mealType=${mealType}&date=${selectedDateString}`);
+      router.push(`/(tabs)/mealtype-log?mealType=${mealType}&date=${selectedDateString}`);
     } else if (action === 'exercise') {
       router.push(`/exercise?date=${selectedDateString}`);
     } else if (action === 'med') {

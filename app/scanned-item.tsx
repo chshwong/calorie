@@ -89,7 +89,7 @@ export default function ScannedItemScreen() {
   const handleScanAnother = () => {
     // Navigate to mealtype-log with the same params and a flag to open the scanner
     router.push({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params: {
         mealType: mealType || 'breakfast',
         entryDate: entryDate || getLocalDateKey(new Date()),
@@ -101,7 +101,7 @@ export default function ScannedItemScreen() {
   // Use canonical food from food_master - navigate back with auto-select
   const handleUseCanonicalFood = (foodId: string) => {
     router.replace({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params: {
         mealType: mealType || 'breakfast',
         entryDate: entryDate,
@@ -138,7 +138,7 @@ export default function ScannedItemScreen() {
         
         // Navigate back to meal log with auto-select of the new food (this will open the entry form)
         router.replace({
-          pathname: '/mealtype-log',
+          pathname: '/(tabs)/mealtype-log',
           params: {
             mealType: mealType || 'breakfast',
             entryDate: entryDate,
@@ -189,7 +189,7 @@ export default function ScannedItemScreen() {
     });
 
     router.replace({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params: {
         mealType: mealType || 'breakfast',
         entryDate: entryDate,
@@ -229,7 +229,7 @@ export default function ScannedItemScreen() {
     });
 
     router.replace({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params: {
         mealType: mealType || 'breakfast',
         entryDate: entryDate,

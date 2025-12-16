@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
@@ -21,6 +22,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight } from '@/constants/theme';
 import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
 import { useSaveWeightEntry, useWeightLogs180d, getLatestBodyFatEntry, getLatestWeightEntry } from '@/hooks/use-weight-logs';
+import { useDeleteWeightLog } from '@/hooks/useDeleteWeightLog';
+import { validateBodyFatPercent, validateWeightKg } from '@/utils/validation';
+import { PROFILES } from '@/constants/constraints';
 import { showAppToast } from '@/components/ui/app-toast';
 import {
   getButtonAccessibilityProps,
@@ -31,6 +35,7 @@ import {
 // @ts-ignore - native picker types are supplied by the package at runtime
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatLocalTime } from '@/utils/dateTime';
+import { useAuth } from '@/contexts/AuthContext';
 
 type WeightUnit = 'kg' | 'lbs';
 
@@ -39,9 +44,12 @@ export default function WeightEntryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { data: profile } = useUserProfile();
+  const { user } = useAuth();
+  const userId = user?.id;
   const { date: dateParam, weightLb: weightLbParam, bodyFatPercent: bodyFatParam, entryId: entryIdParam, weighedAt: weighedAtParam, mode: modeParam } =
     useLocalSearchParams<{ date?: string; weightLb?: string; bodyFatPercent?: string; entryId?: string; weighedAt?: string; mode?: EntryMode }>();
   const weight180Query = useWeightLogs180d();
+  const deleteMutation = useDeleteWeightLog(userId ?? '');
 
   const initialDate = useMemo(() => {
     if (dateParam && typeof dateParam === 'string') {
@@ -202,15 +210,23 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
 
     const weightInput = unit === 'kg' ? weightKg : weightLb;
     const weightValue = parseFloat(weightInput);
+    const weightKgValue = unit === 'kg' ? weightValue : lbToKg(weightValue);
 
-    if (!weightInput || isNaN(weightValue) || weightValue <= 0) {
-      setError('Please enter a valid weight.');
+    const weightErrorKey = validateWeightKg(weightKgValue);
+    if (weightErrorKey) {
+      const weightRangeMessage = `Weight must be between ${PROFILES.WEIGHT_LB.MIN} and ${PROFILES.WEIGHT_LB.MAX} lb.`;
+      const message =
+        weightErrorKey === 'onboarding.current_weight.error_weight_required'
+          ? 'Please enter a valid weight.'
+          : weightRangeMessage;
+      setError(message);
       return;
     }
 
     const bodyFatValue = bodyFat.trim().length > 0 ? parseFloat(bodyFat) : null;
-    if (bodyFatValue !== null && (isNaN(bodyFatValue) || bodyFatValue <= 0 || bodyFatValue > 80)) {
-      setError('Body fat % must be between 0 and 80.');
+    const bodyFatError = validateBodyFatPercent(bodyFatValue);
+    if (bodyFatError) {
+      setError(bodyFatError);
       return;
     }
 
@@ -226,7 +242,7 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
 
     const weighedAt = new Date(selectedDateTime);
 
-    const weightLbValue = unit === 'kg' ? kgToLb(weightValue) : weightValue;
+    const weightLbValue = unit === 'kg' ? kgToLb(weightKgValue) : weightValue;
 
     try {
       await saveMutation.mutateAsync({
@@ -240,6 +256,45 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
     } catch (err: any) {
       setError(err?.message || 'Something went wrong while saving.');
     }
+  };
+
+  const confirmAndDelete = () => {
+    if (!editingEntryId) return;
+    if (!userId) {
+      setError('User not authenticated');
+      return;
+    }
+
+    // TEMP: prove the press fires (remove once verified)
+    showAppToast('Delete pressed');
+
+    const doDelete = () => {
+      deleteMutation.mutate(editingEntryId, {
+        onSuccess: () => {
+          showAppToast('Deleted');
+          router.replace('/weight' as any);
+        },
+        onError: (err: any) => {
+          setError(err?.message || 'Failed to delete entry.');
+        },
+      });
+    };
+
+    if (Platform.OS === 'web') {
+      const ok = typeof window !== 'undefined' ? window.confirm("Delete this entry? This can't be undone.") : false;
+      if (ok) doDelete();
+      return;
+    }
+
+    Alert.alert(
+      'Delete entry?',
+      "This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -449,6 +504,21 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
                 )}
               </TouchableOpacity>
             </View>
+
+            {isEditMode && (
+              <Pressable
+                onPress={confirmAndDelete}
+                disabled={deleteMutation.isPending}
+                style={[
+                  styles.deleteButton,
+                  { borderColor: colors.error },
+                  deleteMutation.isPending && { opacity: 0.6 },
+                ]}
+                {...getButtonAccessibilityProps('Delete weight entry')}
+              >
+                <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
+              </Pressable>
+            )}
           </View>
         </DesktopPageContainer>
       </ScrollView>
@@ -761,6 +831,21 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
     alignItems: 'center',
+  },
+  deleteButton: {
+    marginTop: Spacing.md,
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  deleteButtonText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
   },
 });
 

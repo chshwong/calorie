@@ -106,7 +106,7 @@ export function FloatingActionButton() {
     // Navigate to mealtype-log with current date and auto-selected meal type
     // Note: Time will be stored in UTC when saving, but meal type is determined from local time
     router.push({
-      pathname: '/mealtype-log',
+      pathname: '/(tabs)/mealtype-log',
       params: {
         entryDate: todayString,
         mealType: mealType, // Auto-select meal type based on current local time
