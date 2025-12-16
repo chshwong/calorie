@@ -24,24 +24,10 @@ export function useDailyEntries(entryDate: string) {
   const cacheKey = entriesCacheKey(userId, entryDate);
 
   // NEW: read persistent snapshot once when hook is created
-  const cacheReadStart = performance.now();
   const snapshot =
     cacheKey !== null
       ? getPersistentCache<CalorieEntry[]>(cacheKey, DAILY_ENTRIES_MAX_AGE_MS)
       : null;
-  if (snapshot) {
-    console.log(
-      `[useDailyEntries] persistent cache hit for ${cacheKey} in ${Math.round(
-        performance.now() - cacheReadStart
-      )}ms (count=${snapshot.length})`
-    );
-  } else if (cacheKey) {
-    console.log(
-      `[useDailyEntries] persistent cache miss for ${cacheKey} (took ${Math.round(
-        performance.now() - cacheReadStart
-      )}ms)`
-    );
-  }
 
   return useQuery<CalorieEntry[]>({
     queryKey: ['entries', userId, entryDate],
@@ -56,11 +42,13 @@ export function useDailyEntries(entryDate: string) {
         setPersistentCache(cacheKey, data);
       }
 
-      console.log(
-        `[useDailyEntries] network fetch for ${cacheKey} returned ${data.length} rows in ${Math.round(
-          performance.now() - networkStart
-        )}ms`
-      );
+      // Only log in development mode for slow fetches (>500ms) to help identify performance issues
+      const fetchTime = performance.now() - networkStart;
+      if (__DEV__ && fetchTime > 500) {
+        console.log(
+          `[useDailyEntries] slow network fetch for ${cacheKey} returned ${data.length} rows in ${Math.round(fetchTime)}ms`
+        );
+      }
 
       return data;
     },

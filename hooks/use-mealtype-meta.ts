@@ -20,24 +20,10 @@ export function useMealtypeMeta(entryDate: string) {
   const queryClient = useQueryClient();
 
   const cacheKey = userId ? `mealtypeMeta:${userId}:${entryDate}` : null;
-  const cacheStart = performance.now();
   const snapshot =
     cacheKey !== null
       ? getPersistentCache<MealtypeMeta[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
       : null;
-  if (snapshot) {
-    console.log(
-      `[useMealtypeMeta] persistent cache hit for ${cacheKey} in ${Math.round(
-        performance.now() - cacheStart
-      )}ms (count=${snapshot.length})`
-    );
-  } else if (cacheKey) {
-    console.log(
-      `[useMealtypeMeta] persistent cache miss for ${cacheKey} (took ${Math.round(
-        performance.now() - cacheStart
-      )}ms)`
-    );
-  }
 
   const { data: metaArray = [], isLoading, isFetching, refetch } = useQuery<MealtypeMeta[]>({
     queryKey: ['mealtypeMeta', userId, entryDate],
@@ -50,11 +36,13 @@ export function useMealtypeMeta(entryDate: string) {
         if (cacheKey) {
           setPersistentCache(cacheKey, result);
         }
-        console.log(
-          `[useMealtypeMeta] network fetch for ${cacheKey} returned ${result.length} rows in ${Math.round(
-            performance.now() - networkStart
-          )}ms`
-        );
+        // Only log in development mode for slow fetches (>500ms) to help identify performance issues
+        const fetchTime = performance.now() - networkStart;
+        if (__DEV__ && fetchTime > 500) {
+          console.log(
+            `[useMealtypeMeta] slow network fetch for ${cacheKey} returned ${result.length} rows in ${Math.round(fetchTime)}ms`
+          );
+        }
         return result;
       });
     },

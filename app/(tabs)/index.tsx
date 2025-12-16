@@ -502,13 +502,8 @@ export default function FoodLogHomeScreen() {
   const showLoadingModal = !cachedProfile && isProfileLoading;
 
   const { dailyTotals, groupedEntries } = useMemo(() => {
-    const transformStart = performance.now();
     const totals = calculateDailyTotals(entries, dataByMealType);
     const grouped = groupEntriesByMealType(entries, dataByMealType);
-    const transformMs = Math.round(performance.now() - transformStart);
-    console.log(
-      `[Home] transform ${selectedDateString} entries=${entries.length} ms=${transformMs}`
-    );
     return { dailyTotals: totals, groupedEntries: grouped };
   }, [dataByMealType, entries, selectedDateString]);
 
