@@ -1,1 +1,1 @@
-export { default } from '../mealtype-log';
+export { default } from '../mealtype-log-screen';

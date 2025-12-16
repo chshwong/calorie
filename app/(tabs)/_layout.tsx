@@ -205,7 +205,7 @@ function TabLayoutContent() {
   const openExerciseForToday = () => {
     const todayString = getLocalDateString();
     router.replace({
-      pathname: '/exercise',
+      pathname: '/(tabs)/exercise',
       params: { date: todayString }
     });
   };
@@ -369,6 +369,7 @@ function TabLayoutContent() {
           name="mealtype-log"
           options={{
             href: null, // Hide from tab bar
+            headerShown: false,
           }}
         />
         <Tabs.Screen
