@@ -490,6 +490,8 @@ export default function MedsHomeScreen() {
   // Local collapsed state (synced with preferences)
   const [isMedCollapsed, setIsMedCollapsed] = useState(medPrefs.collapsedMedSection ?? false);
   const [isSuppCollapsed, setIsSuppCollapsed] = useState(medPrefs.collapsedSuppSection ?? false);
+  const [isTemporarilyDisabled, setIsTemporarilyDisabled] = useState(false);
+  const [disabledChips, setDisabledChips] = useState<Set<string>>(new Set());
   
   // Sync local state with preferences when they load
   useEffect(() => {
@@ -701,6 +703,19 @@ export default function MedsHomeScreen() {
   // Handle quick add from chip
   const handleQuickAdd = (name: string, type: 'med' | 'supp' | 'other', dose_amount: number | null = null, dose_unit: string | null = null) => {
     if (!user?.id) return;
+
+    // Create unique key for this chip
+    const chipKey = `${name}-${type}-${dose_amount}-${dose_unit}`;
+    
+    // Disable chip for 3 seconds to prevent multiple clicks
+    setDisabledChips(prev => new Set(prev).add(chipKey));
+    setTimeout(() => {
+      setDisabledChips(prev => {
+        const next = new Set(prev);
+        next.delete(chipKey);
+        return next;
+      });
+    }, 3000);
 
     createMutation.mutate(
       {
@@ -1452,6 +1467,12 @@ export default function MedsHomeScreen() {
             </ThemedText>
             <TouchableOpacity
               onPress={() => {
+                // Disable button for 3 seconds to prevent multiple clicks
+                setIsTemporarilyDisabled(true);
+                setTimeout(() => {
+                  setIsTemporarilyDisabled(false);
+                }, 3000);
+                
                 // Check cache for previous day before cloning
                 const previousDay = new Date(selectedDate);
                 previousDay.setDate(previousDay.getDate() - 1);
@@ -1471,7 +1492,7 @@ export default function MedsHomeScreen() {
               }}
               style={styles.previousDayButton}
               activeOpacity={0.7}
-              disabled={isCopyingFromYesterday}
+              disabled={isCopyingFromYesterday || isTemporarilyDisabled}
               {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
               {...getButtonAccessibilityProps(
                 isToday 
@@ -1483,8 +1504,8 @@ export default function MedsHomeScreen() {
                 <ActivityIndicator size="small" color={colors.tint} />
               ) : (
                 <>
-                  <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
-                  <ThemedText style={[styles.previousDayButtonText, { color: colors.tint }]}>
+                  <IconSymbol name="doc.on.doc" size={16} color={isTemporarilyDisabled ? colors.textSecondary : colors.tint} />
+                  <ThemedText style={[styles.previousDayButtonText, { color: isTemporarilyDisabled ? colors.textSecondary : colors.tint }]}>
                     {isToday 
                       ? t('meds.previous_day_copy.label_yesterday')
                       : t('meds.previous_day_copy.label_previous')}
@@ -1510,6 +1531,7 @@ export default function MedsHomeScreen() {
               >
                 {recentAndFrequentMeds.map((med, index) => {
                   const doseText = med.dose_amount !== null && med.dose_unit ? `${med.dose_amount} ${med.dose_unit}` : null;
+                  const chipKey = `${med.name}-${med.type}-${med.dose_amount}-${med.dose_unit}`;
                   return (
                     <QuickAddChip
                       key={`recent-${index}-${med.name}-${med.type}-${med.dose_amount}-${med.dose_unit}`}
@@ -1517,6 +1539,7 @@ export default function MedsHomeScreen() {
                       metadata={doseText}
                       colors={colors}
                       onPress={() => handleQuickAdd(med.name, med.type, med.dose_amount, med.dose_unit)}
+                      disabled={disabledChips.has(chipKey)}
                     />
                   );
                 })}
@@ -1552,6 +1575,7 @@ export default function MedsHomeScreen() {
             {/* Supplements first, then meds */}
             {COMMON_SUPPS.map((supp) => {
               const translatedName = t(supp.i18nKey);
+              const chipKey = `${translatedName}-${supp.type}-null-null`;
               return (
                 <QuickAddChip
                   key={`supp-${supp.i18nKey}`}
@@ -1559,11 +1583,13 @@ export default function MedsHomeScreen() {
                   icon={supp.icon}
                   colors={colors}
                   onPress={() => handleQuickAdd(translatedName, supp.type)}
+                  disabled={disabledChips.has(chipKey)}
                 />
               );
             })}
             {COMMON_MEDS.map((med) => {
               const translatedName = t(med.i18nKey);
+              const chipKey = `${translatedName}-${med.type}-null-null`;
               return (
                 <QuickAddChip
                   key={`med-${med.i18nKey}`}
@@ -1571,6 +1597,7 @@ export default function MedsHomeScreen() {
                   icon={med.icon}
                   colors={colors}
                   onPress={() => handleQuickAdd(translatedName, med.type)}
+                  disabled={disabledChips.has(chipKey)}
                 />
               );
             })}

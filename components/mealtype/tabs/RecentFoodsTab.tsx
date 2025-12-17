@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, ScrollView, ActivityIndicator, TouchableOpacity, Platform, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
+import { showAppToast } from '@/components/ui/app-toast';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import type { CalorieEntry } from '@/utils/types';
 import type { Colors } from '@/constants/theme';
@@ -32,6 +33,26 @@ export function RecentFoodsTab({
   useTabBackgroundColor = false,
   getTabListBackgroundColor,
 }: RecentFoodsTabProps) {
+  const [disabledButtons, setDisabledButtons] = useState<Set<string>>(new Set());
+
+  const handleQuickAdd = (food: EnhancedFoodItem, latestEntry?: CalorieEntry) => {
+    // Show toast message
+    const foodName = food.name.length > 20 ? food.name.substring(0, 20) + '...' : food.name;
+    showAppToast(`Quick-Adding ${foodName}`);
+    
+    // Disable button for 3 seconds to prevent multiple clicks
+    setDisabledButtons(prev => new Set(prev).add(food.id));
+    setTimeout(() => {
+      setDisabledButtons(prev => {
+        const next = new Set(prev);
+        next.delete(food.id);
+        return next;
+      });
+    }, 3000);
+    
+    onQuickAdd(food, latestEntry);
+  };
+
   const containerStyle = useTabBackgroundColor && getTabListBackgroundColor
     ? { backgroundColor: getTabListBackgroundColor('recent'), borderColor: colors.icon + '20' }
     : { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) };
@@ -105,8 +126,9 @@ export function RecentFoodsTab({
                           </ThemedText>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                          onPress={() => onQuickAdd(food, food.latestEntry || undefined)}
+                          style={[styles.quickAddButton, { backgroundColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, marginLeft: 4 }]}
+                          onPress={() => handleQuickAdd(food, food.latestEntry || undefined)}
+                          disabled={disabledButtons.has(food.id)}
                           activeOpacity={0.7}
                           accessibilityLabel={t('mealtype_log.quick_add')}
                           accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
@@ -114,7 +136,7 @@ export function RecentFoodsTab({
                           <IconSymbol
                             name="plus.circle.fill"
                             size={22}
-                            color={colors.tint}
+                            color={disabledButtons.has(food.id) ? colors.textSecondary : colors.tint}
                           />
                         </TouchableOpacity>
                       </View>

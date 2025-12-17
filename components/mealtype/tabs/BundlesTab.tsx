@@ -27,7 +27,6 @@ type Bundle = {
   name: string;
   created_at: string;
   updated_at: string;
-  order_index?: number;
   items?: BundleItem[];
   totalCalories?: number;
   totalProtein?: number;
@@ -46,8 +45,6 @@ type BundlesTabProps = {
   t: (key: string) => string;
   onAddBundle: (bundle: Bundle) => void;
   onDelete: (bundle: Bundle) => void;
-  onMoveUp: (bundleId: string) => void;
-  onMoveDown: (bundleId: string) => void;
   formatBundleItemsList: (bundle: Bundle) => string;
   isBundleNewlyAdded: (bundleId: string) => boolean;
   editMode: boolean;
@@ -68,8 +65,6 @@ export function BundlesTab({
   t,
   onAddBundle,
   onDelete,
-  onMoveUp,
-  onMoveDown,
   formatBundleItemsList,
   isBundleNewlyAdded,
   editMode,
@@ -271,30 +266,26 @@ export function BundlesTab({
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
                       <TouchableOpacity
-                        style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 4 }]}
-                        onPress={() => onMoveUp(bundle.id)}
-                        disabled={bundles.findIndex(b => b.id === bundle.id) === 0}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.editButton, { backgroundColor: colors.icon + '20', borderColor: colors.icon + '40', marginRight: 6 }]}
-                        onPress={() => onMoveDown(bundle.id)}
-                        disabled={bundles.findIndex(b => b.id === bundle.id) === bundles.length - 1}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                        style={[styles.deleteButton, { 
+                          backgroundColor: 'transparent', 
+                          borderColor: 'transparent', 
+                          borderWidth: 0,
+                          borderRadius: 0,
+                          paddingHorizontal: 0, 
+                          paddingVertical: 0, 
+                          width: 'auto',
+                          height: 'auto',
+                          minWidth: 0,
+                          minHeight: 0,
+                          marginRight: 6 
+                        }]}
                         onPress={() => onDelete(bundle)}
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginRight: 6 }]}
+                        style={[styles.editButton, { backgroundColor: 'transparent', borderColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, marginRight: 6 }]}
                         onPress={() => {
                           router.push({
                             pathname: '/create-bundle',

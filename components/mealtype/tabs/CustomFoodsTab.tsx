@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, ScrollView, ActivityIndicator, TouchableOpacity, Text, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { showAppToast } from '@/components/ui/app-toast';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import type { FoodMaster } from '@/utils/nutritionMath';
 import type { Colors } from '@/constants/theme';
@@ -17,8 +18,6 @@ type CustomFoodsTabProps = {
   onFoodSelect: (food: EnhancedFoodItem) => void;
   onQuickAdd: (food: EnhancedFoodItem) => void;
   onDelete: (food: FoodMaster) => void;
-  onMoveUp: (foodId: string) => void;
-  onMoveDown: (foodId: string) => void;
   editMode: boolean;
   onToggleEditMode: () => void;
   newlyAddedFoodId: React.RefObject<string | undefined>;
@@ -37,8 +36,6 @@ export function CustomFoodsTab({
   onFoodSelect,
   onQuickAdd,
   onDelete,
-  onMoveUp,
-  onMoveDown,
   editMode,
   onToggleEditMode,
   newlyAddedFoodId,
@@ -48,6 +45,25 @@ export function CustomFoodsTab({
   styles,
 }: CustomFoodsTabProps) {
   const router = useRouter();
+  const [disabledButtons, setDisabledButtons] = useState<Set<string>>(new Set());
+
+  const handleQuickAdd = (food: EnhancedFoodItem) => {
+    // Show toast message
+    const foodName = food.name.length > 20 ? food.name.substring(0, 20) + '...' : food.name;
+    showAppToast(`Quick-Adding ${foodName}`);
+    
+    // Disable button for 3 seconds to prevent multiple clicks
+    setDisabledButtons(prev => new Set(prev).add(food.id));
+    setTimeout(() => {
+      setDisabledButtons(prev => {
+        const next = new Set(prev);
+        next.delete(food.id);
+        return next;
+      });
+    }, 3000);
+    
+    onQuickAdd(food);
+  };
 
   return (
     <View style={styles.tabContent}>
@@ -184,46 +200,26 @@ export function CustomFoodsTab({
                     {editMode && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
                         <TouchableOpacity
-                          style={[
-                            styles.editButton, 
-                            { 
-                              backgroundColor: colors.icon + '20', 
-                              borderColor: colors.icon + '40', 
-                              marginRight: 4, 
-                              opacity: sortedFoods.findIndex(f => f.id === food.id) === 0 ? 0.5 : 1,
-                            }
-                          ]}
-                          onPress={() => onMoveUp(food.id)}
-                          disabled={sortedFoods.findIndex(f => f.id === food.id) === 0}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↑</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.editButton, 
-                            { 
-                              backgroundColor: colors.icon + '20', 
-                              borderColor: colors.icon + '40', 
-                              marginRight: 6, 
-                              opacity: sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1 ? 0.5 : 1,
-                            }
-                          ]}
-                          onPress={() => onMoveDown(food.id)}
-                          disabled={sortedFoods.findIndex(f => f.id === food.id) === sortedFoods.length - 1}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.editButtonText, { color: colors.text, fontSize: 14 }]}>↓</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', marginRight: 6 }]}
+                          style={[styles.deleteButton, { 
+                            backgroundColor: 'transparent', 
+                            borderColor: 'transparent', 
+                            borderWidth: 0,
+                            borderRadius: 0,
+                            paddingHorizontal: 0, 
+                            paddingVertical: 0, 
+                            width: 'auto',
+                            height: 'auto',
+                            minWidth: 0,
+                            minHeight: 0,
+                            marginRight: 6 
+                          }]}
                           onPress={() => onDelete(food)}
                           activeOpacity={0.7}
                         >
                           <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}
+                          style={[styles.editButton, { backgroundColor: 'transparent', borderColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0 }]}
                           onPress={() => {
                             router.push({
                               pathname: '/create-custom-food',
@@ -243,7 +239,19 @@ export function CustomFoodsTab({
                     {!editMode && (
                       <>
                         <TouchableOpacity
-                          style={[styles.editButton, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40', marginLeft: 6 }]}
+                          style={[styles.editButton, { 
+                            backgroundColor: 'transparent', 
+                            borderColor: 'transparent', 
+                            borderWidth: 0,
+                            borderRadius: 0,
+                            paddingHorizontal: 2, 
+                            paddingVertical: 0, 
+                            width: 'auto',
+                            height: 'auto',
+                            minWidth: 0,
+                            minHeight: 0,
+                            marginLeft: 6 
+                          }]}
                           onPress={() => {
                             router.push({
                               pathname: '/create-custom-food',
@@ -259,8 +267,9 @@ export function CustomFoodsTab({
                           <Text style={[styles.editButtonText, { color: colors.tint }]}>⧉</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                          onPress={() => onQuickAdd(food)}
+                          style={[styles.quickAddButton, { backgroundColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, marginLeft: 4 }]}
+                          onPress={() => handleQuickAdd(food)}
+                          disabled={disabledButtons.has(food.id)}
                           activeOpacity={0.7}
                           accessibilityLabel={t('mealtype_log.quick_add')}
                           accessibilityHint={t('mealtype_log.accessibility.quick_add_hint')}
@@ -268,7 +277,7 @@ export function CustomFoodsTab({
                           <IconSymbol
                             name="plus.circle.fill"
                             size={22}
-                            color={colors.tint}
+                            color={disabledButtons.has(food.id) ? colors.textSecondary : colors.tint}
                           />
                         </TouchableOpacity>
                       </>

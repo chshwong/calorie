@@ -201,7 +201,7 @@ export function EntryCard({
           </ThemedText>
           {!hasAnySelection && (
             <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
+              style={[styles.deleteButton, { backgroundColor: 'transparent', borderColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, width: 'auto', height: 'auto' }]}
               onPress={() => onDelete(entry.id, entry.item_name)}
               activeOpacity={0.7}
             >

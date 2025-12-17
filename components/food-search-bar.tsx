@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { FoodStatusChip } from '@/components/food-status-chip';
+import { showAppToast } from '@/components/ui/app-toast';
 import type { FoodMaster } from '@/utils/nutritionMath';
 
 export interface FoodSearchBarProps {
@@ -103,6 +104,7 @@ export function FoodSearchBar({
   const wrapperRef = useRef<View>(null);
   const isInteractingWithDropdownRef = useRef(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [disabledButtons, setDisabledButtons] = useState<Set<string>>(new Set());
 
   // Animated value for focus animation (scale + shadow)
   const focusAnim = useRef(new Animated.Value(0)).current;
@@ -167,6 +169,28 @@ export function FoodSearchBar({
   const handleDropdownInteraction = useCallback(() => {
     isInteractingWithDropdownRef.current = true;
   }, []);
+
+  // Handle Quick Add with 3-second disable to prevent multiple clicks
+  const handleQuickAdd = useCallback((food: FoodMaster) => {
+    // Show toast message
+    const foodName = food.name.length > 20 ? food.name.substring(0, 20) + '...' : food.name;
+    showAppToast(`Quick-Adding ${foodName}`);
+    
+    // Disable button for 3 seconds to prevent multiple clicks
+    setDisabledButtons(prev => new Set(prev).add(food.id));
+    setTimeout(() => {
+      setDisabledButtons(prev => {
+        const next = new Set(prev);
+        next.delete(food.id);
+        return next;
+      });
+    }, 3000);
+    
+    handleDropdownInteraction();
+    if (onQuickAdd) {
+      onQuickAdd(food);
+    }
+  }, [onQuickAdd, handleDropdownInteraction]);
 
   // Click-outside detection for web
   useEffect(() => {
@@ -483,12 +507,10 @@ export function FoodSearchBar({
                   {/* Quick Add button - only shown when onQuickAdd is provided */}
                   {onQuickAdd && (
                     <TouchableOpacity
-                      style={[styles.quickAddButton, { backgroundColor: colors.tint + '15' }]}
-                      onPress={() => {
-                        handleDropdownInteraction();
-                        onQuickAdd(food);
-                      }}
+                      style={[styles.quickAddButton, { backgroundColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0 }]}
+                      onPress={() => handleQuickAdd(food)}
                       onPressIn={handleDropdownInteraction}
+                      disabled={disabledButtons.has(food.id)}
                       activeOpacity={0.7}
                       accessibilityLabel={quickAddLabel || 'Quick add'}
                       accessibilityHint="Add with default serving"
@@ -496,7 +518,7 @@ export function FoodSearchBar({
                       <IconSymbol
                         name="plus.circle.fill"
                         size={22}
-                        color={colors.tint}
+                        color={disabledButtons.has(food.id) ? colors.textSecondary : colors.tint}
                       />
                     </TouchableOpacity>
                   )}

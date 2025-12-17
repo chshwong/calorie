@@ -26,7 +26,6 @@ export type Bundle = {
   name: string;
   created_at: string;
   updated_at: string;
-  order_index?: number;
   items?: BundleItem[];
   totalCalories?: number;
   totalProtein?: number;
@@ -49,8 +48,7 @@ export async function fetchBundles(userId: string): Promise<Bundle[]> {
   }
 
   try {
-    // Fetch bundles
-    // Use created_at ordering for now (order_index will be used after migration is run)
+    // Fetch bundles ordered by created_at (newest first)
     const { data: bundlesData, error: bundlesError } = await supabase
       .from('bundles')
       .select('*')

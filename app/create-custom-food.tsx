@@ -760,10 +760,12 @@ export default function CreateCustomFoodScreen() {
         foodData = updatedFood;
       } else {
         // Create new food
+        // When cloning, explicitly exclude barcode (set to null)
         const { data: newFood, error: foodError } = await supabase
           .from('food_master')
           .insert({
             ...foodUpdateData,
+            barcode: null, // Explicitly set barcode to null when creating/cloning
             is_custom: true,
             owner_user_id: user.id,
             source: 'user_created',

@@ -88,7 +88,6 @@ type BundleRow = {
   name: string;
   created_at: string;
   updated_at: string;
-  order_index: number | null;
   // Computed field: name(s) of associated master food(s)
   food_master_name?: string | null;
 };
@@ -113,7 +112,6 @@ const BUNDLE_COLUMN_KEYS = [
   'name',
   'created_at',
   'updated_at',
-  'order_index',
 ];
 
 const BUNDLE_ITEM_COLUMN_KEYS = [
@@ -275,7 +273,6 @@ const DEFAULT_COLUMN_WIDTHS: { [key: string]: number } = {
   bundle_name: 200,
   bundle_created_at: 150,
   bundle_updated_at: 150,
-  bundle_order_index: 100,
   // Bundle Item columns
   bundle_item_food_master_name: 200,
   bundle_item_id: 80,
@@ -788,7 +785,6 @@ export default function MergeFoodScreen() {
           name: bundle.name,
           created_at: bundle.created_at,
           updated_at: bundle.updated_at,
-          order_index: bundle.order_index || null,
           food_master_name: foodMasterName,
         };
       });
@@ -1742,11 +1738,9 @@ export default function MergeFoodScreen() {
             const updates: any = {};
             for (const [key, value] of Object.entries(edits)) {
               if (key === 'food_master_name') continue; // Skip computed field
+              if (key === 'order_index') continue; // Skip order_index (not used for bundles)
               if (value === null || value === undefined || value === '') {
                 updates[key] = null;
-              } else if (key === 'order_index') {
-                const num = Number(value);
-                updates[key] = isNaN(num) ? null : num;
               } else {
                 updates[key] = value;
               }
@@ -2273,11 +2267,9 @@ export default function MergeFoodScreen() {
           const updates: any = {};
           for (const [key, value] of Object.entries(edits)) {
             if (key === 'food_master_name') continue;
+            if (key === 'order_index') continue; // Skip order_index (not used for bundles)
             if (value === null || value === undefined || value === '') {
               updates[key] = null;
-            } else if (key === 'order_index') {
-              const num = Number(value);
-              updates[key] = isNaN(num) ? null : num;
             } else {
               updates[key] = value;
             }
@@ -3954,7 +3946,7 @@ export default function MergeFoodScreen() {
                               const originalValue = bundle[key as keyof BundleRow];
                               const editedValue = getEditedValue(bundle.id, key, originalValue, 'bundle');
                               const displayValue = editedValue === null || editedValue === undefined ? '' : String(editedValue);
-                              const isNumeric = key === 'order_index';
+                              const isNumeric = false; // Bundles don't have numeric editable fields
                               return (
                                 <TextInput
                                   style={[

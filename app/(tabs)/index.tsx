@@ -55,6 +55,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isCopyingFromYesterday, runCopyFromYesterday } = useCopyFromYesterday();
+  const [isTemporarilyDisabled, setIsTemporarilyDisabled] = useState(false);
   
   const { cloneMealTypeFromPreviousDay, isLoading } = useCloneMealTypeFromPreviousDay({
     currentDate: selectedDate,
@@ -134,27 +135,34 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
       }
     }
     
+    // Disable button for 3 seconds to prevent multiple clicks
+    setIsTemporarilyDisabled(true);
+    setTimeout(() => {
+      setIsTemporarilyDisabled(false);
+    }, 3000);
+    
     runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
   };
 
   return (
-    <TouchableOpacity
-      onPress={handleCopy}
-      style={styles.copyFromYesterdayButton}
-      activeOpacity={0.7}
-      disabled={isCopyingFromYesterday}
-      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-      {...getButtonAccessibilityProps(
-        isToday 
-          ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: mealTypeLabel })
-          : t('home.previous_day_copy.accessibility_label_previous', { mealType: mealTypeLabel })
-      )}
-    >
+    <View style={styles.copyFromYesterdayButton}>
       {isCopyingFromYesterday ? (
         <ActivityIndicator size="small" color={colors.tint} />
       ) : (
         <>
-          <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
+          <TouchableOpacity
+            onPress={handleCopy}
+            activeOpacity={0.7}
+            disabled={isCopyingFromYesterday || isTemporarilyDisabled}
+            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+            {...getButtonAccessibilityProps(
+              isToday 
+                ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: mealTypeLabel })
+                : t('home.previous_day_copy.accessibility_label_previous', { mealType: mealTypeLabel })
+            )}
+          >
+            <IconSymbol name="doc.on.doc" size={19} color={isTemporarilyDisabled ? colors.textSecondary : colors.tint} />
+          </TouchableOpacity>
           <ThemedText style={[styles.copyFromYesterdayButtonText, { color: colors.tint }]}>
             {isToday 
               ? t('home.previous_day_copy.label_yesterday')
@@ -162,7 +170,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
           </ThemedText>
         </>
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 

@@ -427,10 +427,12 @@ export default function ExerciseHomeScreen() {
 
   // Modal state for custom exercise form
   const [showCustomForm, setShowCustomForm] = useState(false);
+  const [isTemporarilyDisabled, setIsTemporarilyDisabled] = useState(false);
   const [editingLog, setEditingLog] = useState<{ id: string; name: string; minutes: number | null; notes: string | null } | null>(null);
   const [formName, setFormName] = useState('');
   const [formMinutes, setFormMinutes] = useState('');
   const [formNotes, setFormNotes] = useState('');
+  const [disabledChips, setDisabledChips] = useState<Set<string>>(new Set());
 
   // Delete confirmation modal state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -584,6 +586,19 @@ export default function ExerciseHomeScreen() {
   const chipTextStyle = { fontSize: FontSize.base + 2 };
   const handleQuickAdd = useCallback((name: string, minutes: number | null) => {
     if (!user?.id) return;
+
+    // Create unique key for this chip
+    const chipKey = `${name}-${minutes}`;
+    
+    // Disable chip for 3 seconds to prevent multiple clicks
+    setDisabledChips(prev => new Set(prev).add(chipKey));
+    setTimeout(() => {
+      setDisabledChips(prev => {
+        const next = new Set(prev);
+        next.delete(chipKey);
+        return next;
+      });
+    }, 3000);
 
     createMutation.mutate({
       user_id: user.id,
@@ -1092,6 +1107,12 @@ export default function ExerciseHomeScreen() {
             </ThemedText>
             <TouchableOpacity
               onPress={() => {
+                // Disable button for 3 seconds to prevent multiple clicks
+                setIsTemporarilyDisabled(true);
+                setTimeout(() => {
+                  setIsTemporarilyDisabled(false);
+                }, 3000);
+                
                 // Check cache for previous day before cloning
                 const previousDay = new Date(selectedDate);
                 previousDay.setDate(previousDay.getDate() - 1);
@@ -1111,7 +1132,7 @@ export default function ExerciseHomeScreen() {
               }}
               style={styles.previousDayButton}
               activeOpacity={0.7}
-              disabled={isCloningFromPreviousDay}
+              disabled={isCloningFromPreviousDay || isTemporarilyDisabled}
               {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
               {...getButtonAccessibilityProps(
                 isToday 
@@ -1119,8 +1140,8 @@ export default function ExerciseHomeScreen() {
                   : t('exercise.previous_day_copy.accessibility_label_previous')
               )}
             >
-              <IconSymbol name="doc.on.doc" size={16} color={colors.tint} />
-              <ThemedText style={[styles.previousDayButtonText, { color: colors.tint }]}>
+              <IconSymbol name="doc.on.doc" size={16} color={isTemporarilyDisabled ? colors.textSecondary : colors.tint} />
+              <ThemedText style={[styles.previousDayButtonText, { color: isTemporarilyDisabled ? colors.textSecondary : colors.tint }]}>
                 {isToday 
                   ? t('exercise.previous_day_copy.label_yesterday')
                   : t('exercise.previous_day_copy.label_previous')}
@@ -1144,6 +1165,7 @@ export default function ExerciseHomeScreen() {
               >
                 {recentAndFrequentExercises.map((exercise, index) => {
                   const minutesText = exercise.minutes !== null && exercise.minutes !== undefined ? `${exercise.minutes} min` : null;
+                  const chipKey = `${exercise.name}-${exercise.minutes}`;
                   return (
                     <QuickAddChip
                       key={`recent-${index}-${exercise.name}-${exercise.minutes}`}
@@ -1152,6 +1174,7 @@ export default function ExerciseHomeScreen() {
                       colors={colors}
                       textStyle={chipTextStyle}
                       onPress={() => handleQuickAdd(exercise.name, exercise.minutes)}
+                      disabled={disabledChips.has(chipKey)}
                     />
                   );
                 })}
@@ -1186,6 +1209,7 @@ export default function ExerciseHomeScreen() {
           >
             {DEFAULT_EXERCISES.map((exercise) => {
               const translatedName = t(exercise.i18nKey);
+              const chipKey = `${translatedName}-null`;
               return (
                 <QuickAddChip
                   key={`default-${exercise.i18nKey}`}
@@ -1193,6 +1217,7 @@ export default function ExerciseHomeScreen() {
                   colors={colors}
                   textStyle={chipTextStyle}
                   onPress={() => handleQuickAdd(translatedName, null)}
+                  disabled={disabledChips.has(chipKey)}
                 />
               );
             })}

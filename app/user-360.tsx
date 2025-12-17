@@ -100,7 +100,6 @@ type BundleRow = {
   name: string;
   created_at: string;
   updated_at: string;
-  order_index: number | null;
 };
 
 type BundleItemRow = {
@@ -1235,11 +1234,8 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
                 <View style={[styles.headerCell, { width: 150, borderRightColor: colors.separator }]}>
                   <ThemedText style={[styles.headerText, { color: colors.text }]}>Created At</ThemedText>
                 </View>
-                <View style={[styles.headerCell, { width: 150, borderRightColor: colors.separator }]}>
+                <View style={[styles.headerCell, { width: 150 }]}>
                   <ThemedText style={[styles.headerText, { color: colors.text }]}>Updated At</ThemedText>
-                </View>
-                <View style={[styles.headerCell, { width: 100 }]}>
-                  <ThemedText style={[styles.headerText, { color: colors.text }]}>Order Index</ThemedText>
                 </View>
               </View>
 
@@ -1295,14 +1291,9 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
                           {bundle.created_at ? new Date(bundle.created_at).toLocaleDateString() : '-'}
                         </ThemedText>
                       </View>
-                      <View style={[styles.tableCell, { width: 150, borderRightColor: colors.separator }]}>
+                      <View style={[styles.tableCell, { width: 150 }]}>
                         <ThemedText style={[styles.cellText, { color: colors.text }]} numberOfLines={1}>
                           {bundle.updated_at ? new Date(bundle.updated_at).toLocaleDateString() : '-'}
-                        </ThemedText>
-                      </View>
-                      <View style={[styles.tableCell, { width: 100 }]}>
-                        <ThemedText style={[styles.cellText, { color: colors.text }]} numberOfLines={1}>
-                          {bundle.order_index != null ? bundle.order_index.toString() : '-'}
                         </ThemedText>
                       </View>
                     </View>

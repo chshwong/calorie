@@ -28,13 +28,15 @@ type QuickAddChipProps = {
   colors: typeof Colors.light;
   onPress: () => void;
   textStyle?: StyleProp<TextStyle>;
+  disabled?: boolean;
 };
 
-export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle }: QuickAddChipProps) {
+export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle, disabled = false }: QuickAddChipProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Visual feedback only - scale down on press in
   const handlePressIn = () => {
+    if (disabled) return;
     Animated.spring(scaleAnim, {
       toValue: 0.95,
       useNativeDriver: Platform.OS !== 'web',
@@ -45,6 +47,7 @@ export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle
 
   // Visual feedback only - scale back up on press out
   const handlePressOut = () => {
+    if (disabled) return;
     Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: Platform.OS !== 'web',
@@ -55,6 +58,7 @@ export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle
 
   // The actual action is triggered by onPress (tap completed)
   const handlePress = () => {
+    if (disabled) return;
     onPress();
   };
 
@@ -63,22 +67,23 @@ export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={[styles.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+        style={[styles.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: disabled ? 0.5 : 1 }]}
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
+        disabled={disabled}
         {...getButtonAccessibilityProps(accessibilityLabel)}
       >
         {icon && (
           <IconSymbol 
             name={icon as any} 
             size={14} 
-            color={colors.tint} 
+            color={disabled ? colors.textSecondary : colors.tint} 
             style={{ marginRight: Spacing.xs }} 
           />
         )}
-        <ThemedText style={[styles.chipText, { color: colors.text }, textStyle]}>
+        <ThemedText style={[styles.chipText, { color: disabled ? colors.textSecondary : colors.text }, textStyle]}>
           {label}
           {metadata && ` – ${metadata}`}
         </ThemedText>

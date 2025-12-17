@@ -1737,8 +1737,6 @@ export default function LogFoodScreen() {
             onFoodSelect={handleFoodSelect}
             onQuickAdd={handleQuickAdd}
             onDelete={handleDeleteCustomFood}
-            onMoveUp={handleMoveCustomFoodUp}
-            onMoveDown={handleMoveCustomFoodDown}
             editMode={customFoodEditMode}
             onToggleEditMode={() => {
               setCustomFoodEditMode(!customFoodEditMode);
@@ -1761,8 +1759,6 @@ export default function LogFoodScreen() {
             t={t}
             onAddBundle={handleAddBundleToMeal}
             onDelete={handleDeleteBundle}
-            onMoveUp={handleMoveBundleUp}
-            onMoveDown={handleMoveBundleDown}
             formatBundleItemsList={formatBundleItemsList}
             isBundleNewlyAdded={isBundleNewlyAdded}
             editMode={bundleEditMode}
@@ -1799,8 +1795,6 @@ export default function LogFoodScreen() {
     handleFoodSelect,
     handleQuickAdd,
     handleDeleteCustomFood,
-    handleMoveCustomFoodUp,
-    handleMoveCustomFoodDown,
     customFoodEditMode,
     setCustomFoodEditMode,
     newlyAddedFoodId,
@@ -1809,8 +1803,6 @@ export default function LogFoodScreen() {
     entryDate,
     handleAddBundleToMeal,
     handleDeleteBundle,
-    handleMoveBundleUp,
-    handleMoveBundleDown,
     formatBundleItemsList,
     isBundleNewlyAdded,
     bundleEditMode,
@@ -2261,8 +2253,11 @@ export default function LogFoodScreen() {
                     style={[
                       styles.massDeleteButton,
                       {
-                        backgroundColor: hasAnySelection ? '#EF4444' + '20' : colors.icon + '30',
-                        borderColor: hasAnySelection ? '#EF4444' + '40' : colors.icon + '40',
+                        backgroundColor: 'transparent',
+                        borderColor: 'transparent',
+                        paddingHorizontal: 0,
+                        paddingVertical: 0,
+                        minWidth: 0,
                         opacity: hasAnySelection ? 1 : 0.5,
                       },
                     ]}
