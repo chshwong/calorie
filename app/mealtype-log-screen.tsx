@@ -285,7 +285,7 @@ export default function LogFoodScreen() {
   
   // Handlers for Notes
   const handleNotes = () => {
-    setMassDeleteMenuVisible(false);
+    setThreeDotMenuVisible(false);
     setNoteEditor({ visible: true });
   };
 
@@ -857,7 +857,7 @@ export default function LogFoodScreen() {
   const [massDeleteConfirmVisible, setMassDeleteConfirmVisible] = useState(false);
   
   // 3-dot menu state
-  const [massDeleteMenuVisible, setMassDeleteMenuVisible] = useState(false);
+  const [threeDotMenuVisible, setThreeDotMenuVisible] = useState(false);
   
   // Note editor state
   const [noteEditor, setNoteEditor] = useState<{ visible: boolean }>({ visible: false });
@@ -5431,11 +5431,11 @@ export default function LogFoodScreen() {
                       clearEntrySelection();
                     } else {
                       // Open menu
-                      setMassDeleteMenuVisible(true);
+                      setThreeDotMenuVisible(true);
                     }
                   }}
                   style={[
-                    styles.massDeleteMenuButton,
+                    styles.threeDotMenuButton,
                     getMinTouchTargetStyle(),
                     Platform.OS === 'web' && getFocusStyle(colors.tint),
                   ]}
@@ -6050,28 +6050,28 @@ export default function LogFoodScreen() {
       />
 
 
-      {/* Mass Delete Menu Modal */}
+      {/* Three Dot Menu Modal */}
       <Modal
-        visible={massDeleteMenuVisible}
+        visible={threeDotMenuVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setMassDeleteMenuVisible(false)}
+        onRequestClose={() => setThreeDotMenuVisible(false)}
       >
         <TouchableOpacity
-          style={[styles.massDeleteMenuOverlay, { backgroundColor: colors.overlay }]}
+          style={[styles.threeDotMenuOverlay, { backgroundColor: colors.overlay }]}
           activeOpacity={1}
-          onPress={() => setMassDeleteMenuVisible(false)}
+          onPress={() => setThreeDotMenuVisible(false)}
         >
           <TouchableOpacity
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <View style={[styles.massDeleteMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.threeDotMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {/* Close button header */}
-              <View style={styles.massDeleteMenuHeader}>
+              <View style={styles.threeDotMenuHeader}>
                 <TouchableOpacity
-                  style={[styles.massDeleteMenuCloseButton, getMinTouchTargetStyle()]}
-                  onPress={() => setMassDeleteMenuVisible(false)}
+                  style={[styles.threeDotMenuCloseButton, getMinTouchTargetStyle()]}
+                  onPress={() => setThreeDotMenuVisible(false)}
                   activeOpacity={0.7}
                   {...getButtonAccessibilityProps(
                     t('common.close', { defaultValue: 'Close' }),
@@ -6082,9 +6082,9 @@ export default function LogFoodScreen() {
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
-                style={styles.massDeleteMenuItem}
+                style={styles.threeDotMenuItem}
                 onPress={() => {
-                  setMassDeleteMenuVisible(false);
+                  setThreeDotMenuVisible(false);
                   // Navigate to dedicated Quick Log screen
                   router.push({
                     pathname: '/quick-log',
@@ -6100,12 +6100,12 @@ export default function LogFoodScreen() {
                   `Add quick log for ${t(`home.meal_types.${selectedMealType}`)}`
                 )}
               >
-                <ThemedText style={[styles.massDeleteMenuItemText, { color: colors.text }]}>
+                <ThemedText style={[styles.threeDotMenuItemText, { color: colors.text }]}>
                   ⚡Quick Log
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.massDeleteMenuItem}
+                style={styles.threeDotMenuItem}
                 onPress={handleNotes}
                 activeOpacity={0.7}
                 {...getButtonAccessibilityProps(
@@ -6113,15 +6113,15 @@ export default function LogFoodScreen() {
                   `Add or edit notes for ${t(`home.meal_types.${selectedMealType}`)}`
                 )}
               >
-                <ThemedText style={[styles.massDeleteMenuItemText, { color: colors.text }]}>
+                <ThemedText style={[styles.threeDotMenuItemText, { color: colors.text }]}>
                   📝 {t('food.menu.notes', { defaultValue: 'Notes' })}
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.massDeleteMenuItem}
+                style={styles.threeDotMenuItem}
                 onPress={() => {
                   if (entries.length > 0) {
-                    setMassDeleteMenuVisible(false);
+                    setThreeDotMenuVisible(false);
                     setEntriesEditMode(true);
                   }
                 }}
@@ -6135,7 +6135,7 @@ export default function LogFoodScreen() {
                 )}
               >
                 <ThemedText style={[
-                  styles.massDeleteMenuItemText, 
+                  styles.threeDotMenuItemText, 
                   { 
                     color: entries.length > 0 ? colors.text : colors.textSecondary,
                     opacity: entries.length > 0 ? 1 : 0.5,
@@ -7352,7 +7352,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  massDeleteMenuButton: {
+  threeDotMenuButton: {
     padding: Spacing.xs,
     marginLeft: Spacing.sm,
     minWidth: 44,
@@ -7360,12 +7360,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  massDeleteMenuOverlay: {
+  threeDotMenuOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  massDeleteMenuContent: {
+  threeDotMenuContent: {
     minWidth: 200,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
@@ -7382,7 +7382,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  massDeleteMenuHeader: {
+  threeDotMenuHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
@@ -7390,20 +7390,20 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
     paddingBottom: Spacing.xs,
   },
-  massDeleteMenuCloseButton: {
+  threeDotMenuCloseButton: {
     padding: Spacing.xs,
     minWidth: 44,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  massDeleteMenuItem: {
+  threeDotMenuItem: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     minHeight: 44,
     justifyContent: 'center',
   },
-  massDeleteMenuItemText: {
+  threeDotMenuItemText: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
   },

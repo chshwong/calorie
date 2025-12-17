@@ -195,7 +195,7 @@ export default function FoodLogHomeScreen() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   
   // Menu state for meal type options
-  const [mealMenuVisible, setMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
+  const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
   
   
   // Note editor state
@@ -513,7 +513,7 @@ export default function FoodLogHomeScreen() {
 
   // Handlers for Notes
   const handleNotes = (mealType: string) => {
-    setMealMenuVisible({ mealType: null });
+    setThreeDotMealMenuVisible({ mealType: null });
     setNoteEditor({ visible: true, mealType });
   };
 
@@ -537,7 +537,7 @@ export default function FoodLogHomeScreen() {
   };
 
   const handleQuickLog = (mealType: string) => {
-    setMealMenuVisible({ mealType: null });
+    setThreeDotMealMenuVisible({ mealType: null });
     // Navigate to dedicated Quick Log screen
     router.push({
       pathname: '/quick-log',
@@ -549,7 +549,7 @@ export default function FoodLogHomeScreen() {
   };
 
   const handleCopyTo = (mealType: string) => {
-    setMealMenuVisible({ mealType: null });
+    setThreeDotMealMenuVisible({ mealType: null });
     setCopyMealtypeModal({ visible: true, mealType });
   };
 
@@ -1008,7 +1008,7 @@ export default function FoodLogHomeScreen() {
                               Platform.OS === 'web' && getFocusStyle(colors.tint),
                             ]}
                             onPress={() => {
-                              setMealMenuVisible({ mealType });
+                              setThreeDotMealMenuVisible({ mealType });
                             }}
                             activeOpacity={0.7}
                             {...getButtonAccessibilityProps(
@@ -1133,26 +1133,26 @@ export default function FoodLogHomeScreen() {
 
       {/* Meal Type Options Menu Modal */}
       <Modal
-        visible={mealMenuVisible.mealType !== null}
+        visible={threeDotMealMenuVisible.mealType !== null}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setMealMenuVisible({ mealType: null })}
+        onRequestClose={() => setThreeDotMealMenuVisible({ mealType: null })}
       >
         <TouchableOpacity
-          style={[styles.mealMenuOverlay, { backgroundColor: colors.overlay }]}
+          style={[styles.threeDotMealMenuOverlay, { backgroundColor: colors.overlay }]}
           activeOpacity={1}
-          onPress={() => setMealMenuVisible({ mealType: null })}
+          onPress={() => setThreeDotMealMenuVisible({ mealType: null })}
         >
           <TouchableOpacity
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <View style={[styles.mealMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.threeDotMealMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {/* Close button header */}
-              <View style={styles.mealMenuHeader}>
+              <View style={styles.threeDotMealMenuHeader}>
                 <TouchableOpacity
-                  style={[styles.mealMenuCloseButton, getMinTouchTargetStyle()]}
-                  onPress={() => setMealMenuVisible({ mealType: null })}
+                  style={[styles.threeDotMealMenuCloseButton, getMinTouchTargetStyle()]}
+                  onPress={() => setThreeDotMealMenuVisible({ mealType: null })}
                   activeOpacity={0.7}
                   {...getButtonAccessibilityProps(
                     t('common.close', { defaultValue: 'Close' }),
@@ -1162,9 +1162,9 @@ export default function FoodLogHomeScreen() {
                   <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-              {mealMenuVisible.mealType && (() => {
+              {threeDotMealMenuVisible.mealType && (() => {
                 // Calculate if there's anything to copy for this meal type
-                const currentMealType = mealMenuVisible.mealType;
+                const currentMealType = threeDotMealMenuVisible.mealType;
                 const mealTypeEntries = groupedEntries[currentMealType as keyof typeof groupedEntries]?.entries ?? [];
                 const mealMeta = dataByMealType[currentMealType];
                 const hasAnythingToCopy = 
@@ -1174,33 +1174,33 @@ export default function FoodLogHomeScreen() {
                 return (
                   <>
                     <TouchableOpacity
-                      style={styles.mealMenuItem}
-                      onPress={() => handleQuickLog(mealMenuVisible.mealType!)}
+                      style={styles.threeDotMealMenuItem}
+                      onPress={() => handleQuickLog(threeDotMealMenuVisible.mealType!)}
                       activeOpacity={0.7}
                       {...getButtonAccessibilityProps(
-                        `⚡Quick Log for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`,
-                        `Add quick log for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`
+                        `⚡Quick Log for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`,
+                        `Add quick log for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`
                       )}
                     >
-                      <ThemedText style={[styles.mealMenuItemText, { color: colors.text }]}>
+                      <ThemedText style={[styles.threeDotMealMenuItemText, { color: colors.text }]}>
                         ⚡Quick Log
                       </ThemedText>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.mealMenuItem}
+                      style={styles.threeDotMealMenuItem}
                       onPress={() => {
                         if (hasAnythingToCopy) {
-                          handleCopyTo(mealMenuVisible.mealType!);
+                          handleCopyTo(threeDotMealMenuVisible.mealType!);
                         }
                       }}
                       activeOpacity={hasAnythingToCopy ? 0.7 : 1}
                       disabled={!hasAnythingToCopy}
                       {...getButtonAccessibilityProps(
-                        `Copy ${t(`home.meal_types.${mealMenuVisible.mealType}`)} to another date`,
-                        `Copy ${t(`home.meal_types.${mealMenuVisible.mealType}`)} to another date`
+                        `Copy ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`,
+                        `Copy ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`
                       )}
                     >
-                      <View style={styles.mealMenuItemWithIcon}>
+                      <View style={styles.threeDotMealMenuItemWithIcon}>
                         <IconSymbol 
                           name="doc.on.doc" 
                           size={16} 
@@ -1208,7 +1208,7 @@ export default function FoodLogHomeScreen() {
                         />
                         <ThemedText 
                           style={[
-                            styles.mealMenuItemText, 
+                            styles.threeDotMealMenuItemText, 
                             { 
                               color: hasAnythingToCopy ? colors.text : colors.textSecondary,
                               marginLeft: Spacing.sm,
@@ -1221,15 +1221,15 @@ export default function FoodLogHomeScreen() {
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.mealMenuItem}
-                      onPress={() => handleNotes(mealMenuVisible.mealType!)}
+                      style={styles.threeDotMealMenuItem}
+                      onPress={() => handleNotes(threeDotMealMenuVisible.mealType!)}
                       activeOpacity={0.7}
                       {...getButtonAccessibilityProps(
-                        `Notes for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`,
-                        `Add or edit notes for ${t(`home.meal_types.${mealMenuVisible.mealType}`)}`
+                        `Notes for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`,
+                        `Add or edit notes for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`
                       )}
                     >
-                      <ThemedText style={[styles.mealMenuItemText, { color: colors.text }]}>
+                      <ThemedText style={[styles.threeDotMealMenuItemText, { color: colors.text }]}>
                         📝 {t('food.menu.notes', { defaultValue: 'Notes' })}
                       </ThemedText>
                     </TouchableOpacity>
@@ -2225,12 +2225,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mealMenuOverlay: {
+  threeDotMealMenuOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mealMenuContent: {
+  threeDotMealMenuContent: {
     minWidth: 200,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
@@ -2247,7 +2247,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  mealMenuHeader: {
+  threeDotMealMenuHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
@@ -2255,24 +2255,24 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
     paddingBottom: Spacing.xs,
   },
-  mealMenuCloseButton: {
+  threeDotMealMenuCloseButton: {
     padding: Spacing.xs,
     minWidth: 44,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mealMenuItem: {
+  threeDotMealMenuItem: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     minHeight: 44,
     justifyContent: 'center',
   },
-  mealMenuItemWithIcon: {
+  threeDotMealMenuItemWithIcon: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  mealMenuItemText: {
+  threeDotMealMenuItemText: {
     fontSize: FontSize.base,
     fontWeight: '500',
   },
