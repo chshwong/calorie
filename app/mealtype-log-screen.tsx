@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator, Animated, Easing, Dimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator, Animated, Dimensions, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from 'expo-secure-store';
@@ -23,12 +23,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { validateAndNormalizeBarcode } from '@/lib/barcode';
 import { supabase } from '@/lib/supabase';
 import { 
-  isWeightUnit,
-  isVolumeUnit,
-  convertToMasterUnit,
-  buildServingOptions,
-  getDefaultServingSelection,
-  calculateNutrientsSimple,
   type FoodMaster as FoodMasterType,
   type FoodMaster,
   type FoodServing as FoodServingType,
@@ -36,7 +30,6 @@ import {
 } from '@/utils/nutritionMath';
 import {
   getServingsForFood,
-  getDefaultServingForFood,
   getDefaultServingWithNutrients,
   computeNutrientsForFoodServing,
   computeNutrientsForRawQuantity,
@@ -95,10 +88,6 @@ type CalorieEntry = {
   created_at: string;
   updated_at: string;
 };
-
-// Use shared types from nutritionMath (per engineering guidelines 7.4)
-type FoodMaster = FoodMasterType;
-type FoodServing = FoodServingType;
 
 export default function LogFoodScreen() {
   const { t } = useTranslation();
@@ -1243,7 +1232,6 @@ export default function LogFoodScreen() {
     if (activeTab === 'frequent' && user?.id && !frequentFoodsFetched.current) {
       frequentFoodsFetched.current = true;
     }
-    previousActiveTab.current = activeTab;
   }, [activeTab, user?.id]);
 
   // Refresh frequent foods when page comes into focus and frequent tab is active
@@ -1265,7 +1253,6 @@ export default function LogFoodScreen() {
     if (activeTab === 'recent' && user?.id && !recentFoodsFetched.current) {
       recentFoodsFetched.current = true;
     }
-    previousActiveTab.current = activeTab;
   }, [activeTab, user?.id]);
 
   // Track when bundles tab is first accessed (for UI state tracking)
@@ -1273,7 +1260,6 @@ export default function LogFoodScreen() {
     if (activeTab === 'bundle' && user?.id && !bundlesFetched.current && !newlyAddedBundleIdParam) {
       bundlesFetched.current = true;
     }
-    previousActiveTab.current = activeTab;
   }, [activeTab, user?.id, newlyAddedBundleIdParam]);
 
   // Handle newly added bundle ID from create-bundle page
@@ -1604,7 +1590,6 @@ export default function LogFoodScreen() {
 
   // Track if we need to refresh custom foods (set to true after create/delete operations)
   const shouldRefreshCustomFoods = useRef(false);
-  const previousActiveTab = useRef<'frequent' | 'recent' | 'custom' | 'bundle'>(initialTab);
 
   // Clear "just added/edited" labels when switching away from custom tab
   useEffect(() => {
@@ -1641,8 +1626,6 @@ export default function LogFoodScreen() {
       }
     }
     
-    // Update previous tab
-    previousActiveTab.current = activeTab;
     // queryClient and refetchCustomFoods are stable from React Query, but we'll be explicit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user?.id, refreshCustomFoodsParam]);
@@ -1846,26 +1829,6 @@ export default function LogFoodScreen() {
     if (!user?.id) return;
 
     const enhanced = food as EnhancedFoodItem;
-
-    let displayServing: { quantity: number; unit: string } | null = null;
-
-    // Prefer recent_serving when available (for RECENT items)
-    if (enhanced && enhanced.recent_serving) {
-      displayServing = {
-        quantity: enhanced.recent_serving.quantity,
-        unit: enhanced.recent_serving.unit,
-      };
-    } else if (
-      enhanced &&
-      typeof enhanced.serving_size === 'number' &&
-      enhanced.serving_unit
-    ) {
-      // Fallback: use whatever the search row is displaying
-      displayServing = {
-        quantity: enhanced.serving_size,
-        unit: enhanced.serving_unit,
-      };
-    }
 
     try {
       let servingQuantity: number;
@@ -2762,28 +2725,28 @@ export default function LogFoodScreen() {
           )}
 
           {/* Select All Row - Only shown in edit mode */}
-          {entriesEditMode && entries.length > 0 && (
-            <View
-              style={[
-                styles.selectAllRow,
-                { backgroundColor: colors.background, borderBottomColor: colors.separator },
-              ]}
-            >
-              <MultiSelectItem
-                isSelected={areAllEntriesSelected(entries, (entry) => entry.id)}
-                onToggle={() => {
-                  const allEntriesSelected = areAllEntriesSelected(entries, (entry) => entry.id);
-
-                  if (allEntriesSelected) {
-                    // Deselect everything
-                    deselectAllEntries();
-                  } else {
-                    // Select all entries
-                    selectAllEntries(entries, (entry) => entry.id);
-                  }
-                }}
-                style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+          {entriesEditMode && entries.length > 0 && (() => {
+            const allEntriesSelected = areAllEntriesSelected(entries, (entry) => entry.id);
+            return (
+              <View
+                style={[
+                  styles.selectAllRow,
+                  { backgroundColor: colors.background, borderBottomColor: colors.separator },
+                ]}
               >
+                <MultiSelectItem
+                  isSelected={allEntriesSelected}
+                  onToggle={() => {
+                    if (allEntriesSelected) {
+                      // Deselect everything
+                      deselectAllEntries();
+                    } else {
+                      // Select all entries
+                      selectAllEntries(entries, (entry) => entry.id);
+                    }
+                  }}
+                  style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+                >
                 <View
                   style={{
                     flexDirection: 'row',
@@ -2820,7 +2783,8 @@ export default function LogFoodScreen() {
                 </View>
               </MultiSelectItem>
             </View>
-          )}
+            );
+          })()}
 
           {showLoadingSpinner ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
