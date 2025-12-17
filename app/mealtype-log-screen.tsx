@@ -53,6 +53,9 @@ import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
 import { MultiSelectItem } from '@/components/multi-select-item';
 import { useMultiSelect } from '@/hooks/use-multi-select';
+import { useAddBundleToMeal } from '@/hooks/use-add-bundle-to-meal';
+import { useTabScrollState } from '@/hooks/use-tab-scroll-state';
+import { useEntryDetailsPreference } from '@/hooks/use-entry-details-preference';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -64,6 +67,8 @@ import { RecentFoodsTab } from '@/components/mealtype/tabs/RecentFoodsTab';
 import { CustomFoodsTab } from '@/components/mealtype/tabs/CustomFoodsTab';
 import { BundlesTab } from '@/components/mealtype/tabs/BundlesTab';
 import { TapToExpandHint } from '@/components/ui/tap-to-expand-hint';
+import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
+import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
 
 type CalorieEntry = {
   id: string;
@@ -101,115 +106,29 @@ export default function LogFoodScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
   
-  // Helper function to get unique shade for each tab
-  const getTabColor = (tab: string, isSelected: boolean) => {
-    const shades = {
-      frequent: '#3B82F6', // Blue
-      recent: '#10B981', // Green
-      custom: '#8B5CF6', // Purple
-      bundle: '#F59E0B', // Orange
-      manual: '#6B7280', // Dark Grey
-    };
-    
-    const baseColor = shades[tab as keyof typeof shades] || colors.tint;
-    
-    if (isSelected) {
-      // Return the full vibrant color for selected tab
-      return baseColor;
-    } else {
-      // Return a lighter/muted version for unselected tabs (70% opacity for better visibility)
-      return baseColor + 'B3'; // ~70% opacity
-    }
-  };
+  // Helper functions moved to @/constants/mealtype-ui-helpers.ts
+  // Wrapper functions to maintain component API
+  const getTabColorLocal = useCallback((tab: string, isSelected: boolean) => {
+    return getTabColor(tab, isSelected, colors.tint);
+  }, [colors.tint]);
   
-  // Helper function to get light background color for tab lists
-  const getTabListBackgroundColor = (tab: string) => {
-    // Special handling for Bundle - use a warmer, more sophisticated color that works better in dark mode
-    if (tab === 'bundle') {
-      // Use a muted warm amber/terracotta tone instead of bright orange
-      // Creates a sophisticated, elegant look that complements the orange label
-      if (colorScheme === 'dark') {
-        // In dark mode, use a warm muted amber with subtle opacity
-        return '#E87E5A20'; // Warm terracotta/amber at 12.5% opacity
-      } else {
-        // In light mode, use a softer peach tone
-        return '#FFB88520'; // Soft peach at 12.5% opacity
-      }
-    }
-    
-    const shades = {
-      frequent: '#3B82F6', // Blue
-      recent: '#10B981', // Green
-      custom: '#8B5CF6', // Purple
-      bundle: '#F59E0B', // Orange (fallback)
-      manual: '#6B7280', // Dark Grey
-    };
-    
-    const baseColor = shades[tab as keyof typeof shades] || colors.tint;
-    // Return light background color - use higher opacity in dark mode for better visibility
-    // Light mode: 15% opacity, Dark mode: 30% opacity
-    const opacity = colorScheme === 'dark' ? '4D' : '26'; // '4D' = ~30% opacity, '26' = ~15% opacity
-    return baseColor + opacity;
-  };
+  const getTabListBackgroundColorLocal = useCallback((tab: string) => {
+    return getTabListBackgroundColor(tab, colorScheme, colors.tint);
+  }, [colorScheme, colors.tint]);
   
-  // Handle tabs scroll to update arrow visibility
-  const handleTabsScroll = (event: any) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const scrollX = contentOffset.x;
-    const contentWidth = contentSize.width;
-    const scrollViewWidth = layoutMeasurement.width;
-    
-    // Store measurements in refs for later use
-    if (contentWidth > 0) tabsContentWidthRef.current = contentWidth;
-    if (scrollViewWidth > 0) tabsScrollViewWidthRef.current = scrollViewWidth;
-    
-    // Only update if we have valid measurements
-    if (contentWidth > 0 && scrollViewWidth > 0) {
-      // Check if can scroll left (not at start, with small threshold)
-      setCanScrollLeft(scrollX > 5);
-      
-      // Check if can scroll right (not at end, with small threshold)
-      setCanScrollRight(scrollX + scrollViewWidth < contentWidth - 5);
-    }
-  };
-  
-  // Handle tabs content size change to check initial scroll state
-  const handleTabsContentSizeChange = useCallback((contentWidth: number, contentHeight: number) => {
-    tabsContentWidthRef.current = contentWidth;
-    // Delay to ensure layout is calculated, then check scroll state
-    setTimeout(() => {
-      if (tabsScrollViewRef.current && contentWidth > 0) {
-        // Get scroll view width by measuring
-        tabsScrollViewRef.current.measure((x, y, width, height, pageX, pageY) => {
-          tabsScrollViewWidthRef.current = width;
-          // Check initial scroll state
-          if (contentWidth > width) {
-            // Can scroll right initially
-            setCanScrollRight(true);
-            setCanScrollLeft(false); // Start at left
-          } else {
-            setCanScrollRight(false);
-            setCanScrollLeft(false);
-          }
-        });
-      }
-    }, 150);
-  }, []);
-  
-  // Scroll left handler
-  const handleScrollLeft = () => {
-    if (tabsScrollViewRef.current) {
-      tabsScrollViewRef.current.scrollTo({ x: 0, animated: true });
-    }
-  };
-  
-  // Scroll right handler
-  const handleScrollRight = () => {
-    if (tabsScrollViewRef.current) {
-      // Scroll to end
-      tabsScrollViewRef.current.scrollToEnd({ animated: true });
-    }
-  };
+  // Tab scroll state managed by custom hook
+  const {
+    tabsScrollViewRef,
+    tabsContentWidthRef,
+    tabsScrollViewWidthRef,
+    tabsScrollOffsetRef,
+    canScrollLeft,
+    canScrollRight,
+    handleTabsScroll,
+    handleTabsContentSizeChange,
+    handleScrollLeft,
+    handleScrollRight,
+  } = useTabScrollState();
   
   // Get meal type from params
   const mealTypeParam = params.mealType;
@@ -232,7 +151,7 @@ export default function LogFoodScreen() {
   
   // Handlers for Notes
   const handleNotes = () => {
-    setThreeDotMenuVisible(false);
+    setActiveModal(null);
     setNoteEditor({ visible: true });
   };
 
@@ -289,61 +208,17 @@ export default function LogFoodScreen() {
       })()
     : null;
   
-  // Map meal type keys to display labels (using i18n)
-  const getMealTypeLabel = (type: string): string => {
-    const labels: Record<string, string> = {
-      'breakfast': t('mealtype_log.meal_types.breakfast'),
-      'lunch': t('mealtype_log.meal_types.lunch'),
-      'dinner': t('mealtype_log.meal_types.dinner'),
-      'afternoon_snack': t('mealtype_log.meal_types.snack'),
-      'late_night': t('mealtype_log.meal_types.late_night'),
-    };
-    return labels[type.toLowerCase()] || t('mealtype_log.meal_types.late_night');
-  };
+  // Formatter functions moved to @/utils/formatters.ts
+  // Wrapper functions to maintain component API with translation function
+  const getMealTypeLabelLocal = useCallback((type: string) => {
+    return getMealTypeLabel(type, t);
+  }, [t]);
   
-  // Create mealTypeLabels object for dropdown
-  const mealTypeLabels: Record<string, string> = {
-    'breakfast': t('mealtype_log.meal_types.breakfast'),
-    'lunch': t('mealtype_log.meal_types.lunch'),
-    'dinner': t('mealtype_log.meal_types.dinner'),
-    'afternoon_snack': t('mealtype_log.meal_types.snack'),
-    'late_night': t('mealtype_log.meal_types.late_night'),
-  };
-
-  // Format date for display (using i18n)
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString + 'T00:00:00');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-      
-      // Check if it's today
-      if (dateOnly.getTime() === today.getTime()) {
-        return t('mealtype_log.calendar.today');
-      }
-      
-      // Check if it's yesterday
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (dateOnly.getTime() === yesterday.getTime()) {
-        return t('mealtype_log.calendar.yesterday');
-      }
-      
-      // Format as "MMM DD, YYYY" (e.g., "Jan 15, 2024") or "MMM DD" if current year
-      const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      const monthLabel = t(`mealtype_log.calendar.months.${monthKeys[date.getMonth()]}`);
-      const currentYear = new Date().getFullYear();
-      const dateYear = date.getFullYear();
-      if (dateYear === currentYear) {
-        return `${monthLabel} ${date.getDate()}`;
-      }
-      return `${monthLabel} ${date.getDate()}, ${dateYear}`;
-    } catch (error) {
-      return dateString;
-    }
-  };
+  const mealTypeLabels = useMemo(() => getMealTypeLabels(t), [t]);
+  
+  const formatDateLocal = useCallback((dateString: string) => {
+    return formatDate(dateString, t);
+  }, [t]);
   
   // Get today's date for comparison
   const today = new Date();
@@ -375,28 +250,19 @@ export default function LogFoodScreen() {
   // Loading state for async operations (mass delete, bundle operations, etc.)
   const [loading, setLoading] = useState(false);
   
-  // Delete confirmation modal state
-  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  // Consolidated modal state
+  type ModalType = 'delete_entry' | 'delete_bundle' | 'delete_custom' | 'mass_delete' | 'menu' | 'add_bundle' | 'bundle_warning' | null;
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  
+  // Modal data states
   const [entryToDelete, setEntryToDelete] = useState<{ id: string; name: string } | null>(null);
-  
-  // Bundle delete confirmation modal state
-  const [bundleDeleteConfirmVisible, setBundleDeleteConfirmVisible] = useState(false);
   const [bundleToDelete, setBundleToDelete] = useState<Bundle | null>(null);
-  
-  // Bundle add confirmation modal state
-  const [bundleAddConfirmVisible, setBundleAddConfirmVisible] = useState(false);
   const [bundleToAdd, setBundleToAdd] = useState<Bundle | null>(null);
-  
-  // Custom food delete confirmation modal state
-  const [customFoodDeleteConfirmVisible, setCustomFoodDeleteConfirmVisible] = useState(false);
   const [customFoodToDelete, setCustomFoodToDelete] = useState<FoodMaster | null>(null);
-  const [bundleWarningVisible, setBundleWarningVisible] = useState(false);
   const [bundleWarningData, setBundleWarningData] = useState<{ food: FoodMaster; bundleNames: string; bundleCount: number } | null>(null);
   
-  // Show/hide entry details state
-  const [showEntryDetails, setShowEntryDetails] = useState(true);
-  const [loadingDetailsPreference, setLoadingDetailsPreference] = useState(true);
-  const toggleAnimation = useRef(new Animated.Value(1)).current;
+  // Entry details preference managed by custom hook
+  const { showEntryDetails, setShowEntryDetails, toggleAnimation, loading: loadingDetailsPreference } = useEntryDetailsPreference();
 
 
   // Meal type dropdown state
@@ -408,7 +274,6 @@ export default function LogFoodScreen() {
   const [activeTabLayout, setActiveTabLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const tabsContainerWrapperRef = useRef<View>(null);
   const [tabsContainerWrapperLayout, setTabsContainerWrapperLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const tabsScrollOffsetRef = useRef<number>(0);
   
   // Memoize the callback to prevent infinite loops
   const handleActiveTabLayout = useCallback((layout: { x: number; y: number; width: number; height: number } | null) => {
@@ -429,8 +294,8 @@ export default function LogFoodScreen() {
   // Use route params directly (inline form state removed)
   const activeMealType = mealType;
   const activeEntryDate = entryDate;
-  const mealTypeLabel = getMealTypeLabel(activeMealType);
-  const formattedDate = formatDate(activeEntryDate);
+  const mealTypeLabel = getMealTypeLabelLocal(activeMealType);
+  const formattedDate = formatDateLocal(activeEntryDate);
 
   // Load user preference for show entry details
   useEffect(() => {
@@ -454,7 +319,7 @@ export default function LogFoodScreen() {
       } catch (error) {
         // silently ignore
       } finally {
-        setLoadingDetailsPreference(false);
+        // Loading handled by hook
       }
     };
     loadDetailsPreference();
@@ -538,6 +403,14 @@ export default function LogFoodScreen() {
     animationDelay: 150, // Slightly longer delay to ensure render completes
   });
 
+  // Use hook for adding bundle entries to meal
+  const { loading: bundleLoading, addBundleEntries } = useAddBundleToMeal({
+    userId: user?.id,
+    entryDate: activeEntryDate,
+    mealType: activeMealType,
+    markAsNewlyAdded,
+  });
+
   // Use food search hook (DB-only) for search dropdown (per STEP 1)
   // Note: Recent/Frequent tabs continue to use their own hooks
   const {
@@ -619,12 +492,6 @@ export default function LogFoodScreen() {
     }
   };
   
-  // Scroll tracking for tabs
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const tabsScrollViewRef = useRef<ScrollView>(null);
-  const tabsContentWidthRef = useRef<number>(0);
-  const tabsScrollViewWidthRef = useRef<number>(0);
   
   // Use React Query hooks for tab data
   const queryClient = useQueryClient();
@@ -794,11 +661,7 @@ export default function LogFoodScreen() {
   const hasAnySelection = hasEntrySelection;
   const totalSelectedItems = selectedEntryCount;
   
-  // Mass delete confirmation modal state
-  const [massDeleteConfirmVisible, setMassDeleteConfirmVisible] = useState(false);
-  
   // 3-dot menu state
-  const [threeDotMenuVisible, setThreeDotMenuVisible] = useState(false);
   
   // Note editor state
   const [noteEditor, setNoteEditor] = useState<{ visible: boolean }>({ visible: false });
@@ -870,210 +733,7 @@ export default function LogFoodScreen() {
   }, [t]);
 
   // Fetch bundles function removed - now using React Query hook above
-
-  // Helper function to actually add bundle entries (extracted for reuse)
-  const addBundleEntries = useCallback(async (bundle: Bundle) => {
-    setLoading(true);
-    try {
-      // Fetch food details for all items
-      const foodIds = bundle.items
-        .filter(item => item.food_id)
-        .map(item => item.food_id!);
-      
-      const { data: foodsData, error: foodsError } = foodIds.length > 0
-        ? await supabase
-            .from('food_master')
-            .select('*')
-            .in('id', foodIds)
-        : { data: [], error: null };
-
-      if (foodsError) {
-        Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.fetch_failed', { error: foodsError.message }));
-        setLoading(false);
-        return;
-      }
-
-      const foodsMap = new Map((foodsData || []).map(food => [food.id, food]));
-
-      // Prepare entries to insert
-      const entriesToInsert = await Promise.all(
-        bundle.items.map(async (item) => {
-          let calories = 0;
-          let protein = 0;
-          let carbs = 0;
-          let fat = 0;
-          let fiber = 0;
-          let saturatedFat = 0;
-          let transFat = 0;
-          let sugar = 0;
-          let sodium = 0;
-          let itemName = item.item_name || t('mealtype_log.food_log.unknown_food');
-
-          if (item.food_id && foodsMap.has(item.food_id)) {
-            const food = foodsMap.get(item.food_id)!;
-            itemName = food.name;
-            let multiplier = 1;
-
-            if (item.serving_id) {
-              const { data: servingData, error: servingError } = await supabase
-                .from('food_servings')
-                .select('weight_g, volume_ml')
-                .eq('id', item.serving_id)
-                .single();
-
-              if (servingError || !servingData) {
-                // Fallback to unit-based calculation
-                if (item.unit === 'g' || item.unit === 'ml') {
-                  multiplier = item.quantity / 100;
-                } else {
-                  multiplier = (item.quantity * food.serving_size) / 100;
-                }
-              } else {
-                // Use weight_g or volume_ml from the serving
-                const servingValue = servingData.weight_g ?? servingData.volume_ml ?? 0;
-                multiplier = (item.quantity * servingValue) / 100;
-              }
-            } else {
-              // Unit-based serving (1g or 1ml) or other units
-              if (item.unit === 'g' || item.unit === 'ml') {
-                multiplier = item.quantity / 100;
-              } else {
-                multiplier = (item.quantity * food.serving_size) / 100;
-              }
-            }
-
-            calories = (food.calories_kcal || 0) * multiplier;
-            protein = (food.protein_g || 0) * multiplier;
-            carbs = (food.carbs_g || 0) * multiplier;
-            fat = (food.fat_g || 0) * multiplier;
-            fiber = (food.fiber_g || 0) * multiplier;
-            saturatedFat = (food.saturated_fat_g || 0) * multiplier;
-            transFat = (food.trans_fat_g || 0) * multiplier;
-            sugar = (food.sugar_g || 0) * multiplier;
-            sodium = (food.sodium_mg || 0) * multiplier;
-          }
-
-          // Validate quantity and unit
-          const parsedQuantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(String(item.quantity || '0'));
-          if (isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) {
-            throw new Error(`Invalid quantity for item: ${itemName}`);
-          }
-
-          if (!item.unit || typeof item.unit !== 'string') {
-            throw new Error(`Invalid unit for item: ${itemName}`);
-          }
-
-          // Validate calculated values
-          const validatedCalories = isNaN(calories) || !isFinite(calories) ? 0 : Math.round(calories * 100) / 100;
-          const validatedProtein = (protein > 0 && isFinite(protein)) ? Math.round(protein * 100) / 100 : null;
-          const validatedCarbs = (carbs > 0 && isFinite(carbs)) ? Math.round(carbs * 100) / 100 : null;
-          const validatedFat = (fat > 0 && isFinite(fat)) ? Math.round(fat * 100) / 100 : null;
-          const validatedFiber = (fiber > 0 && isFinite(fiber)) ? Math.round(fiber * 100) / 100 : null;
-          const validatedSaturatedFat = (saturatedFat > 0 && isFinite(saturatedFat)) ? Math.round(saturatedFat * 100) / 100 : null;
-          const validatedTransFat = (transFat > 0 && isFinite(transFat)) ? Math.round(transFat * 100) / 100 : null;
-          const validatedSugar = (sugar > 0 && isFinite(sugar)) ? Math.round(sugar * 100) / 100 : null;
-          const validatedSodium = (sodium > 0 && isFinite(sodium)) ? Math.round(sodium * 100) / 100 : null;
-
-          // Build entry data similar to saveEntry function
-          const entryData: any = {
-            user_id: user.id,
-            entry_date: entryDate,
-            eaten_at: null,
-            meal_type: mealType.toLowerCase(),
-            item_name: itemName.trim(),
-            quantity: parsedQuantity,
-            unit: item.unit,
-            calories_kcal: validatedCalories,
-            protein_g: validatedProtein,
-            carbs_g: validatedCarbs,
-            fat_g: validatedFat,
-            fiber_g: validatedFiber,
-          };
-
-          // Only include food_id if it exists (like in saveEntry)
-          if (item.food_id) {
-            entryData.food_id = item.food_id;
-          }
-
-          // Only include serving_id if it exists (like in saveEntry)
-          if (item.serving_id) {
-            entryData.serving_id = item.serving_id;
-          }
-
-          // Only include fat detail fields if they have values greater than 0
-          if (validatedSaturatedFat !== null) {
-            entryData.saturated_fat_g = validatedSaturatedFat;
-          }
-          if (validatedTransFat !== null) {
-            entryData.trans_fat_g = validatedTransFat;
-          }
-
-          // Only include sugar_g if it has a value greater than 0
-          if (validatedSugar !== null) {
-            entryData.sugar_g = validatedSugar;
-          }
-
-          // Only include sodium_mg if it has a value greater than 0
-          if (validatedSodium !== null) {
-            entryData.sodium_mg = validatedSodium;
-          }
-
-          return entryData;
-        })
-      );
-
-      // Validate entries before inserting
-      if (entriesToInsert.length === 0) {
-        Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.no_valid_entries'));
-        setLoading(false);
-        return;
-      }
-
-      // Insert all entries
-      const { data: insertedData, error: insertError } = await supabase
-        .from('calorie_entries')
-        .insert(entriesToInsert)
-        .select('id');
-
-      if (insertError) {
-        // Show detailed error message
-        const errorDetails = insertError.details || insertError.hint || '';
-        const errorMessage = t('mealtype_log.bundles.add_failed', { error: `${insertError.message}${errorDetails ? `\n\nDetails: ${errorDetails}` : ''}` });
-        Alert.alert(t('alerts.error_title'), errorMessage);
-        setLoading(false);
-        return;
-      }
-
-      // Verify entries were inserted
-      if (!insertedData || insertedData.length === 0) {
-        Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.no_entries_added'));
-        setLoading(false);
-        return;
-      }
-
-      // Mark all newly added entries for highlight animation
-      insertedData.forEach((entry) => {
-        if (entry.id) {
-          markAsNewlyAdded(entry.id);
-        }
-      });
-
-      // Refresh entries - ensure we wait for it to complete
-      // Force a fresh fetch to ensure we get the latest data
-      await refetchEntries();
-      
-      // Double-check: fetch again after a brief moment to ensure consistency
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await refetchEntries();
-      
-      // Show success message after entries are refreshed
-      Alert.alert(t('alerts.success'), t('mealtype_log.bundles.added_success', { name: bundle.name, mealType: mealTypeLabel }));
-    } catch (error: any) {
-      Alert.alert(t('alerts.error_title'), t('mealtype_log.bundles.add_failed', { error: error?.message || t('common.unexpected_error') }));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, entryDate, mealType, mealTypeLabel, refetchEntries, markAsNewlyAdded]);
+  // Bundle addition logic extracted to useAddBundleToMeal hook
 
   // Add bundle to meal (create all entries at once) - with confirmation prompt
   const handleAddBundleToMeal = useCallback((bundle: Bundle) => {
@@ -1089,19 +749,19 @@ export default function LogFoodScreen() {
 
     // Show confirmation modal
     setBundleToAdd(bundle);
-    setBundleAddConfirmVisible(true);
+    setActiveModal('add_bundle');
   }, [user?.id]);
 
   const handleBundleAddConfirm = useCallback(async () => {
     if (bundleToAdd) {
-      setBundleAddConfirmVisible(false);
+      setActiveModal(null);
       await addBundleEntries(bundleToAdd);
       setBundleToAdd(null);
     }
   }, [bundleToAdd, addBundleEntries]);
 
   const handleBundleAddCancel = useCallback(() => {
-    setBundleAddConfirmVisible(false);
+    setActiveModal(null);
     // Don't clear bundleToAdd immediately to avoid showing generic message flash
     // It will be cleared when a new bundle is selected or component unmounts
   }, []);
@@ -1109,12 +769,12 @@ export default function LogFoodScreen() {
   // Delete bundle
   const handleDeleteBundle = useCallback((bundle: Bundle) => {
     setBundleToDelete(bundle);
-    setBundleDeleteConfirmVisible(true);
+    setActiveModal('delete_bundle');
   }, []);
 
   const handleBundleDeleteConfirm = useCallback(async () => {
     if (bundleToDelete) {
-      setBundleDeleteConfirmVisible(false);
+      setActiveModal(null);
       const { error } = await supabase
         .from('bundles')
         .delete()
@@ -1131,7 +791,7 @@ export default function LogFoodScreen() {
   }, [bundleToDelete, queryClient, user?.id]);
 
   const handleBundleDeleteCancel = useCallback(() => {
-    setBundleDeleteConfirmVisible(false);
+    setActiveModal(null);
     setBundleToDelete(null);
   }, []);
 
@@ -1359,19 +1019,19 @@ export default function LogFoodScreen() {
 
   const handleDelete = (entryId: string, entryName: string) => {
     setEntryToDelete({ id: entryId, name: entryName });
-    setDeleteConfirmVisible(true);
+    setActiveModal('delete_entry');
   };
 
   const handleDeleteConfirm = async () => {
     if (entryToDelete) {
-      setDeleteConfirmVisible(false);
+      setActiveModal(null);
       await deleteEntry(entryToDelete.id);
       setEntryToDelete(null);
     }
   };
 
   const handleDeleteCancel = () => {
-    setDeleteConfirmVisible(false);
+    setActiveModal(null);
     setEntryToDelete(null);
   };
 
@@ -1379,12 +1039,12 @@ export default function LogFoodScreen() {
   // Mass delete handlers
   const handleMassDelete = useCallback(() => {
     if (totalSelectedItems > 0) {
-      setMassDeleteConfirmVisible(true);
+      setActiveModal('mass_delete');
     }
   }, [totalSelectedItems]);
 
   const handleMassDeleteConfirm = useCallback(async () => {
-    setMassDeleteConfirmVisible(false);
+    setActiveModal(null);
 
     // If no entries selected, nothing to do
     if (selectedEntryIds.size === 0) return;
@@ -1447,7 +1107,7 @@ export default function LogFoodScreen() {
   ]);
 
   const handleMassDeleteCancel = useCallback(() => {
-    setMassDeleteConfirmVisible(false);
+    setActiveModal(null);
   }, []);
 
   const deleteEntry = async (entryId: string) => {
@@ -1492,40 +1152,40 @@ export default function LogFoodScreen() {
         bundleNames: truncatedBundleNames,
         bundleCount: bundleReferences.length 
       });
-      setBundleWarningVisible(true);
+      setActiveModal('bundle_warning');
     } else {
       // No bundle references - proceed with normal confirmation
       setCustomFoodToDelete(food);
-      setCustomFoodDeleteConfirmVisible(true);
+      setActiveModal('delete_custom');
     }
   };
 
   // Handle bundle warning confirmation - proceed to delete confirmation
   const handleBundleWarningConfirm = () => {
     if (bundleWarningData) {
-      setBundleWarningVisible(false);
+      setActiveModal(null);
       setCustomFoodToDelete(bundleWarningData.food);
-      setCustomFoodDeleteConfirmVisible(true);
+      setActiveModal('delete_custom');
       setBundleWarningData(null);
     }
   };
 
   // Handle bundle warning cancellation
   const handleBundleWarningCancel = () => {
-    setBundleWarningVisible(false);
+    setActiveModal(null);
     setBundleWarningData(null);
   };
 
   const handleCustomFoodDeleteConfirm = async () => {
     if (customFoodToDelete) {
-      setCustomFoodDeleteConfirmVisible(false);
+      setActiveModal(null);
       await deleteCustomFood(customFoodToDelete);
       setCustomFoodToDelete(null);
     }
   };
 
   const handleCustomFoodDeleteCancel = () => {
-    setCustomFoodDeleteConfirmVisible(false);
+    setActiveModal(null);
     setCustomFoodToDelete(null);
   };
 
@@ -2105,7 +1765,7 @@ export default function LogFoodScreen() {
             onQuickAdd={handleQuickAdd}
             styles={styles}
             useTabBackgroundColor={useTabBackgroundColor}
-            {...(useTabBackgroundColor && { getTabListBackgroundColor })}
+            {...(useTabBackgroundColor && { getTabListBackgroundColor: getTabListBackgroundColorLocal })}
           />
         );
       
@@ -2121,7 +1781,7 @@ export default function LogFoodScreen() {
             onQuickAdd={handleQuickAdd}
             styles={styles}
             useTabBackgroundColor={useTabBackgroundColor}
-            {...(useTabBackgroundColor && { getTabListBackgroundColor })}
+            {...(useTabBackgroundColor && { getTabListBackgroundColor: getTabListBackgroundColorLocal })}
           />
         );
       
@@ -2176,12 +1836,12 @@ export default function LogFoodScreen() {
                 setBundleEditMode(true);
               }
             }}
-            loading={loading}
+            loading={bundleLoading}
             mealType={mealType}
             entryDate={entryDate}
             styles={styles}
             useTabBackgroundColor={useTabBackgroundColor}
-            {...(useTabBackgroundColor && { getTabListBackgroundColor })}
+            {...(useTabBackgroundColor && { getTabListBackgroundColor: getTabListBackgroundColorLocal })}
           />
         );
       
@@ -2412,11 +2072,7 @@ export default function LogFoodScreen() {
                 contentContainerStyle={[styles.tabsContainer, { flexGrow: 1 }]}
                 style={styles.tabsScrollView}
                 scrollIndicatorInsets={{ bottom: -1 }}
-                onScroll={(e) => {
-                  handleTabsScroll(e);
-                  const scrollX = e.nativeEvent.contentOffset?.x || 0;
-                  tabsScrollOffsetRef.current = scrollX;
-                }}
+                onScroll={handleTabsScroll}
                 onContentSizeChange={handleTabsContentSizeChange}
                 scrollEventThrottle={16}
               >
@@ -2427,35 +2083,35 @@ export default function LogFoodScreen() {
                       label: t('mealtype_log.tabs.frequent'),
                       accessibilityLabel: t('mealtype_log.accessibility.frequent_tab'),
                       themeColor: CategoryColors.frequent,
-                      themeFillColor: getTabListBackgroundColor('frequent'),
+                      themeFillColor: getTabListBackgroundColorLocal('frequent'),
                     },
                     {
                       key: 'recent',
                       label: t('mealtype_log.tabs.recent'),
                       accessibilityLabel: t('mealtype_log.accessibility.recent_tab'),
                       themeColor: CategoryColors.recent,
-                      themeFillColor: getTabListBackgroundColor('recent'),
+                      themeFillColor: getTabListBackgroundColorLocal('recent'),
                     },
                     {
                       key: 'custom',
                       label: t('mealtype_log.tabs.custom'),
                       accessibilityLabel: t('mealtype_log.accessibility.custom_tab'),
                       themeColor: CategoryColors.custom,
-                      themeFillColor: getTabListBackgroundColor('custom'),
+                      themeFillColor: getTabListBackgroundColorLocal('custom'),
                     },
                     {
                       key: 'bundle',
                       label: t('mealtype_log.tabs.bundles'),
                       accessibilityLabel: t('mealtype_log.accessibility.bundles_tab'),
                       themeColor: CategoryColors.bundle,
-                      themeFillColor: getTabListBackgroundColor('bundle'),
+                      themeFillColor: getTabListBackgroundColorLocal('bundle'),
                     },
                     {
                       key: 'manual',
                       label: '⚡Quick Log',
                       accessibilityLabel: t('mealtype_log.accessibility.manual_tab'),
                       themeColor: CategoryColors.manual,
-                      themeFillColor: getTabListBackgroundColor('manual'),
+                      themeFillColor: getTabListBackgroundColorLocal('manual'),
                     },
                   ]}
                   activeKey={activeTab}
@@ -2533,7 +2189,7 @@ export default function LogFoodScreen() {
                       width: 26,
                       height: 11,
                       borderRadius: 999,
-                      backgroundColor: getTabListBackgroundColor(activeTab), // Match the dropdown background
+                      backgroundColor: getTabListBackgroundColorLocal(activeTab), // Match the dropdown background
                       zIndex: 1001,
                     }
                   ]}
@@ -2542,7 +2198,7 @@ export default function LogFoodScreen() {
                 <View
                   style={[
                     {
-                      backgroundColor: getTabListBackgroundColor(activeTab), // Match the list background color
+                      backgroundColor: getTabListBackgroundColorLocal(activeTab), // Match the list background color
                       borderColor: colors.icon + '20',
                       borderWidth: 1,
                       borderRadius: 12, // Match searchResultsContainer borderRadius
@@ -2646,7 +2302,7 @@ export default function LogFoodScreen() {
                       clearEntrySelection();
                     } else {
                       // Open menu
-                      setThreeDotMenuVisible(true);
+                      setActiveModal('menu');
                     }
                   }}
                   style={[
@@ -2841,8 +2497,8 @@ export default function LogFoodScreen() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 {...getButtonAccessibilityProps(
                   isSelectedDateToday 
-                    ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: getMealTypeLabel(selectedMealType) })
-                    : t('home.previous_day_copy.accessibility_label_previous', { mealType: getMealTypeLabel(selectedMealType) }),
+                    ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: getMealTypeLabelLocal(selectedMealType) })
+                    : t('home.previous_day_copy.accessibility_label_previous', { mealType: getMealTypeLabelLocal(selectedMealType) }),
                   'Double tap to copy entries from previous day'
                 )}
               >
@@ -2873,8 +2529,8 @@ export default function LogFoodScreen() {
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 {...getButtonAccessibilityProps(
-                  `⚡Quick Log for ${getMealTypeLabel(selectedMealType)}`,
-                  `Add quick log for ${getMealTypeLabel(selectedMealType)}`
+                  `⚡Quick Log for ${getMealTypeLabelLocal(selectedMealType)}`,
+                  `Add quick log for ${getMealTypeLabelLocal(selectedMealType)}`
                 )}
               >
                 <ThemedText style={[styles.emptyStateText, { color: colors.tint, fontSize: 20 }]}>
@@ -3174,7 +2830,7 @@ export default function LogFoodScreen() {
 
       {/* Delete Entry Confirmation Modal */}
       <ConfirmModal
-        visible={deleteConfirmVisible}
+        visible={activeModal === 'delete_entry'}
         title={t('mealtype_log.delete_entry.title')}
         message={entryToDelete ? t('mealtype_log.delete_entry.message', { name: entryToDelete.name }) : t('mealtype_log.delete_entry.message_generic')}
         confirmText={t('mealtype_log.delete_entry.confirm')}
@@ -3186,7 +2842,7 @@ export default function LogFoodScreen() {
 
       {/* Delete Bundle Confirmation Modal */}
       <ConfirmModal
-        visible={bundleDeleteConfirmVisible}
+        visible={activeModal === 'delete_bundle'}
         title={t('mealtype_log.delete_bundle.title')}
         message={bundleToDelete ? t('mealtype_log.delete_bundle.message', { name: bundleToDelete.name }) : t('mealtype_log.delete_bundle.message_generic')}
         confirmText={t('mealtype_log.delete_entry.confirm')}
@@ -3198,7 +2854,7 @@ export default function LogFoodScreen() {
 
       {/* Bundle Warning Modal - shown before delete confirmation if food is in bundles */}
       <ConfirmModal
-        visible={bundleWarningVisible}
+        visible={activeModal === 'bundle_warning'}
         title={t('mealtype_log.delete_custom_food.bundle_warning_title')}
         message={bundleWarningData ? t('mealtype_log.delete_custom_food.message_with_bundles', {
           bundleCount: bundleWarningData.bundleCount,
@@ -3213,7 +2869,7 @@ export default function LogFoodScreen() {
 
       {/* Delete Custom Food Confirmation Modal */}
       <ConfirmModal
-        visible={customFoodDeleteConfirmVisible}
+        visible={activeModal === 'delete_custom'}
         title={t('mealtype_log.delete_custom_food.title')}
         message={customFoodToDelete ? t('mealtype_log.delete_custom_food.message', { name: customFoodToDelete.name }) : t('mealtype_log.delete_custom_food.message_generic')}
         confirmText={t('mealtype_log.delete_custom_food.confirm')}
@@ -3224,7 +2880,7 @@ export default function LogFoodScreen() {
       />
 
       <ConfirmModal
-        visible={bundleAddConfirmVisible}
+        visible={activeModal === 'add_bundle'}
         title={t('mealtype_log.add_bundle.title')}
         message={bundleToAdd ? t('mealtype_log.add_bundle.message', { count: bundleToAdd.items?.length || 0, name: bundleToAdd.name }) : t('mealtype_log.add_bundle.message_generic')}
         confirmText={t('mealtype_log.add_bundle.confirm')}
@@ -3234,7 +2890,7 @@ export default function LogFoodScreen() {
       />
 
       <ConfirmModal
-        visible={massDeleteConfirmVisible}
+        visible={activeModal === 'mass_delete'}
         title={t('mealtype_log.mass_delete.title')}
         message={t('mealtype_log.mass_delete.message', { count: selectedEntryCount, items: selectedEntryCount === 1 ? t('mealtype_log.mass_delete.item_singular') : t('mealtype_log.mass_delete.item_plural') })}
         confirmText={t('mealtype_log.delete_entry.confirm')}
@@ -3247,15 +2903,15 @@ export default function LogFoodScreen() {
 
       {/* Three Dot Menu Modal */}
       <Modal
-        visible={threeDotMenuVisible}
+        visible={activeModal === 'menu'}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setThreeDotMenuVisible(false)}
+        onRequestClose={() => setActiveModal(null)}
       >
         <TouchableOpacity
           style={[styles.threeDotMenuOverlay, { backgroundColor: colors.overlay }]}
           activeOpacity={1}
-          onPress={() => setThreeDotMenuVisible(false)}
+          onPress={() => setActiveModal(null)}
         >
           <TouchableOpacity
             activeOpacity={1}
@@ -3266,7 +2922,7 @@ export default function LogFoodScreen() {
               <View style={styles.threeDotMenuHeader}>
                 <TouchableOpacity
                   style={[styles.threeDotMenuCloseButton, getMinTouchTargetStyle()]}
-                  onPress={() => setThreeDotMenuVisible(false)}
+                  onPress={() => setActiveModal(null)}
                   activeOpacity={0.7}
                   {...getButtonAccessibilityProps(
                     t('common.close', { defaultValue: 'Close' }),
@@ -3279,7 +2935,7 @@ export default function LogFoodScreen() {
               <TouchableOpacity
                 style={styles.threeDotMenuItem}
                 onPress={() => {
-                  setThreeDotMenuVisible(false);
+                  setActiveModal(null);
                   // Navigate to dedicated Quick Log screen
                   router.push({
                     pathname: '/quick-log',
@@ -3316,7 +2972,7 @@ export default function LogFoodScreen() {
                 style={styles.threeDotMenuItem}
                 onPress={() => {
                   if (entries.length > 0) {
-                    setThreeDotMenuVisible(false);
+                    setActiveModal(null);
                     setEntriesEditMode(true);
                   }
                 }}
