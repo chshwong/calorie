@@ -2288,6 +2288,11 @@ export default function LogFoodScreen() {
     }
   }, [refreshCustomFoodsParam, newlyAddedFoodIdParam, user?.id, activeTab, refetchCustomFoods]);
 
+  // Ref guards to prevent double navigation/processing
+  const hasProcessedSelectedFoodIdRef = useRef<string | null>(null);
+  const hasProcessedScannedDataRef = useRef<string | null>(null);
+  const hasProcessedManualDataRef = useRef<string | null>(null);
+
   // Handle barcode scan results - route to quick-log or keep legacy flows
   useEffect(() => {
     const handleScannedFood = async () => {
@@ -2295,7 +2300,8 @@ export default function LogFoodScreen() {
       const manualData = Array.isArray(manualEntryDataParam) ? manualEntryDataParam[0] : manualEntryDataParam;
       const shouldOpenManual = Array.isArray(openManualModeParam) ? openManualModeParam[0] === 'true' : openManualModeParam === 'true';
       
-      if (shouldOpenManual && user?.id) {
+      if (shouldOpenManual && user?.id && manualData && hasProcessedManualDataRef.current !== manualData) {
+        hasProcessedManualDataRef.current = manualData;
         router.push({
           pathname: '/quick-log',
           params: {
@@ -2309,7 +2315,8 @@ export default function LogFoodScreen() {
 
       // Legacy scanned food selection now routes to food-edit create flow
       const foodId = Array.isArray(selectedFoodIdParam) ? selectedFoodIdParam[0] : selectedFoodIdParam;
-      if (foodId && user?.id) {
+      if (foodId && user?.id && hasProcessedSelectedFoodIdRef.current !== foodId) {
+        hasProcessedSelectedFoodIdRef.current = foodId;
         try {
           const { data: food, error } = await supabase
             .from('food_master')
@@ -2319,15 +2326,20 @@ export default function LogFoodScreen() {
           
           if (food && !error) {
             handleFoodSelect(food as FoodMaster);
+            // Clear the param after processing to prevent re-trigger
+            router.setParams({ selectedFoodId: undefined });
           }
         } catch (err) {
           console.error('[MealTypeLog] Error fetching scanned food:', err);
+          // Reset on error so user can retry
+          hasProcessedSelectedFoodIdRef.current = null;
         }
       }
 
       // External scanned data (use once) → still navigate to food-edit create flow with a virtual food?
       const scannedData = Array.isArray(scannedFoodDataParam) ? scannedFoodDataParam[0] : scannedFoodDataParam;
-      if (scannedData && user?.id) {
+      if (scannedData && user?.id && hasProcessedScannedDataRef.current !== scannedData) {
+        hasProcessedScannedDataRef.current = scannedData;
         try {
           const externalFood = JSON.parse(scannedData);
           const virtualFood: FoodMaster = {
@@ -2350,14 +2362,18 @@ export default function LogFoodScreen() {
             barcode: externalFood.barcode || null,
           };
           handleFoodSelect(virtualFood);
+          // Clear the param after processing to prevent re-trigger
+          router.setParams({ scannedFoodData: undefined });
         } catch (err) {
           console.error('[MealTypeLog] Error parsing scanned food data:', err);
+          // Reset on error so user can retry
+          hasProcessedScannedDataRef.current = null;
         }
       }
     };
 
     handleScannedFood();
-  }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab]);
+  }, [selectedFoodIdParam, scannedFoodDataParam, manualEntryDataParam, openManualModeParam, user?.id, activeTab, entryDate, mealType, router]);
 
   // Auto-focus item name input when manual mode opens
   useEffect(() => {
@@ -2370,21 +2386,37 @@ export default function LogFoodScreen() {
     }
   }, [isManualMode, selectedFood, editingEntryId]);
 
-  // Handle openBarcodeScanner param - open scanner when navigating from scanned-item "Scan Another"
-  // Use a ref to ensure we only trigger once, even on re-renders
+  // Handle openBarcodeScanner param - open scanner when navigating from Big "+" or scanned-item "Scan Another"
+  // Use focus-based trigger for reliable behavior on web
   const hasAutoOpenedScanner = useRef(false);
-  useEffect(() => {
-    const shouldOpenScanner = Array.isArray(openBarcodeScannerParam) 
-      ? openBarcodeScannerParam[0] === 'true' 
-      : openBarcodeScannerParam === 'true';
-    
-    if (shouldOpenScanner && !showBarcodeScanner && !hasAutoOpenedScanner.current) {
-      setScanned(false); // Reset scanned state
-      setBarcodeScanning(false); // Reset scanning state
+
+  // Reset ref on every focus so repeated taps from Big "+" work even if already opened once
+  useFocusEffect(
+    useCallback(() => {
+      // Every time screen focuses, allow a new auto-open if param arrives again
+      hasAutoOpenedScanner.current = false;
+    }, [])
+  );
+
+  // Auto-open scanner when param is present and screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const raw = openBarcodeScannerParam;
+      const shouldOpenScanner = Array.isArray(raw) ? raw[0] === 'true' : raw === 'true';
+
+      if (!shouldOpenScanner) return;
+      if (hasAutoOpenedScanner.current) return;
+
+      hasAutoOpenedScanner.current = true;
+
+      setScanned(false);
+      setBarcodeScanning(false);
       setShowBarcodeScanner(true);
-      hasAutoOpenedScanner.current = true; // Mark as consumed
-    }
-  }, [openBarcodeScannerParam, showBarcodeScanner]);
+
+      // Consume the param so it doesn't get stuck or re-open on refresh/back
+      router.setParams({ openBarcodeScanner: undefined });
+    }, [openBarcodeScannerParam, router])
+  );
 
   // Real-time validation function
   const validateFields = useCallback(() => {
@@ -2629,7 +2661,17 @@ export default function LogFoodScreen() {
   );
 
   // Handle food selection from search results/lists → open food-edit create flow
+  // Ref guard to prevent double navigation to food-edit
+  const hasNavigatedToFoodEditRef = useRef<string | null>(null);
+
   const handleFoodSelect = async (food: FoodMaster | EnhancedFoodItem) => {
+    // Prevent double navigation - check if we've already navigated for this food
+    const foodId = food.id || '';
+    if (hasNavigatedToFoodEditRef.current === foodId) {
+      return;
+    }
+    hasNavigatedToFoodEditRef.current = foodId;
+    
     clearSearch();
     router.push({
       pathname: '/food-edit',

@@ -111,6 +111,7 @@ export default function FoodEditScreen() {
   const [servingDropdownLayout, setServingDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const entryHydratedRef = useRef(false);
   const foodHydratedRef = useRef(false);
+  const isSavingRef = useRef(false); // Guard to prevent double save execution
 
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(mode === 'create');
@@ -561,10 +562,29 @@ export default function FoodEditScreen() {
     return itemName.trim().length > 0 && quantity && parseFloat(quantity) > 0 && calories && parseFloat(calories) >= 0;
   }, [calories, itemName, quantity]);
 
-  const handleSaveEntry = useCallback(async () => {
-    if (loading) {
+  // Safe navigation helper: go back if possible, else navigate to mealtype-log
+  const goBackSafely = useCallback((fallbackParams?: { entryDate?: string; mealType?: string }) => {
+    if (router.canGoBack()) {
+      router.back();
       return;
     }
+
+    router.replace({
+      pathname: '/(tabs)/mealtype-log',
+      params: {
+        entryDate: fallbackParams?.entryDate ?? getLocalDateString(),
+        mealType: fallbackParams?.mealType ?? 'dinner',
+        preloadedEntries: JSON.stringify([]),
+      },
+    });
+  }, [router]);
+
+  const handleSaveEntry = useCallback(async () => {
+    // Prevent double execution with ref guard (faster than state)
+    if (isSavingRef.current || loading) {
+      return;
+    }
+    isSavingRef.current = true;
 
     setItemNameError('');
     setQuantityError('');
@@ -750,6 +770,8 @@ export default function FoodEditScreen() {
     if (error) {
       console.error('Food edit save error', error);
       Alert.alert(t('alerts.error_title'), error.message || t('common.unexpected_error'));
+      isSavingRef.current = false; // Reset on error
+      setLoading(false);
       return;
     }
 
@@ -759,11 +781,19 @@ export default function FoodEditScreen() {
       });
     }
 
-    router.back();
+    // Use safe navigation: go back if possible, else navigate to mealtype-log
+    goBackSafely({ entryDate: entryDate || entryDateParam, mealType: mealType || mealTypeParam });
+    // Note: Don't reset isSavingRef here since we're navigating away
     } catch (error: any) {
       Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+      isSavingRef.current = false; // Reset on error
     } finally {
       setLoading(false);
+      // Only reset if we're not navigating away (error case)
+      if (isSavingRef.current) {
+        // If we reach here without navigating, something went wrong - reset
+        isSavingRef.current = false;
+      }
     }
   }, [
     calories,
@@ -773,6 +803,7 @@ export default function FoodEditScreen() {
     entryId,
     fat,
     fiber,
+    goBackSafely,
     itemName,
     mealType,
     mealTypeParam,

@@ -213,3 +213,46 @@ export function detectBarcodeFormat(code: string): BarcodeFormat {
   }
 }
 
+// ============================================================================
+// EAN-13 Normalization (strict digits-only, pad to 13)
+// ============================================================================
+
+export type NormalizeBarcodeResult =
+  | { ok: true; value: string } // always 13 digits
+  | { ok: false; reason: 'empty' | 'non_numeric' | 'too_long' };
+
+/**
+ * Normalizes a barcode to 13-digit EAN-13 format.
+ * 
+ * Rules:
+ * - Only accepts pure digits (no letters, no symbols)
+ * - Pads with leading zeros to 13 digits if shorter
+ * - Rejects if > 13 digits
+ * - Rejects if empty
+ * 
+ * This is the primary function for all barcode normalization.
+ * Use this for manual entry, camera scans, and file uploads.
+ * 
+ * @param input - Raw barcode string (may contain non-digits)
+ * @returns Result object with normalized 13-digit string or error reason
+ * 
+ * @example
+ * normalizeBarcodeToEan13("12345") // { ok: true, value: "0000000012345" }
+ * normalizeBarcodeToEan13("abc123") // { ok: false, reason: "non_numeric" }
+ * normalizeBarcodeToEan13("12345678901234") // { ok: false, reason: "too_long" }
+ */
+export function normalizeBarcodeToEan13(input: string | null | undefined): NormalizeBarcodeResult {
+  const raw = (input ?? '').trim();
+  if (!raw) return { ok: false, reason: 'empty' };
+
+  // Reject if contains any non-digit characters (strict validation)
+  if (!/^\d+$/.test(raw)) return { ok: false, reason: 'non_numeric' };
+
+  // Reject if longer than 13 digits
+  if (raw.length > 13) return { ok: false, reason: 'too_long' };
+
+  // Pad with leading zeros to 13 digits
+  const padded = raw.padStart(13, '0');
+  return { ok: true, value: padded };
+}
+

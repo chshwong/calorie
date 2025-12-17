@@ -1202,6 +1202,12 @@
     "scanned_code": "Scanned Code",
     "create_custom": "Create Custom Food",
     "try_again": "Try Again",
+    "found_on": "Found on",
+    "save_and_log": "Save as Custom and Log Food",
+    "save_and_log_hint": "Save this food and log it in your meal",
+    "log_existing_custom": "Log my existing Custom food",
+    "log_existing_custom_hint": "Log your existing custom food",
+    "already_saved_as_custom": "You previously saved it as Custom already!",
     "use_this_food": "Use This Food",
     "use_this_food_hint": "Add this food to your meal",
     "log_it": "Log it",
@@ -1215,7 +1221,10 @@
     "save_and_log": "Save as Custom and Log Food",
     "save_and_log_hint": "Save this food and log it in your meal",
     "log_as_manual": "1-time Log (Manual)",
-    "log_as_manual_hint": "Log this food once without saving it"
+    "log_as_manual_hint": "Log this food once without saving it",
+    "log_existing_custom": "Log my existing Custom food",
+    "log_existing_custom_hint": "Log your existing custom food",
+    "already_saved_as_custom": "You previously saved it as Custom already!"
   },
 
   "exercise": {

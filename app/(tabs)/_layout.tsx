@@ -323,6 +323,11 @@ function TabLayoutContent() {
               backgroundColor: colors.background,
               borderTopColor: colors.border,
               height: 54,
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9999,
             },
             tabBarLabelStyle: {
               fontSize: FontSize.base, // increased by ~2 points from default

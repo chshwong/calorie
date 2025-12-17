@@ -21,16 +21,43 @@ import { ToastProvider } from '@/components/ui/app-toast';
 import { DebugOverlay } from '@/components/DebugOverlay';
 
 // Create QueryClient with sensible defaults
+// TEMPORARY: Added logging and reduced refetch to diagnose idle performance issues
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000, // 60 seconds
-      gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+      staleTime: 5 * 60 * 1000, // 5 minutes (temporarily increased from 60s)
+      gcTime: 180 * 24 * 60 * 60 * 1000, // 180 days (temporarily increased from 5min)
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false, // TEMPORARY: disable refetch on reconnect
+      refetchOnMount: false, // TEMPORARY: disable refetch on mount
+    },
+    mutations: {
+      onError: (err: any) => console.log('[RQ] mutation error', err),
+      onSuccess: (data: any) => console.log('[RQ] mutation success', data),
     },
   },
 });
+
+// TEMPORARY: Add global query logging via event system
+if (typeof window !== 'undefined') {
+  queryClient.getQueryCache().subscribe((event) => {
+    // if (event.type === 'updated') {
+    //   const query = (event as any).query;
+    //   if (query?.state?.status === 'success') {
+    //     console.log('[RQ] query success', query.queryKey);
+    //   } else if (query?.state?.status === 'error') {
+    //     console.log('[RQ] query error', query.queryKey, query.state.error);
+    //   }
+    // } else if (event.type === 'added') {
+    //   const query = (event as any).query;
+    //   console.log('[RQ] query added', query?.queryKey);
+    // } else if (event.type === 'removed') {
+    //   const query = (event as any).query;
+    //   console.log('[RQ] query removed', query?.queryKey);
+    // }
+  });
+}
 
 // Enable cache persistence on web
 if (typeof window !== 'undefined') {

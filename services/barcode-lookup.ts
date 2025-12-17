@@ -15,7 +15,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { normalizeBarcode, BarcodeError } from '@/lib/barcode';
+import { normalizeBarcode, BarcodeError, normalizeBarcodeToEan13 } from '@/lib/barcode';
 import { fetchProductByBarcode, OpenFoodFactsProduct, sodiumGramsToMg } from './openfoodfacts';
 import { mapExternalFoodToBase } from '@/lib/food/mapExternalFoodToBase';
 
@@ -132,26 +132,28 @@ const CACHE_STALE_DAYS = 30;
 export async function handleScannedBarcode(
   rawCode: string
 ): Promise<BarcodeLookupResult> {
-  // Step 1: Normalize the barcode
-  let normalizedBarcode: string;
-  try {
-    normalizedBarcode = normalizeBarcode(rawCode);
-  } catch (error) {
-    if (error instanceof BarcodeError) {
-      return {
-        status: 'invalid_barcode',
-        source: 'none',
-        rawCode,
-        error: error.message,
-      };
+  // Step 1: Normalize the barcode using strict EAN-13 normalization
+  const normalizeResult = normalizeBarcodeToEan13(rawCode);
+  
+  if (!normalizeResult.ok) {
+    let errorMessage = 'Invalid barcode format';
+    if (normalizeResult.reason === 'empty') {
+      errorMessage = 'Barcode is empty';
+    } else if (normalizeResult.reason === 'non_numeric') {
+      errorMessage = 'Barcode must contain only numbers';
+    } else if (normalizeResult.reason === 'too_long') {
+      errorMessage = 'Barcode cannot exceed 13 digits';
     }
+    
     return {
       status: 'invalid_barcode',
       source: 'none',
       rawCode,
-      error: 'Invalid barcode format',
+      error: errorMessage,
     };
   }
+  
+  const normalizedBarcode = normalizeResult.value;
   
   // Step 2: Check food_master for canonical match
   const foodMasterResult = await lookupFoodMaster(normalizedBarcode);
@@ -363,24 +365,25 @@ function isCacheStale(lastFetchedAt: string | null): boolean {
 
 /**
  * Increments the times_scanned counter for a cache entry.
+ * Uses direct update instead of RPC to avoid 404 errors when the RPC function doesn't exist.
  */
 async function incrementCacheScanCount(cacheId: string): Promise<void> {
-  // Try RPC first (if it exists)
-  const rpcResult = await supabase.rpc('increment_cache_scan_count', { cache_id: cacheId });
-  if (rpcResult.error) {
-    // RPC doesn't exist or failed, use direct update
-    // Simple fallback: get current value and increment
-    const { data: current } = await supabase
+  // Use direct update (RPC function doesn't exist in database)
+  const { data: current } = await supabase
+    .from('external_food_cache')
+    .select('times_scanned')
+    .eq('id', cacheId)
+    .maybeSingle();
+  
+  if (current) {
+    const updateResult = await supabase
       .from('external_food_cache')
-      .select('times_scanned')
-      .eq('id', cacheId)
-      .maybeSingle();
+      .update({ times_scanned: (current.times_scanned || 0) + 1 })
+      .eq('id', cacheId);
     
-    if (current) {
-      await supabase
-        .from('external_food_cache')
-        .update({ times_scanned: (current.times_scanned || 0) + 1 })
-        .eq('id', cacheId);
+    if (updateResult.error) {
+      // Only log actual errors, not expected "not found" cases
+      console.error('[BarcodeLookup] Failed to increment scan count:', updateResult.error);
     }
   }
 }
@@ -440,6 +443,49 @@ async function upsertExternalCache(
 }
 
 // ============================================================================
+// Existing Custom Food Lookup
+// ============================================================================
+
+/**
+ * Checks if the user already has a custom food for the given barcode.
+ * 
+ * @param normalizedBarcode - The normalized 13-digit barcode
+ * @param userId - The current user's ID
+ * @returns The existing custom food ID and name if found, null otherwise
+ */
+export async function lookupExistingCustomFood(
+  normalizedBarcode: string,
+  userId: string
+): Promise<{ id: string; name: string; brand: string | null } | null> {
+  const cleanBarcode = normalizedBarcode.trim();
+  
+  const { data: existingCustom, error } = await supabase
+    .from('food_master')
+    .select('id, name, brand, barcode')
+    .eq('barcode', cleanBarcode)
+    .eq('owner_user_id', userId)
+    .eq('is_custom', true)
+    .limit(1)
+    .maybeSingle();
+  
+  if (error) {
+    // Log but don't break the flow - treat as "not found"
+    console.warn('[BarcodeLookup] Error checking for existing custom food:', error);
+    return null;
+  }
+  
+  if (!existingCustom || !existingCustom.id) {
+    return null;
+  }
+  
+  return {
+    id: existingCustom.id,
+    name: existingCustom.name,
+    brand: existingCustom.brand,
+  };
+}
+
+// ============================================================================
 // Promotion Functions
 // ============================================================================
 
@@ -447,10 +493,13 @@ async function upsertExternalCache(
  * Promotes an external food cache entry to a food_master entry.
  * Creates a new food_master row and links it via promoted_food_master_id.
  * 
+ * This function is idempotent: if a custom food already exists for this barcode
+ * and user, it will return the existing food ID instead of creating a duplicate.
+ * 
  * @param cacheRow - The external_food_cache row to promote
  * @param userId - The user creating the custom food
  * @param overrides - Optional overrides for the food_master fields
- * @returns The new food_master row ID
+ * @returns The new or existing food_master row ID
  */
 export async function promoteToFoodMaster(
   cacheRow: ExternalFoodCacheRow,
@@ -462,6 +511,18 @@ export async function promoteToFoodMaster(
     serving_unit: string;
   }>
 ): Promise<{ success: true; foodMasterId: string } | { success: false; error: string }> {
+  const normalizedBarcode = cacheRow.barcode.trim();
+  
+  // First, check if a custom food already exists for this barcode and user
+  const existing = await lookupExistingCustomFood(normalizedBarcode, userId);
+  if (existing) {
+    // Custom food already exists - return it (idempotent behavior)
+    return {
+      success: true,
+      foodMasterId: existing.id,
+    };
+  }
+  
   // Default serving: 100g since cache data is per 100g
   const servingSize = overrides?.serving_size ?? 100;
   const servingUnit = overrides?.serving_unit ?? 'g';
@@ -500,6 +561,23 @@ export async function promoteToFoodMaster(
     .single();
   
   if (insertError || !newFood) {
+    // Check if error is due to unique constraint violation (race condition)
+    const isUniqueViolation = insertError?.code === '23505' || 
+                              insertError?.message?.includes('duplicate key') ||
+                              insertError?.message?.includes('unique constraint');
+    
+    if (isUniqueViolation) {
+      // Race condition: another request created the custom food
+      // Re-lookup and return the existing food
+      const existingAfterConflict = await lookupExistingCustomFood(normalizedBarcode, userId);
+      if (existingAfterConflict) {
+        return {
+          success: true,
+          foodMasterId: existingAfterConflict.id,
+        };
+      }
+    }
+    
     console.error('[BarcodeLookup] Failed to create food_master:', insertError);
     return {
       success: false,

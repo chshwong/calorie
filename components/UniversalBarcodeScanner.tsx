@@ -3,7 +3,7 @@ import { Platform, View, Text, ActivityIndicator, Alert, ScrollView, StyleSheet,
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { validateAndNormalizeBarcode } from "@/lib/barcode";
+import { validateAndNormalizeBarcode, normalizeBarcodeToEan13 } from "@/lib/barcode";
 import { getLocalDateString } from "@/utils/calculations";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -108,75 +108,35 @@ function NativeScanner({
   const handleDecodedBarcode = useCallback(async (barcode: string) => {
     const barcodeData = barcode?.trim();
     if (!barcodeData) {
-      Alert.alert(
-        t('alerts.error_title'),
-        "No barcode detected. Please try again."
-      );
+      // Silently ignore empty barcodes
       return;
     }
 
-    try {
-      // Validate and normalize the barcode
-      const validationResult = validateAndNormalizeBarcode(barcodeData);
-
-      if (!validationResult.isValid) {
-        Alert.alert(
-          t('scanned_item.invalid_barcode_title', 'Invalid Barcode'),
-          validationResult.error || 'Invalid barcode format',
-          [
-            { 
-              text: t('common.go_back', 'Go Back'), 
-              style: 'cancel', 
-              onPress: () => {
-                onClose?.();
-              }
-            },
-            {
-              text: t('mealtype_log.scanner.try_again', 'Try Again'), 
-              onPress: () => {
-                setIsScanning(true);
-              }
-            }
-          ]
-        );
-        return;
-      }
-
-      // Barcode is valid - close scanner and navigate to scanned-item page
-      const normalizedCode = validationResult.normalizedCode!;
-      
-      // Close the scanner modal
-      onClose?.();
-      
-      // Navigate to the scanned-item page with the normalized barcode
-      router.push({
-        pathname: '/scanned-item',
-        params: {
-          barcode: normalizedCode,
-          mealType: mealType || 'breakfast',
-          entryDate: entryDate || getLocalDateString(),
-        },
-      });
-      
-    } catch (error: any) {
-      console.error('Barcode scan error:', error);
-      Alert.alert(
-        t('alerts.error_title'),
-        error.message || t('common.unexpected_error'),
-        [
-          { text: t('common.go_back', 'Go Back'), style: 'cancel', onPress: () => {
-            onClose?.();
-          }},
-          { 
-            text: t('mealtype_log.scanner.try_again', 'Try Again'), 
-            onPress: () => {
-              setIsScanning(true);
-            }
-          }
-        ]
-      );
+    // Normalize barcode using strict EAN-13 normalization
+    const normalizeResult = normalizeBarcodeToEan13(barcodeData);
+    
+    if (!normalizeResult.ok) {
+      // Silently ignore invalid barcodes (recommended for camera scans)
+      // This prevents interrupting the scanning flow with error dialogs
+      return;
     }
-  }, [router, mealType, entryDate, onClose, t]);
+
+    // Use normalized 13-digit barcode
+    const normalizedCode = normalizeResult.value;
+    
+    // Close the scanner modal
+    onClose?.();
+    
+    // Navigate to the scanned-item page with the normalized barcode
+    router.push({
+      pathname: '/scanned-item',
+      params: {
+        barcode: normalizedCode,
+        mealType: mealType || 'breakfast',
+        entryDate: entryDate || getLocalDateString(),
+      },
+    });
+  }, [router, mealType, entryDate, onClose]);
 
   const handleBarcodeScanned = useCallback(
     (result: any) => {
@@ -421,9 +381,25 @@ function BarcodeScannerModal({
       return;
     }
     
-    // Clear manual input and use the shared handler
+    // Normalize barcode on submit
+    const normalizeResult = normalizeBarcodeToEan13(trimmedBarcode);
+    
+    if (!normalizeResult.ok) {
+      let errorMsg = "Please enter a valid barcode.";
+      if (normalizeResult.reason === 'non_numeric') {
+        errorMsg = "Barcode must contain only numbers.";
+      } else if (normalizeResult.reason === 'too_long') {
+        errorMsg = "Barcode cannot exceed 13 digits.";
+      } else if (normalizeResult.reason === 'empty') {
+        errorMsg = "Please enter a barcode.";
+      }
+      setScanError(errorMsg);
+      return;
+    }
+    
+    // Clear manual input and use the shared handler with normalized barcode
     setManualBarcode("");
-    await handleDecodedBarcode(trimmedBarcode);
+    await handleDecodedBarcode(normalizeResult.value);
   }, [manualBarcode, handleDecodedBarcode]);
 
   // ============================================================================
@@ -850,7 +826,9 @@ function BarcodeScannerModal({
                   placeholderTextColor={colors.textSecondary}
                   value={manualBarcode}
                   onChangeText={(text) => {
-                    setManualBarcode(text);
+                    // Sanitize input: digits only, max 13 characters
+                    const digitsOnly = text.replace(/[^0-9]/g, "").slice(0, 13);
+                    setManualBarcode(digitsOnly);
                     setScanError(null);
                   }}
                   onSubmitEditing={handleManualSearch}

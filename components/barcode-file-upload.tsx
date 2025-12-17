@@ -182,10 +182,30 @@ export function BarcodeFileUpload({
         // Ignore cleanup errors
       }
       
-      // Call the success handler with the decoded barcode
+      // Normalize the decoded barcode before proceeding
+      const { normalizeBarcodeToEan13 } = await import('@/lib/barcode');
+      const normalizeResult = normalizeBarcodeToEan13(decodedResult);
+      
+      if (!normalizeResult.ok) {
+        // Reject invalid barcodes
+        let errorMessage = t('mealtype_log.scanner.invalid_barcode', 
+          'Invalid barcode format. Please try another image.');
+        if (normalizeResult.reason === 'non_numeric') {
+          errorMessage = t('mealtype_log.scanner.barcode_non_numeric',
+            'Barcode must contain only numbers.');
+        } else if (normalizeResult.reason === 'too_long') {
+          errorMessage = t('mealtype_log.scanner.barcode_too_long',
+            'Barcode cannot exceed 13 digits.');
+        }
+        setError(errorMessage);
+        onError?.(errorMessage);
+        return;
+      }
+      
+      // Call the success handler with the normalized 13-digit barcode
       onBarcodeScanned({
         type: 'ean13', // Most common for product barcodes
-        data: decodedResult,
+        data: normalizeResult.value,
       });
       
     } catch (err: any) {

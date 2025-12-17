@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,10 @@ import {
   BarcodeLookupResult,
   promoteToFoodMaster,
   calculateNutritionForServing,
+  lookupExistingCustomFood,
 } from '@/services/barcode-lookup';
+import { getFoodMasterById } from '@/lib/services/foodMaster';
+import type { FoodMaster } from '@/utils/nutritionMath';
 import { getLocalDateKey } from '@/utils/dateTime';
 import {
   getButtonAccessibilityProps,
@@ -56,6 +59,14 @@ export default function ScannedItemScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  
+  // Existing custom food state
+  const [alreadySavedAsCustom, setAlreadySavedAsCustom] = useState(false);
+  const [existingCustomFoodId, setExistingCustomFoodId] = useState<string | null>(null);
+  const [existingCustomFoodName, setExistingCustomFoodName] = useState<string | null>(null);
+  
+  // Ref guard to prevent double navigation
+  const hasNavigatedToLogRef = useRef(false);
 
   // Perform lookup on mount
   useEffect(() => {
@@ -69,6 +80,28 @@ export default function ScannedItemScreen() {
     try {
       const result = await handleScannedBarcode(code);
       setLookupResult(result);
+      
+      // After lookup, check if user already has a custom food for this barcode
+      // Only check for cache/OpenFoodFacts results (not food_master canonical matches)
+      if (user && (result.status === 'found_cache' || result.status === 'found_openfoodfacts')) {
+        const normalizedBarcode = result.normalizedBarcode;
+        const existingCustom = await lookupExistingCustomFood(normalizedBarcode, user.id);
+        
+        if (existingCustom) {
+          setAlreadySavedAsCustom(true);
+          setExistingCustomFoodId(existingCustom.id);
+          setExistingCustomFoodName(existingCustom.name);
+        } else {
+          setAlreadySavedAsCustom(false);
+          setExistingCustomFoodId(null);
+          setExistingCustomFoodName(null);
+        }
+      } else {
+        // Reset state for other result types
+        setAlreadySavedAsCustom(false);
+        setExistingCustomFoodId(null);
+        setExistingCustomFoodName(null);
+      }
     } catch (error: any) {
       console.error('Lookup error:', error);
       setLookupResult({
@@ -77,6 +110,9 @@ export default function ScannedItemScreen() {
         normalizedBarcode: code,
         error: error.message || 'Lookup failed',
       });
+      setAlreadySavedAsCustom(false);
+      setExistingCustomFoodId(null);
+      setExistingCustomFoodName(null);
     } finally {
       setIsLoading(false);
     }
@@ -98,23 +134,131 @@ export default function ScannedItemScreen() {
     });
   };
 
-  // Use canonical food from food_master - navigate back with auto-select
-  const handleUseCanonicalFood = (foodId: string) => {
-    router.replace({
-      pathname: '/(tabs)/mealtype-log',
-      params: {
-        mealType: mealType || 'breakfast',
-        entryDate: entryDate,
-        selectedFoodId: foodId,
-      },
-    });
+  // Use canonical food from food_master - navigate directly to food-edit
+  const handleUseCanonicalFood = async (foodId: string) => {
+    if (hasNavigatedToLogRef.current) {
+      return;
+    }
+    hasNavigatedToLogRef.current = true;
+    
+    try {
+      // Prime cache with food data
+      const foodKey = ['foodMasterFull', foodId];
+      let foodData = queryClient.getQueryData<FoodMaster>(foodKey);
+      
+      if (!foodData) {
+        const fetched = await getFoodMasterById(foodId);
+        foodData = fetched || undefined;
+        if (foodData) {
+          queryClient.setQueryData(foodKey, foodData);
+        }
+      }
+      
+      // Navigate directly to food-edit
+      router.replace({
+        pathname: '/food-edit',
+        params: {
+          foodId: foodId,
+          date: entryDate || getLocalDateKey(new Date()),
+          mealType: mealType || 'breakfast',
+        },
+      });
+    } catch (error) {
+      console.error('[ScannedItem] Error priming cache for canonical food:', error);
+      // Fallback: navigate anyway
+      router.replace({
+        pathname: '/food-edit',
+        params: {
+          foodId: foodId,
+          date: entryDate || getLocalDateKey(new Date()),
+          mealType: mealType || 'breakfast',
+        },
+      });
+    }
+  };
+
+  // Single-shot navigation guard - prevents double navigation
+  // Navigates directly to food-edit and primes React Query cache to avoid flicker
+  const goToLogEntryOnce = async (
+    foodMasterId: string, 
+    cacheRow?: Extract<BarcodeLookupResult, { status: 'found_cache' | 'found_openfoodfacts' }>['cacheRow']
+  ) => {
+    if (hasNavigatedToLogRef.current) {
+      return;
+    }
+    hasNavigatedToLogRef.current = true;
+
+    try {
+      // Prime React Query cache with food data to avoid loading flicker
+      const foodKey = ['foodMasterFull', foodMasterId];
+      
+      // Try to get from cache first
+      let foodData = queryClient.getQueryData<FoodMaster>(foodKey);
+      
+      // If not in cache, fetch it (for existing custom foods)
+      if (!foodData) {
+        const fetched = await getFoodMasterById(foodMasterId);
+        foodData = fetched || undefined;
+      }
+      
+      // If still no data and we have cacheRow (newly created), build FoodMaster from cacheRow
+      if (!foodData && cacheRow) {
+        const nutrition = calculateNutritionForServing(cacheRow, 100);
+        foodData = {
+          id: foodMasterId,
+          name: cacheRow.product_name || 'Scanned Product',
+          brand: cacheRow.brand || null,
+          barcode: cacheRow.barcode,
+          serving_size: 100,
+          serving_unit: 'g',
+          calories_kcal: nutrition.calories,
+          protein_g: nutrition.protein,
+          carbs_g: nutrition.carbs,
+          fat_g: nutrition.fat,
+          saturated_fat_g: nutrition.saturated_fat,
+          trans_fat_g: nutrition.trans_fat,
+          sugar_g: nutrition.sugar,
+          fiber_g: nutrition.fiber,
+          sodium_mg: nutrition.sodium_mg,
+          source: cacheRow.source || 'openfoodfacts',
+          is_custom: true,
+        } as FoodMaster;
+      }
+      
+      // Prime the cache if we have data
+      if (foodData) {
+        queryClient.setQueryData(foodKey, foodData);
+      }
+      
+      // Navigate directly to food-edit (no intermediate mealtype-log screen)
+      router.replace({
+        pathname: '/food-edit',
+        params: {
+          foodId: foodMasterId,
+          date: entryDate || getLocalDateKey(new Date()),
+          mealType: mealType || 'breakfast',
+        },
+      });
+    } catch (error) {
+      console.error('[ScannedItem] Error priming cache or navigating:', error);
+      // Fallback: navigate anyway (food-edit will fetch data)
+      router.replace({
+        pathname: '/food-edit',
+        params: {
+          foodId: foodMasterId,
+          date: entryDate || getLocalDateKey(new Date()),
+          mealType: mealType || 'breakfast',
+        },
+      });
+    }
   };
 
   // Save external food as custom food (promote to food_master), then auto-select
   // Save as Custom and Log Food - promotes to food_master and auto-selects for logging
+  // OR: Log existing custom food if it already exists
   const handleSaveAsCustomAndLog = async () => {
     // Prevent multiple submissions
-    if (isSaving) {
+    if (isSaving || hasNavigatedToLogRef.current) {
       return;
     }
 
@@ -129,6 +273,17 @@ export default function ScannedItemScreen() {
     setSaveError(null);
 
     try {
+      // If custom food already exists, use it directly (no creation needed)
+      if (alreadySavedAsCustom && existingCustomFoodId) {
+        // Invalidate custom foods cache to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: ['customFoods', user.id] });
+        
+        // Navigate directly to food-edit (will fetch full food data)
+        await goToLogEntryOnce(existingCustomFoodId);
+        return;
+      }
+      
+      // Otherwise, create new custom food (idempotent - will return existing if race condition)
       const cacheRow = lookupResult.cacheRow;
       const result = await promoteToFoodMaster(cacheRow, user.id);
       
@@ -136,67 +291,20 @@ export default function ScannedItemScreen() {
         // Invalidate custom foods cache immediately so it appears right away
         queryClient.invalidateQueries({ queryKey: ['customFoods', user.id] });
         
-        // Navigate back to meal log with auto-select of the new food (this will open the entry form)
-        router.replace({
-          pathname: '/(tabs)/mealtype-log',
-          params: {
-            mealType: mealType || 'breakfast',
-            entryDate: entryDate,
-            refreshCustomFoods: Date.now().toString(),
-            selectedFoodId: result.foodMasterId,
-          },
-        });
+        // Navigate directly to food-edit with cacheRow data to prime cache
+        await goToLogEntryOnce(result.foodMasterId, cacheRow);
       } else {
         setSaveError(result.error);
         setIsSaving(false);
+        // Reset navigation guard on error so user can retry
+        hasNavigatedToLogRef.current = false;
       }
     } catch (error: any) {
       setSaveError(error.message || 'Failed to save food');
       setIsSaving(false);
+      // Reset navigation guard on error so user can retry
+      hasNavigatedToLogRef.current = false;
     }
-  };
-
-  // 1-time Log (Manual) - opens manual mode with prefilled data
-  const handleLogAsManual = () => {
-    if (!lookupResult) return;
-    
-    if (lookupResult.status !== 'found_cache' && lookupResult.status !== 'found_openfoodfacts') {
-      return;
-    }
-
-    const cacheRow = lookupResult.cacheRow;
-    
-    // Convert cache data (per 100g) to a standard serving for manual entry
-    // Default to 100g serving
-    const servingGrams = 100;
-    const nutrition = calculateNutritionForServing(cacheRow, servingGrams);
-    
-    // Pass manual entry data as JSON - this will trigger manual mode with prefilled form
-    const manualEntryData = JSON.stringify({
-      item_name: cacheRow.product_name || 'Scanned Product',
-      quantity: servingGrams,
-      unit: 'g',
-      calories_kcal: nutrition.calories,
-      protein_g: nutrition.protein,
-      carbs_g: nutrition.carbs,
-      fat_g: nutrition.fat,
-      fiber_g: nutrition.fiber,
-      saturated_fat_g: null, // Not available from cache calculation
-      sugar_g: nutrition.sugar,
-      sodium_mg: nutrition.sodium_mg,
-      brand: cacheRow.brand || null,
-      barcode: cacheRow.barcode,
-    });
-
-    router.replace({
-      pathname: '/(tabs)/mealtype-log',
-      params: {
-        mealType: mealType || 'breakfast',
-        entryDate: entryDate,
-        manualEntryData: manualEntryData,
-        openManualMode: 'true',
-      },
-    });
   };
 
   // Keep old handler name for compatibility (now unused, but keeping for now)
@@ -409,6 +517,16 @@ export default function ScannedItemScreen() {
           </View>
         </View>
 
+        {/* Show message if user already saved this as custom food */}
+        {alreadySavedAsCustom && existingCustomFoodName && (
+          <View style={[styles.alreadySavedContainer, { backgroundColor: colors.tint + '15' }]}>
+            <IconSymbol name="checkmark.circle.fill" size={18} color={colors.tint} />
+            <ThemedText style={[styles.alreadySavedText, { color: colors.tint }]}>
+              {t('scanned_item.already_saved_as_custom', 'You previously saved it as Custom already!')}
+            </ThemedText>
+          </View>
+        )}
+
         {/* Product info */}
         <View style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.separator }]}>
           <ThemedText style={styles.productName}>
@@ -477,7 +595,7 @@ export default function ScannedItemScreen() {
 
         {/* Actions */}
         <View style={styles.buttonsContainer}>
-          {/* Primary: Save as Custom and Log Food */}
+          {/* Primary: Save as Custom and Log Food OR Log existing Custom food */}
           <TouchableOpacity
             style={[
               styles.primaryButton, 
@@ -489,32 +607,23 @@ export default function ScannedItemScreen() {
             disabled={isSaving}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              t('scanned_item.save_and_log', 'Save as Custom and Log Food'),
-              t('scanned_item.save_and_log_hint', 'Save this food and log it in your meal')
+              alreadySavedAsCustom 
+                ? t('scanned_item.log_existing_custom', 'Log my existing Custom food')
+                : t('scanned_item.save_and_log', 'Save as Custom and Log Food'),
+              alreadySavedAsCustom
+                ? t('scanned_item.log_existing_custom_hint', 'Log your existing custom food')
+                : t('scanned_item.save_and_log_hint', 'Save this food and log it in your meal')
             )}
           >
             {isSaving ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <ThemedText style={styles.primaryButtonText}>
-                {t('scanned_item.save_and_log', 'Save as Custom and Log Food')}
+                {alreadySavedAsCustom 
+                  ? t('scanned_item.log_existing_custom', 'Log my existing Custom food')
+                  : t('scanned_item.save_and_log', 'Save as Custom and Log Food')}
               </ThemedText>
             )}
-          </TouchableOpacity>
-
-          {/* Secondary: 1-time Log (Manual) */}
-          <TouchableOpacity
-            style={[styles.secondaryButton, { borderColor: colors.tint }]}
-            onPress={handleLogAsManual}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps(
-              t('scanned_item.log_as_manual', '1-time Log (Manual)'),
-              t('scanned_item.log_as_manual_hint', 'Log this food once without saving it')
-            )}
-          >
-            <ThemedText style={[styles.secondaryButtonText, { color: colors.tint }]}>
-              {t('scanned_item.log_as_manual', '1-time Log (Manual)')}
-            </ThemedText>
           </TouchableOpacity>
 
           {/* Cancel */}
@@ -891,6 +1000,22 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#c62828',
     fontSize: 14,
+    textAlign: 'center',
+  },
+  alreadySavedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  alreadySavedText: {
+    fontSize: 14,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

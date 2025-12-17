@@ -11,6 +11,7 @@
 import React from 'react';
 import { View, StyleSheet, Platform, Dimensions } from 'react-native';
 import { BottomTabBar, BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
@@ -21,6 +22,10 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isLargeDesktop = Platform.OS === 'web' && screenWidth >= 1024;
+  
+  // Freeze safe-area bottom inset on web (always use 0)
+  const insets = useSafeAreaInsets();
+  const bottomInset = Platform.OS === 'web' ? 0 : insets.bottom;
 
   React.useEffect(() => {
     if (Platform.OS === 'web') {
@@ -57,6 +62,9 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
               {
                 backgroundColor: 'transparent',
                 borderTopWidth: 0,
+                // Ensure no dynamic height changes on web
+                height: Platform.OS === 'web' ? 54 : undefined,
+                paddingBottom: Platform.OS === 'web' ? 0 : bottomInset,
               },
             ]}
           />
@@ -66,13 +74,37 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
   }
 
   // On mobile/tablet, use the default tab bar without constraints
-  return <BottomTabBar {...props} />;
+  // Override safe area insets on web to prevent dynamic height changes
+  return (
+    <BottomTabBar 
+      {...props}
+      style={[
+        props.style,
+        Platform.OS === 'web' && {
+          height: 54,
+          paddingBottom: 0,
+        },
+      ]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
   fullWidthContainer: {
     width: '100%',
     borderTopWidth: StyleSheet.hairlineWidth,
+    ...Platform.select({
+      web: {
+        position: 'fixed' as any,
+      },
+      default: {
+        position: 'absolute' as any,
+      },
+    }),
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999, // ensure it stays above sheets
     // Background spans full width edge-to-edge
   },
   footerInner: {
