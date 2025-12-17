@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { uploadUserAvatar, setProfileAvatarUrl } from '@/lib/avatar/avatar-service';
 
 /**
  * DATA ACCESS SERVICE - User Profile
@@ -11,39 +12,17 @@ import { supabase } from '@/lib/supabase';
 /**
  * Uploads a profile avatar image to Supabase Storage
  * 
+ * @deprecated Use uploadUserAvatar and setProfileAvatarUrl from @/lib/avatar/avatar-service instead
+ * This function is kept for backward compatibility.
+ * 
  * @param userId - The user's ID
  * @param fileUri - Local URI or object URL of the image file
  * @returns Public URL of the uploaded avatar
  */
 export async function uploadProfileAvatar(userId: string, fileUri: string): Promise<string> {
-  const fileName = `${userId}.jpg`;
-  const filePath = `avatars/${fileName}`; // subfolder inside the bucket
-
-  // Convert local URI or object URL into a Blob
-  const response = await fetch(fileUri);
-  const blob = await response.blob();
-
-  const { error } = await supabase.storage
-    .from('profile_pictures') // bucket name
-    .upload(filePath, blob, {
-      upsert: true,
-      cacheControl: '3600',
-      contentType: 'image/jpeg',
-    });
-
-  if (error) {
-    throw error;
-  }
-
-  const { data } = supabase.storage
-    .from('profile_pictures')
-    .getPublicUrl(filePath);
-
-  if (!data?.publicUrl) {
-    throw new Error('No public URL returned for avatar');
-  }
-
-  return data.publicUrl;
+  const { cacheBustedUrl } = await uploadUserAvatar({ userId, sourceUri: fileUri });
+  await setProfileAvatarUrl({ userId, avatarUrl: cacheBustedUrl });
+  return cacheBustedUrl;
 }
 
 /**

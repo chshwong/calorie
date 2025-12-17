@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { showAppToast } from '@/components/ui/app-toast';
+import { autoSquareCrop } from '@/lib/avatar/auto-square-crop';
 
 interface AvatarUploaderProps {
   value?: string | null;
@@ -63,16 +64,30 @@ export function AvatarUploader({
     }
 
     try {
+      setIsProcessing(true);
+      
       // Read file as data URL
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setImageSrc(result);
-        setOriginalImageSrc(result); // Store original for re-editing
-        setShowCropModal(true);
-        setCropPosition({ x: 0, y: 0 });
-        setZoom(1);
-        setIsDragging(false);
+      reader.onload = async (e) => {
+        try {
+          const result = e.target?.result as string;
+          
+          // Immediately center-crop to square (no black bars)
+          const squareUri = await autoSquareCrop(result);
+          
+          // Use square image for crop modal (zoom only, no padding)
+          setImageSrc(squareUri);
+          setOriginalImageSrc(squareUri); // Store square version for re-editing
+          setShowCropModal(true);
+          setCropPosition({ x: 0, y: 0 });
+          setZoom(1);
+          setIsDragging(false);
+          setIsProcessing(false);
+        } catch (error) {
+          console.error('Error processing image:', error);
+          showAppToast('We couldn\'t process this photo. Please try a different image.');
+          setIsProcessing(false);
+        }
       };
       reader.onerror = () => {
         throw new Error('Failed to read file');
@@ -81,6 +96,7 @@ export function AvatarUploader({
     } catch (error) {
       console.error('Error reading file:', error);
       showAppToast('We couldn\'t process this photo. Please try a different image.');
+      setIsProcessing(false);
     }
   };
 
@@ -327,13 +343,13 @@ export function AvatarUploader({
   };
 
   // Calculate image display dimensions
+  // Image is already square, so we ensure it fills the square crop area with cover fit
   const getImageStyle = (): React.CSSProperties => {
     if (!imageSize) return {};
 
-    const scale = Math.min(
-      (cropSize * zoom) / imageSize.width,
-      (cropSize * zoom) / imageSize.height
-    );
+    // Since image is square, use the same scale for both dimensions
+    // Scale based on cropSize * zoom to fill the crop area
+    const scale = (cropSize * zoom) / Math.min(imageSize.width, imageSize.height);
     const scaledWidth = imageSize.width * scale;
     const scaledHeight = imageSize.height * scale;
 
@@ -347,6 +363,7 @@ export function AvatarUploader({
       left: containerCenterX - scaledWidth / 2 + cropPosition.x,
       top: containerCenterY - scaledHeight / 2 + cropPosition.y,
       pointerEvents: 'none',
+      objectFit: 'cover', // Ensure cover fit (no stretching)
     };
   };
 
@@ -576,8 +593,9 @@ export function AvatarUploader({
               ref={containerRef}
               style={{
                 position: 'relative',
-                width: '100%',
+                width: cropSize,
                 height: cropSize,
+                margin: '0 auto',
                 backgroundColor: '#000',
                 overflow: 'hidden',
                 cursor: isDragging ? 'grabbing' : 'grab',
@@ -593,7 +611,10 @@ export function AvatarUploader({
                   ref={imageRef}
                   src={imageSrc}
                   alt="Crop"
-                  style={getImageStyle()}
+                  style={{
+                    ...getImageStyle(),
+                    objectFit: 'cover', // Ensure square image fills crop area with cover
+                  }}
                   onLoad={handleImageLoad}
                   draggable={false}
                   onDragStart={(e) => e.preventDefault()}

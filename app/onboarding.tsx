@@ -53,7 +53,8 @@ import {
   filterPreferredNameInput, 
   normalizeSpaces 
 } from '@/utils/inputFilters';
-import { updateProfile, uploadProfileAvatar } from '@/lib/services/profileService';
+import { updateProfile } from '@/lib/services/profileService';
+import { uploadUserAvatar, setProfileAvatarUrl } from '@/lib/avatar/avatar-service';
 import { checkProfanity } from '@/utils/profanity';
 import {
   getButtonAccessibilityProps,
@@ -263,6 +264,13 @@ export default function OnboardingScreen() {
       if (!isNaN(dobDate.getTime())) {
         setSelectedDateStep2(dobDate);
       }
+    }
+  }, [profile]);
+
+  // Prefill avatar from profile if available
+  useEffect(() => {
+    if (profile?.avatar_url && !avatarUri) {
+      setAvatarUri(profile.avatar_url);
     }
   }, [profile]);
 
@@ -996,6 +1004,17 @@ export default function OnboardingScreen() {
     // Save name and date of birth to profile
     setLoading(true);
     try {
+      // Upload avatar if one was chosen
+      if (avatarUri && user) {
+        try {
+          const { cacheBustedUrl } = await uploadUserAvatar({ userId: user.id, sourceUri: avatarUri });
+          await setProfileAvatarUrl({ userId: user.id, avatarUrl: cacheBustedUrl });
+        } catch (error) {
+          console.error('Failed to upload avatar', error);
+          // Do not block onboarding if avatar upload fails
+        }
+      }
+
       const updateData: any = {};
       if (preferredName) {
         // Normalize spaces before saving
@@ -1415,17 +1434,6 @@ export default function OnboardingScreen() {
       
       setLoading(true);
       try {
-        // Upload avatar if one was chosen
-        let avatarUrl: string | null = null;
-        if (avatarUri && user) {
-          try {
-            avatarUrl = await uploadProfileAvatar(user.id, avatarUri);
-          } catch (error) {
-            console.error('Failed to upload avatar', error);
-            // Optional: show toast, but DO NOT block onboarding completion
-          }
-        }
-
         // Calculate BMR and TDEE
         const bmr = calculateBMR(currentWeightKgValue, heightCmValue, ageNum, sex as 'male' | 'female');
         const tdee = calculateTDEE(bmr, activityLevel as ActivityLevel);
@@ -1477,11 +1485,6 @@ export default function OnboardingScreen() {
           goal_target_date: targetDate,
           goal_timeframe: timelineOption,
         };
-        
-        // Include avatar URL if upload was successful
-        if (avatarUrl) {
-          updateData.avatar_url = avatarUrl;
-        }
         
         // Save all the calculated values
         const updatedProfile = await updateProfile(user.id, updateData);

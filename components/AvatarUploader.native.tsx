@@ -3,9 +3,9 @@ import { View, TouchableOpacity, StyleSheet, Alert, Platform, ActivityIndicator 
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import * as ImageManipulator from 'expo-image-manipulator';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { showAppToast } from '@/components/ui/app-toast';
+import { autoSquareCrop } from '@/lib/avatar/auto-square-crop';
 
 interface AvatarUploaderProps {
   value?: string | null;
@@ -37,11 +37,10 @@ export function AvatarUploader({
         return;
       }
 
-      // Launch image picker with built-in square crop editor
+      // Launch image picker (no built-in crop - we'll do it ourselves)
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 1,
       });
 
@@ -56,16 +55,13 @@ export function AvatarUploader({
       const selectedAsset = result.assets[0];
       const selectedUri = selectedAsset.uri;
 
-      // Process with size validation and compression
-      // The image is already square-cropped by the built-in editor
+      if (!selectedUri) {
+        return;
+      }
+
       setIsProcessing(true);
 
       try {
-        if (!selectedUri) {
-          setIsProcessing(false);
-          return;
-        }
-
         // Check original file size
         const fileInfo = await FileSystem.getInfoAsync(selectedUri);
         
@@ -82,37 +78,11 @@ export function AvatarUploader({
           return;
         }
 
-        // Resize to 512x512 and compress (no crop needed - already square from editor)
-        const manipulated = await ImageManipulator.manipulateAsync(
-          selectedUri,
-          [{ resize: { width: 512, height: 512 } }],
-          {
-            compress: 0.75,
-            format: ImageManipulator.SaveFormat.JPEG,
-          }
-        );
-        let manipulatedUri = manipulated.uri;
+        // Immediately center-crop to square (no black bars)
+        const squareUri = await autoSquareCrop(selectedUri);
 
-        // Check processed file size
-        const processedInfo = await FileSystem.getInfoAsync(manipulatedUri);
-        const processedSizeInBytes = processedInfo.size || 0;
-        const targetSizeBytes = 1 * 1024 * 1024; // 1 MB
-
-        // If still too large, compress further (second pass only)
-        if (processedSizeInBytes > targetSizeBytes) {
-          const furtherCompressed = await ImageManipulator.manipulateAsync(
-            manipulatedUri,
-            [], // No additional manipulation, just re-compress
-            {
-              compress: 0.6,
-              format: ImageManipulator.SaveFormat.JPEG,
-            }
-          );
-          manipulatedUri = furtherCompressed.uri;
-        }
-
-        // Update avatar with processed URI
-        onChange?.(manipulatedUri);
+        // Update avatar with square-cropped URI (already square, ready for preview/save)
+        onChange?.(squareUri);
       } catch (error) {
         console.error('Error processing image:', Platform.OS, error);
         showAppToast('We couldn\'t process this photo. Please try a different one.');
