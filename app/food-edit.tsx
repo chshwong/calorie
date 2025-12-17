@@ -894,6 +894,11 @@ export default function FoodEditScreen() {
                   keyboardType="numeric"
                   maxLength={4}
                   returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (isFormValid() && !loading) {
+                      handleSaveEntry();
+                    }
+                  }}
                 />
               }
               servingUnitInput={
