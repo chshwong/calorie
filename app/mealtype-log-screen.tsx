@@ -55,6 +55,9 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { showAppToast } from '@/components/ui/app-toast';
+import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
+import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
 import { TabButton } from '@/components/ui/tab-button';
 import { TabBar } from '@/components/ui/tab-bar';
@@ -779,6 +782,99 @@ export default function LogFoodScreen() {
   
   // Use React Query hooks for tab data
   const queryClient = useQueryClient();
+  
+  // Determine if selected date is today (reuse existing today variable)
+  const selectedDateOnly = new Date(selectedDate);
+  selectedDateOnly.setHours(0, 0, 0, 0);
+  const todayForComparison = new Date();
+  todayForComparison.setHours(0, 0, 0, 0);
+  const isSelectedDateToday = selectedDateOnly.getTime() === todayForComparison.getTime();
+
+  // Setup copy from yesterday hooks
+  const { isCopyingFromYesterday, runCopyFromYesterday } = useCopyFromYesterday();
+  
+  const { cloneMealTypeFromPreviousDay } = useCloneMealTypeFromPreviousDay({
+    currentDate: selectedDate,
+    mealType: selectedMealType,
+    onSuccess: (result) => {
+      if (result.totalCount > 0) {
+        showAppToast(t('home.previous_day_copy.success_message', {
+          count: result.totalCount,
+          items: result.totalCount === 1 ? t('home.previous_day_copy.item_one') : t('home.previous_day_copy.item_other'),
+        }));
+      }
+    },
+    onError: (error: Error) => {
+      // Handle nothing to copy error
+      if (error.message === 'NOTHING_TO_COPY') {
+        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+      // Handle same-date error specifically
+      if (error.message === 'SAME_DATE' || error.message?.includes('same date')) {
+        Alert.alert(
+          t('home.previous_day_copy.error_title'),
+          t('home.previous_day_copy.same_date_error')
+        );
+      } else {
+        Alert.alert(
+          t('home.previous_day_copy.error_title'),
+          t('home.previous_day_copy.error_message', {
+            error: error.message || t('common.unexpected_error'),
+          })
+        );
+      }
+    },
+  });
+
+  // Handle copy from yesterday/previous day
+  const handleCopyFromPreviousDay = useCallback(() => {
+    // Check cache for previous day before cloning
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const previousDateString = getLocalDateKey(previousDay);
+    
+    // Use React Query cache to check if previous day has entries or notes for this meal type
+    const previousDayQueryKey = ['entries', user?.id, previousDateString];
+    const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
+    const previousDayMetaQueryKey = ['mealtypeMeta', user?.id, previousDateString];
+    const cachedPreviousDayMeta = queryClient.getQueryData<any[]>(previousDayMetaQueryKey);
+    
+    // Check if there's anything to copy: entries or notes
+    let hasEntries = false;
+    let hasNotes = false;
+    
+    // Check entries
+    if (cachedPreviousDayEntries !== undefined) {
+      if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
+        const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+          entry.meal_type?.toLowerCase() === selectedMealType.toLowerCase()
+        );
+        hasEntries = mealTypeEntries.length > 0;
+      }
+    }
+    
+    // Check notes from meta
+    if (cachedPreviousDayMeta !== undefined && cachedPreviousDayMeta !== null) {
+      const mealTypeMeta = cachedPreviousDayMeta.find(meta => 
+        meta.meal_type?.toLowerCase() === selectedMealType.toLowerCase()
+      );
+      if (mealTypeMeta) {
+        hasNotes = mealTypeMeta.note != null && mealTypeMeta.note.trim().length > 0;
+      }
+    }
+    
+    // If cache exists and there's nothing to copy, show message and skip DB call
+    if (cachedPreviousDayEntries !== undefined && cachedPreviousDayMeta !== undefined) {
+      if (!hasEntries && !hasNotes) {
+        showAppToast(t('home.previous_day_copy.nothing_to_copy'));
+        return;
+      }
+    }
+    
+    runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
+  }, [selectedDate, selectedMealType, user?.id, queryClient, runCopyFromYesterday, cloneMealTypeFromPreviousDay, t]);
+  
   const { data: customFoods = [], isLoading: customFoodsLoading, refetch: refetchCustomFoods } = useCustomFoods();
   const { data: frequentFoods = [], isLoading: frequentFoodsLoading, refetch: refetchFrequentFoods } = useFrequentFoods(mealType);
   const { data: recentFoods = [], isLoading: recentFoodsLoading, refetch: refetchRecentFoods } = useRecentFoods(mealType);
@@ -2855,6 +2951,17 @@ export default function LogFoodScreen() {
       );
     }
   };
+
+  // Handle Quick Log navigation
+  const handleQuickLog = useCallback(() => {
+    router.push({
+      pathname: '/quick-log',
+      params: {
+        date: entryDate,
+        mealType: mealType,
+      }
+    });
+  }, [router, entryDate, mealType]);
 
   // Handle barcode scan button press
   const handleBarcodeScanPress = useCallback(async () => {
@@ -5581,8 +5688,11 @@ export default function LogFoodScreen() {
             </View>
           ) : entries.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
+              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary, fontWeight: '600', marginBottom: 4 }]}>
+                Log your first entry for this meal!
+              </ThemedText>
               <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                {t('mealtype_log.food_log.no_entries')}
+                Search for your food above.
               </ThemedText>
               <TouchableOpacity
                 style={[styles.barcodeButton, { 
@@ -5608,6 +5718,63 @@ export default function LogFoodScreen() {
                 />
                 <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
                   {t('mealtype_log.scanner.title', 'Scan Barcode')}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.barcodeButton, { 
+                  backgroundColor: colors.tint + '15', 
+                  borderColor: colors.tint + '40',
+                  marginTop: 12,
+                  flexDirection: 'row',
+                  gap: 8,
+                }]}
+                onPress={handleCopyFromPreviousDay}
+                activeOpacity={0.7}
+                disabled={isCopyingFromYesterday}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                {...getButtonAccessibilityProps(
+                  isSelectedDateToday 
+                    ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: getMealTypeLabel(selectedMealType) })
+                    : t('home.previous_day_copy.accessibility_label_previous', { mealType: getMealTypeLabel(selectedMealType) }),
+                  'Double tap to copy entries from previous day'
+                )}
+              >
+                {isCopyingFromYesterday ? (
+                  <ActivityIndicator size="small" color={colors.tint} />
+                ) : (
+                  <IconSymbol 
+                    name="doc.on.doc" 
+                    size={24} 
+                    color={colors.tint}
+                  />
+                )}
+                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
+                  {isSelectedDateToday 
+                    ? t('home.previous_day_copy.label_yesterday')
+                    : t('home.previous_day_copy.label_previous')}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.barcodeButton, { 
+                  backgroundColor: colors.tint + '15', 
+                  borderColor: colors.tint + '40',
+                  marginTop: 12,
+                  flexDirection: 'row',
+                  gap: 8,
+                }]}
+                onPress={handleQuickLog}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                {...getButtonAccessibilityProps(
+                  `⚡Quick Log for ${getMealTypeLabel(selectedMealType)}`,
+                  `Add quick log for ${getMealTypeLabel(selectedMealType)}`
+                )}
+              >
+                <ThemedText style={[styles.emptyStateText, { color: colors.tint, fontSize: 20 }]}>
+                  ⚡
+                </ThemedText>
+                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
+                  Quick Log
                 </ThemedText>
               </TouchableOpacity>
             </View>

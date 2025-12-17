@@ -628,7 +628,7 @@
   "mealtype_log": {
     "title": "Diary",
     "back": "Back",
-    "search_placeholder": "Search for food to add",
+    "search_placeholder": "Search for food to log",
     "quick_add": "Quick Add",
     "quick_add_success": "Added {{foodName}} to {{mealType}}",
     "no_entries": "No entries yet",
