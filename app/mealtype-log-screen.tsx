@@ -36,7 +36,6 @@ import {
   type FoodNutrients,
 } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { FoodSourceBadge } from '@/components/food-source-badge';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { NoteEditor } from '@/components/note-editor';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -49,7 +48,6 @@ import { getLocalDateKey } from '@/utils/dateTime';
 import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
 import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
 import { SegmentedTabs, type SegmentedTabItem } from '@/components/SegmentedTabs';
-import { HighlightableRow } from '@/components/common/highlightable-row';
 import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
 import { MultiSelectItem } from '@/components/multi-select-item';
 import { useMultiSelect } from '@/hooks/use-multi-select';
@@ -59,7 +57,6 @@ import { useEntryDetailsPreference } from '@/hooks/use-entry-details-preference'
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
-  getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import { CalendarModal } from '@/components/mealtype/CalendarModal';
 import { FrequentFoodsTab } from '@/components/mealtype/tabs/FrequentFoodsTab';
@@ -67,8 +64,14 @@ import { RecentFoodsTab } from '@/components/mealtype/tabs/RecentFoodsTab';
 import { CustomFoodsTab } from '@/components/mealtype/tabs/CustomFoodsTab';
 import { BundlesTab } from '@/components/mealtype/tabs/BundlesTab';
 import { TapToExpandHint } from '@/components/ui/tap-to-expand-hint';
+import { MealTotals } from '@/components/mealtype/MealTotals';
+import { EmptyEntriesState } from '@/components/mealtype/EmptyEntriesState';
+import { EntryCard } from '@/components/mealtype/EntryCard';
+import { FoodLogMenuModal } from '@/components/mealtype/FoodLogMenuModal';
+import { MealTypeLogHeader } from '@/components/mealtype/MealTypeLogHeader';
 import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
 import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
+import { styles } from './mealtype-log-screen.styles';
 
 type CalorieEntry = {
   id: string;
@@ -195,19 +198,7 @@ export default function LogFoodScreen() {
       // Keep current selectedDate if parsing fails
     }
   }, [entryDate]);
-  
-  // Get preloaded entries from params (if available)
-  const preloadedEntriesParam = params.preloadedEntries;
-  const preloadedEntries = preloadedEntriesParam && typeof preloadedEntriesParam === 'string'
-    ? (() => {
-        try {
-          return JSON.parse(preloadedEntriesParam) as CalorieEntry[];
-        } catch (e) {
-          return null;
-        }
-      })()
-    : null;
-  
+
   // Formatter functions moved to @/utils/formatters.ts
   // Wrapper functions to maintain component API with translation function
   const getMealTypeLabelLocal = useCallback((type: string) => {
@@ -237,7 +228,6 @@ export default function LogFoodScreen() {
       params: {
         mealType: mealType,
         entryDate: newDateString,
-        preloadedEntries: JSON.stringify([])
       }
     });
     
@@ -272,8 +262,6 @@ export default function LogFoodScreen() {
   
   // Track active tab position for dropdown attachment (for tab content area)
   const [activeTabLayout, setActiveTabLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const tabsContainerWrapperRef = useRef<View>(null);
-  const [tabsContainerWrapperLayout, setTabsContainerWrapperLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   
   // Memoize the callback to prevent infinite loops
   const handleActiveTabLayout = useCallback((layout: { x: number; y: number; width: number; height: number } | null) => {
@@ -439,11 +427,6 @@ export default function LogFoodScreen() {
     }
     return null;
   }, [highlightedIndex, searchResults]);
-
-  // Ensure local foods loaded - no-op for DB-only search
-  const ensureLocalFoodsLoaded = useCallback(() => {
-    // No-op: DB-only search doesn't need to load local foods
-  }, []);
   
   // Barcode scanning state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -631,7 +614,6 @@ export default function LogFoodScreen() {
   };
 
   const bundlesFetched = useRef(false);
-  const bundlesFetching = useRef(false);
   const processedNewBundleIds = useRef<Set<string>>(new Set());
   const [bundleEditMode, setBundleEditMode] = useState(false);
   
@@ -639,8 +621,6 @@ export default function LogFoodScreen() {
   const {
     markAsNewlyAdded: markBundleAsNewlyAdded,
     isNewlyAdded: isBundleNewlyAdded,
-    getAnimationValue: getBundleAnimationValue,
-    clearNewlyAdded: clearNewlyAddedBundle,
   } = useNewItemHighlight(bundles, (bundle) => bundle.id);
   const [customFoodEditMode, setCustomFoodEditMode] = useState(false);
   const [entriesEditMode, setEntriesEditMode] = useState(false);
@@ -683,14 +663,6 @@ export default function LogFoodScreen() {
     return map;
   }, [foodMasterData]);
   
-  const foodBrandMap = useMemo<{ [foodId: string]: string | null }>(() => {
-    if (!foodMasterData || foodMasterData.length === 0) return {};
-    const map: { [foodId: string]: string | null } = {};
-    foodMasterData.forEach((food) => {
-      map[food.id] = food.brand ?? null;
-    });
-    return map;
-  }, [foodMasterData]);
 
   
 
@@ -796,36 +768,14 @@ export default function LogFoodScreen() {
   }, []);
 
   // Bundle reordering removed - bundles are read-only from React Query
-  // Keeping no-op functions for tab component compatibility
-  const handleMoveBundleUp = useCallback((bundleId: string) => {
-    // No-op: bundles are managed by React Query
-  }, []);
-
-  const handleMoveBundleDown = useCallback((bundleId: string) => {
-    // No-op: bundles are managed by React Query
-  }, []);
-
-  // Bundle order saving removed - bundles are read-only from React Query
-  // Simplified to just toggle edit mode
-  const handleExitBundleEditMode = useCallback(() => {
-    setBundleEditMode(false);
-  }, []);
+  // No-op functions for tab component compatibility
+  const handleMoveBundleUp = () => {};
+  const handleMoveBundleDown = () => {};
 
   // Custom food reordering removed - custom foods are read-only from React Query
-  // Keeping no-op functions for tab component compatibility
-  const handleMoveCustomFoodUp = useCallback((foodId: string) => {
-    // No-op: custom foods are managed by React Query
-  }, []);
-
-  const handleMoveCustomFoodDown = useCallback((foodId: string) => {
-    // No-op: custom foods are managed by React Query
-  }, []);
-
-  // Custom food order saving removed - custom foods are read-only from React Query
-  // Simplified to just toggle edit mode
-  const handleExitCustomFoodEditMode = useCallback(() => {
-    setCustomFoodEditMode(false);
-  }, []);
+  // No-op functions for tab component compatibility
+  const handleMoveCustomFoodUp = () => {};
+  const handleMoveCustomFoodDown = () => {};
 
   // Exit edit mode when switching tabs
   useEffect(() => {
@@ -1236,8 +1186,6 @@ export default function LogFoodScreen() {
 
       // Refresh the custom foods list
       queryClient.invalidateQueries({ queryKey: ['customFoods', user?.id] });
-      // Keep fetched flag true since we just refreshed
-      shouldRefreshCustomFoods.current = false;
     } catch (error: any) {
       const errorMessage = `Failed to delete custom food: ${error.message || 'Unknown error'}`;
       if (Platform.OS === 'web') {
@@ -1247,9 +1195,6 @@ export default function LogFoodScreen() {
       }
     }
   };
-
-  // Track if we need to refresh custom foods (set to true after create/delete operations)
-  const shouldRefreshCustomFoods = useRef(false);
 
   // Clear "just added/edited" labels when switching away from custom tab
   useEffect(() => {
@@ -1274,10 +1219,6 @@ export default function LogFoodScreen() {
         if (currentRefreshParam) {
           lastRefreshParam.current = currentRefreshParam;
         }
-      } else if (shouldRefreshCustomFoods.current) {
-        // Refresh if explicitly needed (after delete)
-        queryClient.invalidateQueries({ queryKey: ['customFoods', user?.id] });
-        shouldRefreshCustomFoods.current = false;
       } else if (shouldRefreshFromCreate && customFoodsFetched.current) {
         // Refresh when coming back from create page (detected by refreshCustomFoods param)
         // Refresh immediately without delay
@@ -1800,11 +1741,7 @@ export default function LogFoodScreen() {
             onMoveDown={handleMoveCustomFoodDown}
             editMode={customFoodEditMode}
             onToggleEditMode={() => {
-              if (customFoodEditMode) {
-                handleExitCustomFoodEditMode();
-              } else {
-                setCustomFoodEditMode(true);
-              }
+              setCustomFoodEditMode(!customFoodEditMode);
             }}
             newlyAddedFoodId={newlyAddedFoodId}
             newlyEditedFoodId={newlyEditedFoodId}
@@ -1830,11 +1767,7 @@ export default function LogFoodScreen() {
             isBundleNewlyAdded={isBundleNewlyAdded}
             editMode={bundleEditMode}
             onToggleEditMode={() => {
-              if (bundleEditMode) {
-                handleExitBundleEditMode();
-              } else {
-                setBundleEditMode(true);
-              }
+              setBundleEditMode(!bundleEditMode);
             }}
             loading={bundleLoading}
             mealType={mealType}
@@ -1869,7 +1802,6 @@ export default function LogFoodScreen() {
     handleMoveCustomFoodUp,
     handleMoveCustomFoodDown,
     customFoodEditMode,
-    handleExitCustomFoodEditMode,
     setCustomFoodEditMode,
     newlyAddedFoodId,
     newlyEditedFoodId,
@@ -1882,10 +1814,9 @@ export default function LogFoodScreen() {
     formatBundleItemsList,
     isBundleNewlyAdded,
     bundleEditMode,
-    handleExitBundleEditMode,
     setBundleEditMode,
     loading,
-    getTabListBackgroundColor,
+    getTabListBackgroundColorLocal,
   ]);
 
   return (
@@ -1910,80 +1841,20 @@ export default function LogFoodScreen() {
       >
         <DesktopPageContainer>
           {/* Header */}
-          <View style={styles.headerContainer}>
-          {/* First Line: Back Arrow, Diary Title, Empty Right */}
-          <View style={styles.headerTop}>
-            <TouchableOpacity
-              style={[
-                styles.backArrowButton,
-                getMinTouchTargetStyle(),
-              ]}
-              onPress={() => {
-                router.back();
-              }}
-              activeOpacity={0.7}
-              {...getButtonAccessibilityProps(
-                'Go back',
-                'Double tap to go back'
-              )}
-            >
-              <ThemedText style={[styles.backArrow, { color: colors.tint }]}>←</ThemedText>
-            </TouchableOpacity>
-            <View style={styles.titleCenter}>
-              <ThemedText style={[styles.mainTitle, { color: colors.text }]}>🍴 {t('mealtype_log.title')}</ThemedText>
-            </View>
-            <View style={styles.headerRight}>
-              <View style={styles.placeholder} />
-            </View>
-          </View>
-          
-          {/* Second Line: Meal Type and Date - Centered */}
-          <View style={styles.headerBottom}>
-            <View
-              ref={mealTypeButtonRef}
-              onLayout={() => {
-                mealTypeButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                  setMealTypeDropdownLayout({ x: pageX, y: pageY + height, width, height });
-                });
-              }}
-            >
-              <TouchableOpacity
-                style={[
-                  getMinTouchTargetStyle(),
-                ]}
-                onPress={() => {
-                  mealTypeButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                    setMealTypeDropdownLayout({ x: pageX, y: pageY + height, width, height });
-                    setShowMealTypeDropdown(!showMealTypeDropdown);
-                  });
-                }}
-                activeOpacity={0.7}
-                {...getButtonAccessibilityProps(
-                  `Change meal type, currently ${mealTypeLabel}`,
-                  'Double tap to change meal type'
-                )}
-              >
-                <ThemedText style={[styles.subHeaderMealType, { color: colors.tint }]}>{mealTypeLabel} ▼</ThemedText>
-              </TouchableOpacity>
-            </View>
-            <ThemedText style={[styles.subHeaderSeparator, { color: colors.textSecondary }]}> • </ThemedText>
-            <TouchableOpacity
-              style={[
-                getMinTouchTargetStyle(),
-              ]}
-              onPress={() => {
-                setShowDatePicker(true);
-              }}
-              activeOpacity={0.7}
-              {...getButtonAccessibilityProps(
-                `Change date, currently ${formattedDate}`,
-                'Double tap to change the date'
-              )}
-            >
-              <ThemedText style={[styles.subHeaderDate, { color: colors.tint }]}>{formattedDate}</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
+          <MealTypeLogHeader
+            mealTypeLabel={mealTypeLabel}
+            formattedDate={formattedDate}
+            onBack={() => router.back()}
+            onMealTypePress={() => {
+              setShowMealTypeDropdown(!showMealTypeDropdown);
+            }}
+            onDatePress={() => setShowDatePicker(true)}
+            mealTypeButtonRef={mealTypeButtonRef}
+            onMealTypeLayout={(layout) => setMealTypeDropdownLayout(layout)}
+            colors={colors}
+            t={t}
+            styles={styles}
+          />
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -2000,7 +1871,6 @@ export default function LogFoodScreen() {
                 }}
                 onClearSearch={clearSearch}
                 onSetShowSearchResults={setShowSearchResults}
-                onEnsureLocalFoodsLoaded={ensureLocalFoodsLoaded}
                 searchResults={searchResults}
                 searchLoading={searchLoading}
                 showSearchResults={showSearchResults}
@@ -2021,8 +1891,6 @@ export default function LogFoodScreen() {
                 borderColor: colors.tint + '40',
               }]}
               onPress={handleBarcodeScanPress}
-              onPressIn={() => {}}
-              onPressOut={() => {}}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               {...getButtonAccessibilityProps(
@@ -2042,13 +1910,7 @@ export default function LogFoodScreen() {
         {/* Tabs */}
         <>
             <View 
-              ref={tabsContainerWrapperRef}
               style={styles.tabsContainerWrapper}
-              onLayout={() => {
-                tabsContainerWrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                  setTabsContainerWrapperLayout({ x: pageX, y: pageY, width, height });
-                });
-              }}
             >
               {/* Left arrow */}
               {canScrollLeft && (
@@ -2356,28 +2218,7 @@ export default function LogFoodScreen() {
 
           {/* Meal Totals - Only shown when Details toggle is ON and there are entries */}
           {showEntryDetails && mealTotals && (mealTotals.kcal > 0 || (entries?.length ?? 0) > 0) && (
-            <View style={[styles.mealTotalsContainer, { backgroundColor: colors.tintLight }]}>
-              <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
-                {`Total · Pro `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.protein_g ?? 0}g</ThemedText>
-                {`  Carb `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.carbs_g ?? 0}g</ThemedText>
-                {`  Fat `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.fat_g ?? 0}g</ThemedText>
-                {`  Fib `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.fiber_g ?? 0}g</ThemedText>
-              </ThemedText>
-              <ThemedText style={[styles.mealTotalsLine, { color: colors.text }]}>
-                {`Sat Fat `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.saturated_fat_g ?? 0}g</ThemedText>
-                {`  Trans Fat `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.trans_fat_g ?? 0}g</ThemedText>
-                {`  Sugar `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sugar_g ?? 0}g</ThemedText>
-                {`  Sodium `}
-                <ThemedText style={[styles.mealTotalsLine, { color: colors.tint, fontWeight: '400' }]}>{mealTotals.sodium_mg ?? 0}mg</ThemedText>
-              </ThemedText>
-            </View>
+            <MealTotals mealTotals={mealTotals} colors={colors} styles={styles} />
           )}
 
           {/* Select All Row - Only shown in edit mode */}
@@ -2450,262 +2291,37 @@ export default function LogFoodScreen() {
               </ThemedText>
             </View>
           ) : entries.length === 0 ? (
-            <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
-              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary, fontWeight: '600', marginBottom: 4 }]}>
-                Log your first entry for this meal!
-              </ThemedText>
-              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                Search for your food above.
-              </ThemedText>
-              <TouchableOpacity
-                style={[styles.barcodeButton, { 
-                  backgroundColor: colors.tint + '15', 
-                  borderColor: colors.tint + '40',
-                  marginTop: 16,
-                  flexDirection: 'row',
-                  gap: 8,
-                }]}
-                onPress={handleBarcodeScanPress}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                {...getButtonAccessibilityProps(
-                  'Scan barcode',
-                  'Double tap to scan a barcode'
-                )}
-              >
-                <IconSymbol 
-                  name="barcode.viewfinder" 
-                  size={24} 
-                  color={colors.tint}
-                  accessibilityLabel={t('mealtype_log.accessibility.scan_barcode')}
-                />
-                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
-                  {t('mealtype_log.scanner.title', 'Scan Barcode')}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.barcodeButton, { 
-                  backgroundColor: colors.tint + '15', 
-                  borderColor: colors.tint + '40',
-                  marginTop: 12,
-                  flexDirection: 'row',
-                  gap: 8,
-                }]}
-                onPress={handleCopyFromPreviousDay}
-                activeOpacity={0.7}
-                disabled={isCopyingFromYesterday}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                {...getButtonAccessibilityProps(
-                  isSelectedDateToday 
-                    ? t('home.previous_day_copy.accessibility_label_yesterday', { mealType: getMealTypeLabelLocal(selectedMealType) })
-                    : t('home.previous_day_copy.accessibility_label_previous', { mealType: getMealTypeLabelLocal(selectedMealType) }),
-                  'Double tap to copy entries from previous day'
-                )}
-              >
-                {isCopyingFromYesterday ? (
-                  <ActivityIndicator size="small" color={colors.tint} />
-                ) : (
-                  <IconSymbol 
-                    name="doc.on.doc" 
-                    size={24} 
-                    color={colors.tint}
-                  />
-                )}
-                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
-                  {isSelectedDateToday 
-                    ? t('home.previous_day_copy.label_yesterday')
-                    : t('home.previous_day_copy.label_previous')}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.barcodeButton, { 
-                  backgroundColor: colors.tint + '15', 
-                  borderColor: colors.tint + '40',
-                  marginTop: 12,
-                  flexDirection: 'row',
-                  gap: 8,
-                }]}
-                onPress={handleQuickLog}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                {...getButtonAccessibilityProps(
-                  `⚡Quick Log for ${getMealTypeLabelLocal(selectedMealType)}`,
-                  `Add quick log for ${getMealTypeLabelLocal(selectedMealType)}`
-                )}
-              >
-                <ThemedText style={[styles.emptyStateText, { color: colors.tint, fontSize: 20 }]}>
-                  ⚡
-                </ThemedText>
-                <ThemedText style={[styles.emptyStateText, { color: colors.tint }]}>
-                  Quick Log
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
+            <EmptyEntriesState
+              onScanPress={handleBarcodeScanPress}
+              onCopyFromYesterday={handleCopyFromPreviousDay}
+              onQuickLog={handleQuickLog}
+              isCopying={isCopyingFromYesterday}
+              isToday={isSelectedDateToday}
+              mealTypeLabel={getMealTypeLabelLocal(selectedMealType)}
+              colors={colors}
+              t={t}
+              styles={styles}
+            />
           ) : (
             <>
-              {entries.map((entry) => {
-              const entryContent = (
-                <HighlightableRow
-                  isNew={isNewlyAdded(entry.id)}
-                  style={[
-                    styles.entryCard, 
-                    { 
-                      backgroundColor: 'transparent',
-                      borderColor: 'transparent',
-                      borderWidth: 0,
-                    }
-                  ]}
-                >
-                  <View style={styles.entryHeader}>
-                    <View style={styles.entryHeaderLeft}>
-                      <View style={styles.entryNameRow}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
-                          <TouchableOpacity
-                            onPress={() => handleEditEntry(entry)}
-                            activeOpacity={0.7}
-                            style={[
-                              styles.entryItemNameButton,
-                              { flexShrink: 1, minWidth: 0 },
-                              getMinTouchTargetStyle(),
-                            ]}
-                            {...getButtonAccessibilityProps(
-                              `Edit ${entry.item_name}`,
-                              'Double tap to edit this food entry'
-                            )}
-                            {...(Platform.OS === 'web' ? getWebAccessibilityProps(
-                              'button',
-                              `Edit ${entry.item_name}`,
-                              `edit-entry-${entry.id}`
-                            ) : {})}
-                          >
-                            <ThemedText 
-                              style={[styles.entryItemName, { color: colors.text, flexShrink: 1 }]}
-                              numberOfLines={1}
-                              ellipsizeMode="tail"
-                            >
-                              {entry.item_name}
-                            </ThemedText>
-                          </TouchableOpacity>
-                          {/* Source indicator badge - moved to left side */}
-                          {entry.food_id && (
-                            <FoodSourceBadge
-                              isCustom={foodSourceMap[entry.food_id] === true}
-                              colors={colors}
-                              marginLeft={6}
-                              containerStyle={{ marginRight: 0 }}
-                            />
-                          )}
-                          {!entry.food_id && (
-                            <View style={[
-                              styles.sourceBadge,
-                              {
-                                backgroundColor: colors.icon + '20',
-                                borderColor: colors.icon + '40',
-                                marginLeft: 6,
-                                marginRight: 0,
-                              }
-                            ]}>
-                              <ThemedText style={[
-                                styles.sourceBadgeText,
-                                { color: colors.icon }
-                              ]}>
-                                ⚡
-                              </ThemedText>
-                            </View>
-                          )}
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
-                          {/* Only show quantity x unit for non-manual entries */}
-                          {entry.food_id && (
-                            <ThemedText style={[styles.entrySummary, { color: colors.textSecondary, fontSize: 11 }]}>
-                              {entry.quantity} x {entry.unit}
-                            </ThemedText>
-                          )}
-                        </View>
-                      </View>
-                      {showEntryDetails && (
-                        <TouchableOpacity
-                          onPress={() => handleEditEntry(entry)}
-                          activeOpacity={0.7}
-                          style={styles.entryMacros}
-                        >
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.protein_g ?? 0}g</ThemedText>
-                          </View>
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.carbs_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.carbs_g ?? 0}g</ThemedText>
-                          </View>
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fat_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fat_g ?? 0}g</ThemedText>
-                          </View>
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fiber_g ?? 0}g</ThemedText>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                      {showEntryDetails && (
-                        <TouchableOpacity
-                          onPress={() => handleEditEntry(entry)}
-                          activeOpacity={0.7}
-                          style={[styles.entryMacros, { marginTop: 2 }]}
-                        >
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.saturated_fat_g ?? 0}g</ThemedText>
-                          </View>
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.trans_fat_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.trans_fat_g ?? 0}g</ThemedText>
-                          </View>
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sugar_g ?? 0}g</ThemedText>
-                          </View>
-                          <View style={styles.entryMacroItem}>
-                            <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
-                            <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sodium_mg ?? 0}mg</ThemedText>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    <View style={styles.entryHeaderRight}>
-                      {/* Kcal value */}
-                      <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
-                        {entry.calories_kcal} cal
-                      </ThemedText>
-                      {!hasAnySelection && (
-                        <TouchableOpacity
-                          style={[styles.deleteButton, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}
-                          onPress={() => handleDelete(entry.id, entry.item_name)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                </HighlightableRow>
-              );
-              
-              // Wrap with MultiSelectItem if in edit mode
-              if (entriesEditMode) {
-                return (
-                  <MultiSelectItem
-                    key={entry.id}
-                    isSelected={isEntrySelected(entry.id)}
-                    onToggle={() => toggleEntrySelection(entry.id)}
-                  >
-                    {entryContent}
-                  </MultiSelectItem>
-                );
-              }
-              
-              return <React.Fragment key={entry.id}>{entryContent}</React.Fragment>;
-            })}
+              {entries.map((entry) => (
+                <EntryCard
+                  key={entry.id}
+                  entry={entry}
+                  foodSourceMap={foodSourceMap}
+                  showEntryDetails={showEntryDetails}
+                  onEdit={handleEditEntry}
+                  onDelete={handleDelete}
+                  isSelected={isEntrySelected(entry.id)}
+                  onToggleSelection={() => toggleEntrySelection(entry.id)}
+                  isNewlyAdded={isNewlyAdded(entry.id)}
+                  hasAnySelection={hasAnySelection}
+                  entriesEditMode={entriesEditMode}
+                  colors={colors}
+                  t={t}
+                  styles={styles}
+                />
+              ))}
             </>
           )}
           </View>
@@ -2902,103 +2518,32 @@ export default function LogFoodScreen() {
 
 
       {/* Three Dot Menu Modal */}
-      <Modal
+      <FoodLogMenuModal
         visible={activeModal === 'menu'}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setActiveModal(null)}
-      >
-        <TouchableOpacity
-          style={[styles.threeDotMenuOverlay, { backgroundColor: colors.overlay }]}
-          activeOpacity={1}
-          onPress={() => setActiveModal(null)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={[styles.threeDotMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {/* Close button header */}
-              <View style={styles.threeDotMenuHeader}>
-                <TouchableOpacity
-                  style={[styles.threeDotMenuCloseButton, getMinTouchTargetStyle()]}
-                  onPress={() => setActiveModal(null)}
-                  activeOpacity={0.7}
-                  {...getButtonAccessibilityProps(
-                    t('common.close', { defaultValue: 'Close' }),
-                    t('common.close_hint', { defaultValue: 'Double tap to close menu' })
-                  )}
-                >
-                  <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={styles.threeDotMenuItem}
-                onPress={() => {
-                  setActiveModal(null);
-                  // Navigate to dedicated Quick Log screen
-                  router.push({
-                    pathname: '/quick-log',
-                    params: {
-                      date: entryDate,
-                      mealType: mealType,
-                    }
-                  });
-                }}
-                activeOpacity={0.7}
-                {...getButtonAccessibilityProps(
-                  `⚡Quick Log for ${t(`home.meal_types.${selectedMealType}`)}`,
-                  `Add quick log for ${t(`home.meal_types.${selectedMealType}`)}`
-                )}
-              >
-                <ThemedText style={[styles.threeDotMenuItemText, { color: colors.text }]}>
-                  ⚡Quick Log
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.threeDotMenuItem}
-                onPress={handleNotes}
-                activeOpacity={0.7}
-                {...getButtonAccessibilityProps(
-                  `Notes for ${t(`home.meal_types.${selectedMealType}`)}`,
-                  `Add or edit notes for ${t(`home.meal_types.${selectedMealType}`)}`
-                )}
-              >
-                <ThemedText style={[styles.threeDotMenuItemText, { color: colors.text }]}>
-                  📝 {t('food.menu.notes', { defaultValue: 'Notes' })}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.threeDotMenuItem}
-                onPress={() => {
-                  if (entries.length > 0) {
-                    setActiveModal(null);
-                    setEntriesEditMode(true);
-                  }
-                }}
-                activeOpacity={entries.length > 0 ? 0.7 : 1}
-                disabled={entries.length === 0}
-                {...getButtonAccessibilityProps(
-                  t('mealtype_log.food_log.mass_delete', { defaultValue: 'Mass Delete' }),
-                  entries.length > 0
-                    ? t('mealtype_log.food_log.mass_delete_hint', { defaultValue: 'Double tap to enter mass delete mode' })
-                    : t('mealtype_log.food_log.mass_delete_disabled_hint', { defaultValue: 'Mass delete is not available when there are no entries' })
-                )}
-              >
-                <ThemedText style={[
-                  styles.threeDotMenuItemText, 
-                  { 
-                    color: entries.length > 0 ? colors.text : colors.textSecondary,
-                    opacity: entries.length > 0 ? 1 : 0.5,
-                  }
-                ]}>
-                  🗑️ {t('mealtype_log.food_log.mass_delete', { defaultValue: 'Mass Delete' })}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        onClose={() => setActiveModal(null)}
+        onQuickLog={() => {
+          setActiveModal(null);
+          router.push({
+            pathname: '/quick-log',
+            params: {
+              date: entryDate,
+              mealType: mealType,
+            }
+          });
+        }}
+        onNotes={handleNotes}
+        onMassDelete={() => {
+          if (entries.length > 0) {
+            setActiveModal(null);
+            setEntriesEditMode(true);
+          }
+        }}
+        hasEntries={entries.length > 0}
+        mealTypeLabel={t(`home.meal_types.${selectedMealType}`)}
+        colors={colors}
+        t={t}
+        styles={styles}
+      />
 
 
       {/* Note Editor */}
@@ -3015,955 +2560,3 @@ export default function LogFoodScreen() {
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  dropdownBackdrop: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
-    backgroundColor: 'transparent',
-  },
-  scrollContent: {
-    paddingVertical: 0,
-    paddingTop: 0,
-    paddingBottom: 40, // Increased to allow scrolling past footer (bottom nav bar ~60-80px + extra space)
-    // DesktopPageContainer handles horizontal padding and max-width
-  },
-  headerContainer: {
-    marginBottom: 0,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  backArrowButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    minWidth: 48,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backArrow: {
-    fontSize: 28,
-    fontWeight: '400',
-    lineHeight: 32,
-  },
-  titleCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mainTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 24,
-  },
-  headerRight: {
-    minWidth: 48,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subHeaderMealType: {
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  subHeaderSeparator: {
-    fontSize: 13,
-    opacity: 0.5,
-    lineHeight: 20,
-    marginHorizontal: 6,
-  },
-  subHeaderDate: {
-    fontSize: 15,
-    fontWeight: '400',
-    lineHeight: 20,
-  },
-  placeholder: {
-    width: 48,
-    height: 48,
-  },
-  checkmarkButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mealTypeDropdown: {
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 4,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    overflow: 'hidden',
-    minWidth: 140,
-  },
-  mealTypeDropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  mealTypeDropdownText: {
-    fontSize: 16,
-  },
-  mealTypeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  mealTypeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  // Form-related styles removed - legacy form UI is dead code
-  dropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    marginTop: 4,
-    borderWidth: 1,
-    borderRadius: 8,
-    maxHeight: 200,
-    zIndex: 10000,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 10,
-      },
-    }),
-  },
-  servingDropdown: {
-    zIndex: 10000,
-    opacity: 1,
-    elevation: 10,
-  },
-  dropdownScroll: {
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-  },
-  dropdownItemText: {
-    fontSize: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 0,
-  },
-  collapsibleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginTop: 6,
-    marginBottom: 4,
-    borderBottomWidth: 1,
-  },
-  sectionTitleText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    opacity: 0.7,
-  },
-  expandIcon: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  macrosContent: {
-    marginTop: 6,
-    gap: 12,
-  },
-  // Form action button styles removed - legacy form UI is dead code
-  nutritionLabelInput: {
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    margin: 0,
-    fontSize: 12,
-    textAlign: 'right',
-    minWidth: 50,
-  },
-  nutritionLabelTitleInput: {
-    fontSize: 16,
-    fontWeight: '400',
-    textAlign: 'left',
-    paddingVertical: 4,
-    paddingHorizontal: 0,
-    minWidth: '100%',
-  },
-  nutritionLabelSmallInput: {
-    fontSize: 12,
-    textAlign: 'left',
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    minWidth: 60,
-  },
-  nutritionLabelCaloriesInput: {
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'right',
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    minWidth: 60,
-  },
-  nutritionLabelNutrientInput: {
-    fontSize: 12,
-    textAlign: 'right',
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    minWidth: 25,
-  },
-  nutritionLabelInputWithUnit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  nutritionLabelUnit: {
-    fontSize: 12,
-    color: '#000000',
-    marginLeft: 4,
-  },
-  foodLogContainer: {
-    marginHorizontal: -12,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 12,
-    marginTop: 12,
-    marginBottom: 0,
-  },
-  entriesSection: {
-    marginTop: 0,
-  },
-  entriesHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  foodLogDivider: {
-    height: 1,
-    width: '100%',
-    marginBottom: 12,
-    opacity: 0.5,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  toggleLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  toggleTrack: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    padding: 2,
-    justifyContent: 'center',
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-      },
-    }),
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 2,
-      },
-    }),
-  },
-  emptyState: {
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-        elevation: 1,
-      },
-    }),
-  },
-  emptyStateText: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  entryCard: {
-    paddingVertical: Platform.select({ web: 4, default: 6 }),
-    paddingHorizontal: 0,
-    marginBottom: 0,
-    width: '100%',
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-    width: '100%',
-  },
-  entryHeaderLeft: {
-    flex: 1,
-    marginRight: 4,
-  },
-  entryHeaderRight: {
-    marginLeft: 4,
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  entryNameRow: {
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-    minWidth: 0,
-  },
-  entryItemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    flexShrink: 1,
-    flex: 1,
-    minWidth: 0,
-  },
-  entryItemNameButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    borderRadius: 4,
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        transition: 'background-color 0.15s ease, outline 0.15s ease',
-      },
-    }),
-  },
-  entrySummary: {
-    fontSize: 12,
-    opacity: 1.0,
-    flexShrink: 0,
-  },
-  entryCaloriesValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    flexShrink: 0,
-  },
-  entryMacros: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    marginLeft: 8,
-    marginTop: 4,
-  },
-  entryMacroItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  entryMacroLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    opacity: 1.0,
-  },
-  entryMacroValue: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  mealTotalsContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginVertical: 6,
-    borderRadius: 8,
-  },
-  mealTotalsLine: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  editButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 8,
-    minWidth: 0,
-    minHeight: 0,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 11,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-        transition: 'all 0.2s ease',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 3,
-        elevation: 1,
-      },
-    }),
-  },
-  editButtonText: {
-    fontSize: 16,
-  },
-  deleteButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 8,
-    minWidth: 0,
-    minHeight: 0,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 11,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-        transition: 'all 0.2s ease',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 3,
-        elevation: 1,
-      },
-    }),
-  },
-  deleteButtonText: {
-    fontSize: 16,
-  },
-  searchBarWrapper: {
-    flex: 1,
-    marginRight: 8,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
-    position: 'relative',
-    zIndex: 1000,
-  },
-  searchInputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    minHeight: 44,
-  },
-  searchIconLeft: {
-    marginRight: 8,
-  },
-  searchResultsOverlay: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    marginTop: 4,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    maxHeight: 300,
-    overflow: 'hidden',
-    zIndex: 9999,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 12,
-      },
-    }),
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 8,
-    fontSize: 16,
-  },
-  searchLoader: {
-    marginLeft: 8,
-    right: 12,
-    top: 12,
-  },
-  barcodeButton: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-        transition: 'all 0.2s ease',
-        zIndex: 100,
-      },
-      default: {
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 10,
-      },
-    }),
-  },
-  scannerContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  scannerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  scannerCloseButton: {
-    padding: 8,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scannerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  scannerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  barcodeScanner: {
-    flex: 1,
-    width: '100%',
-  },
-  scannerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  scannerText: {
-    fontSize: 16,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  scannerButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  scannerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  scannerInstructions: {
-    position: 'absolute',
-    bottom: 40,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  scannerInstructionText: {
-    fontSize: 14,
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  tabsContainerWrapper: {
-    position: 'relative',
-    overflow: 'visible',
-    marginBottom: Spacing.xs, // Minimal spacing - tightened from 12
-  },
-  tabsScrollView: {
-    borderBottomWidth: 0,
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 0,
-    paddingRight: 40,
-  },
-  tabsFadeOverlay: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 30,
-    opacity: 0.95,
-    pointerEvents: 'none',
-    ...Platform.select({
-      web: {
-        background: 'linear-gradient(to right, transparent, rgba(255, 255, 255, 0.95))',
-      },
-    }),
-  },
-  tabsScrollArrow: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    borderRadius: 4,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        transition: 'background-color 0.2s ease',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 4,
-      },
-    }),
-  },
-  tabsScrollArrowLeft: {
-    left: 0,
-    paddingLeft: 4,
-  },
-  tabsScrollArrowRight: {
-    right: 0,
-    paddingRight: 4,
-  },
-  tabsScrollArrowText: {
-    fontSize: 28,
-    fontWeight: '300',
-    lineHeight: 32,
-  },
-  tab: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    minWidth: 80,
-    borderRadius: 8,
-    marginHorizontal: 2,
-    ...Platform.select({
-      web: {
-        transition: 'background-color 0.2s ease, border-bottom-width 0.2s ease',
-      },
-    }),
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tabContent: {
-    minHeight: 200,
-  },
-  collapsedHintText: {
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  emptyTabState: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTabText: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  emptyTabSubtext: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.5,
-    marginTop: 4,
-  },
-  createCustomButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  createCustomButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  searchResultsContainer: {
-    borderRadius: 12,
-    maxHeight: 300,
-    marginBottom: 8,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
-      },
-    }),
-  },
-  searchResultsList: {
-    maxHeight: 300,
-  },
-  searchResultItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 10,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    minHeight: 48,
-  },
-  searchResultTouchable: {
-    flex: 1,
-    paddingVertical: 4,
-  },
-  searchResultItem: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 40,
-  },
-  quickAddButton: {
-    padding: 8,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  searchResultContent: {
-    gap: 4,
-  },
-  searchResultName: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  searchResultBrand: {
-    fontSize: 13,
-    opacity: 0.7,
-  },
-  searchResultNutrition: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 2,
-  },
-  searchResultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  searchResultFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  searchResultTime: {
-    fontSize: 11,
-    opacity: 0.6,
-    fontStyle: 'italic',
-  },
-  frequencyBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    minWidth: 32,
-    alignItems: 'center',
-  },
-  frequencyBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  justAddedBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-    borderWidth: 1,
-    marginLeft: 4,
-  },
-  justAddedText: {
-    fontSize: 9,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  sourceBadge: {
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-    borderRadius: 3,
-    borderWidth: 1,
-    marginLeft: 8,
-  },
-  sourceBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  selectAllRow: {
-    borderBottomWidth: 1,
-    paddingVertical: 0,
-  },
-  selectAllText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  massDeleteButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  massDeleteButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  threeDotMenuButton: {
-    padding: Spacing.xs,
-    marginLeft: Spacing.sm,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  threeDotMenuOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  threeDotMenuContent: {
-    minWidth: 200,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    paddingVertical: Spacing.xs,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      },
-      default: {
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
-      },
-    }),
-  },
-  threeDotMenuHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.xs,
-  },
-  threeDotMenuCloseButton: {
-    padding: Spacing.xs,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  threeDotMenuItem: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  threeDotMenuItemText: {
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.medium,
-  },
-  noteRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: Platform.select({ web: 0, default: 0 }),
-    paddingHorizontal: 0,
-    marginTop: -8,
-    marginBottom: 4,
-  },
-  noteRowText: {
-    flex: 1,
-    fontSize: Platform.select({ web: 12, default: 13 }),
-    fontWeight: '400',
-  },
-});
