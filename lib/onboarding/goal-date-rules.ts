@@ -30,15 +30,15 @@ export function computeTargetDateFromPace(
     return today;
   }
   
-  const weeks = Math.ceil(deltaLb / paceLbPerWeek);
-  const days = weeks * 7;
+  // Calculate days directly using day-based approach
+  // Formula: days = ceil(deltaLb * 7 / paceLbPerWeek)
+  // This gives more accurate dates that match the pace more closely
+  const days = Math.ceil((deltaLb * 7) / paceLbPerWeek);
   
-  // Clone the input date and ensure it's at noon (to avoid DST issues)
-  const targetDate = new Date(today);
-  targetDate.setHours(12, 0, 0, 0);
-  targetDate.setDate(targetDate.getDate() + days);
-  
-  return targetDate;
+  // Use addDaysLocal helper to ensure proper DST handling
+  const todayAtNoon = new Date(today);
+  todayAtNoon.setHours(12, 0, 0, 0);
+  return addDaysLocal(todayAtNoon, days);
 }
 
 /**
@@ -85,11 +85,12 @@ export function computeMinSelectableDateForLoss(params: {
     return addDaysLocal(todayAtNoon, 1);
   }
   
-  // Calculate minimum weeks based on max pace
-  const minWeeks = Math.ceil(deltaLb / MAX_SELECTABLE_LOSS_LB_PER_WEEK);
-  const days = Math.max(1, minWeeks * 7);
+  // Calculate minimum days based on max pace (day-based calculation)
+  // Formula: minDiffDays = ceil(deltaLb * 7 / MAX_SELECTABLE_LOSS_LB_PER_WEEK)
+  // This ensures the earliest selectable date implies ~6.0 lb/week (or slightly under due to ceil)
+  const minDiffDays = Math.ceil((deltaLb * 7) / MAX_SELECTABLE_LOSS_LB_PER_WEEK);
   
-  const minSelectableDate = addDaysLocal(todayAtNoon, days);
+  const minSelectableDate = addDaysLocal(todayAtNoon, minDiffDays);
   
   // Ensure it's at least tomorrow (to disable today and past dates)
   const tomorrow = addDaysLocal(todayAtNoon, 1);
@@ -99,9 +100,12 @@ export function computeMinSelectableDateForLoss(params: {
 /**
  * Compute implied weight loss pace from a target date
  * 
+ * Calculates pace smoothly day-by-day (not in weekly steps).
+ * Assumes today and targetDate are already set to local NOON (12:00) by date-only helpers.
+ * 
  * @param deltaLb - Weight difference in pounds (current - target, must be > 0)
- * @param targetDate - Target date
- * @param today - Today's date
+ * @param targetDate - Target date (at local noon)
+ * @param today - Today's date (at local noon)
  * @returns Implied weight loss pace in pounds per week
  */
 export function computeImpliedLbPerWeek(
@@ -113,15 +117,17 @@ export function computeImpliedLbPerWeek(
     return 0;
   }
   
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
   const diffMs = targetDate.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffMs / MS_PER_DAY);
   
   if (diffDays <= 0) {
     return Infinity; // Invalid date (past or today)
   }
   
-  const weeksToDate = Math.max(1, Math.ceil(diffDays / 7));
-  const impliedLbPerWeek = deltaLb / weeksToDate;
+  // Calculate pace smoothly: deltaLb * 7 / diffDays
+  // This gives smooth day-by-day changes instead of weekly jumps
+  const impliedLbPerWeek = (deltaLb * 7) / diffDays;
   
   return impliedLbPerWeek;
 }

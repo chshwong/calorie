@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Alert, Platform, Dimensions } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { ageFromDob, ActivityLevel, calculateBMR, calculateTDEE, calculateRequiredDailyCalorieDiff, calculateSafeCalorieTarget } from '@/utils/calculations';
 import { 
@@ -34,6 +35,12 @@ import { checkProfanity } from '@/utils/profanity';
 import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
 import { PROFILES, DERIVED } from '@/constants/constraints';
 import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
+import { 
+  scheduleDraftSave, 
+  flushDraftSave, 
+  type OnboardingDraft,
+  getLastDraftError 
+} from '@/lib/onboarding/onboarding-draft-sync';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 
@@ -41,6 +48,7 @@ export function useOnboardingForm() {
   const { t } = useTranslation();
   const { user, refreshProfile, profile } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 8;
   
@@ -109,6 +117,11 @@ export function useOnboardingForm() {
   const [errorText, setErrorTextState] = useState<string | null>(null);
   const [errorKey, setErrorKeyState] = useState<string | null>(null);
   const [errorParams, setErrorParamsState] = useState<Record<string, any> | undefined>(undefined);
+  
+  // Draft sync status tracking
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const lastSyncErrorRef = useRef<Error | null>(null);
   
   // Unified error management helpers
   const setErrorText = (text: string | null) => {
@@ -533,6 +546,82 @@ export function useOnboardingForm() {
     return null;
   };
   
+  /**
+   * Build draft from current form state
+   */
+  const buildDraft = (): OnboardingDraft => {
+    const draft: OnboardingDraft = {};
+    
+    // Step 1: Name and DOB
+    if (preferredName) {
+      const normalized = normalizeSpaces(preferredName);
+      if (normalized) {
+        draft.first_name = normalized;
+      }
+    }
+    if (dateOfBirthStep2) {
+      draft.date_of_birth = dateOfBirthStep2;
+    }
+    
+    // Step 2: Sex
+    if (sex === 'male' || sex === 'female') {
+      draft.gender = sex;
+    }
+    
+    // Step 3: Height
+    const heightCmValue = getHeightInCm();
+    if (heightCmValue !== null) {
+      draft.height_cm = heightCmValue;
+      draft.height_unit = heightUnit === 'ft/in' ? 'ft' : heightUnit;
+    }
+    
+    // Step 4: Activity Level
+    if (activityLevel && ['sedentary', 'light', 'moderate', 'high', 'very_high'].includes(activityLevel)) {
+      draft.activity_level = activityLevel as 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high';
+    }
+    
+    // Step 5: Current Weight
+    if (currentWeightUnit === 'kg' && currentWeightKg) {
+      const kg = parseFloat(currentWeightKg);
+      if (!isNaN(kg) && kg > 0) {
+        draft.weight_lb = roundTo3(kgToLb(kg));
+        draft.weight_unit = 'kg';
+      }
+    } else if (currentWeightUnit === 'lb' && currentWeightLb) {
+      const lb = parseFloat(currentWeightLb);
+      if (!isNaN(lb) && lb > 0) {
+        draft.weight_lb = roundTo3(lb);
+        draft.weight_unit = 'lbs';
+      }
+    }
+    if (currentBodyFatPercent && currentBodyFatPercent.trim().length > 0) {
+      const bf = parseFloat(currentBodyFatPercent);
+      if (!isNaN(bf) && bf > 0) {
+        draft.body_fat_percent = roundTo2(bf);
+      }
+    }
+    
+    // Step 6: Goal
+    if (goal && ['lose', 'maintain', 'gain', 'recomp'].includes(goal)) {
+      draft.goal_type = goal as 'lose' | 'maintain' | 'gain' | 'recomp';
+    }
+    
+    // Step 7: Goal Weight
+    if (goalWeightUnit === 'kg' && goalWeightKg) {
+      const kg = parseFloat(goalWeightKg);
+      if (!isNaN(kg) && kg > 0) {
+        draft.goal_weight_lb = roundTo3(kgToLb(kg));
+      }
+    } else if (goalWeightUnit === 'lb' && goalWeightLb) {
+      const lb = parseFloat(goalWeightLb);
+      if (!isNaN(lb) && lb > 0) {
+        draft.goal_weight_lb = roundTo3(lb);
+      }
+    }
+    
+    return draft;
+  };
+  
   const validateTimeline = (): string | null => {
     const errorKey = validateTimelineUtil(timelineOption, customTargetDate || null);
     return errorKey ? t(errorKey) : null;
@@ -543,15 +632,16 @@ export function useOnboardingForm() {
     return errorKey ? t(errorKey) : null;
   };
   
-  const handleGoalNext = async () => {
+  const handleGoalNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Goal step
     const validationError = validateGoal();
-      if (validationError) {
-        setErrorText(validationError);
-        return;
-      }
+    if (validationError) {
+      setErrorText(validationError);
+      return;
+    }
     
     if (!user) {
       setErrorText(t('onboarding.error_no_session'));
@@ -559,28 +649,29 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Save goal to profile
-    setLoading(true);
-    try {
-      const updatedProfile = await updateProfile(user.id, { goal_type: goal });
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save goal');
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_goal');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(7);
+    
+    // Update sync status after a short delay (background save will complete)
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
       }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(7);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save goal. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    }, 100);
   };
   
-  const handleNameAgeNext = async () => {
+  const handleNameAgeNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Step 2
@@ -596,51 +687,39 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Save name and date of birth to profile
-    setLoading(true);
-    try {
-      // Upload avatar if one was chosen
-      if (avatarUri && user) {
-        try {
-          const { cacheBustedUrl } = await uploadUserAvatar({ userId: user.id, sourceUri: avatarUri });
-          await setProfileAvatarUrl({ userId: user.id, avatarUrl: cacheBustedUrl });
-        } catch (error) {
+    // Upload avatar in background (fire-and-forget, don't block)
+    if (avatarUri && user) {
+      uploadUserAvatar({ userId: user.id, sourceUri: avatarUri })
+        .then(({ cacheBustedUrl }) => setProfileAvatarUrl({ userId: user.id, avatarUrl: cacheBustedUrl }))
+        .catch((error) => {
           console.error('Failed to upload avatar', error);
           // Do not block onboarding if avatar upload fails
-        }
-      }
-
-      const updateData: any = {};
-      if (preferredName) {
-        // Normalize spaces before saving
-        const normalized = normalizeSpaces(preferredName);
-        if (normalized) {
-          updateData.first_name = normalized;
-        }
-      }
-      if (dateOfBirthStep2) {
-        updateData.date_of_birth = dateOfBirthStep2;
-      }
-      
-      const updatedProfile = await updateProfile(user.id, updateData);
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save profile');
-      }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(2);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save. Please try again.');
-    } finally {
-      setLoading(false);
+        });
     }
+
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_name_age');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(2);
+    
+    // Update sync status after a short delay
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
+      }
+    }, 100);
   };
   
-  const handleSexNext = async () => {
+  const handleSexNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Step 3
@@ -656,28 +735,28 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Save sex to profile
-    setLoading(true);
-    try {
-      const updatedProfile = await updateProfile(user.id, { gender: sex });
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save profile');
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_sex');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(3);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
       }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(3);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    }, 100);
   };
   
-  const handleHeightNext = async () => {
+  const handleHeightNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Step 4
@@ -693,45 +772,28 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Convert height to cm and save to profile
-    setLoading(true);
-    try {
-      let heightCmValue: number;
-      
-      if (heightUnit === 'cm') {
-        heightCmValue = parseFloat(heightCm);
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_height');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(4);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
       } else {
-        const ft = parseFloat(heightFt);
-        const inches = parseFloat(heightIn);
-        const totalInches = ft * 12 + inches;
-        heightCmValue = totalInches * 2.54;
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
       }
-      
-      // Convert 'ft/in' to 'ft' for database storage
-      const dbHeightUnit = heightUnit === 'ft/in' ? 'ft' : heightUnit;
-      
-      const updatedProfile = await updateProfile(user.id, {
-        height_cm: heightCmValue,
-        height_unit: dbHeightUnit,
-      });
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save profile');
-      }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(4);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    }, 100);
   };
   
-  const handleActivityNext = async () => {
+  const handleActivityNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Step 5
@@ -747,28 +809,28 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Save activity level to profile
-    setLoading(true);
-    try {
-      const updatedProfile = await updateProfile(user.id, { activity_level: activityLevel });
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save profile');
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_activity');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(5);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
       }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(5);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    }, 100);
   };
   
-  const handleCurrentWeightNext = async () => {
+  const handleCurrentWeightNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Step 6
@@ -784,60 +846,53 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Convert weight to lb and save via weight log
-    setLoading(true);
-    try {
-      let weightLbValue: number;
-      
-      if (currentWeightUnit === 'kg') {
-        const kg = parseFloat(currentWeightKg);
-        weightLbValue = kgToLb(kg);
-      } else {
-        weightLbValue = parseFloat(currentWeightLb);
-      }
-
-      const storedWeightLb = roundTo3(weightLbValue);
-      const storedBodyFat =
-        currentBodyFatPercent && currentBodyFatPercent.trim().length > 0
-          ? roundTo2(parseFloat(currentBodyFatPercent))
-          : null;
-
-      try {
-        await insertWeightLogAndUpdateProfile({
-          userId: user.id,
-          weighedAt: new Date(),
-          weightLb: storedWeightLb,
-          bodyFatPercent: storedBodyFat,
-          weightUnit: currentWeightUnit,
-        });
-      } catch (logError) {
-        console.error('Weight log insert failed, falling back to direct profile update', logError);
-        const fallbackUpdates: Record<string, any> = {
-          weight_lb: storedWeightLb,
-          weight_unit: currentWeightUnit === 'lb' ? 'lbs' : 'kg',
-        };
-        if (storedBodyFat !== null) {
-          fallbackUpdates.body_fat_percent = storedBodyFat;
-        }
-        const updatedProfile = await updateProfile(user.id, fallbackUpdates);
-        if (!updatedProfile) {
-          throw new Error('Failed to save profile');
-        }
-      }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(6);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save. Please try again.');
-    } finally {
-      setLoading(false);
+    // Save weight log in background (fire-and-forget, don't block)
+    let weightLbValue: number;
+    if (currentWeightUnit === 'kg') {
+      const kg = parseFloat(currentWeightKg);
+      weightLbValue = kgToLb(kg);
+    } else {
+      weightLbValue = parseFloat(currentWeightLb);
     }
+    const storedWeightLb = roundTo3(weightLbValue);
+    const storedBodyFat =
+      currentBodyFatPercent && currentBodyFatPercent.trim().length > 0
+        ? roundTo2(parseFloat(currentBodyFatPercent))
+        : null;
+
+    insertWeightLogAndUpdateProfile({
+      userId: user.id,
+      weighedAt: new Date(),
+      weightLb: storedWeightLb,
+      bodyFatPercent: storedBodyFat,
+      weightUnit: currentWeightUnit,
+    }).catch((logError) => {
+      console.error('Weight log insert failed, falling back to draft save', logError);
+      // Draft save will handle the profile update
+    });
+    
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_current_weight');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(6);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
+      }
+    }, 100);
   };
   
-  const handleGoalWeightNext = async () => {
+  const handleGoalWeightNext = () => {
+    const startTime = performance.now();
     clearErrors();
     
     // Validate Step 7
@@ -853,38 +908,24 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Convert goal weight to kg and save to profile
-    setLoading(true);
-    try {
-      let goalWeightLbValue: number;
-      
-      if (goalWeightUnit === 'kg') {
-        const kg = parseFloat(goalWeightKg);
-        goalWeightLbValue = kgToLb(kg);
+    // Build draft and schedule background save
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_goal_weight');
+    
+    // Move to next step immediately (optimistic)
+    setCurrentStep(8);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
       } else {
-        goalWeightLbValue = parseFloat(goalWeightLb);
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
       }
-
-      const storedGoalWeightLb = roundTo3(goalWeightLbValue);
-      
-      const updatedProfile = await updateProfile(user.id, {
-        goal_weight_lb: storedGoalWeightLb,
-      });
-      
-      if (!updatedProfile) {
-        throw new Error('Failed to save profile');
-      }
-      
-      // Refresh profile to get updated data
-      await refreshProfile();
-      
-      // Move to next step
-      setCurrentStep(8);
-    } catch (error: any) {
-      setErrorText(error.message || 'Failed to save. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    }, 100);
   };
   
   const handleNext = () => {
@@ -980,7 +1021,14 @@ export function useOnboardingForm() {
   };
   
   const handleCompleteOnboarding = async () => {
+    const startTime = performance.now();
     clearErrors();
+    
+    // Guard: Don't start mutation if tab is not visible (web only)
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      setErrorText('Please make sure the tab is visible before continuing.');
+      return;
+    }
     
     // Validate timeline step
     const validationError = validateTimeline();
@@ -1073,7 +1121,17 @@ export function useOnboardingForm() {
         sex as 'male' | 'female'
       );
       
-      // Final profile update with all calculated values
+      // Step 1: Flush draft save (ensures all intermediate steps are saved)
+      try {
+        const draft = buildDraft();
+        await flushDraftSave(draft, user.id, queryClient);
+      } catch (error: any) {
+        setErrorText('Failed to save your information. Please try again.');
+        setLoading(false);
+        return; // Keep user on final step
+      }
+      
+      // Step 2: Final profile update with calculated values and onboarding_complete=true
       const updateData = {
         daily_calorie_target: targetCalories,
         goal_target_date: targetDate,
@@ -1081,14 +1139,41 @@ export function useOnboardingForm() {
         onboarding_complete: true,
       };
       
-      const updatedProfile = await updateProfile(user.id, updateData);
+      // Perform final mutation with timeout and retry support
+      const mutationStart = performance.now();
+      const MUTATION_TIMEOUT_MS = 5000; // 5 second timeout
+      
+      const mutationPromise = updateProfile(user.id, updateData);
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), MUTATION_TIMEOUT_MS);
+      });
+      
+      let updatedProfile: any | null = null;
+      try {
+        updatedProfile = await Promise.race([mutationPromise, timeoutPromise]);
+      } catch (error: any) {
+        if (error.message === 'TIMEOUT') {
+          // Timeout occurred - show retry option
+          const mutationTime = performance.now() - mutationStart;
+          console.warn(`[handleCompleteOnboarding] Final mutation timeout after ${mutationTime.toFixed(2)}ms`);
+          setErrorText('Network is waking up... Please try again.');
+          setLoading(false);
+          return; // Allow user to retry by clicking Next again
+        }
+        throw error; // Re-throw other errors
+      }
+      
+      const mutationTime = performance.now() - mutationStart;
       
       if (!updatedProfile) {
         throw new Error('Failed to save profile');
       }
       
-      // Refresh profile to get latest data
-      await refreshProfile();
+      // Update cache with final profile
+      queryClient.setQueryData(['userProfile', user.id], updatedProfile);
+      
+      // Also refresh profile in AuthContext (fire-and-forget)
+      refreshProfile().catch(() => {}); // Fire-and-forget
       
       // Show warning if pace was adjusted
       if (warningMessage) {
@@ -1154,6 +1239,10 @@ export function useOnboardingForm() {
     errorKey,
     errorParams,
     isDesktop,
+    
+    // Draft sync status (for debugging, not shown in UI except final step)
+    syncStatus,
+    lastSavedAt,
     
     // Goal weight suggestion (derived, not state)
     goalWeightSuggestion,

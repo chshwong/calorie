@@ -55,6 +55,7 @@ export async function updateProfile(
       }
     });
 
+    // Perform the actual mutation (NO session refresh calls here - that's handled by warm-up)
     const { data, error } = await supabase
       .from('profiles')
       .update(cleanUpdates)

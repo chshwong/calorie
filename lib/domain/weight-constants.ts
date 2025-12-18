@@ -55,7 +55,7 @@ export const MIN_DELTA_GAIN_LB = 1;
  * Maximum percentage weight change allowed for lose/gain goals
  * Prevents overly aggressive targets
  */
-export const MAX_DELTA_LOSE_PCT = 0.35; // 35%
+export const MAX_DELTA_LOSE_PCT = 0.50; // 35%
 export const MAX_DELTA_GAIN_PCT = 0.35; // 35%
 
 // ============================================================================

@@ -19,6 +19,7 @@ import { DebugLoadingProvider } from '@/contexts/DebugLoadingContext';
 import { Colors } from '@/constants/theme';
 import { ToastProvider } from '@/components/ui/app-toast';
 import { DebugOverlay } from '@/components/DebugOverlay';
+import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 
 // Create QueryClient with sensible defaults
 // TEMPORARY: Added logging and reduced refetch to diagnose idle performance issues
@@ -124,6 +125,12 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // Setup focus warm-up for session/network (prevents slow mutations after tab blur/focus)
+  useEffect(() => {
+    const cleanup = setupFocusWarmup();
+    return cleanup;
+  }, []);
 
   // Monitor for navigation lifecycle (web only)
   useEffect(() => {

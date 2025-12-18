@@ -7,7 +7,7 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, LineHeigh
 import { PROFILES, DERIVED } from '@/constants/constraints';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { validateBodyFatPercent } from '@/utils/validation';
-import { kgToLb, lbToKg, roundTo1 } from '@/utils/bodyMetrics';
+import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
 import { filterNumericInput } from '@/utils/inputFilters';
 import { getInputAccessibilityProps, getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 
@@ -260,8 +260,25 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               placeholderTextColor={colors.textSecondary}
               value={currentWeightKg}
               onChangeText={(text) => {
-                onCurrentWeightKgChange(limitWeightInput(text));
+                const sanitized = limitWeightInput(text);
+                onCurrentWeightKgChange(sanitized);
                 onErrorClear();
+                
+                // Sync to canonical LB field
+                if (sanitized.trim() === '') {
+                  if (currentWeightLb !== '') {
+                    onCurrentWeightLbChange('');
+                  }
+                } else {
+                  const kgValue = parseFloat(sanitized);
+                  if (!isNaN(kgValue)) {
+                    const lbs = kgToLb(kgValue);
+                    const lbsString = roundTo3(lbs).toString();
+                    if (currentWeightLb !== lbsString) {
+                      onCurrentWeightLbChange(lbsString);
+                    }
+                  }
+                }
               }}
               keyboardType="numeric"
               editable={!loading}
@@ -287,8 +304,25 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               placeholderTextColor={colors.textSecondary}
               value={currentWeightLb}
               onChangeText={(text) => {
-                onCurrentWeightLbChange(limitWeightInput(text));
+                const sanitized = limitWeightInput(text);
+                onCurrentWeightLbChange(sanitized);
                 onErrorClear();
+                
+                // Sync to KG field
+                if (sanitized.trim() === '') {
+                  if (currentWeightKg !== '') {
+                    onCurrentWeightKgChange('');
+                  }
+                } else {
+                  const lbValue = parseFloat(sanitized);
+                  if (!isNaN(lbValue)) {
+                    const kg = lbToKg(lbValue);
+                    const kgString = roundTo1(kg).toString();
+                    if (currentWeightKg !== kgString) {
+                      onCurrentWeightKgChange(kgString);
+                    }
+                  }
+                }
               }}
               keyboardType="numeric"
               editable={!loading}

@@ -161,12 +161,12 @@ export function getSuggestedTargetWeightLb(params: {
 }): SuggestionResult {
   const { goalType, currentWeightLb, heightCm, sexAtBirth, dobISO } = params;
 
-  // Get validity range
+  // Get validity range (validator-shaped)
   const validityRange = getGoalValidityRangeLb({ goalType, currentWeightLb });
   const validityMinLb = validityRange.minLb;
   const validityMaxLb = validityRange.maxLb;
 
-  // For maintain/recomp: return current weight
+  // Maintain/Recomp: suggest current weight
   if (goalType === 'maintain' || goalType === 'recomp') {
     return {
       ok: true,
@@ -177,7 +177,7 @@ export function getSuggestedTargetWeightLb(params: {
     };
   }
 
-  // For lose/gain: require height, sex, and dob
+  // Lose/Gain require height, sex, dob for safety bounds
   if (heightCm === null || sexAtBirth === null || dobISO === null) {
     return {
       ok: false,
@@ -186,7 +186,7 @@ export function getSuggestedTargetWeightLb(params: {
     };
   }
 
-  // Compute safe range from BMI guardrails
+  // Safe BMI bounds
   const minSafeLb = getMinSafeWeightLb({
     heightCm,
     sexAtBirth: sexAtBirth as SexAtBirth,
@@ -198,19 +198,83 @@ export function getSuggestedTargetWeightLb(params: {
     dobISO,
   });
 
-  // DB range
   const dbRange: [number, number] = [DB_MIN_WEIGHT_LB, DB_MAX_WEIGHT_LB];
-  
-  // Safe range
-  const safeRange: [number, number] = [minSafeLb, maxSafeLb];
-  
-  // Validity range
   const validityRangeTuple: [number, number] = [validityMinLb, validityMaxLb];
 
-  // Compute feasible range as intersection
-  const feasibleRange = intersectRanges([dbRange, safeRange, validityRangeTuple]);
+  // Goal-specific interpretation of "safe" bounds:
+  // - LOSE: maxSafe is advisory (do not block loss suggestions above it), minSafe is a hard floor
+  // - GAIN: minSafe is advisory (do not block gain suggestions below it), maxSafe is a hard ceiling
+  const safeRange: [number, number] =
+    goalType === 'gain'
+      ? [DB_MIN_WEIGHT_LB, maxSafeLb]
+      : [minSafeLb, DB_MAX_WEIGHT_LB];
 
-  // If no feasible range, return error
+  // Compute base suggestion and a HARD "suggestion-cap range" that must not be violated
+  let baseSuggestion: number;
+  let suggestionCapRange: [number, number];
+
+  if (goalType === 'lose') {
+    const lossLbRaw = currentWeightLb * WEIGHT_LOSS_SUGGESTION_PCT;
+    const lossLbCap = Math.min(lossLbRaw, WEIGHT_LOSS_SUGGESTION_MAX_LB);
+
+    if (lossLbCap < MIN_DELTA_LOSE_LB) {
+      return {
+        ok: false,
+        code: 'NO_FEASIBLE_RANGE',
+        messageKey: 'onboarding.goal_weight.suggestion_unavailable',
+        meta: {
+          reason: 'LOSS_CAP_BELOW_MIN_DELTA',
+          currentWeightLb,
+          lossLbCap,
+          minDeltaLoseLb: MIN_DELTA_LOSE_LB,
+        },
+      };
+    }
+
+    baseSuggestion = currentWeightLb - lossLbCap;
+
+    // Must stay within: [current - lossCap, current - MIN_DELTA]
+    suggestionCapRange = [
+      currentWeightLb - lossLbCap,
+      currentWeightLb - MIN_DELTA_LOSE_LB,
+    ];
+  } else {
+    const gainLbRaw = currentWeightLb * WEIGHT_GAIN_SUGGESTION_PCT;
+    const gainLbCap = Math.min(gainLbRaw, WEIGHT_GAIN_SUGGESTION_MAX_LB);
+
+    if (gainLbCap < MIN_DELTA_GAIN_LB) {
+      return {
+        ok: false,
+        code: 'NO_FEASIBLE_RANGE',
+        messageKey: 'onboarding.goal_weight.suggestion_unavailable',
+        meta: {
+          reason: 'GAIN_CAP_BELOW_MIN_DELTA',
+          currentWeightLb,
+          gainLbCap,
+          minDeltaGainLb: MIN_DELTA_GAIN_LB,
+        },
+      };
+    }
+
+    baseSuggestion = currentWeightLb + gainLbCap;
+
+    // Must stay within: [current + MIN_DELTA, current + gainCap]
+    suggestionCapRange = [
+      currentWeightLb + MIN_DELTA_GAIN_LB,
+      currentWeightLb + gainLbCap,
+    ];
+  }
+
+  // Feasible range is intersection of constraints.
+  // - For LOSE: we do not include maxSafeLb (advisory), only enforce minSafe floor.
+  // - For GAIN: we do not include minSafeLb (advisory), only enforce maxSafe ceiling.
+  const feasibleRange = intersectRanges([
+    dbRange,
+    safeRange,
+    validityRangeTuple,
+    suggestionCapRange,
+  ]);
+
   if (feasibleRange === null) {
     return {
       ok: false,
@@ -221,45 +285,44 @@ export function getSuggestedTargetWeightLb(params: {
         minSafeLb,
         maxSafeLb,
         validityRange: { minLb: validityMinLb, maxLb: validityMaxLb },
-        feasibleRange: null,
+        suggestionCapRange,
+        safeRangeUsed: safeRange,
       },
     };
   }
 
   const [feasibleMinLb, feasibleMaxLb] = feasibleRange;
 
-  // Compute base suggestion with max-lb caps
-  let baseSuggestion: number;
-  if (goalType === 'lose') {
-    // Loss: calculate percentage loss, cap it, then subtract from current
-    const lossLbRaw = currentWeightLb * WEIGHT_LOSS_SUGGESTION_PCT;
-    const lossLb = Math.min(lossLbRaw, WEIGHT_LOSS_SUGGESTION_MAX_LB);
-    baseSuggestion = currentWeightLb - lossLb;
-  } else {
-    // gain: calculate percentage gain, cap it, then add to current
-    const gainLbRaw = currentWeightLb * WEIGHT_GAIN_SUGGESTION_PCT;
-    const gainLb = Math.min(gainLbRaw, WEIGHT_GAIN_SUGGESTION_MAX_LB);
-    baseSuggestion = currentWeightLb + gainLb;
-  }
+  // Clamp base suggestion into feasible intersection (guaranteed to never violate caps)
+  const suggestedLb = Math.max(feasibleMinLb, Math.min(feasibleMaxLb, baseSuggestion));
+  const wasClamped = suggestedLb !== baseSuggestion;
 
-  // Clamp base suggestion into feasible range
-  let suggestedLb = Math.max(feasibleMinLb, Math.min(feasibleMaxLb, baseSuggestion));
-  const wasClamped = baseSuggestion !== suggestedLb;
-
-  // Additional guards to ensure logical consistency
-  if (goalType === 'lose' && suggestedLb > currentWeightLb) {
-    suggestedLb = currentWeightLb;
-  }
-  if (goalType === 'gain' && suggestedLb < currentWeightLb) {
-    suggestedLb = currentWeightLb;
-  }
-
-  return {
+  const result: SuggestionResult = {
     ok: true,
     suggestedLb,
     minAllowedLb: feasibleMinLb,
     maxAllowedLb: feasibleMaxLb,
     wasClamped,
   };
-}
 
+  // Advisory metadata:
+  // - Gain: if still below minSafe after suggested gain
+  if (goalType === 'gain' && suggestedLb < minSafeLb) {
+    result.meta = {
+      ...(result.meta || {}),
+      advisory: 'SUGGESTION_BELOW_MIN_SAFE',
+      minSafeLb,
+    };
+  }
+
+  // - Lose: if still above maxSafe even after suggested loss (advisory only)
+  if (goalType === 'lose' && suggestedLb > maxSafeLb) {
+    result.meta = {
+      ...(result.meta || {}),
+      advisory: 'SUGGESTION_ABOVE_MAX_SAFE',
+      maxSafeLb,
+    };
+  }
+
+  return result;
+}

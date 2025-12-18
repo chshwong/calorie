@@ -250,8 +250,32 @@ export const HeightStep: React.FC<HeightStepProps> = ({
               placeholderTextColor={colors.textSecondary}
               value={heightCm}
               onChangeText={(text) => {
-                onHeightCmChange(filterNumericInput(text));
+                const sanitized = filterNumericInput(text);
+                onHeightCmChange(sanitized);
                 onErrorClear();
+                
+                // Sync to ft/in fields (symmetry)
+                if (sanitized.trim() === '') {
+                  if (heightFt !== '' || heightIn !== '') {
+                    onHeightFtChange('');
+                    onHeightInChange('');
+                  }
+                } else {
+                  const cmValue = parseFloat(sanitized);
+                  if (!isNaN(cmValue) && cmValue > 0) {
+                    const result = cmToFtIn(cmValue);
+                    if (result) {
+                      const ftString = result.feet.toString();
+                      const inString = result.inches.toString();
+                      if (heightFt !== ftString) {
+                        onHeightFtChange(ftString);
+                      }
+                      if (heightIn !== inString) {
+                        onHeightInChange(inString);
+                      }
+                    }
+                  }
+                }
               }}
               keyboardType="numeric"
               editable={!loading}
@@ -281,8 +305,26 @@ export const HeightStep: React.FC<HeightStepProps> = ({
                 placeholderTextColor={colors.textSecondary}
                 value={heightFt}
                 onChangeText={(text) => {
-                  onHeightFtChange(filterNumericInput(text));
+                  const sanitized = filterNumericInput(text);
+                  onHeightFtChange(sanitized);
                   onErrorClear();
+                  
+                  // Sync to canonical cm field
+                  const ftValue = sanitized.trim() === '' ? NaN : parseFloat(sanitized);
+                  const inValue = heightIn.trim() === '' ? NaN : parseFloat(heightIn);
+                  
+                  if (!isNaN(ftValue) && ftValue >= 0 && !isNaN(inValue) && inValue >= 0) {
+                    const cm = ftInToCm(ftValue, inValue);
+                    const cmString = roundTo1(cm).toString();
+                    if (heightCm !== cmString) {
+                      onHeightCmChange(cmString);
+                    }
+                  } else if (sanitized.trim() === '' && heightIn.trim() === '') {
+                    // Both cleared, clear cm too
+                    if (heightCm !== '') {
+                      onHeightCmChange('');
+                    }
+                  }
                 }}
                 keyboardType="numeric"
                 editable={!loading}
@@ -310,8 +352,26 @@ export const HeightStep: React.FC<HeightStepProps> = ({
                 placeholderTextColor={colors.textSecondary}
                 value={heightIn}
                 onChangeText={(text) => {
-                  onHeightInChange(filterNumericInput(text));
+                  const sanitized = filterNumericInput(text);
+                  onHeightInChange(sanitized);
                   onErrorClear();
+                  
+                  // Sync to canonical cm field
+                  const ftValue = heightFt.trim() === '' ? NaN : parseFloat(heightFt);
+                  const inValue = sanitized.trim() === '' ? NaN : parseFloat(sanitized);
+                  
+                  if (!isNaN(ftValue) && ftValue >= 0 && !isNaN(inValue) && inValue >= 0) {
+                    const cm = ftInToCm(ftValue, inValue);
+                    const cmString = roundTo1(cm).toString();
+                    if (heightCm !== cmString) {
+                      onHeightCmChange(cmString);
+                    }
+                  } else if (heightFt.trim() === '' && sanitized.trim() === '') {
+                    // Both cleared, clear cm too
+                    if (heightCm !== '') {
+                      onHeightCmChange('');
+                    }
+                  }
                 }}
                 keyboardType="numeric"
                 editable={!loading}

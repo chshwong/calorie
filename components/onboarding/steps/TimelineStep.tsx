@@ -315,7 +315,12 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
               : timelineOption === 'custom_date' && customDateObj && deltaLb !== null
               ? (() => {
                   const impliedPace = computeImpliedLbPerWeek(deltaLb, customDateObj, today);
-                  return `~${formatPace(impliedPace)}/week`;
+                  const formattedPace = formatPace(impliedPace);
+                  // Extract number and unit, round to 1 decimal
+                  const parts = formattedPace.split(' ');
+                  const paceNum = parseFloat(parts[0]);
+                  const unit = parts[1];
+                  return `~${roundTo1(paceNum)} ${unit}/week`;
                 })()
               : (() => {
                   // Find which pace option matches the current custom date
@@ -332,7 +337,12 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
                   });
                   
                   if (selectedPace && selectedPace.pace) {
-                    return `~${formatPace(selectedPace.pace)}/week`;
+                    const formattedPace = formatPace(selectedPace.pace);
+                    // Extract number and unit, round to 1 decimal
+                    const parts = formattedPace.split(' ');
+                    const paceNum = parseFloat(parts[0]);
+                    const unit = parts[1];
+                    return `~${roundTo1(paceNum)} ${unit}/week`;
                   }
                   return undefined;
                 })()
@@ -559,7 +569,7 @@ const styles = StyleSheet.create({
   },
   recommendedLabel: {
     fontWeight: FontWeight.semibold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.md,
   },
   paceInfo: {
     marginTop: Spacing.xs,

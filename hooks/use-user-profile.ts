@@ -18,9 +18,11 @@ export function useUserProfile() {
       if (!userId) throw new Error('User not authenticated');
       return getUserProfile(userId);
     },
-    staleTime: 30 * 60 * 1000, // 30 min
+    staleTime: Infinity, // Never consider data stale during onboarding
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: false, // Don't refetch on tab focus
+    refetchOnReconnect: false, // Don't refetch on reconnect
+    retry: false, // Don't retry to avoid long spinners
 
     // Show cached profile instantly
     placeholderData: (previousData) => {

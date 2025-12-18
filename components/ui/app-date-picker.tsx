@@ -132,7 +132,10 @@ export function AppDatePicker({
   const handlePreviousMonth = () => {
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() - 1);
-    if (newMonth >= minDate) {
+    // Normalize to first day of month for comparison
+    const newMonthFirst = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+    const minDateFirst = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    if (newMonthFirst >= minDateFirst) {
       setCalendarViewMonth(newMonth);
     }
   };
@@ -141,8 +144,15 @@ export function AppDatePicker({
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() + 1);
     // Only check maxDate if it's defined
-    if (maxDate === undefined || newMonth <= maxDate) {
+    if (maxDate === undefined) {
       setCalendarViewMonth(newMonth);
+    } else {
+      // Normalize to first day of month for comparison
+      const newMonthFirst = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      const maxDateFirst = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+      if (newMonthFirst <= maxDateFirst) {
+        setCalendarViewMonth(newMonth);
+      }
     }
   };
   
@@ -254,7 +264,10 @@ export function AppDatePicker({
                     disabled={(() => {
                       const prevMonth = new Date(calendarViewMonth);
                       prevMonth.setMonth(prevMonth.getMonth() - 1);
-                      return prevMonth < minDate;
+                      // Normalize to first day of month for comparison
+                      const prevMonthFirst = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+                      const minDateFirst = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+                      return prevMonthFirst < minDateFirst;
                     })()}
                     {...getButtonAccessibilityProps(
                       t('home.date_picker.previous_month'),
@@ -288,7 +301,10 @@ export function AppDatePicker({
                       if (maxDate === undefined) return false;
                       const nextMonth = new Date(calendarViewMonth);
                       nextMonth.setMonth(nextMonth.getMonth() + 1);
-                      return nextMonth > maxDate;
+                      // Normalize to first day of month for comparison
+                      const nextMonthFirst = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1);
+                      const maxDateFirst = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+                      return nextMonthFirst > maxDateFirst;
                     })()}
                     {...getButtonAccessibilityProps(
                       t('home.date_picker.next_month'),
