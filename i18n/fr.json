@@ -285,24 +285,28 @@
       "error_dob_future": "La date de naissance ne peut pas être dans le futur",
       "error_age_minimum": "Vous devez avoir au moins 18 ans",
       "error_age_maximum": "Veuillez entrer une date de naissance valide",
+      "error_name_required": "Le nom préféré est requis",
       "error_name_too_long": "Le nom préféré ne doit pas dépasser 40 caractères"
     },
     "sex": {
       "title": "Quel est votre sexe?",
-      "subtitle": "Nous utilisons cela pour calculer vos besoins caloriques.",
+      "subtitle": "Utilisé uniquement pour les calculs caloriques.",
       "male": "Homme",
       "female": "Femme",
       "error_select_sex": "Veuillez sélectionner votre sexe"
     },
     "height": {
       "title": "Quelle est votre taille?",
-      "subtitle": "Nous l'utiliserons pour affiner vos objectifs quotidiens.",
+      "subtitle": "Utilisé pour affiner vos objectifs quotidiens.",
       "height_label": "Taille",
-      "height_cm_placeholder": "120-230",
+      "height_cm_placeholder": "50-260",
       "height_ft_placeholder": "pieds",
       "height_in_placeholder": "pouces",
+      "height_cm_accessibility_label": "Taille en centimètres",
+      "height_ft_accessibility_label": "Taille en pieds",
+      "height_in_accessibility_label": "Taille en pouces",
       "error_height_required": "La taille est requise",
-      "error_height_invalid": "La taille doit être entre 120 cm et 230 cm (environ 3'11\" à 7'7\")"
+      "error_height_invalid": "La taille doit être entre 50 cm et 260 cm (environ 1'8\" à 8'6\")"
     },
     "activity": {
       "title": "Quel est votre niveau d'activité en journée?",
@@ -348,7 +352,20 @@
       "error_weight_invalid": "Le poids objectif doit être entre 35 kg et 250 kg (environ 77 lb à 550 lb)",
       "error_lose_too_high": "Pour un objectif de perte de graisse, votre poids objectif doit être inférieur à votre poids actuel.",
       "error_gain_too_low": "Pour un objectif de prise de poids, votre poids objectif doit être supérieur à votre poids actuel.",
-      "error_maintain_too_different": "Pour maintenir le poids, votre poids objectif doit être très proche de votre poids actuel. Envisagez d'ajuster votre type d'objectif."
+      "error_maintain_too_different": "Pour maintenir le poids, votre poids objectif doit être très proche de votre poids actuel. Envisagez d'ajuster votre type d'objectif.",
+      "goal_weight_error_invalid_number": "Le poids cible doit être un nombre valide.",
+      "goal_weight_error_range_kg": "Le poids cible doit être entre {{minKg}} kg et {{maxKg}} kg.",
+      "goal_weight_error_range_lb": "Le poids cible doit être entre {{minLb}} lb et {{maxLb}} lb.",
+      "goal_weight_error_lose_not_lower": "Pour une perte de poids, ton poids cible doit être plus bas que ton poids actuel.",
+      "goal_weight_error_lose_min_delta": "Pour une perte de poids, choisis un poids cible au moins {{minDelta}} lb en dessous de ton poids actuel.",
+      "goal_weight_error_lose_too_aggressive": "Cet objectif est trop agressif. Choisis un poids plus proche de ton poids actuel.",
+      "goal_weight_error_gain_not_higher": "Pour une prise de poids, ton poids cible doit être plus haut que ton poids actuel.",
+      "goal_weight_error_gain_min_delta": "Pour une prise de poids, choisis un poids cible au moins {{minDelta}} lb au-dessus de ton poids actuel.",
+      "goal_weight_error_gain_too_aggressive": "Cet objectif est trop agressif. Choisis un poids plus proche de ton poids actuel.",
+      "goal_weight_error_maintain_range_lb": "Maintenir signifie garder le poids stable. Choisis un poids cible à ±{{delta}} lb de ton poids actuel.",
+      "goal_weight_error_maintain_range_kg": "Maintenir signifie garder le poids stable. Choisis un poids cible à ±{{delta}} kg de ton poids actuel.",
+      "goal_weight_error_recomp_range_lb": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} lb de ton poids actuel.",
+      "goal_weight_error_recomp_range_kg": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} kg de ton poids actuel."
     },
     "timeline": {
       "title": "Quand souhaitez-vous atteindre cet objectif?",

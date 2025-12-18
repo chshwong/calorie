@@ -41,6 +41,21 @@ export function validatePreferredName(rawValue: string): ValidationResult {
 }
 
 /**
+ * Checks if an error message is related to name validation
+ * Used by UI components to determine if name field should show error styling
+ * Per engineering guidelines: Business logic must live in validation utils, not components
+ */
+export function isNameValidationError(error: string | null): boolean {
+  if (!error) return false;
+  const lowerError = error.toLowerCase();
+  return (
+    lowerError.includes('name') ||
+    lowerError.includes('emoji') ||
+    lowerError.includes('different name')
+  );
+}
+
+/**
  * Validates date of birth in YYYY-MM-DD format
  * @param dob - Date of birth string in YYYY-MM-DD format
  * @param minAge - Minimum age in years (default: 13)

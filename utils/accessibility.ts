@@ -83,11 +83,8 @@ export function getInputAccessibilityProps(
   return {
     accessibilityLabel: label,
     accessibilityHint: hint,
-    accessibilityState: {
-      invalid: !!error,
-    },
     accessibilityRequired: required,
-    accessibilityLiveRegion: error ? 'polite' : undefined,
+    accessibilityLiveRegion: (error ? 'polite' : undefined) as 'polite' | undefined,
   };
 }
 

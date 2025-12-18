@@ -274,36 +274,42 @@
       "error_select_goal": "Please select your goal"
     },
     "name_age": {
-      "title": "Tell us a bit about you.",
+      "title": "A bit about you",
       "subtitle": "Your date of birth helps us calculate your calorie needs accurately.",
       "preferred_name_label": "Preferred Name",
       "preferred_name_placeholder": "How do you like to be called?",
+      "preferred_name_helper": "Allowed: letters, numbers, spaces, and ' - . One emoji max.",
       "dob_label": "Date of birth",
       "dob_placeholder": "Select your date of birth",
+      "dob_accessibility_hint": "Double tap to select your date of birth",
       "age_display": "Age: {{age}} years old",
       "error_dob_required": "Date of birth is required",
       "error_dob_format": "Please enter a valid date of birth",
       "error_dob_future": "Date of birth cannot be in the future",
       "error_age_minimum": "You must be at least 18 years old",
       "error_age_maximum": "Please enter a valid date of birth",
+      "error_name_required": "Preferred Name is required",
       "error_name_too_long": "Preferred name must be 40 characters or less"
     },
     "sex": {
       "title": "Sex at birth",
-      "subtitle": "We use this to calculate your calorie needs.",
+      "subtitle": "Used only for calorie calculations.",
       "male": "Male",
       "female": "Female",
       "error_select_sex": "Please select your sex"
     },
     "height": {
       "title": "What's your height?",
-      "subtitle": "We'll use this to fine-tune your daily targets.",
+      "subtitle": "Used to fine-tune your daily targets.",
       "height_label": "Height",
-      "height_cm_placeholder": "120-230",
+      "height_cm_placeholder": "50-260",
       "height_ft_placeholder": "ft",
       "height_in_placeholder": "in",
+      "height_cm_accessibility_label": "Height in centimeters",
+      "height_ft_accessibility_label": "Height in feet",
+      "height_in_accessibility_label": "Height in inches",
       "error_height_required": "Height is required",
-      "error_height_invalid": "Height must be between 120 cm and 230 cm (approximately 3'11\" to 7'7\")"
+      "error_height_invalid": "Height must be between 50 cm and 260 cm (approximately 1'8\" to 8'6\")"
     },
     "activity": {
       "title": "How active are you on a typical day?",
@@ -349,7 +355,20 @@
       "error_weight_invalid": "Goal weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)",
       "error_lose_too_high": "For a fat-loss goal, your goal weight should be lower than your current weight.",
       "error_gain_too_low": "For a weight-gain goal, your goal weight should be higher than your current weight.",
-      "error_maintain_too_different": "For maintaining weight, your goal weight should be very close to your current weight. Consider adjusting your goal type."
+      "error_maintain_too_different": "For maintaining weight, your goal weight should be very close to your current weight. Consider adjusting your goal type.",
+      "goal_weight_error_invalid_number": "Target weight must be a valid number.",
+      "goal_weight_error_range_kg": "Target weight must be between {{minKg}} kg and {{maxKg}} kg.",
+      "goal_weight_error_range_lb": "Target weight must be between {{minLb}} lbs and {{maxLb}} lbs.",
+      "goal_weight_error_lose_not_lower": "For a weight loss goal, your target weight must be lower than your current weight.",
+      "goal_weight_error_lose_min_delta": "For a weight loss goal, choose a target at least {{minDelta}} lb below your current weight.",
+      "goal_weight_error_lose_too_aggressive": "That target is too aggressive. Choose a weight closer to your current weight.",
+      "goal_weight_error_gain_not_higher": "For a weight gain goal, your target weight must be above your current weight.",
+      "goal_weight_error_gain_min_delta": "For a weight gain goal, choose a target at least {{minDelta}} lb above your current weight.",
+      "goal_weight_error_gain_too_aggressive": "That target is too aggressive. Choose a weight closer to your current weight.",
+      "goal_weight_error_maintain_range_lb": "Maintain is meant to keep weight steady. Choose a target within ±{{delta}} lbs of your current weight.",
+      "goal_weight_error_maintain_range_kg": "Maintain is meant to keep weight steady. Choose a target within ±{{delta}} kg of your current weight.",
+      "goal_weight_error_recomp_range_lb": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} lbs of your current weight.",
+      "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight."
     },
     "timeline": {
       "title": "When do you want to reach this goal?",
