@@ -7,6 +7,8 @@
  * - No React/browser/UI imports allowed
  */
 
+import { kgToLb, lbToKg } from '@/lib/domain/weight-constants';
+
 /**
  * Round helpers
  * Use simple decimal rounding to avoid floating point drift in UI
@@ -23,23 +25,8 @@ export function roundTo3(x: number): number {
   return Math.round(x * 1000) / 1000;
 }
 
-/**
- * Convert kilograms to pounds
- * @param kg - Weight in kilograms
- * @returns Weight in pounds
- */
-export function kgToLb(kg: number): number {
-  return kg * 2.20462;
-}
-
-/**
- * Convert pounds to kilograms
- * @param lb - Weight in pounds
- * @returns Weight in kilograms
- */
-export function lbToKg(lb: number): number {
-  return lb / 2.20462;
-}
+// Re-export weight conversion functions from weight-constants.ts for backward compatibility
+export { kgToLb, lbToKg };
 
 // Back-compat aliases used by existing code
 export const kgToLbs = kgToLb;

@@ -5,43 +5,26 @@
  * Handles unit conversions and provides detailed error messages.
  */
 
+import { PROFILES, DERIVED } from '@/constants/constraints';
+import {
+  MIN_DELTA_LOSE_LB,
+  MIN_DELTA_GAIN_LB,
+  MAX_DELTA_LOSE_PCT,
+  MAX_DELTA_GAIN_PCT,
+  MAINTAIN_RECOMP_PCT,
+  MAINTAIN_RECOMP_ABS_CAP_LB,
+  kgToLb,
+  lbToKg,
+} from '@/lib/domain/weight-constants';
+
 export type GoalType = 'lose' | 'gain' | 'maintain' | 'recomp';
 export type WeightUnit = 'lbs' | 'kg';
 
-// Constants for validation rules
-const RECOMP_PCT = 0.02;
-const RECOMP_ABS_CAP_LB = 5;
-const MAINTAIN_PCT = 0.02;
-const MAINTAIN_ABS_CAP_LB = 5;
-const MIN_DELTA_LOSE_LB = 1;
-const MIN_DELTA_GAIN_LB = 1;
-const MAX_DELTA_LOSE_PCT = 0.35;
-const MAX_DELTA_GAIN_PCT = 0.35;
-
-// DB constraints (in lb)
-const MIN_WEIGHT_LB = 45;
-const MAX_WEIGHT_LB = 880;
-
-// Conversion factor (as specified)
-const KG_TO_LB = 2.2046226218;
-
-// Derived kg constraints
-const MIN_WEIGHT_KG = MIN_WEIGHT_LB / KG_TO_LB; // ~20.4kg
-const MAX_WEIGHT_KG = MAX_WEIGHT_LB / KG_TO_LB; // ~399.2kg
-
-/**
- * Convert kilograms to pounds
- */
-function kgToLb(kg: number): number {
-  return kg * KG_TO_LB;
-}
-
-/**
- * Convert pounds to kilograms
- */
-function lbToKg(lb: number): number {
-  return lb / KG_TO_LB;
-}
+// Weight constraints from constraints.ts (single source of truth)
+const MIN_WEIGHT_LB = PROFILES.WEIGHT_LB.MIN;
+const MAX_WEIGHT_LB = PROFILES.WEIGHT_LB.MAX;
+const MIN_WEIGHT_KG = DERIVED.WEIGHT_KG.MIN;
+const MAX_WEIGHT_KG = DERIVED.WEIGHT_KG.MAX;
 
 /**
  * Round to 1 decimal place
@@ -83,8 +66,8 @@ export function getGoalWeightRange(params: {
     }
 
     case 'maintain': {
-      const deltaByPct = currentWeightLb * MAINTAIN_PCT;
-      const delta = Math.min(deltaByPct, MAINTAIN_ABS_CAP_LB);
+      const deltaByPct = currentWeightLb * MAINTAIN_RECOMP_PCT;
+      const delta = Math.min(deltaByPct, MAINTAIN_RECOMP_ABS_CAP_LB);
       const allowedMin = currentWeightLb - delta;
       const allowedMax = currentWeightLb + delta;
       return {
@@ -96,8 +79,8 @@ export function getGoalWeightRange(params: {
     }
 
     case 'recomp': {
-      const deltaByPct = currentWeightLb * RECOMP_PCT;
-      const delta = Math.min(deltaByPct, RECOMP_ABS_CAP_LB);
+      const deltaByPct = currentWeightLb * MAINTAIN_RECOMP_PCT;
+      const delta = Math.min(deltaByPct, MAINTAIN_RECOMP_ABS_CAP_LB);
       const allowedMin = currentWeightLb - delta;
       const allowedMax = currentWeightLb + delta;
       return {
@@ -177,7 +160,6 @@ export function validateGoalWeight(params: {
         return {
           ok: false,
           i18nKey: 'onboarding.goal_weight.goal_weight_error_lose_min_delta',
-          i18nParams: { minDelta: 1 },
         };
       }
 
@@ -210,15 +192,24 @@ export function validateGoalWeight(params: {
         return {
           ok: false,
           i18nKey: 'onboarding.goal_weight.goal_weight_error_gain_min_delta',
-          i18nParams: { minDelta: 1 },
+          i18nParams: { minDelta: MIN_DELTA_GAIN_LB },
         };
       }
 
       // THIRD: Check if target is too aggressive (maximum delta violation)
       if (targetLb > allowedMax) {
+        // Calculate milestone: currentWeight * (1 + MAX_DELTA_GAIN_PCT)
+        const milestoneLb = currentWeightLb * (1 + MAX_DELTA_GAIN_PCT);
+        const milestoneValue = weightUnit === 'kg' ? roundTo1(lbToKg(milestoneLb)) : roundTo1(milestoneLb);
+        const unitLabel = weightUnit === 'kg' ? 'kg' : 'lb';
+        
         return {
           ok: false,
           i18nKey: 'onboarding.goal_weight.goal_weight_error_gain_too_aggressive',
+          i18nParams: {
+            milestone: milestoneValue,
+            unit: unitLabel,
+          },
         };
       }
 
@@ -227,8 +218,8 @@ export function validateGoalWeight(params: {
 
     case 'maintain': {
       // Rule: target should be approximately current weight
-      const deltaByPct = currentWeightLb * MAINTAIN_PCT;
-      const delta = Math.min(deltaByPct, MAINTAIN_ABS_CAP_LB);
+      const deltaByPct = currentWeightLb * MAINTAIN_RECOMP_PCT;
+      const delta = Math.min(deltaByPct, MAINTAIN_RECOMP_ABS_CAP_LB);
       const allowedMin = currentWeightLb - delta;
       const allowedMax = currentWeightLb + delta;
 
@@ -248,8 +239,8 @@ export function validateGoalWeight(params: {
 
     case 'recomp': {
       // Rule: same as maintain but with recomp wording
-      const deltaByPct = currentWeightLb * RECOMP_PCT;
-      const delta = Math.min(deltaByPct, RECOMP_ABS_CAP_LB);
+      const deltaByPct = currentWeightLb * MAINTAIN_RECOMP_PCT;
+      const delta = Math.min(deltaByPct, MAINTAIN_RECOMP_ABS_CAP_LB);
       const allowedMin = currentWeightLb - delta;
       const allowedMax = currentWeightLb + delta;
 

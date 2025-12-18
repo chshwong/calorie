@@ -365,7 +365,9 @@
       "goal_weight_error_maintain_range_lb": "Maintenir signifie garder le poids stable. Choisis un poids cible à ±{{delta}} lb de ton poids actuel.",
       "goal_weight_error_maintain_range_kg": "Maintenir signifie garder le poids stable. Choisis un poids cible à ±{{delta}} kg de ton poids actuel.",
       "goal_weight_error_recomp_range_lb": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} lb de ton poids actuel.",
-      "goal_weight_error_recomp_range_kg": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} kg de ton poids actuel."
+      "goal_weight_error_recomp_range_kg": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} kg de ton poids actuel.",
+      "suggested_placeholder": "Selon ton objectif, nous suggérons : {{weight}} {{unit}}",
+      "suggestion_unavailable": "Selon tes statistiques actuelles, nous ne pouvons pas suggérer un poids cible sûr pour cet objectif. Envisage de choisir un autre objectif."
     },
     "timeline": {
       "title": "Quand souhaitez-vous atteindre cet objectif?",

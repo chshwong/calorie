@@ -227,6 +227,11 @@ export default function OnboardingScreen() {
         goalWeightKg={goalWeightKg}
         goalWeightLb={goalWeightLb}
         currentWeightUnit={currentWeightUnit}
+        goalType={goal}
+        currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
+        heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
+        sexAtBirth={sex}
+        dobISO={dateOfBirthStep2 || null}
         onGoalWeightKgChange={(text) => {
           setGoalWeightKg(text);
           clearErrors();

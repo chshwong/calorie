@@ -352,7 +352,7 @@
     },
     "goal_weight": {
       "title": "What's your goal weight?",
-      "subtitle": "We'll use this with your timeline to set safe, realistic targets.",
+      "subtitle": "Knowing your destination helps us keep you on a safe and steady path.",
       "weight_label": "Goal Weight",
       "weight_kg_placeholder": "35-250",
       "weight_lb_placeholder": "77-550",
@@ -367,15 +367,17 @@
       "goal_weight_error_range_kg": "Target weight must be between {{minKg}} kg and {{maxKg}} kg.",
       "goal_weight_error_range_lb": "Target weight must be between {{minLb}} lbs and {{maxLb}} lbs.",
       "goal_weight_error_lose_not_lower": "For a weight loss goal, your target weight must be lower than your current weight.",
-      "goal_weight_error_lose_min_delta": "For a weight loss goal, choose a target at least {{minDelta}} lb below your current weight.",
-      "goal_weight_error_lose_too_aggressive": "That target is too aggressive. Choose a weight closer to your current weight.",
+      "goal_weight_error_lose_min_delta": "For a weight loss goal, choose a lower target weight.",
+      "goal_weight_error_lose_too_aggressive": "We love that ambition! To make sure you have the energy to smash your workouts safely, we recommend a goal weight of at least half your current weight.",
       "goal_weight_error_gain_not_higher": "For a weight gain goal, your target weight must be above your current weight.",
       "goal_weight_error_gain_min_delta": "For a weight gain goal, choose a target at least {{minDelta}} lb above your current weight.",
-      "goal_weight_error_gain_too_aggressive": "That target is too aggressive. Choose a weight closer to your current weight.",
+      "goal_weight_error_gain_too_aggressive": "That's an amazing goal! To make sure your progress is steady and healthy, let's start with an initial milestone of {{milestone}} {{unit}} or less. We can set your next big target once you smash this one!",
       "goal_weight_error_maintain_range_lb": "Maintain is meant to keep weight steady. Choose a target within ±{{delta}} lbs of your current weight.",
       "goal_weight_error_maintain_range_kg": "Maintain is meant to keep weight steady. Choose a target within ±{{delta}} kg of your current weight.",
       "goal_weight_error_recomp_range_lb": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} lbs of your current weight.",
-      "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight."
+      "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight.",
+      "suggested_placeholder": "Based on your goal, we suggest: {{weight}} {{unit}}",
+      "suggestion_unavailable": "Based on your current stats, we can't suggest a safe target weight for this goal. Consider choosing a different goal."
     },
     "timeline": {
       "title": "When do you want to reach this goal?",

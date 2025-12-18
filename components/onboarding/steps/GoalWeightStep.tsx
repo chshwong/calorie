@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, TextInput, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -8,11 +8,19 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Semant
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { filterNumericInput } from '@/utils/inputFilters';
 import { getInputAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { getSuggestedTargetWeightLb, type GoalType } from '@/lib/onboarding/goal-weight-rules';
+import { lbToKg } from '@/lib/domain/weight-constants';
+import { roundTo1 } from '@/utils/bodyMetrics';
 
 interface GoalWeightStepProps {
   goalWeightKg: string;
   goalWeightLb: string;
   currentWeightUnit: 'kg' | 'lb';
+  goalType: GoalType | null;
+  currentWeightLb: number | null;
+  heightCm: number | null;
+  sexAtBirth: string | null;
+  dobISO: string | null;
   onGoalWeightKgChange: (text: string) => void;
   onGoalWeightLbChange: (text: string) => void;
   onErrorClear: () => void;
@@ -41,6 +49,11 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
   goalWeightKg,
   goalWeightLb,
   currentWeightUnit,
+  goalType,
+  currentWeightLb,
+  heightCm,
+  sexAtBirth,
+  dobISO,
   onGoalWeightKgChange,
   onGoalWeightLbChange,
   onErrorClear,
@@ -51,9 +64,61 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
 }) => {
   const { t } = useTranslation();
   
-  // Placeholder examples
-  const weightKgPlaceholder = '(e.g., 79)';
-  const weightLbPlaceholder = '(e.g., 175)';
+  // Compute placeholder based on goal type and suggestion engine
+  const placeholder = useMemo(() => {
+    // If goalType is maintain or recomp, use current weight
+    if (goalType === 'maintain' || goalType === 'recomp') {
+      if (currentWeightLb === null) {
+        // Fallback if current weight not available
+        return currentWeightUnit === 'kg' ? '(e.g., 79)' : '(e.g., 175)';
+      }
+      
+      const currentWeight = currentWeightUnit === 'kg' 
+        ? roundTo1(lbToKg(currentWeightLb))
+        : roundTo1(currentWeightLb);
+      
+      return currentWeight.toString();
+    }
+    
+    // For lose/gain, use suggestion engine
+    if (goalType === 'lose' || goalType === 'gain') {
+      if (currentWeightLb === null) {
+        // Fallback if current weight not available
+        return currentWeightUnit === 'kg' ? '(e.g., 79)' : '(e.g., 175)';
+      }
+      
+      const suggestionResult = getSuggestedTargetWeightLb({
+        goalType,
+        currentWeightLb,
+        heightCm,
+        sexAtBirth,
+        dobISO,
+      });
+      
+      if (suggestionResult.ok) {
+        // Format suggested weight in user's selected unit
+        const suggestedWeight = currentWeightUnit === 'kg'
+          ? roundTo1(lbToKg(suggestionResult.suggestedLb))
+          : roundTo1(suggestionResult.suggestedLb);
+        
+        const unit = currentWeightUnit === 'kg' ? 'kg' : 'lb';
+        
+        // Use i18n for placeholder - ensure it's a string
+        const placeholderText = t('onboarding.goal_weight.suggested_placeholder', {
+          weight: suggestedWeight.toString(),
+          unit,
+        });
+        return typeof placeholderText === 'string' ? placeholderText : String(placeholderText);
+      } else {
+        // If suggestion unavailable, use i18n message (no number shown)
+        const placeholderText = t(suggestionResult.messageKey, suggestionResult.messageParams || {});
+        return typeof placeholderText === 'string' ? placeholderText : String(placeholderText);
+      }
+    }
+    
+    // Fallback for unknown goal type
+    return currentWeightUnit === 'kg' ? '(e.g., 79)' : '(e.g., 175)';
+  }, [goalType, currentWeightLb, heightCm, sexAtBirth, dobISO, currentWeightUnit, t]);
   
   return (
     <View style={styles.stepContentAnimated}>
@@ -61,8 +126,8 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
       <View style={styles.stepIllustration}>
         <View
           style={{
-            width: 172,
-            height: 172,
+            width: 172, // Illustration-specific size - not a theme token
+            height: 172, // Illustration-specific size - not a theme token
             borderRadius: BorderRadius['3xl'],
             alignItems: 'center',
             justifyContent: 'center',
@@ -72,11 +137,11 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
         >
           <View
             style={{
-              width: 148,
-              height: 148,
+              width: 148, // Illustration-specific size - not a theme token
+              height: 148, // Illustration-specific size - not a theme token
               borderRadius: BorderRadius['3xl'],
               backgroundColor: Colors.light.background,
-              borderWidth: 2,
+              borderWidth: Spacing.xs, // Using theme token for border width
               borderColor: `${onboardingColors.primary}50`,
               alignItems: 'center',
               justifyContent: 'center',
@@ -86,11 +151,8 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
             {/* Flag icon - representing goal */}
             <MaterialCommunityIcons
               name="flag"
-              size={100}
+              size={100} // Icon size - consistent across onboarding illustrations
               color={onboardingColors.primary}
-              style={{
-                position: 'absolute',
-              }}
             />
           </View>
         </View>
@@ -118,7 +180,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder={weightKgPlaceholder}
+              placeholder={placeholder}
               placeholderTextColor={colors.textSecondary}
               value={goalWeightKg}
               onChangeText={(text) => {
@@ -129,7 +191,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               editable={!loading}
               {...getInputAccessibilityProps(
                 t('onboarding.goal_weight.accessibility_label_kg'),
-                weightKgPlaceholder,
+                placeholder,
                 error && !goalWeightKg ? error : undefined,
                 true
               )}
@@ -145,7 +207,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder={weightLbPlaceholder}
+              placeholder={placeholder}
               placeholderTextColor={colors.textSecondary}
               value={goalWeightLb}
               onChangeText={(text) => {
@@ -156,7 +218,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               editable={!loading}
               {...getInputAccessibilityProps(
                 t('onboarding.goal_weight.accessibility_label_lb'),
-                weightLbPlaceholder,
+                placeholder,
                 error && !goalWeightLb ? error : undefined,
                 true
               )}
@@ -223,7 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     fontSize: FontSize.md,
-    minHeight: 52,
+    minHeight: Spacing['5xl'] + Spacing.xs, // 48 + 4 = 52px - using theme tokens
     width: '100%',
     maxWidth: '100%',
     ...Platform.select({
@@ -238,7 +300,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: Spacing.lg,
     top: '50%',
-    transform: [{ translateY: -10 }],
+    transform: [{ translateY: -Spacing.sm }], // Using theme token instead of hardcoded -10
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
   },

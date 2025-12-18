@@ -1,9 +1,10 @@
 // src/constants/constraints.ts
 
+import { DB_MIN_WEIGHT_LB, DB_MAX_WEIGHT_LB, LB_PER_KG, lbToKg } from '@/lib/domain/weight-constants';
 
 // truth in code
 export const PROFILES = {
-    WEIGHT_LB: { MIN: 45, MAX: 880 },     // DB: profiles_weight_lb_check, NOT NULL
+    WEIGHT_LB: { MIN: DB_MIN_WEIGHT_LB, MAX: DB_MAX_WEIGHT_LB },     // DB: profiles_weight_lb_check, NOT NULL
     HEIGHT_CM: { MIN: 50, MAX: 260 },     // DB: profiles_height_cm_check, NOT NULL
     BODY_FAT_PERCENT: { MIN_EXCLUSIVE: 2, MAX: 80 }, // DB: profiles_body_fat_percent_range (nullable)
     WATER_GOAL_ML: { MIN: 500, MAX: 5000 }, // DB: water_goal_ml_range (nullable)
@@ -15,11 +16,11 @@ export const PROFILES = {
 //     BODY_FAT_PERCENT: { MIN_EXCLUSIVE: 0, MAX: 80 }, // DB: profiles_body_fat_percent_range (nullable)
 //     WATER_GOAL_ML: { MIN: 500, MAX: 5000 }, // DB: water_goal_ml_range (nullable)
 //   } as const;
-  // Optional: derived ranges (always derive from the LB constraint so it can’t drift)
+  // Optional: derived ranges (always derive from the LB constraint so it can't drift)
   export const DERIVED = {
     WEIGHT_KG: {
-      MIN: PROFILES.WEIGHT_LB.MIN / 2.2046226218,
-      MAX: PROFILES.WEIGHT_LB.MAX / 2.2046226218,
+      MIN: lbToKg(DB_MIN_WEIGHT_LB),
+      MAX: lbToKg(DB_MAX_WEIGHT_LB),
     },
   } as const;
   
