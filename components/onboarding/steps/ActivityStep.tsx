@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedText } from '@/components/themed-text';
+import { Text } from '@/components/ui/text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, LineHeight } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 
@@ -20,96 +22,33 @@ const ActivityIllustration = () => (
     style={{
       width: 172,
       height: 172,
-      borderRadius: 28,
+      borderRadius: BorderRadius['3xl'],
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: `${onboardingColors.primary}0F`,
-      shadowColor: '#000',
-      shadowOpacity: Platform.OS === 'web' ? 0 : 0.08,
-      shadowOffset: { width: 0, height: 8 },
-      shadowRadius: 16,
-      elevation: 4,
+      ...Shadows.md,
     }}
   >
     <View
       style={{
         width: 148,
         height: 148,
-        borderRadius: 24,
-        backgroundColor: '#fff',
+        borderRadius: BorderRadius['3xl'],
+        backgroundColor: Colors.light.background,
         borderWidth: 2,
         borderColor: `${onboardingColors.primary}50`,
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
-      {/* Head */}
-      <View
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: 13,
-          backgroundColor: onboardingColors.primary,
-          marginBottom: 6,
-        }}
-      />
-      {/* Torso */}
-      <View
-        style={{
-          width: 10,
-          height: 40,
-          borderRadius: 8,
-          backgroundColor: onboardingColors.primary,
-          transform: [{ rotate: '-5deg' }],
-        }}
-      />
-      {/* Arms */}
-      <View
+      {/* Running icon from MaterialCommunityIcons - solid fill */}
+      <MaterialCommunityIcons
+        name="run-fast"
+        size={100}
+        color={onboardingColors.primary}
         style={{
           position: 'absolute',
-          top: 70,
-          width: 60,
-          height: 10,
-          borderRadius: 8,
-          backgroundColor: `${onboardingColors.primary}90`,
-          transform: [{ rotate: '-20deg' }],
-        }}
-      />
-      {/* Front Leg */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 34,
-          left: 70,
-          width: 14,
-          height: 54,
-          borderRadius: 10,
-          backgroundColor: onboardingColors.primary,
-          transform: [{ rotate: 22 }],
-        }}
-      />
-      {/* Back Leg */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 28,
-          right: 66,
-          width: 12,
-          height: 46,
-          borderRadius: 10,
-          backgroundColor: `${onboardingColors.primary}70`,
-          transform: [{ rotate: -18 }],
-        }}
-      />
-      {/* Ground */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 18,
-          width: 96,
-          height: 8,
-          borderRadius: 6,
-          backgroundColor: `${onboardingColors.primary}12`,
         }}
       />
     </View>
@@ -128,7 +67,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
   
   return (
     <View style={styles.stepContentAnimated}>
-      {/* SVG Illustration */}
+      {/* Illustration */}
       <View style={styles.stepIllustration}>
         <ActivityIllustration />
       </View>
@@ -152,53 +91,35 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
           const selected = activityLevel === activity.value;
           const pressed = pressedCard === activity.value;
           
+          // Compute shadow styles based on selection state
+          const shadowStyle = !selected 
+            ? (Platform.OS === 'web' 
+                ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' as const, transition: 'all 0.2s ease' as const }
+                : Shadows.sm)
+            : (Platform.OS === 'web'
+                ? { 
+                    background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})` as const,
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' as const,
+                    transition: 'all 0.2s ease' as const,
+                  }
+                : { backgroundColor: onboardingColors.primary, ...Shadows.lg });
+          
           return (
             <TouchableOpacity
               key={activity.value}
               style={[
                 styles.goalCard,
                 {
-                  borderColor: selected ? 'transparent' : colors.border,
+                  borderColor: selected ? Colors.light.background : colors.border,
                   backgroundColor: selected ? undefined : colors.background,
                   borderWidth: selected ? 0 : 1,
-                  borderRadius: 16,
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
+                  borderRadius: BorderRadius.xl,
+                  paddingVertical: Spacing.md,
+                  paddingHorizontal: Spacing.lg,
                   transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
                   opacity: pressed ? 0.96 : 1,
                 },
-                !selected && {
-                  ...Platform.select({
-                    web: {
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      transition: 'all 0.2s ease',
-                    },
-                    default: {
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 3,
-                      elevation: 2,
-                    },
-                  }),
-                },
-                selected && {
-                  ...Platform.select({
-                    web: {
-                      background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                      transition: 'all 0.2s ease',
-                    },
-                    default: {
-                      backgroundColor: onboardingColors.primary,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 12,
-                      elevation: 4,
-                    },
-                  }),
-                },
+                shadowStyle,
                 Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
               ]}
               onPress={() => {
@@ -216,17 +137,23 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
               accessibilityRole="radio"
               accessibilityState={{ selected }}
             >
-              <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
-                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
+              <View style={{ flex: 1, paddingRight: selected ? Spacing['4xl'] : 0 }}>
+                <Text 
+                  variant="h4" 
+                  style={[styles.goalCardTitle, { color: selected ? Colors.light.textInverse : colors.text }]}
+                >
                   {t(activity.labelKey)}
                 </Text>
-                <Text style={[styles.goalCardDescription, { color: selected ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
+                <Text 
+                  variant="body" 
+                  style={[styles.goalCardDescription, { color: selected ? Colors.light.textInverse : colors.textSecondary, opacity: selected ? 0.9 : 1 }]}
+                >
                   {t(activity.descriptionKey)}
                 </Text>
               </View>
               {selected && (
                 <View style={styles.goalCardCheckmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                  <IconSymbol name="checkmark.circle.fill" size={Spacing['2xl']} color={Colors.light.textInverse} />
                 </View>
               )}
             </TouchableOpacity>
@@ -239,15 +166,15 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
 
 const styles = StyleSheet.create({
   stepContentAnimated: {
-    gap: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
+    gap: Spacing.xl,
+    paddingTop: Spacing['2xl'],
+    paddingBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.xl,
     ...Platform.select({
       web: {
         animation: 'fadeUp 0.3s ease',
         '@keyframes fadeUp': {
-          from: { opacity: 0, transform: 'translateY(12px)' },
+          from: { opacity: 0, transform: `translateY(${Spacing.md}px)` },
           to: { opacity: 1, transform: 'translateY(0)' },
         },
       },
@@ -258,27 +185,27 @@ const styles = StyleSheet.create({
   },
   stepIllustration: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   stepTitleModern: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: FontSize['2xl'],
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   stepSubtitleModern: {
-    fontSize: 16,
-    marginBottom: 24,
+    fontSize: FontSize.md,
+    marginBottom: Spacing['2xl'],
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: FontSize.md * LineHeight.normal,
   },
   goalContainer: {
-    gap: 12,
-    marginTop: 8,
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
   },
   goalCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.xl,
     borderWidth: 2,
     position: 'relative',
     minHeight: 80,
@@ -291,18 +218,17 @@ const styles = StyleSheet.create({
     }),
   },
   goalCardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.xs,
   },
   goalCardDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: FontSize.base,
+    lineHeight: FontSize.base * LineHeight.normal,
   },
   goalCardCheckmark: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: Spacing.lg,
+    right: Spacing.lg,
   },
 });
-

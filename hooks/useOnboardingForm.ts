@@ -226,6 +226,16 @@ export function useOnboardingForm() {
     }
   }, [profile]);
   
+  // Prefill goal from profile if available
+  useEffect(() => {
+    if (profile?.goal_type && !goal) {
+      const validGoalTypes = ['lose', 'maintain', 'gain', 'recomp'];
+      if (validGoalTypes.includes(profile.goal_type)) {
+        setGoal(profile.goal_type as GoalType);
+      }
+    }
+  }, [profile]);
+  
   // Conversion helper function for validation
   const getHeightInCm = (): number | null => {
     return convertHeightToCm(heightUnit, heightCm, heightFt, heightIn);
@@ -234,15 +244,27 @@ export function useOnboardingForm() {
   // Unit conversion-aware setters
   const setWeightUnit = (unit: 'kg' | 'lb') => {
     setCurrentWeightUnit(unit);
+    // Sync goalWeightUnit with currentWeightUnit since GoalWeightStep uses the same unit preference
+    setGoalWeightUnit(unit);
     if (unit === 'kg') {
       if (currentWeightLb) {
         const kg = roundTo1(lbToKg(parseFloat(currentWeightLb)));
         setCurrentWeightKg(kg.toString());
       }
+      // Also convert goal weight if needed
+      if (goalWeightLb) {
+        const kg = roundTo1(lbToKg(parseFloat(goalWeightLb)));
+        setGoalWeightKg(kg.toString());
+      }
     } else {
       if (currentWeightKg) {
         const lbs = roundTo1(kgToLb(parseFloat(currentWeightKg)));
         setCurrentWeightLb(lbs.toString());
+      }
+      // Also convert goal weight if needed
+      if (goalWeightKg) {
+        const lbs = roundTo1(kgToLb(parseFloat(goalWeightKg)));
+        setGoalWeightLb(lbs.toString());
       }
     }
     clearErrors();
@@ -904,13 +926,13 @@ export function useOnboardingForm() {
       } else {
         const lbs = parseFloat(currentWeightLb);
         if (isNaN(lbs) || lbs <= 0) return true;
-        const kgValue = lbToKg(lbs);
-        return kgValue < DERIVED.WEIGHT_KG.MIN || kgValue > DERIVED.WEIGHT_KG.MAX;
+        // Compare pounds directly against PROFILES.WEIGHT_LB to avoid floating-point conversion errors
+        return lbs < PROFILES.WEIGHT_LB.MIN || lbs > PROFILES.WEIGHT_LB.MAX;
       }
 
       if (currentBodyFatPercent) {
         const bf = parseFloat(currentBodyFatPercent);
-        if (isNaN(bf) || bf <= 0 || bf > 80) return true;
+        if (isNaN(bf) || bf <= 0 || bf > PROFILES.BODY_FAT_PERCENT.MAX) return true;
       }
     } else if (currentStep === 6) {
       return !goal;
@@ -922,8 +944,8 @@ export function useOnboardingForm() {
       } else {
         const lbs = parseFloat(goalWeightLb);
         if (isNaN(lbs) || lbs <= 0) return true;
-        const kgValue = lbToKg(lbs);
-        return kgValue < DERIVED.WEIGHT_KG.MIN || kgValue > DERIVED.WEIGHT_KG.MAX;
+        // Compare pounds directly against PROFILES.WEIGHT_LB to avoid floating-point conversion errors
+        return lbs < PROFILES.WEIGHT_LB.MIN || lbs > PROFILES.WEIGHT_LB.MAX;
       }
     } else if (currentStep === 8) {
       return !timelineOption || (timelineOption === 'custom_date' && !customTargetDate);

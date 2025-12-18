@@ -1,25 +1,23 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React from 'react';
+import { View, TextInput, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Text } from '@/components/ui/text';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, SemanticColors, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
-import { kgToLb, lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { filterNumericInput } from '@/utils/inputFilters';
-import { getInputAccessibilityProps, getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { getInputAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 
 interface GoalWeightStepProps {
   goalWeightKg: string;
   goalWeightLb: string;
-  goalWeightUnit: 'kg' | 'lb';
+  currentWeightUnit: 'kg' | 'lb';
   onGoalWeightKgChange: (text: string) => void;
   onGoalWeightLbChange: (text: string) => void;
-  onGoalWeightUnitChange: (unit: 'kg' | 'lb') => void;
   onErrorClear: () => void;
   error: string | null;
   errorKey: string | null;
-  errorParams: Record<string, any> | undefined;
   loading: boolean;
   colors: typeof Colors.light;
 }
@@ -42,56 +40,60 @@ const limitWeightInput = (text: string): string => {
 export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
   goalWeightKg,
   goalWeightLb,
-  goalWeightUnit,
+  currentWeightUnit,
   onGoalWeightKgChange,
   onGoalWeightLbChange,
-  onGoalWeightUnitChange,
   onErrorClear,
   error,
   errorKey,
-  errorParams,
   loading,
   colors,
 }) => {
   const { t } = useTranslation();
   
-  const isSelected = (value: string) => goalWeightUnit === value;
-  
-  const handleUnitChange = (unit: 'kg' | 'lb') => {
-    if (unit === 'kg') {
-      onGoalWeightUnitChange('kg');
-      if (goalWeightLb) {
-        const kg = roundTo1(lbToKg(parseFloat(goalWeightLb)));
-        onGoalWeightKgChange(kg.toString());
-      }
-    } else {
-      onGoalWeightUnitChange('lb');
-      if (goalWeightKg) {
-        const lbs = roundTo1(kgToLb(parseFloat(goalWeightKg)));
-        onGoalWeightLbChange(lbs.toString());
-      }
-    }
-    onErrorClear();
-  };
+  // Placeholder examples
+  const weightKgPlaceholder = '(e.g., 79)';
+  const weightLbPlaceholder = '(e.g., 175)';
   
   return (
     <View style={styles.stepContentAnimated}>
-      {/* SVG Illustration */}
+      {/* Illustration */}
       <View style={styles.stepIllustration}>
-        {Platform.OS === 'web' ? (
+        <View
+          style={{
+            width: 172,
+            height: 172,
+            borderRadius: BorderRadius['3xl'],
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: `${onboardingColors.primary}0F`,
+            ...Shadows.md,
+          }}
+        >
           <View
             style={{
-              width: 48,
-              height: 48,
+              width: 148,
+              height: 148,
+              borderRadius: BorderRadius['3xl'],
+              backgroundColor: Colors.light.background,
+              borderWidth: 2,
+              borderColor: `${onboardingColors.primary}50`,
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
             }}
-            // @ts-ignore - web-specific prop
-            dangerouslySetInnerHTML={{
-              __html: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="${onboardingColors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
-            }}
-          />
-        ) : (
-          <IconSymbol name="target" size={48} color={onboardingColors.primary} />
-        )}
+          >
+            {/* Flag icon - representing goal */}
+            <MaterialCommunityIcons
+              name="flag"
+              size={100}
+              color={onboardingColors.primary}
+              style={{
+                position: 'absolute',
+              }}
+            />
+          </View>
+        </View>
       </View>
       
       {/* Title */}
@@ -102,79 +104,21 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
         {t('onboarding.goal_weight.subtitle')}
       </ThemedText>
       
-      {/* Unit Toggle - Modern Pill Style */}
-      <View style={styles.unitToggleModern}>
-        {[
-          { value: 'kg', label: 'kg' },
-          { value: 'lb', label: 'lbs' },
-        ].map((unitOption) => {
-          const selected = isSelected(unitOption.value);
-          
-          return (
-            <TouchableOpacity
-              key={unitOption.value}
-              style={[
-                styles.unitPill,
-                selected ? styles.unitPillSelected : styles.unitPillUnselected,
-                {
-                  transform: [{ scale: selected ? 1.02 : 1 }],
-                },
-                selected && {
-                  ...Platform.select({
-                    web: {
-                      background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
-                      boxShadow: `0 4px 12px ${onboardingColors.primary}40`,
-                    },
-                    default: {
-                      backgroundColor: onboardingColors.primary,
-                    },
-                  }),
-                },
-                Platform.select({
-                  web: {
-                    transition: 'all 0.2s ease',
-                  },
-                  default: {},
-                }),
-              ]}
-              onPress={() => handleUnitChange(unitOption.value as 'kg' | 'lb')}
-              disabled={loading}
-              {...getButtonAccessibilityProps(
-                `${unitOption.label}${selected ? ' selected' : ''}`,
-                `Double tap to select ${unitOption.label}`,
-                loading
-              )}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-            >
-              <Text
-                style={[
-                  styles.unitPillText,
-                  { color: selected ? '#FFFFFF' : onboardingColors.primary },
-                ]}
-              >
-                {unitOption.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      
       {/* Weight Input */}
       <View style={styles.heightInputContainer}>
         <View style={styles.inputWrapper}>
-          {goalWeightUnit === 'kg' ? (
+          {currentWeightUnit === 'kg' ? (
             <TextInput
               style={[
                 styles.inputModern,
                 {
-                  borderColor: (error || errorKey) && !goalWeightKg ? '#EF4444' : '#E5E7EB',
+                  borderColor: (error || errorKey) && !goalWeightKg ? SemanticColors.error : colors.border,
                   color: colors.text,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: Colors.light.background,
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder={t('onboarding.goal_weight.weight_kg_placeholder')}
+              placeholder={weightKgPlaceholder}
               placeholderTextColor={colors.textSecondary}
               value={goalWeightKg}
               onChangeText={(text) => {
@@ -184,8 +128,8 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               keyboardType="numeric"
               editable={!loading}
               {...getInputAccessibilityProps(
-                'Goal weight in kilograms',
-                t('onboarding.goal_weight.weight_kg_placeholder'),
+                t('onboarding.goal_weight.accessibility_label_kg'),
+                weightKgPlaceholder,
                 error && !goalWeightKg ? error : undefined,
                 true
               )}
@@ -195,13 +139,13 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               style={[
                 styles.inputModern,
                 {
-                  borderColor: (error || errorKey) && !goalWeightLb ? '#EF4444' : '#E5E7EB',
+                  borderColor: (error || errorKey) && !goalWeightLb ? SemanticColors.error : colors.border,
                   color: colors.text,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: Colors.light.background,
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder={t('onboarding.goal_weight.weight_lb_placeholder')}
+              placeholder={weightLbPlaceholder}
               placeholderTextColor={colors.textSecondary}
               value={goalWeightLb}
               onChangeText={(text) => {
@@ -211,15 +155,15 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               keyboardType="numeric"
               editable={!loading}
               {...getInputAccessibilityProps(
-                'Goal weight in pounds',
-                t('onboarding.goal_weight.weight_lb_placeholder'),
+                t('onboarding.goal_weight.accessibility_label_lb'),
+                weightLbPlaceholder,
                 error && !goalWeightLb ? error : undefined,
                 true
               )}
             />
           )}
-          <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>
-            {goalWeightUnit}
+          <Text variant="label" style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>
+            {currentWeightUnit}
           </Text>
         </View>
       </View>
@@ -229,15 +173,15 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
 
 const styles = StyleSheet.create({
   stepContentAnimated: {
-    gap: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
+    gap: Spacing.xl,
+    paddingTop: Spacing['2xl'],
+    paddingBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.xl,
     ...Platform.select({
       web: {
         animation: 'fadeUp 0.3s ease',
         '@keyframes fadeUp': {
-          from: { opacity: 0, transform: 'translateY(12px)' },
+          from: { opacity: 0, transform: `translateY(${Spacing.md}px)` },
           to: { opacity: 1, transform: 'translateY(0)' },
         },
       },
@@ -248,56 +192,23 @@ const styles = StyleSheet.create({
   },
   stepIllustration: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   stepTitleModern: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: FontSize['2xl'],
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   stepSubtitleModern: {
-    fontSize: 16,
-    marginBottom: 24,
+    fontSize: FontSize.md,
+    marginBottom: Spacing['2xl'],
     textAlign: 'center',
-    lineHeight: 22,
-  },
-  unitToggleModern: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  unitPill: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 9999,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 100,
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-      },
-      default: {},
-    }),
-  },
-  unitPillSelected: {
-    borderWidth: 0,
-  },
-  unitPillUnselected: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
-  },
-  unitPillText: {
-    fontSize: 15,
-    fontWeight: '600',
+    lineHeight: FontSize.md * LineHeight.normal,
   },
   heightInputContainer: {
-    marginTop: 12,
-    gap: 12,
+    marginTop: Spacing.md,
+    gap: Spacing.md,
     width: '100%',
     maxWidth: '100%',
   },
@@ -309,9 +220,9 @@ const styles = StyleSheet.create({
   },
   inputModern: {
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    fontSize: FontSize.md,
     minHeight: 52,
     width: '100%',
     maxWidth: '100%',
@@ -325,11 +236,11 @@ const styles = StyleSheet.create({
   },
   inputUnitLabel: {
     position: 'absolute',
-    right: 16,
+    right: Spacing.lg,
     top: '50%',
     transform: [{ translateY: -10 }],
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
   },
 });
 

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React from 'react';
+import { View, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { Text } from '@/components/ui/text';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, LineHeight, SemanticColors } from '@/constants/theme';
+import { PROFILES, DERIVED } from '@/constants/constraints';
 import { onboardingColors } from '@/theme/onboardingTheme';
+import { validateBodyFatPercent } from '@/utils/validation';
 import { kgToLb, lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { filterNumericInput } from '@/utils/inputFilters';
 import { getInputAccessibilityProps, getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
@@ -61,6 +64,10 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
 }) => {
   const { t } = useTranslation();
   
+  // Placeholder examples
+  const weightKgPlaceholder = '(e.g., 79)';
+  const weightLbPlaceholder = '(e.g., 175)';
+  
   const isSelected = (value: string) => currentWeightUnit === value;
   
   const handleUnitChange = (unit: 'kg' | 'lb') => {
@@ -88,28 +95,24 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
           style={{
             width: 172,
             height: 172,
-            borderRadius: 28,
+            borderRadius: BorderRadius['3xl'],
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: `${onboardingColors.primary}0F`,
-            shadowColor: '#000',
-            shadowOpacity: Platform.OS === 'web' ? 0 : 0.08,
-            shadowOffset: { width: 0, height: 8 },
-            shadowRadius: 16,
-            elevation: 4,
+            ...Shadows.md,
           }}
         >
           <View
             style={{
               width: 148,
               height: 148,
-              borderRadius: 24,
-              backgroundColor: '#fff',
+              borderRadius: BorderRadius['3xl'],
+              backgroundColor: Colors.light.background,
               borderWidth: 2,
               borderColor: `${onboardingColors.primary}50`,
               alignItems: 'center',
               justifyContent: 'flex-start',
-              paddingTop: 18,
+              paddingTop: Spacing.lg,
               overflow: 'hidden',
             }}
           >
@@ -118,7 +121,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               style={{
                 width: 96,
                 height: 42,
-                borderRadius: 12,
+                borderRadius: BorderRadius.md,
                 backgroundColor: `${onboardingColors.primary}12`,
                 borderWidth: 2,
                 borderColor: `${onboardingColors.primary}50`,
@@ -130,10 +133,10 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
                 style={{
                   width: 70,
                   height: 6,
-                  borderRadius: 3,
+                  borderRadius: BorderRadius.sm,
                   backgroundColor: `${onboardingColors.primary}30`,
                   position: 'absolute',
-                  top: 10,
+                  top: Spacing.sm,
                 }}
               />
               <View
@@ -141,7 +144,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
                   width: 2,
                   height: 22,
                   backgroundColor: onboardingColors.primary,
-                  borderRadius: 2,
+                  borderRadius: BorderRadius.sm,
                   transform: [{ rotate: '-8deg' }],
                 }}
               />
@@ -153,7 +156,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 width: '72%',
-                marginTop: 22,
+                marginTop: Spacing.xl,
               }}
             >
               {[0, 1].map((i) => (
@@ -162,15 +165,11 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
                   style={{
                     width: 46,
                     height: 62,
-                    borderRadius: 18,
+                    borderRadius: BorderRadius['2xl'],
                     backgroundColor: `${onboardingColors.primary}14`,
                     borderWidth: 1.5,
                     borderColor: `${onboardingColors.primary}30`,
-                    shadowColor: '#000',
-                    shadowOpacity: Platform.OS === 'web' ? 0 : 0.05,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowRadius: 6,
-                    elevation: 2,
+                    ...Shadows.sm,
                   }}
                 />
               ))}
@@ -233,10 +232,8 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               accessibilityState={{ selected }}
             >
               <Text
-                style={[
-                  styles.unitPillText,
-                  { color: selected ? '#FFFFFF' : onboardingColors.primary },
-                ]}
+                variant="body"
+                style={{ color: selected ? Colors.light.textInverse : onboardingColors.primary }}
               >
                 {unitOption.label}
               </Text>
@@ -253,13 +250,13 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               style={[
                 styles.inputModern,
                 {
-                  borderColor: error && !currentWeightKg ? '#EF4444' : '#E5E7EB',
+                  borderColor: error && !currentWeightKg ? SemanticColors.error : colors.border,
                   color: colors.text,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: Colors.light.background,
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder={t('onboarding.current_weight.weight_kg_placeholder')}
+              placeholder={weightKgPlaceholder}
               placeholderTextColor={colors.textSecondary}
               value={currentWeightKg}
               onChangeText={(text) => {
@@ -270,7 +267,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               editable={!loading}
               {...getInputAccessibilityProps(
                 'Current weight in kilograms',
-                t('onboarding.current_weight.weight_kg_placeholder'),
+                weightKgPlaceholder,
                 error && !currentWeightKg ? error : undefined,
                 true
               )}
@@ -280,13 +277,13 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               style={[
                 styles.inputModern,
                 {
-                  borderColor: error && !currentWeightLb ? '#EF4444' : '#E5E7EB',
+                  borderColor: error && !currentWeightLb ? SemanticColors.error : colors.border,
                   color: colors.text,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: Colors.light.background,
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder={t('onboarding.current_weight.weight_lb_placeholder')}
+              placeholder={weightLbPlaceholder}
               placeholderTextColor={colors.textSecondary}
               value={currentWeightLb}
               onChangeText={(text) => {
@@ -297,21 +294,21 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               editable={!loading}
               {...getInputAccessibilityProps(
                 'Current weight in pounds',
-                t('onboarding.current_weight.weight_lb_placeholder'),
+                weightLbPlaceholder,
                 error && !currentWeightLb ? error : undefined,
                 true
               )}
             />
           )}
-          <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>
+          <Text variant="label" style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>
             {currentWeightUnit}
           </Text>
         </View>
 
         {/* Body Fat % (optional) */}
-        <View style={{ width: '100%', marginTop: 16 }}>
-          <ThemedText style={[styles.label, { color: colors.text, marginBottom: 8 }]}>
-            Body Fat % (optional)
+        <View style={{ width: '100%', marginTop: Spacing.lg }}>
+          <ThemedText style={[styles.label, { color: colors.text, marginBottom: Spacing.sm }]}>
+            {t('onboarding.current_weight.body_fat_label')}
           </ThemedText>
           <View style={styles.inputWrapper}>
             <TextInput
@@ -319,15 +316,15 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
                 styles.inputModern,
                 {
                   borderColor:
-                    error && currentBodyFatPercent && (parseFloat(currentBodyFatPercent) <= 0 || parseFloat(currentBodyFatPercent) > 80)
-                      ? '#EF4444'
-                      : '#E5E7EB',
+                    error && currentBodyFatPercent && validateBodyFatPercent(parseFloat(currentBodyFatPercent)) !== null
+                      ? SemanticColors.error
+                      : colors.border,
                   color: colors.text,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: Colors.light.background,
                 },
                 Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
               ]}
-              placeholder="Optional (e.g., 18.5)"
+              placeholder={t('onboarding.current_weight.body_fat_placeholder')}
               placeholderTextColor={colors.textSecondary}
               value={currentBodyFatPercent}
               onChangeText={(text) => {
@@ -338,13 +335,13 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               keyboardType="numeric"
               editable={!loading}
               {...getInputAccessibilityProps(
-                'Body fat percentage',
-                'Enter your body fat percentage',
+                t('onboarding.current_weight.body_fat_accessibility_label'),
+                t('onboarding.current_weight.body_fat_accessibility_hint'),
                 undefined,
                 false
               )}
             />
-            <Text style={[styles.inputUnitLabel, { color: '#404040' }]}>%</Text>
+            <Text variant="label" style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>%</Text>
           </View>
         </View>
       </View>
@@ -354,15 +351,15 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
 
 const styles = StyleSheet.create({
   stepContentAnimated: {
-    gap: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
+    gap: Spacing.xl,
+    paddingTop: Spacing['2xl'],
+    paddingBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.xl,
     ...Platform.select({
       web: {
         animation: 'fadeUp 0.3s ease',
         '@keyframes fadeUp': {
-          from: { opacity: 0, transform: 'translateY(12px)' },
+          from: { opacity: 0, transform: `translateY(${Spacing.md}px)` },
           to: { opacity: 1, transform: 'translateY(0)' },
         },
       },
@@ -373,31 +370,31 @@ const styles = StyleSheet.create({
   },
   stepIllustration: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   stepTitleModern: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: FontSize['2xl'],
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   stepSubtitleModern: {
-    fontSize: 16,
-    marginBottom: 24,
+    fontSize: FontSize.md,
+    marginBottom: Spacing['2xl'],
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: FontSize.md * LineHeight.normal,
   },
   unitToggleModern: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   unitPill: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 9999,
+    paddingHorizontal: Spacing['2xl'],
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -413,16 +410,12 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   unitPillUnselected: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
-  },
-  unitPillText: {
-    fontSize: 15,
-    fontWeight: '600',
+    backgroundColor: Colors.light.background,
+    borderColor: Colors.light.border,
   },
   heightInputContainer: {
-    marginTop: 12,
-    gap: 12,
+    marginTop: Spacing.md,
+    gap: Spacing.md,
     width: '100%',
     maxWidth: '100%',
   },
@@ -434,9 +427,9 @@ const styles = StyleSheet.create({
   },
   inputModern: {
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    fontSize: FontSize.md,
     minHeight: 52,
     width: '100%',
     maxWidth: '100%',
@@ -450,16 +443,16 @@ const styles = StyleSheet.create({
   },
   inputUnitLabel: {
     position: 'absolute',
-    right: 16,
+    right: Spacing.lg,
     top: '50%',
     transform: [{ translateY: -10 }],
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    marginBottom: Spacing.sm,
   },
 });
 

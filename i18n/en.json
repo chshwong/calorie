@@ -271,6 +271,7 @@
         "description": "Lose fat and gain muscle at about the same weight."
       },
       "advanced_goal": "Advanced goal",
+      "advanced_goal_hint": "Double tap to show advanced goal options",
       "error_select_goal": "Please select your goal"
     },
     "name_age": {
@@ -342,6 +343,10 @@
       "weight_label": "Weight",
       "weight_kg_placeholder": "35-250",
       "weight_lb_placeholder": "77-550",
+      "body_fat_label": "Body Fat % (optional)",
+      "body_fat_placeholder": "Optional (e.g., 18.5)",
+      "body_fat_accessibility_label": "Body fat percentage",
+      "body_fat_accessibility_hint": "Enter your body fat percentage",
       "error_weight_required": "Weight is required",
       "error_weight_invalid": "Weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)"
     },
@@ -351,6 +356,8 @@
       "weight_label": "Goal Weight",
       "weight_kg_placeholder": "35-250",
       "weight_lb_placeholder": "77-550",
+      "accessibility_label_kg": "Goal weight in kilograms",
+      "accessibility_label_lb": "Goal weight in pounds",
       "error_weight_required": "Goal weight is required",
       "error_weight_invalid": "Goal weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)",
       "error_lose_too_high": "For a fat-loss goal, your goal weight should be lower than your current weight.",

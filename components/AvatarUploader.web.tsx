@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { showAppToast } from '@/components/ui/app-toast';
 import { autoSquareCrop } from '@/lib/avatar/auto-square-crop';
 
@@ -557,8 +558,8 @@ export function AvatarUploader({
         />
       </div>
 
-      {/* Crop Modal */}
-      {showCropModal && imageSrc && (
+      {/* Crop Modal - rendered via portal to ensure it's always on top */}
+      {showCropModal && imageSrc && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -570,7 +571,7 @@ export function AvatarUploader({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10000,
+            zIndex: 99999,
             padding: 20,
           }}
           onClick={handleCancelCrop}
@@ -745,7 +746,8 @@ export function AvatarUploader({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* CSS for spinner animation */}

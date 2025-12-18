@@ -93,7 +93,6 @@ export default function OnboardingScreen() {
     
     // Unit conversion setters
     setWeightUnit,
-    setGoalWeightUnitWithConversion,
     setHeightUnitWithConversion,
     
     // Display getters
@@ -227,7 +226,7 @@ export default function OnboardingScreen() {
       <GoalWeightStep
         goalWeightKg={goalWeightKg}
         goalWeightLb={goalWeightLb}
-        goalWeightUnit={goalWeightUnit}
+        currentWeightUnit={currentWeightUnit}
         onGoalWeightKgChange={(text) => {
           setGoalWeightKg(text);
           clearErrors();
@@ -236,11 +235,9 @@ export default function OnboardingScreen() {
           setGoalWeightLb(text);
           clearErrors();
         }}
-        onGoalWeightUnitChange={setGoalWeightUnitWithConversion}
         onErrorClear={clearErrors}
         error={errorText}
         errorKey={errorKey}
-        errorParams={errorParams}
         loading={loading}
         colors={colors}
       />

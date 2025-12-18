@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
+import { Text } from '@/components/ui/text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, LineHeight } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
-import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { getButtonAccessibilityProps, getFocusStyle, AccessibilityHints } from '@/utils/accessibility';
 
 type GoalType = 'lose' | 'gain' | 'maintain' | 'recomp';
 
@@ -79,47 +80,27 @@ export const GoalStep: React.FC<GoalStepProps> = ({
               style={[
                 styles.goalCard,
                 {
-                  borderColor: selected ? 'transparent' : colors.border,
+                  borderColor: selected ? Colors.light.background : colors.border,
                   backgroundColor: selected ? undefined : colors.background,
                   borderWidth: selected ? 0 : 1,
-                  borderRadius: 16,
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
+                  borderRadius: BorderRadius.xl,
+                  paddingVertical: Spacing.md,
+                  paddingHorizontal: Spacing.lg,
                   transform: [{ scale: selected ? 1.02 : pressed ? 0.97 : 1 }],
                   opacity: pressed ? 0.96 : 1,
                 },
-                !selected && {
-                  ...Platform.select({
-                    web: {
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      transition: 'all 0.2s ease',
-                    },
-                    default: {
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 3,
-                      elevation: 2,
-                    },
-                  }),
-                },
-                selected && {
-                  ...Platform.select({
-                    web: {
+                // Web-only CSS properties (transition, background gradient) are not in React Native's ViewStyle type
+                // but are valid on web. Using 'as any' is necessary to apply these styles conditionally.
+                !selected && (Platform.OS === 'web' 
+                  ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)', transition: 'all 0.2s ease' } as any
+                  : Shadows.sm),
+                selected && (Platform.OS === 'web'
+                  ? { 
                       background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                       transition: 'all 0.2s ease',
-                    },
-                    default: {
-                      backgroundColor: onboardingColors.primary,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 12,
-                      elevation: 4,
-                    },
-                  }),
-                },
+                    } as any
+                  : { backgroundColor: onboardingColors.primary, ...Shadows.lg }),
                 Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
               ]}
               onPress={() => {
@@ -131,23 +112,29 @@ export const GoalStep: React.FC<GoalStepProps> = ({
               disabled={loading}
               {...getButtonAccessibilityProps(
                 `${t(goalOption.labelKey)}${selected ? ' selected' : ''}`,
-                `Double tap to select ${t(goalOption.labelKey)}`,
+                `${AccessibilityHints.SELECT} ${t(goalOption.labelKey)}`,
                 loading
               )}
               accessibilityRole="radio"
               accessibilityState={{ selected }}
             >
-              <View style={{ flex: 1, paddingRight: selected ? 40 : 0 }}>
-                <Text style={[styles.goalCardTitle, { color: selected ? '#fff' : colors.text }]}>
+              <View style={{ flex: 1, paddingRight: selected ? Spacing['4xl'] : 0 }}>
+                <Text 
+                  variant="h4" 
+                  style={[styles.goalCardTitle, { color: selected ? Colors.light.textInverse : colors.text }]}
+                >
                   {t(goalOption.labelKey)}
                 </Text>
-                <Text style={[styles.goalCardDescription, { color: selected ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
+                <Text 
+                  variant="body" 
+                  style={[styles.goalCardDescription, { color: selected ? Colors.light.textInverse : colors.textSecondary, opacity: selected ? 0.9 : 1 }]}
+                >
                   {t(goalOption.descriptionKey)}
                 </Text>
               </View>
               {selected && (
                 <View style={styles.goalCardCheckmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+                  <IconSymbol name="checkmark.circle.fill" size={Spacing['2xl']} color={Colors.light.textInverse} />
                 </View>
               )}
             </TouchableOpacity>
@@ -162,7 +149,7 @@ export const GoalStep: React.FC<GoalStepProps> = ({
           disabled={loading}
           {...getButtonAccessibilityProps(
             t('onboarding.goal.advanced_goal'),
-            'Double tap to show advanced goal options'
+            t('onboarding.goal.advanced_goal_hint')
           )}
         >
           <ThemedText style={[styles.advancedGoalLinkText, { color: onboardingColors.primary }]}>
@@ -176,25 +163,25 @@ export const GoalStep: React.FC<GoalStepProps> = ({
 
 const styles = StyleSheet.create({
   stepContent: {
-    gap: 20,
+    gap: Spacing.xl,
   },
   stepTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: FontSize['3xl'],
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   stepSubtitle: {
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: FontSize.md,
+    marginBottom: Spacing.sm,
   },
   goalContainer: {
-    gap: 12,
-    marginTop: 8,
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
   },
   goalCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.xl,
     borderWidth: 2,
     position: 'relative',
     minHeight: 80,
@@ -207,28 +194,27 @@ const styles = StyleSheet.create({
     }),
   },
   goalCardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
+    fontWeight: FontWeight.bold, // Override h4 variant's semibold to bold
+    marginBottom: Spacing.xs,
   },
   goalCardDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: FontSize.base,
+    lineHeight: FontSize.base * LineHeight.normal,
   },
   goalCardCheckmark: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: Spacing.lg,
+    right: Spacing.lg,
   },
   advancedGoalLink: {
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
     alignSelf: 'flex-start',
   },
   advancedGoalLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
   },
 });
 
