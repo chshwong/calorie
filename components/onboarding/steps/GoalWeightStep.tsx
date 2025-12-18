@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { View, TextInput, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -8,7 +8,7 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Semant
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { filterNumericInput } from '@/utils/inputFilters';
 import { getInputAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
-import { getSuggestedTargetWeightLb, type GoalType } from '@/lib/onboarding/goal-weight-rules';
+import { type GoalType, type SuggestionResult } from '@/lib/onboarding/goal-weight-rules';
 import { lbToKg } from '@/lib/domain/weight-constants';
 import { roundTo1 } from '@/utils/bodyMetrics';
 
@@ -21,6 +21,7 @@ interface GoalWeightStepProps {
   heightCm: number | null;
   sexAtBirth: string | null;
   dobISO: string | null;
+  goalWeightSuggestion: SuggestionResult | null;
   onGoalWeightKgChange: (text: string) => void;
   onGoalWeightLbChange: (text: string) => void;
   onErrorClear: () => void;
@@ -54,6 +55,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
   heightCm,
   sexAtBirth,
   dobISO,
+  goalWeightSuggestion,
   onGoalWeightKgChange,
   onGoalWeightLbChange,
   onErrorClear,
@@ -63,62 +65,124 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
-  
-  // Compute placeholder based on goal type and suggestion engine
-  const placeholder = useMemo(() => {
+
+  // Compute suggestion text and placeholder from suggestion result (derived, not state)
+  const { suggestionText, placeholder, suggestedWeightLb } = useMemo(() => {
     // If goalType is maintain or recomp, use current weight
     if (goalType === 'maintain' || goalType === 'recomp') {
       if (currentWeightLb === null) {
         // Fallback if current weight not available
-        return currentWeightUnit === 'kg' ? '(e.g., 79)' : '(e.g., 175)';
+        const fallbackPlaceholder = currentWeightUnit === 'kg' 
+          ? t('onboarding.goal_weight.placeholder_fallback_kg')
+          : t('onboarding.goal_weight.placeholder_fallback_lb');
+        return { suggestionText: null, placeholder: fallbackPlaceholder, suggestedWeightLb: null };
       }
       
       const currentWeight = currentWeightUnit === 'kg' 
         ? roundTo1(lbToKg(currentWeightLb))
         : roundTo1(currentWeightLb);
       
-      return currentWeight.toString();
-    }
-    
-    // For lose/gain, use suggestion engine
-    if (goalType === 'lose' || goalType === 'gain') {
-      if (currentWeightLb === null) {
-        // Fallback if current weight not available
-        return currentWeightUnit === 'kg' ? '(e.g., 79)' : '(e.g., 175)';
-      }
-      
-      const suggestionResult = getSuggestedTargetWeightLb({
-        goalType,
-        currentWeightLb,
-        heightCm,
-        sexAtBirth,
-        dobISO,
+      const unit = currentWeightUnit === 'kg' ? 'kg' : 'lb';
+      const suggestionTextValue = t('onboarding.goal_weight.suggested_placeholder', {
+        weight: currentWeight.toString(),
+        unit,
       });
+      const placeholderValue = currentWeightUnit === 'kg'
+        ? t('onboarding.goal_weight.placeholder_example_kg', { weight: currentWeight.toString() })
+        : t('onboarding.goal_weight.placeholder_example_lb', { weight: currentWeight.toString() });
       
-      if (suggestionResult.ok) {
-        // Format suggested weight in user's selected unit
-        const suggestedWeight = currentWeightUnit === 'kg'
-          ? roundTo1(lbToKg(suggestionResult.suggestedLb))
-          : roundTo1(suggestionResult.suggestedLb);
-        
-        const unit = currentWeightUnit === 'kg' ? 'kg' : 'lb';
-        
-        // Use i18n for placeholder - ensure it's a string
-        const placeholderText = t('onboarding.goal_weight.suggested_placeholder', {
-          weight: suggestedWeight.toString(),
-          unit,
-        });
-        return typeof placeholderText === 'string' ? placeholderText : String(placeholderText);
-      } else {
-        // If suggestion unavailable, use i18n message (no number shown)
-        const placeholderText = t(suggestionResult.messageKey, suggestionResult.messageParams || {});
-        return typeof placeholderText === 'string' ? placeholderText : String(placeholderText);
-      }
+      return {
+        suggestionText: typeof suggestionTextValue === 'string' ? suggestionTextValue : String(suggestionTextValue),
+        placeholder: typeof placeholderValue === 'string' ? placeholderValue : String(placeholderValue),
+        suggestedWeightLb: currentWeightLb,
+      };
     }
     
-    // Fallback for unknown goal type
-    return currentWeightUnit === 'kg' ? '(e.g., 79)' : '(e.g., 175)';
-  }, [goalType, currentWeightLb, heightCm, sexAtBirth, dobISO, currentWeightUnit, t]);
+    // For lose/gain, use suggestion result from hook
+    if (!goalWeightSuggestion) {
+      // Fallback if suggestion not available
+      const fallbackPlaceholder = currentWeightUnit === 'kg' 
+        ? t('onboarding.goal_weight.placeholder_fallback_kg')
+        : t('onboarding.goal_weight.placeholder_fallback_lb');
+      return { suggestionText: null, placeholder: fallbackPlaceholder, suggestedWeightLb: null };
+    }
+    
+    if (goalWeightSuggestion.ok) {
+      // Format suggested weight in user's selected unit
+      const suggestedWeight = currentWeightUnit === 'kg'
+        ? roundTo1(lbToKg(goalWeightSuggestion.suggestedLb))
+        : roundTo1(goalWeightSuggestion.suggestedLb);
+      
+      const unit = currentWeightUnit === 'kg' ? 'kg' : 'lb';
+      
+      // Use i18n for suggestion text - ensure it's a string
+      const suggestionTextValue = t('onboarding.goal_weight.suggested_placeholder', {
+        weight: suggestedWeight.toString(),
+        unit,
+      });
+      const placeholderValue = currentWeightUnit === 'kg'
+        ? t('onboarding.goal_weight.placeholder_example_kg', { weight: suggestedWeight.toString() })
+        : t('onboarding.goal_weight.placeholder_example_lb', { weight: suggestedWeight.toString() });
+      
+      return {
+        suggestionText: typeof suggestionTextValue === 'string' ? suggestionTextValue : String(suggestionTextValue),
+        placeholder: typeof placeholderValue === 'string' ? placeholderValue : String(placeholderValue),
+        suggestedWeightLb: goalWeightSuggestion.suggestedLb,
+      };
+    } else {
+      // If suggestion unavailable, use i18n message (no number shown)
+      const suggestionTextValue = t(goalWeightSuggestion.messageKey, goalWeightSuggestion.messageParams || {});
+      const fallbackPlaceholder = currentWeightUnit === 'kg' 
+        ? t('onboarding.goal_weight.placeholder_fallback_kg')
+        : t('onboarding.goal_weight.placeholder_fallback_lb');
+      return {
+        suggestionText: typeof suggestionTextValue === 'string' ? suggestionTextValue : String(suggestionTextValue),
+        placeholder: fallbackPlaceholder,
+        suggestedWeightLb: null,
+      };
+    }
+  }, [goalType, currentWeightLb, currentWeightUnit, goalWeightSuggestion, t]);
+
+  // Track if we've already prefilled for the current goalType
+  // This prevents refilling if user manually clears the field
+  const hasPrefilledForCurrentGoalRef = useRef(false);
+  const previousGoalTypeRef = useRef<GoalType | ''>(goalType || '');
+
+  // Reset prefill flag when goalType changes (user navigated from GoalStep)
+  useEffect(() => {
+    if (goalType && goalType !== previousGoalTypeRef.current) {
+      previousGoalTypeRef.current = goalType;
+      hasPrefilledForCurrentGoalRef.current = false;
+    }
+  }, [goalType]);
+
+  // Prefill weight fields with suggested weight only when:
+  // 1. User just navigated from GoalStep (goalType changed, we haven't prefilled yet)
+  // 2. Suggestion is available
+  // 3. Fields are empty
+  useEffect(() => {
+    if (suggestedWeightLb === null || !goalType) {
+      return;
+    }
+
+    // Only prefill once when goalType changes and fields are empty
+    if (
+      !hasPrefilledForCurrentGoalRef.current &&
+      goalWeightKg.trim() === '' &&
+      goalWeightLb.trim() === ''
+    ) {
+      if (currentWeightUnit === 'kg') {
+        const suggestedKg = roundTo1(lbToKg(suggestedWeightLb));
+        onGoalWeightKgChange(suggestedKg.toString());
+      } else {
+        const suggestedLb = roundTo1(suggestedWeightLb);
+        onGoalWeightLbChange(suggestedLb.toString());
+      }
+      // Mark that we've prefilled for this goalType
+      // This prevents refilling if user manually clears the field later
+      hasPrefilledForCurrentGoalRef.current = true;
+    }
+  }, [suggestedWeightLb, currentWeightUnit, goalType, goalWeightKg, goalWeightLb, onGoalWeightKgChange, onGoalWeightLbChange]);
   
   return (
     <View style={styles.stepContentAnimated}>
@@ -165,6 +229,13 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
       <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
         {t('onboarding.goal_weight.subtitle')}
       </ThemedText>
+      
+      {/* Suggestion Text */}
+      {suggestionText && (
+        <ThemedText style={[styles.suggestionText, { color: colors.textSecondary }]}>
+          {suggestionText}
+        </ThemedText>
+      )}
       
       {/* Weight Input */}
       <View style={styles.heightInputContainer}>
@@ -267,6 +338,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing['2xl'],
     textAlign: 'center',
     lineHeight: FontSize.md * LineHeight.normal,
+  },
+  suggestionText: {
+    fontSize: FontSize.base,
+    marginBottom: Spacing.md,
+    textAlign: 'center',
+    lineHeight: FontSize.base * LineHeight.normal,
   },
   heightInputContainer: {
     marginTop: Spacing.md,

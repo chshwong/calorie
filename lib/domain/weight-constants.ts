@@ -31,8 +31,15 @@ export const LB_PER_KG = 2.2046226218;
 /**
  * Suggested weight change percentages for goal recommendations
  */
-export const WEIGHT_LOSS_SUGGESTION_PCT = 0.10; // 10%
-export const WEIGHT_GAIN_SUGGESTION_PCT = 0.05; // 5%
+export const WEIGHT_LOSS_SUGGESTION_PCT = 0.05; // 10%
+export const WEIGHT_GAIN_SUGGESTION_PCT = 0.04; // 5%
+
+/**
+ * Maximum absolute weight change (in pounds) for suggestions
+ * Caps the suggestion to prevent overly aggressive recommendations
+ */
+export const WEIGHT_LOSS_SUGGESTION_MAX_LB = 10;
+export const WEIGHT_GAIN_SUGGESTION_MAX_LB = 10;
 
 // ============================================================================
 // GOAL WEIGHT VALIDATION RULES

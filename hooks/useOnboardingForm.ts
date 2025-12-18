@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Alert, Platform, Dimensions } from 'react-native';
@@ -33,6 +33,7 @@ import { uploadUserAvatar, setProfileAvatarUrl } from '@/lib/avatar/avatar-servi
 import { checkProfanity } from '@/utils/profanity';
 import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
 import { PROFILES, DERIVED } from '@/constants/constraints';
+import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 
@@ -81,6 +82,24 @@ export function useOnboardingForm() {
   const [goalWeightKg, setGoalWeightKg] = useState('');
   const [goalWeightLb, setGoalWeightLb] = useState('');
   const [goalWeightUnit, setGoalWeightUnit] = useState<'kg' | 'lb'>('kg');
+  
+  // Goal weight suggestion - derived value, not state
+  const goalWeightSuggestion = useMemo(() => {
+    const currentWeightLbNum = currentWeightLb ? parseFloat(currentWeightLb) : null;
+    const heightCmNum = heightCm ? parseFloat(heightCm.toString()) : null;
+    
+    if (!goal || currentWeightLbNum === null) {
+      return null;
+    }
+    
+    return getSuggestedTargetWeightLb({
+      goalType: goal as GoalType,
+      currentWeightLb: currentWeightLbNum,
+      heightCm: heightCmNum,
+      sexAtBirth: sex || null,
+      dobISO: dateOfBirthStep2 || null,
+    });
+  }, [goal, currentWeightLb, heightCm, sex, dateOfBirthStep2]);
   
   // Step 8: Timeline
   const [timelineOption, setTimelineOption] = useState<'3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date' | ''>('');
@@ -1135,6 +1154,9 @@ export function useOnboardingForm() {
     errorKey,
     errorParams,
     isDesktop,
+    
+    // Goal weight suggestion (derived, not state)
+    goalWeightSuggestion,
     
     // Error handlers
     setErrorText,

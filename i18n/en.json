@@ -255,7 +255,7 @@
       "title": "What's your goal?",
       "subtitle": "This helps us set your daily targets correctly.",
       "lose_weight": {
-        "label": "Lose Body Fat",
+        "label": "Weight Loss",
         "description": "Focus on fat loss while keeping or building some muscle."
       },
       "maintain_weight": {
@@ -377,7 +377,11 @@
       "goal_weight_error_recomp_range_lb": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} lbs of your current weight.",
       "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight.",
       "suggested_placeholder": "Based on your goal, we suggest: {{weight}} {{unit}}",
-      "suggestion_unavailable": "Based on your current stats, we can't suggest a safe target weight for this goal. Consider choosing a different goal."
+      "suggestion_unavailable": "Based on your current stats, we can't suggest a safe target weight for this goal. Consider choosing a different goal.",
+      "placeholder_example_kg": "(e.g., {{weight}} kg)",
+      "placeholder_example_lb": "(e.g., {{weight}} lb)",
+      "placeholder_fallback_kg": "(e.g., 79)",
+      "placeholder_fallback_lb": "(e.g., 175)"
     },
     "timeline": {
       "title": "When do you want to reach this goal?",
@@ -391,6 +395,20 @@
       "error_select_timeline": "Please select a timeline option",
       "pace_adjusted": "To keep things safe and sustainable, we've adjusted your pace slightly. You'll still be working steadily toward your goal.",
       "estimated_completion": "Estimated: about {months} months"
+    },
+    "goal_date": {
+      "option_easy": "Easy",
+      "option_decent": "Decent",
+      "option_aggressive": "Aggressive",
+      "option_no_deadline": "No deadline / Just tracking",
+      "option_custom_date": "Set a specific date",
+      "by_date": "by {{date}}",
+      "pace_per_week": "~{{pace}} {{unit}}/week",
+      "warn_ambitious": "This is a nicely ambitious goal. Many people succeed at this pace, but taking a bit more time can make the journey smoother and increase the chances of a lasting win.",
+      "warn_very_aggressive": "This pace is very aggressive. It's not impossible, but it usually works best for highly active or very disciplined individuals. Listen closely to your body and be ready to adjust if needed.",
+      "warn_extreme": "This goal is extremely ambitious. While impressive, it may be difficult to sustain in real life. Consider allowing more time to improve your chances of success and long-term progress.",
+      "warn_medical": "This pace is extremely demanding. Goals like this are usually pursued under medical or professional supervision. While not impossible, it requires careful monitoring and may not be appropriate for most situations.",
+      "warn_unrealistic": "This pace is beyond what's realistically sustainable for most people. Goals at this level usually reflect expectations that are very difficult to achieve in real life, even with strong discipline. Consider allowing more time for a safer and more achievable path."
     },
     "step1_title": "Personal Information",
     "step1_subtitle": "Tell us a bit about yourself",

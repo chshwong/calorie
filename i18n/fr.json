@@ -254,7 +254,7 @@
       "title": "Quel est votre objectif?",
       "subtitle": "Cela nous aide à définir correctement vos objectifs quotidiens.",
       "lose_weight": {
-        "label": "Perdre de la graisse corporelle",
+        "label": "Perte de poids",
         "description": "Se concentrer sur la perte de graisse tout en conservant ou en développant du muscle."
       },
       "maintain_weight": {
@@ -367,7 +367,25 @@
       "goal_weight_error_recomp_range_lb": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} lb de ton poids actuel.",
       "goal_weight_error_recomp_range_kg": "La recomposition se concentre sur la composition corporelle tout en gardant le poids stable. Choisis un poids cible à ±{{delta}} kg de ton poids actuel.",
       "suggested_placeholder": "Selon ton objectif, nous suggérons : {{weight}} {{unit}}",
-      "suggestion_unavailable": "Selon tes statistiques actuelles, nous ne pouvons pas suggérer un poids cible sûr pour cet objectif. Envisage de choisir un autre objectif."
+      "suggestion_unavailable": "Selon tes statistiques actuelles, nous ne pouvons pas suggérer un poids cible sûr pour cet objectif. Envisage de choisir un autre objectif.",
+      "placeholder_example_kg": "(p. ex., {{weight}} kg)",
+      "placeholder_example_lb": "(p. ex., {{weight}} lb)",
+      "placeholder_fallback_kg": "(p. ex., 79)",
+      "placeholder_fallback_lb": "(p. ex., 175)"
+    },
+    "goal_date": {
+      "option_easy": "Facile",
+      "option_decent": "Décent",
+      "option_aggressive": "Agressif",
+      "option_no_deadline": "Pas de date limite / Juste suivre",
+      "option_custom_date": "Définir une date spécifique",
+      "by_date": "d'ici le {{date}}",
+      "pace_per_week": "~{{pace}} {{unit}}/semaine",
+      "warn_ambitious": "C'est un objectif ambitieux. Beaucoup de gens réussissent à ce rythme, mais prendre un peu plus de temps peut rendre le parcours plus fluide et augmenter les chances d'une victoire durable.",
+      "warn_very_aggressive": "Ce rythme est très agressif. Ce n'est pas impossible, mais cela fonctionne généralement mieux pour les personnes très actives ou très disciplinées. Écoute attentivement ton corps et sois prêt à ajuster si nécessaire.",
+      "warn_extreme": "Cet objectif est extrêmement ambitieux. Bien qu'impressionnant, il peut être difficile à maintenir dans la vraie vie. Considère accorder plus de temps pour améliorer tes chances de succès et de progrès à long terme.",
+      "warn_medical": "Ce rythme est extrêmement exigeant. Des objectifs comme celui-ci sont généralement poursuivis sous supervision médicale ou professionnelle. Bien que ce ne soit pas impossible, cela nécessite une surveillance attentive et peut ne pas être approprié pour la plupart des situations.",
+      "warn_unrealistic": "Ce rythme dépasse ce qui est réalistement durable pour la plupart des gens. Les objectifs à ce niveau reflètent généralement des attentes très difficiles à atteindre dans la vraie vie, même avec une forte discipline. Considère accorder plus de temps pour un chemin plus sûr et plus réalisable."
     },
     "timeline": {
       "title": "Quand souhaitez-vous atteindre cet objectif?",

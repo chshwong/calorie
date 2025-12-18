@@ -82,7 +82,7 @@ export function AppDatePicker({
     if (showYearMonthPicker && yearScrollViewRef.current) {
       const currentYear = calendarViewMonth.getFullYear();
       const today = new Date();
-      const maxYear = maximumDate ? maximumDate.getFullYear() : today.getFullYear();
+      const maxYear = maximumDate ? maximumDate.getFullYear() : (minimumDate ? 2100 : today.getFullYear());
       const minYear = minimumDate ? minimumDate.getFullYear() : maxYear - 150;
       const yearIndex = maxYear - currentYear;
       const yearItemHeight = 60;
@@ -98,7 +98,9 @@ export function AppDatePicker({
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const maxDate = maximumDate || today;
+  // If maximumDate is explicitly undefined, allow all future dates (no maximum)
+  // If maximumDate is provided, use it; otherwise default to today (for backward compatibility)
+  const maxDate = maximumDate !== undefined ? maximumDate : (minimumDate ? undefined : today);
   const minDate = minimumDate || (() => {
     const d = new Date();
     d.setFullYear(d.getFullYear() - 120);
@@ -138,7 +140,8 @@ export function AppDatePicker({
   const handleNextMonth = () => {
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() + 1);
-    if (newMonth <= maxDate) {
+    // Only check maxDate if it's defined
+    if (maxDate === undefined || newMonth <= maxDate) {
       setCalendarViewMonth(newMonth);
     }
   };
@@ -163,7 +166,11 @@ export function AppDatePicker({
     if (!day) return false;
     const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
     date.setHours(0, 0, 0, 0);
-    return date < minDate || date > maxDate;
+    // Disable if before minDate
+    if (date < minDate) return true;
+    // Disable if after maxDate (only if maxDate is defined)
+    if (maxDate !== undefined && date > maxDate) return true;
+    return false;
   };
   
   const handleDateSelect = (day: number) => {
@@ -179,7 +186,7 @@ export function AppDatePicker({
     const newDate = new Date(year, month, 1);
     if (newDate < minDate) {
       setCalendarViewMonth(new Date(minDate));
-    } else if (newDate > maxDate) {
+    } else if (maxDate !== undefined && newDate > maxDate) {
       setCalendarViewMonth(new Date(maxDate));
     } else {
       setCalendarViewMonth(newDate);
@@ -278,6 +285,7 @@ export function AppDatePicker({
                     ]}
                     activeOpacity={0.7}
                     disabled={(() => {
+                      if (maxDate === undefined) return false;
                       const nextMonth = new Date(calendarViewMonth);
                       nextMonth.setMonth(nextMonth.getMonth() + 1);
                       return nextMonth > maxDate;
@@ -444,7 +452,8 @@ export function AppDatePicker({
                     contentContainerStyle={styles.yearMonthScrollContent}
                   >
                     {Array.from({ length: 150 }, (_, i) => {
-                      const year = (maxDate.getFullYear()) - i;
+                      const maxYear = maxDate ? maxDate.getFullYear() : 2100;
+                      const year = maxYear - i;
                       if (year < minDate.getFullYear()) return null;
                       const isSelected = calendarViewMonth.getFullYear() === year;
                       return (
@@ -496,7 +505,7 @@ export function AppDatePicker({
                       const monthName = new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'long' });
                       const isSelected = calendarViewMonth.getMonth() === month;
                       const testDate = new Date(calendarViewMonth.getFullYear(), i, 1);
-                      const isDisabled = testDate < minDate || testDate > maxDate;
+                      const isDisabled = testDate < minDate || (maxDate !== undefined && testDate > maxDate);
                       
                       return (
                         <TouchableOpacity

@@ -23,6 +23,8 @@ import {
   MAINTAIN_RECOMP_ABS_CAP_LB,
   WEIGHT_LOSS_SUGGESTION_PCT,
   WEIGHT_GAIN_SUGGESTION_PCT,
+  WEIGHT_LOSS_SUGGESTION_MAX_LB,
+  WEIGHT_GAIN_SUGGESTION_MAX_LB,
 } from '@/lib/domain/weight-constants';
 import {
   getMinSafeWeightLb,
@@ -226,13 +228,18 @@ export function getSuggestedTargetWeightLb(params: {
 
   const [feasibleMinLb, feasibleMaxLb] = feasibleRange;
 
-  // Compute base suggestion
+  // Compute base suggestion with max-lb caps
   let baseSuggestion: number;
   if (goalType === 'lose') {
-    baseSuggestion = currentWeightLb * (1 - WEIGHT_LOSS_SUGGESTION_PCT);
+    // Loss: calculate percentage loss, cap it, then subtract from current
+    const lossLbRaw = currentWeightLb * WEIGHT_LOSS_SUGGESTION_PCT;
+    const lossLb = Math.min(lossLbRaw, WEIGHT_LOSS_SUGGESTION_MAX_LB);
+    baseSuggestion = currentWeightLb - lossLb;
   } else {
-    // gain
-    baseSuggestion = currentWeightLb * (1 + WEIGHT_GAIN_SUGGESTION_PCT);
+    // gain: calculate percentage gain, cap it, then add to current
+    const gainLbRaw = currentWeightLb * WEIGHT_GAIN_SUGGESTION_PCT;
+    const gainLb = Math.min(gainLbRaw, WEIGHT_GAIN_SUGGESTION_MAX_LB);
+    baseSuggestion = currentWeightLb + gainLb;
   }
 
   // Clamp base suggestion into feasible range

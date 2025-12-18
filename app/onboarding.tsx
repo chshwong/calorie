@@ -32,6 +32,7 @@ import {
   getButtonAccessibilityProps,
   getFocusStyle,
 } from '@/utils/accessibility';
+import { kgToLb } from '@/lib/domain/weight-constants';
 
 export default function OnboardingScreen() {
   const { t } = useTranslation();
@@ -110,6 +111,7 @@ export default function OnboardingScreen() {
     handleBack,
     handleCompleteOnboarding,
     shouldDisableNext,
+    goalWeightSuggestion,
   } = useOnboardingForm();
   
   // Step map for cleaner rendering
@@ -232,6 +234,7 @@ export default function OnboardingScreen() {
         heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
         sexAtBirth={sex}
         dobISO={dateOfBirthStep2 || null}
+        goalWeightSuggestion={goalWeightSuggestion}
         onGoalWeightKgChange={(text) => {
           setGoalWeightKg(text);
           clearErrors();
@@ -249,22 +252,21 @@ export default function OnboardingScreen() {
     ),
     8: (
       <TimelineStep
+        goalType={goal}
+        currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
+        targetWeightLb={goalWeightLb ? parseFloat(goalWeightLb) : (goalWeightKg ? kgToLb(parseFloat(goalWeightKg)) : null)}
+        currentWeightUnit={currentWeightUnit}
         timelineOption={timelineOption}
+        customTargetDate={customTargetDate}
         onTimelineChange={(option) => {
           setTimelineOption(option);
-          setCustomTargetDate(null);
+          if (option !== 'custom_date') {
+            setCustomTargetDate(null);
+          }
           clearErrors();
         }}
         onCustomTargetDateChange={setCustomTargetDate}
         onErrorClear={clearErrors}
-        currentWeightDisplay={(() => {
-          const display = getCurrentWeightDisplay();
-          return display.value ? `${display.value} ${display.unitLabel}` : '';
-        })()}
-        goalWeightDisplay={(() => {
-          const display = getGoalWeightDisplay();
-          return display.value ? `${display.value} ${display.unitLabel}` : '';
-        })()}
         loading={loading}
         colors={colors}
       />
