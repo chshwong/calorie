@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Text } from '@/components/ui/text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
+import { TrajectoryCard } from '@/components/onboarding/TrajectoryCard';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle, AccessibilityHints } from '@/utils/accessibility';
@@ -14,6 +15,7 @@ import {
   computeTargetDateFromPace,
   computeImpliedLbPerWeek,
   getLossCustomDateWarningKey,
+  computeMinSelectableDateForLoss,
 } from '@/lib/onboarding/goal-date-rules';
 import { lbToKg } from '@/lib/domain/weight-constants';
 import { roundTo1 } from '@/utils/bodyMetrics';
@@ -126,13 +128,21 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
     return date;
   }, []);
   
-  // Get minimum date for custom date picker (tomorrow at noon)
-  const getMinDate = (): Date => {
-    const minDate = new Date(today);
-    minDate.setDate(minDate.getDate() + 1);
-    minDate.setHours(12, 0, 0, 0);
-    return minDate;
-  };
+  // Get minimum date for custom date picker based on max loss pace
+  const minSelectableDate = useMemo(() => {
+    if (currentWeightLb === null || targetWeightLb === null) {
+      // Fallback to tomorrow if weights are not available
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(12, 0, 0, 0);
+      return tomorrow;
+    }
+    return computeMinSelectableDateForLoss({
+      currentWeightLb,
+      targetWeightLb,
+      today,
+    });
+  }, [currentWeightLb, targetWeightLb, today]);
   
   // Get custom date as Date object (parsed as local, not UTC)
   const customDateObj = useMemo(() => {
@@ -228,6 +238,16 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelineOption, deltaLb]);
   
+  // Prefill custom date to Decent's computed date when entering step or when weights change
+  React.useEffect(() => {
+    if (deltaLb !== null && computedDates.decent && !customTargetDate) {
+      const decentDateStr = formatDateAsLocalISO(computedDates.decent);
+      onCustomTargetDateChange(decentDateStr);
+      onTimelineChange('custom_date');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deltaLb, computedDates.decent]);
+  
   return (
     <View style={styles.stepContentAnimated}>
       {/* Illustration */}
@@ -273,6 +293,56 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
       <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
         {t('onboarding.timeline.subtitle')}
       </ThemedText>
+      
+      {/* Trajectory Card */}
+      {currentWeightLb !== null && targetWeightLb !== null && (
+        <TrajectoryCard
+          currentWeightLabel={`${roundTo1(currentWeightUnit === 'kg' ? lbToKg(currentWeightLb) : currentWeightLb)} ${currentWeightUnit === 'kg' ? 'kg' : 'lb'}`}
+          targetWeightLabel={`${roundTo1(currentWeightUnit === 'kg' ? lbToKg(targetWeightLb) : targetWeightLb)} ${currentWeightUnit === 'kg' ? 'kg' : 'lb'}`}
+          startLabel={t('common.today')}
+          endLabel={
+            timelineOption === 'no_deadline'
+              ? t('onboarding.timeline.no_deadline')
+              : customDateObj
+              ? formatDate(customDateObj)
+              : computedDates.decent
+              ? formatDate(computedDates.decent)
+              : t('onboarding.timeline.no_deadline')
+          }
+          paceLabel={
+            timelineOption === 'no_deadline'
+              ? undefined
+              : timelineOption === 'custom_date' && customDateObj && deltaLb !== null
+              ? (() => {
+                  const impliedPace = computeImpliedLbPerWeek(deltaLb, customDateObj, today);
+                  return `~${formatPace(impliedPace)}/week`;
+                })()
+              : (() => {
+                  // Find which pace option matches the current custom date
+                  const customISO = customTargetDate;
+                  if (!customISO) return undefined;
+                  
+                  const selectedPace = timelineOptions.find(opt => {
+                    if (opt.id === 'easy' || opt.id === 'decent' || opt.id === 'aggressive') {
+                      if (!opt.computedDate) return false;
+                      const optISO = formatDateAsLocalISO(opt.computedDate);
+                      return customISO === optISO;
+                    }
+                    return false;
+                  });
+                  
+                  if (selectedPace && selectedPace.pace) {
+                    return `~${formatPace(selectedPace.pace)}/week`;
+                  }
+                  return undefined;
+                })()
+          }
+          isNoDeadline={timelineOption === 'no_deadline'}
+          accentColor={onboardingColors.primary}
+          backgroundColor={colors.background}
+          textColor={colors.text}
+        />
+      )}
       
       {/* Timeline Options */}
       <View style={styles.optionsContainer}>
@@ -348,12 +418,22 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
               accessibilityState={{ selected: actuallySelected || false }}
             >
               <View style={{ flex: 1, paddingRight: actuallySelected ? Spacing['4xl'] : 0 }}>
-                <Text 
-                  variant="h4" 
-                  style={[styles.optionCardTitle, { color: actuallySelected ? Colors.light.textInverse : colors.text }]}
-                >
-                  {t(option.labelKey)}
-                </Text>
+                <View style={styles.titleRow}>
+                  <Text 
+                    variant="h4" 
+                    style={[styles.optionCardTitle, { color: actuallySelected ? Colors.light.textInverse : colors.text }]}
+                  >
+                    {t(option.labelKey)}
+                  </Text>
+                  {option.id === 'decent' && (
+                    <Text 
+                      variant="body" 
+                      style={[styles.recommendedLabel, { color: actuallySelected ? Colors.light.textInverse : onboardingColors.primary }]}
+                    >
+                      {t('onboarding.goal_date.recommended')}
+                    </Text>
+                  )}
+                </View>
                 {isPaceOption && option.computedDate && deltaLb !== null && (
                   <View style={styles.paceInfo}>
                     <Text 
@@ -378,17 +458,6 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
                     >
                       {formatDate(customDateObj)}
                     </Text>
-                    {customDateWarning && (
-                      <Text 
-                        variant="body" 
-                        style={[styles.warningText, { color: Colors.light.textInverse }]}
-                      >
-                        {t('onboarding.goal_date.pace_per_week', { 
-                          pace: roundTo1(customDateWarning.pace).toString(), 
-                          unit: currentWeightUnit === 'kg' ? 'kg' : 'lb' 
-                        })}
-                      </Text>
-                    )}
                   </View>
                 )}
               </View>
@@ -413,9 +482,9 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
       
       {/* Date Picker */}
       <AppDatePicker
-        value={customDateObj || getMinDate()}
+        value={customDateObj || minSelectableDate}
         onChange={handleCustomDateSelect}
-        minimumDate={getMinDate()}
+        minimumDate={minSelectableDate}
         maximumDate={undefined}
         visible={showDatePicker}
         onClose={() => setShowDatePicker(false)}
@@ -478,9 +547,19 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
   optionCardTitle: {
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.xs,
+    flex: 1,
+  },
+  recommendedLabel: {
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.sm,
   },
   paceInfo: {
     marginTop: Spacing.xs,
@@ -504,7 +583,7 @@ const styles = StyleSheet.create({
     borderColor: `${Colors.light.warning}40`,
   },
   warningText: {
-    fontSize: FontSize.sm,
-    lineHeight: FontSize.sm * LineHeight.normal,
+    fontSize: FontSize.md,
+    lineHeight: FontSize.md * LineHeight.normal,
   },
 });

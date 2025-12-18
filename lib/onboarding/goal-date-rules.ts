@@ -11,13 +11,15 @@ export const LOSS_PACES_LB_PER_WEEK = {
   aggressive: 1.5,
 } as const;
 
+export const MAX_SELECTABLE_LOSS_LB_PER_WEEK = 6.0;
+
 /**
  * Compute target date from pace for weight loss
  * 
  * @param deltaLb - Weight difference in pounds (current - target, must be > 0)
  * @param paceLbPerWeek - Weight loss pace in pounds per week
- * @param today - Today's date
- * @returns Computed target date
+ * @param today - Today's date (should be at local noon)
+ * @returns Computed target date (at local noon)
  */
 export function computeTargetDateFromPace(
   deltaLb: number,
@@ -37,6 +39,61 @@ export function computeTargetDateFromPace(
   targetDate.setDate(targetDate.getDate() + days);
   
   return targetDate;
+}
+
+/**
+ * Add days to a date at local noon (to avoid DST issues)
+ * 
+ * @param date - Base date
+ * @param days - Number of days to add
+ * @returns New date with days added (at local noon)
+ */
+function addDaysLocal(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setHours(12, 0, 0, 0);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+/**
+ * Compute minimum selectable date for weight loss goal based on max pace
+ * 
+ * Disables dates that would imply faster than MAX_SELECTABLE_LOSS_LB_PER_WEEK loss.
+ * Ensures minimum is at least tomorrow (to disable today and past dates).
+ * 
+ * @param params - Parameters for computation
+ * @param params.currentWeightLb - Current weight in pounds
+ * @param params.targetWeightLb - Target weight in pounds
+ * @param params.today - Today's date (should be at local noon)
+ * @returns Minimum selectable date (at local noon)
+ */
+export function computeMinSelectableDateForLoss(params: {
+  currentWeightLb: number;
+  targetWeightLb: number;
+  today: Date;
+}): Date {
+  const { currentWeightLb, targetWeightLb, today } = params;
+  
+  // Ensure today is at noon
+  const todayAtNoon = new Date(today);
+  todayAtNoon.setHours(12, 0, 0, 0);
+  
+  const deltaLb = currentWeightLb - targetWeightLb;
+  
+  // Fallback: if delta is invalid, return tomorrow
+  if (deltaLb <= 0) {
+    return addDaysLocal(todayAtNoon, 1);
+  }
+  
+  // Calculate minimum weeks based on max pace
+  const minWeeks = Math.ceil(deltaLb / MAX_SELECTABLE_LOSS_LB_PER_WEEK);
+  const days = Math.max(1, minWeeks * 7);
+  
+  const minSelectableDate = addDaysLocal(todayAtNoon, days);
+  
+  // Ensure it's at least tomorrow (to disable today and past dates)
+  const tomorrow = addDaysLocal(todayAtNoon, 1);
+  return minSelectableDate > tomorrow ? minSelectableDate : tomorrow;
 }
 
 /**

@@ -387,6 +387,8 @@
       "title": "When do you want to reach this goal?",
       "subtitle": "We'll use this to estimate a safe and realistic pace.",
       "summary_label": "Trajectory",
+      "trajectory_title": "Trajectory",
+      "no_deadline": "No deadline",
       "three_months": "3 months",
       "six_months": "6 months",
       "twelve_months": "12 months",
@@ -398,7 +400,8 @@
     },
     "goal_date": {
       "option_easy": "Easy",
-      "option_decent": "Decent",
+      "option_decent": "Good Pace",
+      "recommended": "Recommended",
       "option_aggressive": "Aggressive",
       "option_no_deadline": "No deadline / Just tracking",
       "option_custom_date": "Set a specific date",
