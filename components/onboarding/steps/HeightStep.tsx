@@ -1,12 +1,13 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, FontSize, FontWeight, BorderRadius, Spacing, Layout, Typography, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { filterNumericInput } from '@/utils/inputFilters';
-import { getInputAccessibilityProps, getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
 import { ftInToCm, cmToFtIn, roundTo1 } from '@/utils/bodyMetrics';
+import { NumericUnitInput, NumericUnitInputRow } from '@/components/forms/NumericUnitInput';
 
 interface HeightStepProps {
   heightCm: string;
@@ -235,156 +236,120 @@ export const HeightStep: React.FC<HeightStepProps> = ({
       {/* Height Inputs */}
       <View style={styles.heightInputContainer}>
         {heightUnit === 'cm' ? (
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={[
-                styles.inputModern,
-                {
-                  borderColor: error && !heightCm ? colors.error : colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.background,
-                },
-                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-              ]}
-              placeholder={t('onboarding.height.height_cm_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={heightCm}
-              onChangeText={(text) => {
-                const sanitized = filterNumericInput(text);
-                onHeightCmChange(sanitized);
-                onErrorClear();
-                
-                // Sync to ft/in fields (symmetry)
-                if (sanitized.trim() === '') {
-                  if (heightFt !== '' || heightIn !== '') {
-                    onHeightFtChange('');
-                    onHeightInChange('');
-                  }
-                } else {
-                  const cmValue = parseFloat(sanitized);
-                  if (!isNaN(cmValue) && cmValue > 0) {
-                    const result = cmToFtIn(cmValue);
-                    if (result) {
-                      const ftString = result.feet.toString();
-                      const inString = result.inches.toString();
-                      if (heightFt !== ftString) {
-                        onHeightFtChange(ftString);
-                      }
-                      if (heightIn !== inString) {
-                        onHeightInChange(inString);
-                      }
+          <NumericUnitInput
+            value={heightCm}
+            onChangeText={(text) => {
+              const sanitized = filterNumericInput(text);
+              onHeightCmChange(sanitized);
+              onErrorClear();
+              
+              // Sync to ft/in fields (symmetry)
+              if (sanitized.trim() === '') {
+                if (heightFt !== '' || heightIn !== '') {
+                  onHeightFtChange('');
+                  onHeightInChange('');
+                }
+              } else {
+                const cmValue = parseFloat(sanitized);
+                if (!isNaN(cmValue) && cmValue > 0) {
+                  const result = cmToFtIn(cmValue);
+                  if (result) {
+                    const ftString = result.feet.toString();
+                    const inString = result.inches.toString();
+                    if (heightFt !== ftString) {
+                      onHeightFtChange(ftString);
+                    }
+                    if (heightIn !== inString) {
+                      onHeightInChange(inString);
                     }
                   }
                 }
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                t('onboarding.height.height_cm_accessibility_label'),
-                t('onboarding.height.height_cm_placeholder'),
-                error && !heightCm ? error : undefined,
-                true
-              )}
-            />
-            <ThemedText style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>cm</ThemedText>
-          </View>
+              }
+            }}
+            unitLabel="cm"
+            placeholder={t('onboarding.height.height_cm_placeholder')}
+            keyboardType="numeric"
+            width={88}
+            disabled={loading}
+            accessibilityLabel={t('onboarding.height.height_cm_accessibility_label')}
+            accessibilityHint={t('onboarding.height.height_cm_placeholder')}
+            error={error && !heightCm ? error : undefined}
+            required
+            borderColor={error && !heightCm ? colors.error : colors.border}
+          />
         ) : (
-          <View style={styles.dualInputRowModern}>
-            <View style={[styles.inputWrapper, { flex: 1 }]}>
-              <TextInput
-                style={[
-                  styles.inputModern,
-                  {
-                    borderColor: error && !heightFt ? colors.error : colors.border,
-                    color: colors.text,
-                    backgroundColor: colors.background,
-                  },
-                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-                ]}
-                placeholder={t('onboarding.height.height_ft_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={heightFt}
-                onChangeText={(text) => {
-                  const sanitized = filterNumericInput(text);
-                  onHeightFtChange(sanitized);
-                  onErrorClear();
-                  
-                  // Sync to canonical cm field
-                  const ftValue = sanitized.trim() === '' ? NaN : parseFloat(sanitized);
-                  const inValue = heightIn.trim() === '' ? NaN : parseFloat(heightIn);
-                  
-                  if (!isNaN(ftValue) && ftValue >= 0 && !isNaN(inValue) && inValue >= 0) {
-                    const cm = ftInToCm(ftValue, inValue);
-                    const cmString = roundTo1(cm).toString();
-                    if (heightCm !== cmString) {
-                      onHeightCmChange(cmString);
-                    }
-                  } else if (sanitized.trim() === '' && heightIn.trim() === '') {
-                    // Both cleared, clear cm too
-                    if (heightCm !== '') {
-                      onHeightCmChange('');
-                    }
+          <NumericUnitInputRow>
+            <NumericUnitInput
+              value={heightFt}
+              onChangeText={(text) => {
+                const sanitized = filterNumericInput(text);
+                onHeightFtChange(sanitized);
+                onErrorClear();
+                
+                // Sync to canonical cm field
+                const ftValue = sanitized.trim() === '' ? NaN : parseFloat(sanitized);
+                const inValue = heightIn.trim() === '' ? NaN : parseFloat(heightIn);
+                
+                if (!isNaN(ftValue) && ftValue >= 0 && !isNaN(inValue) && inValue >= 0) {
+                  const cm = ftInToCm(ftValue, inValue);
+                  const cmString = roundTo1(cm).toString();
+                  if (heightCm !== cmString) {
+                    onHeightCmChange(cmString);
                   }
-                }}
-                keyboardType="numeric"
-                editable={!loading}
-                {...getInputAccessibilityProps(
-                  t('onboarding.height.height_ft_accessibility_label'),
-                  t('onboarding.height.height_ft_placeholder'),
-                  error && !heightFt ? error : undefined,
-                  true
-                )}
-              />
-              <ThemedText style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>ft</ThemedText>
-            </View>
-            <View style={[styles.inputWrapper, { flex: 1 }]}>
-              <TextInput
-                style={[
-                  styles.inputModern,
-                  {
-                    borderColor: error && !heightIn ? colors.error : colors.border,
-                    color: colors.text,
-                    backgroundColor: colors.background,
-                  },
-                  Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-                ]}
-                placeholder={t('onboarding.height.height_in_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={heightIn}
-                onChangeText={(text) => {
-                  const sanitized = filterNumericInput(text);
-                  onHeightInChange(sanitized);
-                  onErrorClear();
-                  
-                  // Sync to canonical cm field
-                  const ftValue = heightFt.trim() === '' ? NaN : parseFloat(heightFt);
-                  const inValue = sanitized.trim() === '' ? NaN : parseFloat(sanitized);
-                  
-                  if (!isNaN(ftValue) && ftValue >= 0 && !isNaN(inValue) && inValue >= 0) {
-                    const cm = ftInToCm(ftValue, inValue);
-                    const cmString = roundTo1(cm).toString();
-                    if (heightCm !== cmString) {
-                      onHeightCmChange(cmString);
-                    }
-                  } else if (heightFt.trim() === '' && sanitized.trim() === '') {
-                    // Both cleared, clear cm too
-                    if (heightCm !== '') {
-                      onHeightCmChange('');
-                    }
+                } else if (sanitized.trim() === '' && heightIn.trim() === '') {
+                  // Both cleared, clear cm too
+                  if (heightCm !== '') {
+                    onHeightCmChange('');
                   }
-                }}
-                keyboardType="numeric"
-                editable={!loading}
-                {...getInputAccessibilityProps(
-                  t('onboarding.height.height_in_accessibility_label'),
-                  t('onboarding.height.height_in_placeholder'),
-                  error && !heightIn ? error : undefined,
-                  true
-                )}
-              />
-              <ThemedText style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>in</ThemedText>
-            </View>
-          </View>
+                }
+              }}
+              unitLabel="ft"
+              placeholder={t('onboarding.height.height_ft_placeholder')}
+              keyboardType="numeric"
+              width={72}
+              disabled={loading}
+              accessibilityLabel={t('onboarding.height.height_ft_accessibility_label')}
+              accessibilityHint={t('onboarding.height.height_ft_placeholder')}
+              error={error && !heightFt ? error : undefined}
+              required
+              borderColor={error && !heightFt ? colors.error : colors.border}
+            />
+            <NumericUnitInput
+              value={heightIn}
+              onChangeText={(text) => {
+                const sanitized = filterNumericInput(text);
+                onHeightInChange(sanitized);
+                onErrorClear();
+                
+                // Sync to canonical cm field
+                const ftValue = heightFt.trim() === '' ? NaN : parseFloat(heightFt);
+                const inValue = sanitized.trim() === '' ? NaN : parseFloat(sanitized);
+                
+                if (!isNaN(ftValue) && ftValue >= 0 && !isNaN(inValue) && inValue >= 0) {
+                  const cm = ftInToCm(ftValue, inValue);
+                  const cmString = roundTo1(cm).toString();
+                  if (heightCm !== cmString) {
+                    onHeightCmChange(cmString);
+                  }
+                } else if (heightFt.trim() === '' && sanitized.trim() === '') {
+                  // Both cleared, clear cm too
+                  if (heightCm !== '') {
+                    onHeightCmChange('');
+                  }
+                }
+              }}
+              unitLabel="in"
+              placeholder={t('onboarding.height.height_in_placeholder')}
+              keyboardType="numeric"
+              width={72}
+              disabled={loading}
+              accessibilityLabel={t('onboarding.height.height_in_accessibility_label')}
+              accessibilityHint={t('onboarding.height.height_in_placeholder')}
+              error={error && !heightIn ? error : undefined}
+              required
+              borderColor={error && !heightIn ? colors.error : colors.border}
+            />
+          </NumericUnitInputRow>
         )}
       </View>
     </View>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { Text } from '@/components/ui/text';
@@ -9,7 +9,8 @@ import { onboardingColors } from '@/theme/onboardingTheme';
 import { validateBodyFatPercent } from '@/utils/validation';
 import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
 import { filterNumericInput } from '@/utils/inputFilters';
-import { getInputAccessibilityProps, getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
+import { NumericUnitInput } from '@/components/forms/NumericUnitInput';
 
 interface CurrentWeightStepProps {
   currentWeightKg: string;
@@ -244,139 +245,102 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
       
       {/* Weight Input */}
       <View style={styles.heightInputContainer}>
-        <View style={styles.inputWrapper}>
-          {currentWeightUnit === 'kg' ? (
-            <TextInput
-              style={[
-                styles.inputModern,
-                {
-                  borderColor: error && !currentWeightKg ? SemanticColors.error : colors.border,
-                  color: colors.text,
-                  backgroundColor: Colors.light.background,
-                },
-                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-              ]}
-              placeholder={weightKgPlaceholder}
-              placeholderTextColor={colors.textSecondary}
-              value={currentWeightKg}
-              onChangeText={(text) => {
-                const sanitized = limitWeightInput(text);
-                onCurrentWeightKgChange(sanitized);
-                onErrorClear();
-                
-                // Sync to canonical LB field
-                if (sanitized.trim() === '') {
-                  if (currentWeightLb !== '') {
-                    onCurrentWeightLbChange('');
-                  }
-                } else {
-                  const kgValue = parseFloat(sanitized);
-                  if (!isNaN(kgValue)) {
-                    const lbs = kgToLb(kgValue);
-                    const lbsString = roundTo3(lbs).toString();
-                    if (currentWeightLb !== lbsString) {
-                      onCurrentWeightLbChange(lbsString);
-                    }
+        {currentWeightUnit === 'kg' ? (
+          <NumericUnitInput
+            value={currentWeightKg}
+            onChangeText={(text) => {
+              const sanitized = limitWeightInput(text);
+              onCurrentWeightKgChange(sanitized);
+              onErrorClear();
+              
+              // Sync to canonical LB field
+              if (sanitized.trim() === '') {
+                if (currentWeightLb !== '') {
+                  onCurrentWeightLbChange('');
+                }
+              } else {
+                const kgValue = parseFloat(sanitized);
+                if (!isNaN(kgValue)) {
+                  const lbs = kgToLb(kgValue);
+                  const lbsString = roundTo3(lbs).toString();
+                  if (currentWeightLb !== lbsString) {
+                    onCurrentWeightLbChange(lbsString);
                   }
                 }
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                'Current weight in kilograms',
-                weightKgPlaceholder,
-                error && !currentWeightKg ? error : undefined,
-                true
-              )}
-            />
-          ) : (
-            <TextInput
-              style={[
-                styles.inputModern,
-                {
-                  borderColor: error && !currentWeightLb ? SemanticColors.error : colors.border,
-                  color: colors.text,
-                  backgroundColor: Colors.light.background,
-                },
-                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-              ]}
-              placeholder={weightLbPlaceholder}
-              placeholderTextColor={colors.textSecondary}
-              value={currentWeightLb}
-              onChangeText={(text) => {
-                const sanitized = limitWeightInput(text);
-                onCurrentWeightLbChange(sanitized);
-                onErrorClear();
-                
-                // Sync to KG field
-                if (sanitized.trim() === '') {
-                  if (currentWeightKg !== '') {
-                    onCurrentWeightKgChange('');
-                  }
-                } else {
-                  const lbValue = parseFloat(sanitized);
-                  if (!isNaN(lbValue)) {
-                    const kg = lbToKg(lbValue);
-                    const kgString = roundTo1(kg).toString();
-                    if (currentWeightKg !== kgString) {
-                      onCurrentWeightKgChange(kgString);
-                    }
+              }
+            }}
+            unitLabel="kg"
+            placeholder={weightKgPlaceholder}
+            keyboardType="numeric"
+            width={88}
+            disabled={loading}
+            accessibilityLabel="Current weight in kilograms"
+            accessibilityHint={weightKgPlaceholder}
+            error={error && !currentWeightKg ? error : undefined}
+            required
+            borderColor={error && !currentWeightKg ? SemanticColors.error : colors.border}
+          />
+        ) : (
+          <NumericUnitInput
+            value={currentWeightLb}
+            onChangeText={(text) => {
+              const sanitized = limitWeightInput(text);
+              onCurrentWeightLbChange(sanitized);
+              onErrorClear();
+              
+              // Sync to KG field
+              if (sanitized.trim() === '') {
+                if (currentWeightKg !== '') {
+                  onCurrentWeightKgChange('');
+                }
+              } else {
+                const lbValue = parseFloat(sanitized);
+                if (!isNaN(lbValue)) {
+                  const kg = lbToKg(lbValue);
+                  const kgString = roundTo1(kg).toString();
+                  if (currentWeightKg !== kgString) {
+                    onCurrentWeightKgChange(kgString);
                   }
                 }
-              }}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                'Current weight in pounds',
-                weightLbPlaceholder,
-                error && !currentWeightLb ? error : undefined,
-                true
-              )}
-            />
-          )}
-          <Text variant="label" style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>
-            {currentWeightUnit}
-          </Text>
-        </View>
+              }
+            }}
+            unitLabel="lb"
+            placeholder={weightLbPlaceholder}
+            keyboardType="numeric"
+            width={88}
+            disabled={loading}
+            accessibilityLabel="Current weight in pounds"
+            accessibilityHint={weightLbPlaceholder}
+            error={error && !currentWeightLb ? error : undefined}
+            required
+            borderColor={error && !currentWeightLb ? SemanticColors.error : colors.border}
+          />
+        )}
 
         {/* Body Fat % (optional) */}
-        <View style={{ width: '100%', marginTop: Spacing.lg }}>
-          <ThemedText style={[styles.label, { color: colors.text, marginBottom: Spacing.sm }]}>
+        <View style={{ width: '100%', marginTop: Spacing.lg, alignItems: 'center' }}>
+          <ThemedText style={[styles.label, { color: colors.text, marginBottom: Spacing.sm, textAlign: 'center' }]}>
             {t('onboarding.current_weight.body_fat_label')}
           </ThemedText>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={[
-                styles.inputModern,
-                {
-                  borderColor:
-                    error && currentBodyFatPercent && validateBodyFatPercent(parseFloat(currentBodyFatPercent)) !== null
-                      ? SemanticColors.error
-                      : colors.border,
-                  color: colors.text,
-                  backgroundColor: Colors.light.background,
-                },
-                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-              ]}
-              placeholder={t('onboarding.current_weight.body_fat_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={currentBodyFatPercent}
-              onChangeText={(text) => {
-                onCurrentBodyFatPercentChange(limitBodyFatInput(text));
-                onErrorClear();
-              }}
-              maxLength={4}
-              keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                t('onboarding.current_weight.body_fat_accessibility_label'),
-                t('onboarding.current_weight.body_fat_accessibility_hint'),
-                undefined,
-                false
-              )}
-            />
-            <Text variant="label" style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>%</Text>
-          </View>
+          <NumericUnitInput
+            value={currentBodyFatPercent}
+            onChangeText={(text) => {
+              onCurrentBodyFatPercentChange(limitBodyFatInput(text));
+              onErrorClear();
+            }}
+            unitLabel="%"
+            placeholder={t('onboarding.current_weight.body_fat_placeholder')}
+            keyboardType="numeric"
+            width={72}
+            disabled={loading}
+            accessibilityLabel={t('onboarding.current_weight.body_fat_accessibility_label')}
+            accessibilityHint={t('onboarding.current_weight.body_fat_accessibility_hint')}
+            borderColor={
+              error && currentBodyFatPercent && validateBodyFatPercent(parseFloat(currentBodyFatPercent)) !== null
+                ? SemanticColors.error
+                : colors.border
+            }
+          />
         </View>
       </View>
     </View>
@@ -448,7 +412,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.border,
   },
   heightInputContainer: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.none, // Reduced from Spacing.md to bring input closer to unit toggle
     gap: Spacing.md,
     width: '100%',
     maxWidth: '100%',

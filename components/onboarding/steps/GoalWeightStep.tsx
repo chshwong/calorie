@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { View, TextInput, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedText } from '@/components/themed-text';
@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, SemanticColors, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { filterNumericInput } from '@/utils/inputFilters';
-import { getInputAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { NumericUnitInput } from '@/components/forms/NumericUnitInput';
 import { type GoalType, type SuggestionResult } from '@/lib/onboarding/goal-weight-rules';
 import { lbToKg, kgToLb, MAINTAIN_RECOMP_PCT, MAINTAIN_RECOMP_ABS_CAP_LB } from '@/lib/domain/weight-constants';
 import { roundTo1, roundTo3 } from '@/utils/bodyMetrics';
@@ -451,69 +451,46 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
       ) : (
         /* Weight Input for lose/gain */
         <View style={styles.heightInputContainer}>
-        <View style={styles.inputWrapper}>
           {currentWeightUnit === 'kg' ? (
-            <TextInput
-              style={[
-                styles.inputModern,
-                {
-                  borderColor: (error || errorKey) && !goalWeightKg ? SemanticColors.error : colors.border,
-                  color: colors.text,
-                  backgroundColor: Colors.light.background,
-                },
-                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-              ]}
-              placeholder={placeholder}
-              placeholderTextColor={colors.textSecondary}
+            <NumericUnitInput
               value={goalWeightKg}
               onChangeText={(text) => {
                 hasManuallyAdjustedRef.current = true;
                 onGoalWeightKgChange(limitWeightInput(text));
                 onErrorClear();
               }}
+              unitLabel="kg"
+              placeholder={placeholder}
               keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                t('onboarding.goal_weight.accessibility_label_kg'),
-                placeholder,
-                error && !goalWeightKg ? error : undefined,
-                true
-              )}
+              width={88}
+              disabled={loading}
+              accessibilityLabel={t('onboarding.goal_weight.accessibility_label_kg')}
+              accessibilityHint={placeholder}
+              error={(error || errorKey) && !goalWeightKg ? (error || undefined) : undefined}
+              required
+              borderColor={(error || errorKey) && !goalWeightKg ? SemanticColors.error : colors.border}
             />
           ) : (
-            <TextInput
-              style={[
-                styles.inputModern,
-                {
-                  borderColor: (error || errorKey) && !goalWeightLb ? SemanticColors.error : colors.border,
-                  color: colors.text,
-                  backgroundColor: Colors.light.background,
-                },
-                Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
-              ]}
-              placeholder={placeholder}
-              placeholderTextColor={colors.textSecondary}
+            <NumericUnitInput
               value={goalWeightLb}
               onChangeText={(text) => {
                 hasManuallyAdjustedRef.current = true;
                 onGoalWeightLbChange(limitWeightInput(text));
                 onErrorClear();
               }}
+              unitLabel="lb"
+              placeholder={placeholder}
               keyboardType="numeric"
-              editable={!loading}
-              {...getInputAccessibilityProps(
-                t('onboarding.goal_weight.accessibility_label_lb'),
-                placeholder,
-                error && !goalWeightLb ? error : undefined,
-                true
-              )}
+              width={120}
+              disabled={loading}
+              accessibilityLabel={t('onboarding.goal_weight.accessibility_label_lb')}
+              accessibilityHint={placeholder}
+              error={(error || errorKey) && !goalWeightLb ? (error || undefined) : undefined}
+              required
+              borderColor={(error || errorKey) && !goalWeightLb ? SemanticColors.error : colors.border}
             />
           )}
-          <Text variant="label" style={[styles.inputUnitLabel, { color: colors.textSecondary }]}>
-            {currentWeightUnit}
-          </Text>
         </View>
-      </View>
       )}
     </View>
   );

@@ -28,8 +28,7 @@ interface WeightNudgePickerProps {
 }
 
 const TRACK_WIDTH = 280;
-const THUMB_SIZE = 40;
-const TICK_SPACING = 20; // Visual spacing between ticks
+const THUMB_SIZE = 26;
 
 export const WeightNudgePicker: React.FC<WeightNudgePickerProps> = ({
   value,
@@ -68,15 +67,6 @@ export const WeightNudgePicker: React.FC<WeightNudgePickerProps> = ({
   
   const currentPosition = valueToPosition(clampedValue);
   const thumbX = currentPosition * (TRACK_WIDTH - THUMB_SIZE);
-  
-  // Generate tick marks for visual reference
-  const ticks = Array.from({ length: numSteps + 1 }, (_, i) => {
-    const tickValue = min + i * step;
-    return {
-      value: tickValue,
-      position: valueToPosition(tickValue),
-    };
-  });
   
   const panResponder = useRef(
     PanResponder.create({
@@ -126,13 +116,14 @@ export const WeightNudgePicker: React.FC<WeightNudgePickerProps> = ({
         <Text variant="h2" style={[styles.valueText, disabled && styles.valueTextDisabled]}>
           {formatValue(clampedValue)} {unit}
         </Text>
-        <ThemedText style={[styles.helperText, disabled && styles.helperTextDisabled]}>
-          {unit === 'lbs' 
-            ? t('onboarding.goal_weight.nudge_helper_lbs')
-            : t('onboarding.goal_weight.nudge_helper_kg')
-          }
-        </ThemedText>
       </View>
+      
+      {/* Instructional hint - always visible for maintain/recomp */}
+      {!disabled && (
+        <ThemedText style={styles.hintText}>
+          {t('onboarding.goal_weight.nudge_hint')}
+        </ThemedText>
+      )}
       
       {/* Horizontal slider track */}
       <View 
@@ -141,23 +132,6 @@ export const WeightNudgePicker: React.FC<WeightNudgePickerProps> = ({
         {...panResponder.panHandlers}
       >
         <View style={styles.track}>
-          {/* Tick marks */}
-          {ticks.map((tick, index) => {
-            const tickX = tick.position * TRACK_WIDTH;
-            const isSelected = Math.abs(tick.value - clampedValue) < step / 2;
-            
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.tick,
-                  { left: tickX },
-                  isSelected && styles.tickSelected,
-                ]}
-              />
-            );
-          })}
-          
           {/* Thumb */}
           <View 
             style={[
@@ -217,13 +191,13 @@ const styles = StyleSheet.create({
   valueTextDisabled: {
     opacity: 0.5,
   },
-  helperText: {
-    fontSize: FontSize.sm,
+  hintText: {
+    fontSize: FontSize.sm + 1, // 12px + 1pt = 13px (within 12-13 range)
     color: Colors.light.textSecondary,
-    lineHeight: FontSize.sm * LineHeight.normal,
-  },
-  helperTextDisabled: {
-    opacity: 0.5,
+    lineHeight: (FontSize.sm + 1) * LineHeight.normal,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   trackContainer: {
     width: TRACK_WIDTH,
@@ -237,37 +211,44 @@ const styles = StyleSheet.create({
   },
   track: {
     width: TRACK_WIDTH,
-    height: 4,
-    backgroundColor: Colors.light.border,
-    borderRadius: 2,
-    position: 'relative',
-  },
-  tick: {
-    position: 'absolute',
-    top: -6,
-    width: 2,
-    height: 16,
+    height: 2,
     backgroundColor: Colors.light.border,
     borderRadius: 1,
-  },
-  tickSelected: {
-    backgroundColor: onboardingColors.primary,
-    width: 3,
+    position: 'relative',
   },
   thumb: {
     position: 'absolute',
-    top: -THUMB_SIZE / 2 + 2,
+    top: -THUMB_SIZE / 2 + 1,
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
     backgroundColor: onboardingColors.primary,
-    borderWidth: 3,
-    borderColor: Colors.light.background,
-    ...Shadows.md,
+    ...Platform.select({
+      web: {
+        boxShadow: `0 2px 8px ${onboardingColors.primary}40`,
+      },
+      default: {
+        shadowColor: onboardingColors.primary,
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 4,
+      },
+    }),
   },
   thumbDragging: {
-    transform: [{ scale: 1.1 }],
-    ...Shadows.lg,
+    ...Platform.select({
+      web: {
+        boxShadow: `0 4px 12px ${onboardingColors.primary}50`,
+      },
+      default: {
+        shadowColor: onboardingColors.primary,
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 6,
+      },
+    }),
   },
   thumbDisabled: {
     opacity: 0.5,
@@ -281,7 +262,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   resetButtonText: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.sm + 2, // 12px + 2pt = 14px
     color: onboardingColors.primary,
     fontWeight: FontWeight.semibold,
   },

@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Text } from '@/components/ui/text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
-import { TrajectoryCard } from '@/components/onboarding/TrajectoryCard';
+import { TrajectorySummary } from '@/components/onboarding/TrajectorySummary';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle, AccessibilityHints } from '@/utils/accessibility';
@@ -290,17 +290,14 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
       <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
         {t('onboarding.timeline.title')}
       </ThemedText>
-      <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
-        {t('onboarding.timeline.subtitle')}
-      </ThemedText>
       
-      {/* Trajectory Card */}
+      {/* Trajectory Summary */}
       {currentWeightLb !== null && targetWeightLb !== null && (
-        <TrajectoryCard
-          currentWeightLabel={`${roundTo1(currentWeightUnit === 'kg' ? lbToKg(currentWeightLb) : currentWeightLb)} ${currentWeightUnit === 'kg' ? 'kg' : 'lb'}`}
-          targetWeightLabel={`${roundTo1(currentWeightUnit === 'kg' ? lbToKg(targetWeightLb) : targetWeightLb)} ${currentWeightUnit === 'kg' ? 'kg' : 'lb'}`}
-          startLabel={t('common.today')}
-          endLabel={
+        <TrajectorySummary
+          startWeightLabel={`${roundTo1(currentWeightUnit === 'kg' ? lbToKg(currentWeightLb) : currentWeightLb)} ${currentWeightUnit === 'kg' ? 'kg' : 'lb'}`}
+          endWeightLabel={`${roundTo1(currentWeightUnit === 'kg' ? lbToKg(targetWeightLb) : targetWeightLb)} ${currentWeightUnit === 'kg' ? 'kg' : 'lb'}`}
+          startSubLabel={t('common.today')}
+          endSubLabel={
             timelineOption === 'no_deadline'
               ? t('onboarding.timeline.no_deadline')
               : customDateObj
@@ -347,9 +344,7 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
                   return undefined;
                 })()
           }
-          isNoDeadline={timelineOption === 'no_deadline'}
           accentColor={onboardingColors.primary}
-          backgroundColor={colors.background}
           textColor={colors.text}
         />
       )}
@@ -454,7 +449,7 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
                     </Text>
                     <Text 
                       variant="body" 
-                      style={[styles.paceText, { color: actuallySelected ? Colors.light.textInverse : colors.textSecondary, opacity: actuallySelected ? 0.9 : 1 }]}
+                      style={[styles.paceText, styles.paceTextRight, { color: actuallySelected ? Colors.light.textInverse : colors.textSecondary, opacity: actuallySelected ? 0.9 : 1 }]}
                     >
                       {t('onboarding.goal_date.pace_per_week', { pace: formatPace(option.pace!).split(' ')[0], unit: formatPace(option.pace!).split(' ')[1] })}
                     </Text>
@@ -530,14 +525,8 @@ const styles = StyleSheet.create({
   stepTitleModern: {
     fontSize: FontSize['2xl'],
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.none,
     textAlign: 'center',
-  },
-  stepSubtitleModern: {
-    fontSize: FontSize.md,
-    marginBottom: Spacing['2xl'],
-    textAlign: 'center',
-    lineHeight: FontSize.md * LineHeight.normal,
   },
   optionsContainer: {
     gap: Spacing.md,
@@ -573,11 +562,16 @@ const styles = StyleSheet.create({
   },
   paceInfo: {
     marginTop: Spacing.xs,
-    gap: Spacing.xs,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   paceText: {
     fontSize: FontSize.base,
     lineHeight: FontSize.base * LineHeight.normal,
+  },
+  paceTextRight: {
+    textAlign: 'right',
   },
   optionCardCheckmark: {
     position: 'absolute',
