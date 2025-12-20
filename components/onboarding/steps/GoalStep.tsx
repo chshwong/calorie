@@ -174,6 +174,7 @@ const styles = StyleSheet.create({
   stepSubtitle: {
     fontSize: FontSize.md,
     marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   goalContainer: {
     gap: Spacing.md,

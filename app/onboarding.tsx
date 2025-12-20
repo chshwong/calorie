@@ -23,7 +23,8 @@ import {
   CurrentWeightStep,
   GoalStep,
   GoalWeightStep,
-  TimelineStep,
+  DailyCalorieTargetStep,
+  DailyFocusTargetsStep,
 } from '@/components/onboarding/steps';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
@@ -81,6 +82,16 @@ export default function OnboardingScreen() {
     setTimelineOption,
     customTargetDate,
     setCustomTargetDate,
+    calorieTarget,
+    maintenanceCalories,
+    caloriePlan,
+    calorieExecutionMode,
+    setCalorieTarget,
+    setMaintenanceCalories,
+    setCaloriePlan,
+    setCalorieExecutionMode,
+    dailyTargets,
+    setDailyTargets,
     loading,
     errorText,
     errorKey,
@@ -191,6 +202,7 @@ export default function OnboardingScreen() {
         currentWeightLb={currentWeightLb}
         currentWeightUnit={currentWeightUnit}
         currentBodyFatPercent={currentBodyFatPercent}
+        sexAtBirth={sex}
         onCurrentWeightKgChange={(text) => {
           setCurrentWeightKg(text);
           clearErrors();
@@ -251,21 +263,41 @@ export default function OnboardingScreen() {
       />
     ),
     8: (
-      <TimelineStep
+      <DailyCalorieTargetStep
         goalType={goal}
         currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
         targetWeightLb={goalWeightLb ? parseFloat(goalWeightLb) : (goalWeightKg ? kgToLb(parseFloat(goalWeightKg)) : null)}
-        currentWeightUnit={currentWeightUnit}
-        timelineOption={timelineOption}
-        customTargetDate={customTargetDate}
-        onTimelineChange={(option) => {
-          setTimelineOption(option);
-          if (option !== 'custom_date') {
-            setCustomTargetDate(null);
-          }
-          clearErrors();
+        heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
+        sexAtBirth={sex}
+        activityLevel={activityLevel}
+        dobISO={dateOfBirthStep2 || null}
+        bodyFatPercent={currentBodyFatPercent ? parseFloat(currentBodyFatPercent) : null}
+        weightUnit={currentWeightUnit}
+        heightUnit={heightUnit}
+        firstName={preferredName || null}
+        onCalorieTargetChange={(target) => {
+          console.log('onCalorieTargetChange', target);
+          setCalorieTarget(target.calorieTarget);
+          setMaintenanceCalories(target.maintenanceCalories);
+          setCaloriePlan(target.caloriePlan);
+          setCalorieExecutionMode(target.executionMode);
         }}
-        onCustomTargetDateChange={setCustomTargetDate}
+        onErrorClear={clearErrors}
+        loading={loading}
+        colors={colors}
+      />
+    ),
+    9: (
+      <DailyFocusTargetsStep
+        goalType={goal}
+        currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
+        targetWeightLb={goalWeightLb ? parseFloat(goalWeightLb) : (goalWeightKg ? kgToLb(parseFloat(goalWeightKg)) : null)}
+        heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
+        sexAtBirth={sex}
+        activityLevel={activityLevel}
+        weightUnit={currentWeightUnit}
+        calorieTarget={calorieTarget}
+        onTargetChange={setDailyTargets}
         onErrorClear={clearErrors}
         loading={loading}
         colors={colors}

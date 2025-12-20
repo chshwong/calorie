@@ -676,8 +676,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: itemNameError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -720,8 +719,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: quantityError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -762,8 +760,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                   borderBottomWidth: 1,
                   color: '#000000',
                   ...(Platform.OS === 'web' ? { 
-                    outline: 'none',
-                    borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                    outlineWidth: 0,
                   } : {}),
                 }
               ]}
@@ -798,8 +795,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                       color: '#000000',
                       fontWeight: '700',
                       ...(Platform.OS === 'web' ? { 
-                        outline: 'none',
-                        borderBottom: caloriesError ? '1px solid #EF4444' : '1px solid rgba(0, 0, 0, 0.2)',
+                        outlineWidth: 0,
                       } : {}),
                     }
                   ]}
@@ -843,8 +839,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -881,8 +876,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -917,8 +911,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -953,8 +946,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -991,8 +983,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -1029,8 +1020,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -1065,8 +1055,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}
@@ -1103,8 +1092,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                     borderBottomWidth: 1,
                     color: '#000000',
                     ...(Platform.OS === 'web' ? { 
-                      outline: 'none',
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      outlineWidth: 0,
                     } : {}),
                   }
                 ]}

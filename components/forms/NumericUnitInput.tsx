@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     ...Platform.select({
       web: {
-        outline: 'none',
+        outlineWidth: 0,
         boxSizing: 'border-box',
       },
       default: {},

@@ -41,6 +41,7 @@ import {
   type OnboardingDraft,
   getLastDraftError 
 } from '@/lib/onboarding/onboarding-draft-sync';
+import type { DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 
@@ -50,7 +51,7 @@ export function useOnboardingForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 8;
+  const totalSteps = 9; // Steps 1-9: Name, Sex, Height, Activity, Current Weight, Goal, Goal Weight, Daily Calorie Target, Daily Focus Targets
   
   // Step 6: Goal
   const [goal, setGoal] = useState<GoalType | ''>('');
@@ -112,6 +113,22 @@ export function useOnboardingForm() {
   // Step 8: Timeline
   const [timelineOption, setTimelineOption] = useState<'3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date' | ''>('');
   const [customTargetDate, setCustomTargetDate] = useState<string | null>(null);
+  
+  // Step 9: Daily Calorie Target
+  const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
+  const [maintenanceCalories, setMaintenanceCalories] = useState<number | null>(null);
+  const [caloriePlan, setCaloriePlan] = useState<string | null>(null);
+  const [calorieExecutionMode, setCalorieExecutionMode] = useState<'override' | undefined>(undefined);
+  
+  // Step 10: Daily Focus Targets
+  const [dailyTargets, setDailyTargets] = useState<{
+    proteinGMin: number;
+    fiberGMin: number;
+    carbsGMax: number;
+    sugarGMax: number;
+    sodiumMgMax: number;
+    waterMlTarget: number;
+  } | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorTextState] = useState<string | null>(null);
@@ -619,6 +636,27 @@ export function useOnboardingForm() {
       }
     }
     
+    // Step 8: Timeline
+    if (timelineOption && ['3_months', '6_months', '12_months', 'no_deadline', 'custom_date'].includes(timelineOption)) {
+      draft.goal_timeframe = timelineOption as '3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date';
+    }
+    if (customTargetDate) {
+      draft.goal_target_date = customTargetDate;
+    }
+    
+    // Step 9: Daily Calorie Target - only include if explicitly set (not null/undefined)
+    // Using daily_calorie_target (existing column name)
+    if (calorieTarget !== null && calorieTarget !== undefined) {
+      draft.daily_calorie_target = calorieTarget;
+    }
+    if (maintenanceCalories !== null && maintenanceCalories !== undefined) {
+      draft.maintenance_calories = maintenanceCalories;
+    }
+    if (caloriePlan && typeof caloriePlan === 'string' && caloriePlan.trim().length > 0) {
+      draft.calorie_plan = caloriePlan;
+      draft.onboarding_calorie_set_at = new Date().toISOString();
+    }
+    
     return draft;
   };
   
@@ -928,6 +966,79 @@ export function useOnboardingForm() {
     }, 100);
   };
   
+  const handleTimelineNext = () => {
+    clearErrors();
+    
+    // Validate timeline step
+    const validationError = validateTimeline();
+    if (validationError) {
+      setErrorText(validationError);
+      return;
+    }
+    
+    if (!user) {
+      setErrorText(t('onboarding.error_no_session'));
+      router.replace('/login');
+      return;
+    }
+    
+    // Build draft with timeline fields and schedule background save (fire-and-forget)
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_timeline');
+    
+    // Move to next step immediately (optimistic, no blocking)
+    setCurrentStep(9);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
+      }
+    }, 100);
+  };
+  
+  const handleCalorieTargetNext = () => {
+    clearErrors();
+    
+    // Validate calorie target is set (only for weight loss)
+    if (goal === 'lose' && (calorieTarget === null || maintenanceCalories === null || caloriePlan === null)) {
+      setErrorText('Please select a calorie target.');
+      return;
+    }
+    
+    if (!user) {
+      setErrorText(t('onboarding.error_no_session'));
+      router.replace('/login');
+      return;
+    }
+    
+    // Schedule background save of calorie target (fire-and-forget)
+    const draft = buildDraft();
+    setSyncStatus('saving');
+    scheduleDraftSave(draft, user.id, queryClient, 'step_calorie_target');
+    
+    // Move to next step immediately (optimistic, no blocking)
+    // Step 9 is Daily Focus Targets (TimelineStep was removed)
+    setCurrentStep(9);
+    
+    setTimeout(() => {
+      const { error } = getLastDraftError();
+      if (error) {
+        setSyncStatus('error');
+        lastSyncErrorRef.current = error;
+        console.error('Async calorie target save failed:', error);
+      } else {
+        setSyncStatus('idle');
+        setLastSavedAt(Date.now());
+      }
+    }, 100);
+  };
+  
   const handleNext = () => {
     clearErrors();
     
@@ -953,7 +1064,11 @@ export function useOnboardingForm() {
       // Goal weight step
       handleGoalWeightNext();
     } else if (currentStep === 8) {
-      // Timeline step - handled by handleCompleteOnboarding
+      // Daily calorie target step - navigate to focus targets step (async save)
+      // TimelineStep was removed, so this is now step 8
+      handleCalorieTargetNext();
+    } else if (currentStep === 9) {
+      // Daily focus targets step - handled by handleCompleteOnboarding
       handleCompleteOnboarding();
     }
   };
@@ -1008,7 +1123,21 @@ export function useOnboardingForm() {
         return lbs < PROFILES.WEIGHT_LB.MIN || lbs > PROFILES.WEIGHT_LB.MAX;
       }
     } else if (currentStep === 8) {
-      return !timelineOption || (timelineOption === 'custom_date' && !customTargetDate);
+      // Daily Calorie Target step (TimelineStep was removed)
+      // Allow Next even for non-weight-loss (placeholder step)
+      if (goal !== 'lose') {
+        return false;
+      }
+      // Validate: calorieTarget must be >= 700 (HARD_HARD_STOP) and finite
+      // Do NOT require >= 1200 or soft floors - those are warnings, not blockers
+      if (calorieTarget === null || !isFinite(calorieTarget) || calorieTarget < 700) {
+        return true; // Disable Next
+      }
+      // Also require maintenanceCalories and caloriePlan to be set
+      return maintenanceCalories === null || caloriePlan === null;
+    } else if (currentStep === 9) {
+      // Daily Focus Targets step
+      return !dailyTargets;
     }
     return false;
   };
@@ -1030,7 +1159,13 @@ export function useOnboardingForm() {
       return;
     }
     
-    // Validate timeline step
+    // Validate targets are set
+    if (!dailyTargets) {
+      setErrorText('Please set your daily focus targets.');
+      return;
+    }
+    
+    // Validate timeline step (should already be saved, but validate for safety)
     const validationError = validateTimeline();
     if (validationError) {
       setErrorText(validationError);
@@ -1131,13 +1266,55 @@ export function useOnboardingForm() {
         return; // Keep user on final step
       }
       
-      // Step 2: Final profile update with calculated values and onboarding_complete=true
-      const updateData = {
-        daily_calorie_target: targetCalories,
-        goal_target_date: targetDate,
-        goal_timeframe: timelineOption,
-        onboarding_complete: true,
+      // Step 2: Final profile update with calculated values, targets, timeline fields, and onboarding_complete=true
+      // Use calorie target from step 9 if available, otherwise fall back to calculated targetCalories
+      const finalCalorieTarget = calorieTarget !== null ? calorieTarget : targetCalories;
+      const finalMaintenanceCalories = maintenanceCalories !== null ? maintenanceCalories : targetCalories;
+      
+      // Map UI plan names to database values
+      const mapCaloriePlanToDb = (plan: string | null): string => {
+        if (!plan) return 'calculated';
+        switch (plan) {
+          case 'onTime':
+            return 'calculated';
+          case 'sustainable':
+            return 'recommended';
+          case 'accelerated':
+            return 'aggressive';
+          case 'custom':
+            return 'custom';
+          default:
+            return 'calculated';
+        }
       };
+      
+      const finalCaloriePlan = mapCaloriePlanToDb(caloriePlan);
+      
+       const updateData: Record<string, any> = {
+         daily_calorie_target: finalCalorieTarget,
+         goal_target_date: targetDate,
+         goal_timeframe: timelineOption,
+         onboarding_complete: true,
+       };
+       
+       // Add optional fields only if they exist in schema (will be added via migration)
+       // For now, only include fields that definitely exist
+       if (finalMaintenanceCalories !== null) {
+         updateData.maintenance_calories = finalMaintenanceCalories;
+       }
+       if (finalCaloriePlan) {
+         updateData.calorie_plan = finalCaloriePlan;
+         updateData.onboarding_calorie_set_at = new Date().toISOString();
+       }
+       if (dailyTargets) {
+         updateData.protein_g_min = dailyTargets.proteinGMin;
+         updateData.fiber_g_min = dailyTargets.fiberGMin;
+         updateData.carbs_g_max = dailyTargets.carbsGMax;
+         updateData.sugar_g_max = dailyTargets.sugarGMax;
+         updateData.sodium_mg_max = dailyTargets.sodiumMgMax;
+         updateData.water_goal_ml = dailyTargets.waterMlTarget; // Using existing column name
+         updateData.onboarding_targets_set_at = new Date().toISOString();
+       }
       
       // Perform final mutation with timeout and retry support
       const mutationStart = performance.now();
@@ -1234,6 +1411,16 @@ export function useOnboardingForm() {
     setTimelineOption,
     customTargetDate,
     setCustomTargetDate,
+    calorieTarget,
+    maintenanceCalories,
+    caloriePlan,
+    calorieExecutionMode,
+    setCalorieTarget,
+    setMaintenanceCalories,
+    setCaloriePlan,
+    setCalorieExecutionMode,
+    dailyTargets,
+    setDailyTargets,
     loading,
     errorText,
     errorKey,

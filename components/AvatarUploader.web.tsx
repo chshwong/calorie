@@ -459,7 +459,14 @@ export function AvatarUploader({
                   border: '2px solid #14B8A6',
                   borderTopColor: 'transparent',
                   borderRadius: '50%',
-                  animation: 'spin 0.6s linear infinite',
+                  animationName: 'spin',
+                  animationDuration: '0.6s',
+                  animationTimingFunction: 'linear',
+                  animationIterationCount: 'infinite',
+                          animationName: 'spin',
+                          animationDuration: '0.6s',
+                          animationTimingFunction: 'linear',
+                          animationIterationCount: 'infinite',
                 }}
               />
             </div>
@@ -734,7 +741,10 @@ export function AvatarUploader({
                           border: '2px solid #FFFFFF',
                           borderTopColor: 'transparent',
                           borderRadius: '50%',
-                          animation: 'spin 0.6s linear infinite',
+                          animationName: 'spin',
+                          animationDuration: '0.6s',
+                          animationTimingFunction: 'linear',
+                          animationIterationCount: 'infinite',
                         }}
                       />
                       Processing...

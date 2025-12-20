@@ -178,11 +178,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     ...Platform.select({
       web: {
-        animation: 'fadeUp 0.3s ease',
-        '@keyframes fadeUp': {
+        animationKeyframes: {
           from: { opacity: 0, transform: `translateY(${Spacing.md}px)` },
           to: { opacity: 1, transform: 'translateY(0)' },
         },
+        animationDuration: '0.3s',
+        animationTimingFunction: 'ease',
+        animationFillMode: 'both',
       },
       default: {
         opacity: 1,

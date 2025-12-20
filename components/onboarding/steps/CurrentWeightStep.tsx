@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
@@ -9,14 +9,16 @@ import { onboardingColors } from '@/theme/onboardingTheme';
 import { validateBodyFatPercent } from '@/utils/validation';
 import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
 import { filterNumericInput } from '@/utils/inputFilters';
-import { getButtonAccessibilityProps } from '@/utils/accessibility';
+import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { NumericUnitInput } from '@/components/forms/NumericUnitInput';
+import { BodyFatRangesModal } from '@/components/onboarding/body-fat-ranges-modal';
 
 interface CurrentWeightStepProps {
   currentWeightKg: string;
   currentWeightLb: string;
   currentWeightUnit: 'kg' | 'lb';
   currentBodyFatPercent: string;
+  sexAtBirth: 'male' | 'female' | '' | null;
   onCurrentWeightKgChange: (text: string) => void;
   onCurrentWeightLbChange: (text: string) => void;
   onCurrentWeightUnitChange: (unit: 'kg' | 'lb') => void;
@@ -54,6 +56,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
   currentWeightLb,
   currentWeightUnit,
   currentBodyFatPercent,
+  sexAtBirth,
   onCurrentWeightKgChange,
   onCurrentWeightLbChange,
   onCurrentWeightUnitChange,
@@ -64,6 +67,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const [bfModalOpen, setBfModalOpen] = useState(false);
   
   // Placeholder examples
   const weightKgPlaceholder = '(e.g., 79)';
@@ -195,6 +199,20 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
         ].map((unitOption) => {
           const selected = isSelected(unitOption.value);
           
+          const selectedStyle = selected
+            ? Platform.select({
+                web: {
+                  background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                  boxShadow: `0 4px 12px ${onboardingColors.primary}40`,
+                },
+                default: {
+                  backgroundColor: onboardingColors.primary,
+                },
+              })
+            : null;
+
+          const transitionStyle = Platform.OS === 'web' ? ({ transition: 'all 0.2s ease' } as any) : null;
+
           return (
             <TouchableOpacity
               key={unitOption.value}
@@ -204,24 +222,9 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
                 {
                   transform: [{ scale: selected ? 1.02 : 1 }],
                 },
-                selected && {
-                  ...Platform.select({
-                    web: {
-                      background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
-                      boxShadow: `0 4px 12px ${onboardingColors.primary}40`,
-                    },
-                    default: {
-                      backgroundColor: onboardingColors.primary,
-                    },
-                  }),
-                },
-                Platform.select({
-                  web: {
-                    transition: 'all 0.2s ease',
-                  },
-                  default: {},
-                }),
-              ]}
+                selectedStyle,
+                transitionStyle,
+              ].filter(Boolean)}
               onPress={() => handleUnitChange(unitOption.value as 'kg' | 'lb')}
               disabled={loading}
               {...getButtonAccessibilityProps(
@@ -272,7 +275,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
             unitLabel="kg"
             placeholder={weightKgPlaceholder}
             keyboardType="numeric"
-            width={88}
+            width={100}
             disabled={loading}
             accessibilityLabel="Current weight in kilograms"
             accessibilityHint={weightKgPlaceholder}
@@ -307,7 +310,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
             unitLabel="lb"
             placeholder={weightLbPlaceholder}
             keyboardType="numeric"
-            width={88}
+            width={100}
             disabled={loading}
             accessibilityLabel="Current weight in pounds"
             accessibilityHint={weightLbPlaceholder}
@@ -318,31 +321,61 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
         )}
 
         {/* Body Fat % (optional) */}
-        <View style={{ width: '100%', marginTop: Spacing.lg, alignItems: 'center' }}>
-          <ThemedText style={[styles.label, { color: colors.text, marginBottom: Spacing.sm, textAlign: 'center' }]}>
-            {t('onboarding.current_weight.body_fat_label')}
-          </ThemedText>
-          <NumericUnitInput
-            value={currentBodyFatPercent}
-            onChangeText={(text) => {
-              onCurrentBodyFatPercentChange(limitBodyFatInput(text));
-              onErrorClear();
-            }}
-            unitLabel="%"
-            placeholder={t('onboarding.current_weight.body_fat_placeholder')}
-            keyboardType="numeric"
-            width={72}
-            disabled={loading}
-            accessibilityLabel={t('onboarding.current_weight.body_fat_accessibility_label')}
-            accessibilityHint={t('onboarding.current_weight.body_fat_accessibility_hint')}
-            borderColor={
-              error && currentBodyFatPercent && validateBodyFatPercent(parseFloat(currentBodyFatPercent)) !== null
-                ? SemanticColors.error
-                : colors.border
-            }
-          />
+        <View style={styles.bfBlock}>
+          <View style={styles.bfHeaderRow}>
+            <ThemedText style={[styles.bfLabel, { color: colors.text }]}>
+              {t('onboarding.current_weight.body_fat_label')}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={() => setBfModalOpen(true)}
+              disabled={loading}
+              style={[
+                styles.bfLinkPressable,
+                Platform.OS === 'web' && (getFocusStyle(colors.tint) as any),
+              ]}
+              hitSlop={8}
+              {...getButtonAccessibilityProps(
+                'Reference',
+                'Double tap to view typical body fat percentage ranges',
+                loading
+              )}
+            >
+              <ThemedText style={[styles.bfLinkText, { color: colors.tint }]}>
+                📑Reference
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.bfInputRow}>
+            <NumericUnitInput
+              value={currentBodyFatPercent}
+              onChangeText={(text) => {
+                onCurrentBodyFatPercentChange(limitBodyFatInput(text));
+                onErrorClear();
+              }}
+              unitLabel="%"
+              placeholder={t('onboarding.current_weight.body_fat_placeholder')}
+              keyboardType="numeric"
+              width={100}
+              disabled={loading}
+              accessibilityLabel={t('onboarding.current_weight.body_fat_accessibility_label')}
+              accessibilityHint={t('onboarding.current_weight.body_fat_accessibility_hint')}
+              borderColor={
+                error && currentBodyFatPercent && validateBodyFatPercent(parseFloat(currentBodyFatPercent)) !== null
+                  ? SemanticColors.error
+                  : colors.border
+              }
+            />
+          </View>
         </View>
       </View>
+
+      {/* Body Fat Ranges Modal */}
+      <BodyFatRangesModal
+        visible={bfModalOpen}
+        onClose={() => setBfModalOpen(false)}
+        sex={sexAtBirth}
+        colors={colors}
+      />
     </View>
   );
 };
@@ -355,11 +388,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     ...Platform.select({
       web: {
-        animation: 'fadeUp 0.3s ease',
-        '@keyframes fadeUp': {
+        animationKeyframes: {
           from: { opacity: 0, transform: `translateY(${Spacing.md}px)` },
           to: { opacity: 1, transform: 'translateY(0)' },
         },
+        animationDuration: '0.3s',
+        animationTimingFunction: 'ease',
+        animationFillMode: 'both',
       },
       default: {
         opacity: 1,
@@ -433,7 +468,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     ...Platform.select({
       web: {
-        outline: 'none',
+        outlineWidth: 0,
         boxSizing: 'border-box',
       },
       default: {},
@@ -451,6 +486,41 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     marginBottom: Spacing.sm,
+  },
+  bfBlock: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    marginTop: Spacing.lg,
+  },
+  bfHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  bfLabel: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    lineHeight: FontSize.base * LineHeight.normal,
+  },
+  bfLinkPressable: {
+    marginLeft: Spacing.md,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+      default: {},
+    }),
+  },
+  bfLinkText: {
+    fontSize: FontSize.sm + 2,
+    textDecorationLine: 'underline',
+    lineHeight: FontSize.base * LineHeight.normal,
+  },
+  bfInputRow: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

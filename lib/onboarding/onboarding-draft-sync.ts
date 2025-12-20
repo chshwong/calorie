@@ -25,6 +25,12 @@ export type OnboardingDraft = {
   activity_level?: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high' | null;
   goal_type?: 'lose' | 'maintain' | 'gain' | 'recomp' | null;
   goal_weight_lb?: number | null;
+  goal_target_date?: string | null;
+  goal_timeframe?: '3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date' | null;
+  daily_calorie_target?: number | null; // Using existing column name
+  maintenance_calories?: number | null;
+  calorie_plan?: string | null;
+  onboarding_calorie_set_at?: string | null;
   // Note: onboarding_complete is NOT in draft - only set on final flush
 };
 
@@ -43,6 +49,12 @@ export function toProfileUpdate(draft: OnboardingDraft): Partial<{
   activity_level: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high' | null;
   goal_type: 'lose' | 'maintain' | 'gain' | 'recomp' | null;
   goal_weight_lb: number | null;
+  goal_target_date: string | null;
+  goal_timeframe: '3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date' | null;
+  daily_calorie_target?: number | null; // Using existing column name
+  maintenance_calories?: number | null;
+  calorie_plan?: string | null;
+  onboarding_calorie_set_at?: string | null;
   [key: string]: any;
 }> {
   const update: Record<string, any> = {};
@@ -59,6 +71,37 @@ export function toProfileUpdate(draft: OnboardingDraft): Partial<{
   if (draft.activity_level !== undefined) update.activity_level = draft.activity_level;
   if (draft.goal_type !== undefined) update.goal_type = draft.goal_type;
   if (draft.goal_weight_lb !== undefined) update.goal_weight_lb = draft.goal_weight_lb;
+  if (draft.goal_target_date !== undefined) update.goal_target_date = draft.goal_target_date;
+  if (draft.goal_timeframe !== undefined) update.goal_timeframe = draft.goal_timeframe;
+  // Only include calorie fields if they're explicitly set (not null/undefined)
+  // Using daily_calorie_target (existing column) instead of calorie_target
+  if (draft.daily_calorie_target !== undefined && draft.daily_calorie_target !== null) update.daily_calorie_target = draft.daily_calorie_target;
+  if (draft.maintenance_calories !== undefined && draft.maintenance_calories !== null) update.maintenance_calories = draft.maintenance_calories;
+  if (draft.calorie_plan !== undefined && draft.calorie_plan !== null) {
+    // Map UI plan names to database values
+    // Database expects: 'easy', 'recommended', 'aggressive', 'custom', 'calculated'
+    // UI uses: 'onTime', 'sustainable', 'accelerated', 'custom'
+    const mapCaloriePlanToDb = (plan: string): string => {
+      switch (plan) {
+        case 'onTime':
+          return 'calculated';
+        case 'sustainable':
+          return 'recommended';
+        case 'accelerated':
+          return 'aggressive';
+        case 'custom':
+          return 'custom';
+        default:
+          // If it's already a valid DB value, pass it through
+          if (['easy', 'recommended', 'aggressive', 'custom', 'calculated'].includes(plan)) {
+            return plan;
+          }
+          return 'calculated';
+      }
+    };
+    update.calorie_plan = mapCaloriePlanToDb(draft.calorie_plan);
+  }
+  if (draft.onboarding_calorie_set_at !== undefined && draft.onboarding_calorie_set_at !== null) update.onboarding_calorie_set_at = draft.onboarding_calorie_set_at;
   
   return update;
 }
