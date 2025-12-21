@@ -911,6 +911,9 @@ export function useOnboardingForm() {
     
     // Build draft and schedule background save
     const draft = buildDraft();
+    // IMPORTANT: Explicitly persist body_fat_percent even when blank (null) so the DB clears it.
+    // The weight-log path intentionally skips profile updates when bodyFatPercent is null.
+    draft.body_fat_percent = storedBodyFat;
     setSyncStatus('saving');
     scheduleDraftSave(draft, user.id, queryClient, 'step_current_weight');
     
@@ -1005,8 +1008,9 @@ export function useOnboardingForm() {
   const handleCalorieTargetNext = () => {
     clearErrors();
     
-    // Validate calorie target is set (only for weight loss)
-    if (goal === 'lose' && (calorieTarget === null || maintenanceCalories === null || caloriePlan === null)) {
+    // Validate calorie target is set (all goals)
+    // HARD_HARD_STOP (700) is the only absolute blocker.
+    if (calorieTarget === null || !isFinite(calorieTarget) || calorieTarget < 700 || maintenanceCalories === null || caloriePlan === null) {
       setErrorText('Please select a calorie target.');
       return;
     }
@@ -1124,10 +1128,6 @@ export function useOnboardingForm() {
       }
     } else if (currentStep === 8) {
       // Daily Calorie Target step (TimelineStep was removed)
-      // Allow Next even for non-weight-loss (placeholder step)
-      if (goal !== 'lose') {
-        return false;
-      }
       // Validate: calorieTarget must be >= 700 (HARD_HARD_STOP) and finite
       // Do NOT require >= 1200 or soft floors - those are warnings, not blockers
       if (calorieTarget === null || !isFinite(calorieTarget) || calorieTarget < 700) {

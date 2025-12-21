@@ -12,12 +12,14 @@ import { filterNumericInput } from '@/utils/inputFilters';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { NumericUnitInput } from '@/components/forms/NumericUnitInput';
 import { BodyFatRangesModal } from '@/components/onboarding/body-fat-ranges-modal';
+import { ageFromDob } from '@/utils/calculations';
 
 interface CurrentWeightStepProps {
   currentWeightKg: string;
   currentWeightLb: string;
   currentWeightUnit: 'kg' | 'lb';
   currentBodyFatPercent: string;
+  dobISO?: string | null;
   sexAtBirth: 'male' | 'female' | '' | null;
   onCurrentWeightKgChange: (text: string) => void;
   onCurrentWeightLbChange: (text: string) => void;
@@ -56,6 +58,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
   currentWeightLb,
   currentWeightUnit,
   currentBodyFatPercent,
+  dobISO,
   sexAtBirth,
   onCurrentWeightKgChange,
   onCurrentWeightLbChange,
@@ -68,6 +71,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
 }) => {
   const { t } = useTranslation();
   const [bfModalOpen, setBfModalOpen] = useState(false);
+  const ageYears = dobISO ? ageFromDob(dobISO) : null;
   
   // Placeholder examples
   const weightKgPlaceholder = '(e.g., 79)';
@@ -374,6 +378,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
         visible={bfModalOpen}
         onClose={() => setBfModalOpen(false)}
         sex={sexAtBirth}
+        ageYears={ageYears}
         colors={colors}
       />
     </View>

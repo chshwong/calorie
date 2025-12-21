@@ -35,6 +35,33 @@ function floorToNearest10(value: number): number {
   return Math.floor(value / 10) * 10;
 }
 
+export function roundDownTo25(n: number): number {
+  return Math.floor(n / 25) * 25;
+}
+
+function roundUpTo25(n: number): number {
+  return Math.ceil(n / 25) * 25;
+}
+
+// Gain plan pace definitions (pace-first approach)
+const GAIN_PRESET_PACES = {
+  lean: 0.4,
+  standard: 0.6,
+  aggressive: 1.3,
+} as const;
+
+// Calculate calories from pace (single source of truth for gain plans)
+export function caloriesFromLbPerWeek(
+  maintenanceCals: number,
+  lbPerWeek: number
+): number {
+  return maintenanceCals + (lbPerWeek * CALORIES_PER_LB) / 7;
+}
+
+function roundToNearest25(n: number): number {
+  return Math.round(n / 25) * 25;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -80,34 +107,46 @@ export function computeBmr(params: {
   rawBmr: number;
   lowerBmr: number;
   upperBmr: number;
-  method: 'mifflin' | 'katch';
+  method: 'mifflin' | 'katch' | 'blend';
   usedBodyFat: boolean;
 } {
   const { sexAtBirth, ageYears, heightCm, weightKg, bodyFatPct } = params;
 
   let rawBmr: number;
-  let method: 'mifflin' | 'katch';
+  let method: 'mifflin' | 'katch' | 'blend';
   let usedBodyFat: boolean;
 
-  // Use Katch-McArdle if body fat is provided and within valid range
-  if (bodyFatPct !== null && bodyFatPct !== undefined && bodyFatPct >= 5 && bodyFatPct <= 60) {
+  // Always compute Mifflin-St Jeor (stable baseline)
+  const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * ageYears;
+
+  let rawBmrMifflin: number;
+  if (sexAtBirth === 'male') {
+    rawBmrMifflin = baseBMR + 5;
+  } else if (sexAtBirth === 'female') {
+    rawBmrMifflin = baseBMR - 161;
+  } else {
+    // unknown: midpoint between male/female constants (+5 and -161 -> -78)
+    rawBmrMifflin = baseBMR - 78;
+  }
+
+  // If body fat is provided and within valid range, compute Katch-McArdle too
+  const hasValidBodyFat =
+    bodyFatPct !== null &&
+    bodyFatPct !== undefined &&
+    bodyFatPct >= 5 &&
+    bodyFatPct <= 60;
+
+  if (hasValidBodyFat) {
     const lbmKg = weightKg * (1 - bodyFatPct / 100);
-    rawBmr = 370 + 21.6 * lbmKg;
-    method = 'katch';
+    const rawBmrKatch = 370 + 21.6 * lbmKg;
+
+    // Conservative blend: 70% Mifflin + 30% Katch
+    rawBmr = 0.7 * rawBmrMifflin + 0.3 * rawBmrKatch;
+
+    method = 'blend';
     usedBodyFat = true;
   } else {
-    // Otherwise use Mifflin-St Jeor
-    const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * ageYears;
-    
-    if (sexAtBirth === 'male') {
-      rawBmr = baseBMR + 5;
-    } else if (sexAtBirth === 'female') {
-      rawBmr = baseBMR - 161;
-    } else {
-      // unknown: use midpoint between male/female constants
-      // male: +5, female: -161, midpoint: -78
-      rawBmr = baseBMR - 78;
-    }
+    rawBmr = rawBmrMifflin;
     method = 'mifflin';
     usedBodyFat = false;
   }
@@ -143,7 +182,7 @@ export function computeMaintenanceRange(params: {
   lowerActivityCalories: number;
   upperActivityCalories: number;
   activityMultiplier: number;
-  bmrMethod: 'mifflin' | 'katch';
+  bmrMethod: 'mifflin' | 'katch' | 'blend';
   usedBodyFat: boolean;
 } {
   const { activityLevel, ...bmrParams } = params;
@@ -338,17 +377,359 @@ export function computePaceAndEta(params: {
  * Plan structure for baseline deficit chips
  */
 export type BaselinePlan = {
-  key: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum';
+  key: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200';
   title: string;
+  subtitle?: string; // Optional subtitle for escape-hatch plans
   caloriesPerDay: number | null;
   isVisible: boolean;
   isSelectable: boolean;
-  warningLevel: 'none' | 'soft' | 'hard' | 'unsafe';
+  warningLevel: 'none' | 'neutral' | 'red' | 'unsafe';
+  warningText: string | null;
   isRecommended: boolean;
   paceLbsPerWeek: number | null;
   etaWeeks: number | null;
   etaDateISO: string | null;
 };
+
+export type WeightLossWarningLevel = 'none' | 'neutral' | 'red' | 'unsafe';
+
+export function getWeightLossCalorieWarning(caloriesPerDay: number): {
+  warningLevel: WeightLossWarningLevel;
+  warningText: string | null;
+} {
+  if (!isFinite(caloriesPerDay)) {
+    return { warningLevel: 'none', warningText: null };
+  }
+
+  // Tier 4: <700
+  if (caloriesPerDay < HARD_HARD_STOP) {
+    return { warningLevel: 'unsafe', warningText: 'This plan is unsafe and cannot be selected.' };
+  }
+
+  // Tier 3: 700–1000 (inclusive)
+  if (caloriesPerDay <= 1000) {
+    return { warningLevel: 'red', warningText: 'Unsafe for most people without professional supervision.' };
+  }
+
+  // Tier 2: 1001–1199
+  if (caloriesPerDay < HARD_FLOOR) {
+    return {
+      warningLevel: 'neutral',
+      warningText: 'Demanding — requires careful nutrition and monitoring.',
+    };
+  }
+
+  // Tier 1: >=1200
+  return { warningLevel: 'none', warningText: null };
+}
+
+export type SupportedGoalType = 'lose' | 'maintain' | 'recomp' | 'gain';
+
+export type SuggestedCaloriePlanWarningLevel = 'none' | 'orange' | 'red';
+
+export type SuggestedCaloriePlan = {
+  key:
+    | 'moreSustainable'
+    | 'standard'
+    | 'aggressive'
+    | 'cautiousMinimum'
+    | 'sustainable_floor_1200'
+    | 'maintain_leaner'
+    | 'maintain_standard'
+    | 'maintain_flexible'
+    | 'recomp_leaner'
+    | 'recomp_standard'
+    | 'recomp_muscle'
+    | 'gain_lean'
+    | 'gain_standard'
+    | 'gain_aggressive';
+  caloriesPerDay: number;
+  isSelectable: boolean; // only blocked by HARD_HARD_STOP
+  isRecommended: boolean;
+  // UI should render via i18n; domain returns keys.
+  titleKey: string;
+  subtitleKey: string;
+  warning: null | {
+    level: SuggestedCaloriePlanWarningLevel;
+    textKey: string;
+  };
+};
+
+export function suggestCaloriePlans(params: {
+  goalType: SupportedGoalType;
+  sexAtBirth: 'male' | 'female' | 'unknown';
+  ageYears: number;
+  heightCm: number;
+  weightKg: number;
+  bodyFatPct?: number | null;
+  activityLevel: string;
+  currentWeightLb: number | null;
+  targetWeightLb?: number | null;
+  targetDateIso?: string | null; // only used for lose (future)
+  now?: Date;
+}): {
+  maintenance: { lower: number; upper: number; mid: number };
+  plans: SuggestedCaloriePlan[];
+  custom: { min: number; max: number };
+  warningThresholds: {
+    hardHardStop: number;
+    hardFloor: number;
+    softFloorMale: number;
+    softFloorFemale: number;
+  };
+  defaultPlanKey: SuggestedCaloriePlan['key'] | 'custom';
+} {
+  const {
+    goalType,
+    sexAtBirth,
+    ageYears,
+    heightCm,
+    weightKg,
+    bodyFatPct,
+    activityLevel,
+    currentWeightLb,
+    targetWeightLb = null,
+    now,
+  } = params;
+
+  const maintenanceRange = computeMaintenanceRange({
+    sexAtBirth,
+    ageYears,
+    heightCm,
+    weightKg,
+    bodyFatPct,
+    activityLevel,
+  });
+
+  // Rounding rules:
+  // - lower/upper ranges round DOWN
+  // - midpoint rounds to nearest 10
+  const lower = floorToNearest10(maintenanceRange.lowerMaintenance);
+  const upper = floorToNearest10(maintenanceRange.upperMaintenance);
+  const mid = roundToNearest10((lower + upper) / 2);
+
+  const warningThresholds = {
+    hardHardStop: HARD_HARD_STOP,
+    hardFloor: HARD_FLOOR,
+    softFloorMale: SOFT_FLOOR_MALE,
+    softFloorFemale: SOFT_FLOOR_FEMALE,
+  };
+
+  // NOTE: We keep goalType === 'lose' support here for completeness,
+  // but the current UI uses getBaselineDeficitPlans directly to avoid regressions.
+  if (goalType === 'lose') {
+    const baseline = getBaselineDeficitPlans({
+      currentWeightLb,
+      targetWeightLb,
+      maintenanceLow: maintenanceRange.lowerMaintenance,
+      maintenanceHigh: maintenanceRange.upperMaintenance,
+      sexAtBirth,
+      now,
+    });
+
+    const plans: SuggestedCaloriePlan[] = ([
+      baseline.plans.sustainable_floor_1200,
+      baseline.plans.moreSustainable,
+      baseline.plans.standard,
+      baseline.plans.aggressive,
+      baseline.plans.cautiousMinimum,
+    ].filter(Boolean) as BaselinePlan[])
+      .filter((p) => p.isVisible && p.caloriesPerDay !== null)
+      .map((p) => {
+        const caloriesPerDay = p.caloriesPerDay as number;
+        const isSelectable = caloriesPerDay >= HARD_HARD_STOP && p.isSelectable;
+        const warning =
+          p.warningLevel === 'red' || p.warningLevel === 'unsafe'
+            ? { level: 'red' as const, textKey: 'onboarding.calorie_target.warning_unsafe' }
+            : null;
+
+        return {
+          key: p.key,
+          caloriesPerDay: roundDownTo25(caloriesPerDay),
+          isSelectable,
+          isRecommended: p.isRecommended,
+          titleKey: '', // weight-loss UI currently uses title strings
+          subtitleKey: '',
+          warning,
+        };
+      });
+
+    return {
+      maintenance: { lower, upper, mid },
+      plans,
+      custom: {
+        min: HARD_HARD_STOP,
+        max: floorToNearest10(baseline.plans.custom.max),
+      },
+      warningThresholds,
+      defaultPlanKey: (baseline.defaultPlan ?? 'custom') as any,
+    };
+  }
+
+  function buildWarningForNonLoss(caloriesPerDay: number): SuggestedCaloriePlan['warning'] {
+    // Maintenance and Recomp now use unified low-calorie warnings (calculated at render time)
+    // Only return null here - warnings are calculated in component using getWeightLossCalorieWarning
+    if (goalType === 'maintain' || goalType === 'recomp') {
+      return null;
+    }
+    // gain - keep existing logic
+    if (caloriesPerDay < lower) {
+      return { level: 'orange', textKey: 'onboarding.calorie_target.gain_warning_below_maintenance' };
+    }
+    if (caloriesPerDay > upper + 700) {
+      return { level: 'orange', textKey: 'onboarding.calorie_target.gain_warning_high' };
+    }
+    return null;
+  }
+
+  // For maintain/recomp: generate presets from maintenance range bounds with 25-cal rounding
+  const isMaintenanceOrRecomp = goalType === 'maintain' || goalType === 'recomp';
+  
+  let rawPlans: Array<Omit<SuggestedCaloriePlan, 'caloriesPerDay' | 'isSelectable' | 'warning'> & { caloriesPerDay: number }>;
+  
+  if (isMaintenanceOrRecomp) {
+    // Use raw maintenance range (not rounded lower/upper)
+    const L = maintenanceRange.lowerMaintenance;
+    const H = maintenanceRange.upperMaintenance;
+    
+    // Compute presets with 25-cal rounding
+    let lean = roundUpTo25(L);
+    let flex = roundUpTo25(H);
+    
+    // Guard A: If lean > flex (extremely tight range), set flex = lean
+    if (lean > flex) {
+      flex = lean;
+    }
+    
+    // Compute midpoint
+    const midRaw = (L + H) / 2;
+    let mid = roundToNearest25(midRaw);
+    // Clamp mid into [lean, flex]
+    mid = Math.min(flex, Math.max(lean, mid));
+    
+    // Build plan array based on goal type
+    const allPlans = goalType === 'maintain'
+      ? [
+          {
+            key: 'maintain_leaner' as const,
+            titleKey: 'onboarding.calorie_target.maintain_leaner_title',
+            subtitleKey: 'onboarding.calorie_target.maintain_leaner_subtitle',
+            caloriesPerDay: lean,
+            isRecommended: false,
+          },
+          {
+            key: 'maintain_standard' as const,
+            titleKey: 'onboarding.calorie_target.maintain_standard_title',
+            subtitleKey: 'onboarding.calorie_target.maintain_standard_subtitle',
+            caloriesPerDay: mid,
+            isRecommended: true,
+          },
+          {
+            key: 'maintain_flexible' as const,
+            titleKey: 'onboarding.calorie_target.maintain_flexible_title',
+            subtitleKey: 'onboarding.calorie_target.maintain_flexible_subtitle',
+            caloriesPerDay: flex,
+            isRecommended: false,
+          },
+        ]
+      : [
+          {
+            key: 'recomp_leaner' as const,
+            titleKey: 'onboarding.calorie_target.recomp_leaner_title',
+            subtitleKey: 'onboarding.calorie_target.recomp_leaner_subtitle',
+            caloriesPerDay: lean,
+            isRecommended: false,
+          },
+          {
+            key: 'recomp_standard' as const,
+            titleKey: 'onboarding.calorie_target.recomp_standard_title',
+            subtitleKey: 'onboarding.calorie_target.recomp_standard_subtitle',
+            caloriesPerDay: mid,
+            isRecommended: true,
+          },
+          {
+            key: 'recomp_muscle' as const,
+            titleKey: 'onboarding.calorie_target.recomp_muscle_title',
+            subtitleKey: 'onboarding.calorie_target.recomp_muscle_subtitle',
+            caloriesPerDay: flex,
+            isRecommended: false,
+          },
+        ];
+    
+    // Guard B & C: Filter duplicates
+    // If all three are equal: show only recommended
+    if (lean === mid && mid === flex) {
+      rawPlans = allPlans.filter((p) => p.isRecommended);
+    }
+    // If lean === mid && mid < flex: drop leaner, show recommended + flexible
+    else if (lean === mid && mid < flex) {
+      rawPlans = allPlans.filter((p) => p.key !== (goalType === 'maintain' ? 'maintain_leaner' : 'recomp_leaner'));
+    }
+    // If mid === flex && lean < mid: drop flexible, show leaner + recommended
+    else if (mid === flex && lean < mid) {
+      rawPlans = allPlans.filter((p) => p.key !== (goalType === 'maintain' ? 'maintain_flexible' : 'recomp_muscle'));
+    }
+    // Normal case: show all three
+    else {
+      rawPlans = allPlans;
+    }
+  } else {
+    // Weight gain: pace-first approach (calculate calories from pace)
+    const maintenanceMid = (lower + upper) / 2;
+    rawPlans = [
+      {
+        key: 'gain_lean',
+        titleKey: 'onboarding.calorie_target.gain_lean_title',
+        subtitleKey: 'onboarding.calorie_target.gain_lean_subtitle',
+        caloriesPerDay: caloriesFromLbPerWeek(maintenanceMid, GAIN_PRESET_PACES.lean),
+        isRecommended: true,
+      },
+      {
+        key: 'gain_standard',
+        titleKey: 'onboarding.calorie_target.gain_standard_title',
+        subtitleKey: 'onboarding.calorie_target.gain_standard_subtitle',
+        caloriesPerDay: caloriesFromLbPerWeek(maintenanceMid, GAIN_PRESET_PACES.standard),
+        isRecommended: false,
+      },
+      {
+        key: 'gain_aggressive',
+        titleKey: 'onboarding.calorie_target.gain_aggressive_title',
+        subtitleKey: 'onboarding.calorie_target.gain_aggressive_subtitle',
+        caloriesPerDay: caloriesFromLbPerWeek(maintenanceMid, GAIN_PRESET_PACES.aggressive),
+        isRecommended: false,
+      },
+    ];
+  }
+
+  const plans: SuggestedCaloriePlan[] = rawPlans.map((p) => {
+    // For gain goals, round up to nearest 25; for others, round down
+    const caloriesPerDay = goalType === 'gain' 
+      ? roundUpTo25(p.caloriesPerDay)
+      : roundDownTo25(p.caloriesPerDay);
+    return {
+      ...p,
+      caloriesPerDay,
+      isSelectable: caloriesPerDay >= HARD_HARD_STOP,
+      warning: buildWarningForNonLoss(caloriesPerDay),
+    };
+  });
+
+  const customMax =
+    goalType === 'gain'
+      ? floorToNearest10(upper + 800)
+      : floorToNearest10(upper + 300);
+
+  const defaultPlanKey: SuggestedCaloriePlan['key'] =
+    (plans.find((p) => p.isRecommended)?.key ?? plans[0].key) as any;
+
+  return {
+    maintenance: { lower, upper, mid },
+    plans,
+    custom: { min: HARD_HARD_STOP, max: customMax },
+    warningThresholds,
+    defaultPlanKey,
+  };
+}
 
 /**
  * Get baseline deficit calorie plans (new implementation)
@@ -371,12 +752,13 @@ export function getBaselineDeficitPlans(params: {
     standard: BaselinePlan;
     aggressive: BaselinePlan;
     cautiousMinimum: BaselinePlan;
+    sustainable_floor_1200?: BaselinePlan; // Optional escape-hatch plan
     custom: {
       min: number;
       max: number;
     };
   };
-  defaultPlan: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'custom' | null;
+  defaultPlan: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200' | 'custom' | null;
 } {
   const {
     currentWeightLb,
@@ -389,7 +771,7 @@ export function getBaselineDeficitPlans(params: {
 
   const maintenanceMid = (maintenanceLow + maintenanceHigh) / 2;
   const softFloor = getSoftFloor(sexAtBirth);
-  const clampFloor = softFloor; // Same as soft floor for More sustainable clamping
+  // NOTE: softFloor is used for messaging only (not eligibility) for weight-loss plan chips.
 
   // Calculate lbs to lose if target weight exists
   const lbsToLose = currentWeightLb && targetWeightLb
@@ -409,6 +791,7 @@ export function getBaselineDeficitPlans(params: {
           isVisible: false,
           isSelectable: false,
           warningLevel: 'none',
+          warningText: null,
           isRecommended: false,
           paceLbsPerWeek: null,
           etaWeeks: null,
@@ -416,11 +799,12 @@ export function getBaselineDeficitPlans(params: {
         },
         standard: {
           key: 'standard',
-          title: 'Standard',
+          title: 'Standard pace',
           caloriesPerDay: null,
           isVisible: false,
           isSelectable: false,
           warningLevel: 'none',
+          warningText: null,
           isRecommended: false,
           paceLbsPerWeek: null,
           etaWeeks: null,
@@ -428,11 +812,12 @@ export function getBaselineDeficitPlans(params: {
         },
         aggressive: {
           key: 'aggressive',
-          title: 'Aggressive',
+          title: 'Fast-tracked pace',
           caloriesPerDay: null,
           isVisible: false,
           isSelectable: false,
           warningLevel: 'none',
+          warningText: null,
           isRecommended: false,
           paceLbsPerWeek: null,
           etaWeeks: null,
@@ -445,6 +830,7 @@ export function getBaselineDeficitPlans(params: {
           isVisible: false,
           isSelectable: false,
           warningLevel: 'none',
+          warningText: null,
           isRecommended: false,
           paceLbsPerWeek: null,
           etaWeeks: null,
@@ -462,18 +848,15 @@ export function getBaselineDeficitPlans(params: {
   // Helper to evaluate safety for a calorie target
   function evaluateSafety(calorieTarget: number): {
     isSelectable: boolean;
-    warningLevel: 'none' | 'soft' | 'hard' | 'unsafe';
+    warningLevel: WeightLossWarningLevel;
+    warningText: string | null;
   } {
-    if (calorieTarget < HARD_HARD_STOP) {
-      return { isSelectable: false, warningLevel: 'unsafe' };
-    }
-    if (calorieTarget < HARD_FLOOR) {
-      return { isSelectable: true, warningLevel: 'hard' };
-    }
-    if (calorieTarget < softFloor) {
-      return { isSelectable: true, warningLevel: 'soft' };
-    }
-    return { isSelectable: true, warningLevel: 'none' };
+    const { warningLevel, warningText } = getWeightLossCalorieWarning(calorieTarget);
+    return {
+      isSelectable: calorieTarget >= HARD_HARD_STOP,
+      warningLevel,
+      warningText,
+    };
   }
 
   // Helper to calculate pace and date for a plan
@@ -495,24 +878,25 @@ export function getBaselineDeficitPlans(params: {
 
   // AGGRESSIVE (D=750)
   const aggressiveRawTarget = maintenanceMid - AGGRESSIVE_DEFICIT;
-  const aggressiveCalories = roundToNearest10(aggressiveRawTarget);
+  const aggressiveCalories = roundDownTo25(aggressiveRawTarget);
   const aggressiveSafety = evaluateSafety(aggressiveCalories);
   const aggressivePaceAndDate = calculatePaceAndDate(aggressiveCalories);
 
   const aggressivePlan: BaselinePlan = {
     key: 'aggressive',
-    title: 'Aggressive',
+    title: 'Fast-tracked pace',
     caloriesPerDay: aggressiveCalories,
     isVisible: true,
     isSelectable: aggressiveSafety.isSelectable,
     warningLevel: aggressiveSafety.warningLevel,
+    warningText: aggressiveSafety.warningText,
     isRecommended: false, // Never recommended
     ...aggressivePaceAndDate,
   };
 
   // STANDARD (D=500)
   const standardRawTarget = maintenanceMid - STANDARD_DEFICIT;
-  const standardCalories = roundToNearest10(standardRawTarget);
+  const standardCalories = roundDownTo25(standardRawTarget);
   const standardSafety = evaluateSafety(standardCalories);
   const standardPaceAndDate = calculatePaceAndDate(standardCalories);
 
@@ -521,42 +905,27 @@ export function getBaselineDeficitPlans(params: {
 
   const standardPlan: BaselinePlan = {
     key: 'standard',
-    title: 'Standard',
+    title: 'Standard pace',
     caloriesPerDay: standardCalories,
     isVisible: true,
     isSelectable: standardSafety.isSelectable,
     warningLevel: standardSafety.warningLevel,
+    warningText: standardSafety.warningText,
     isRecommended: standardIsRecommended,
     ...standardPaceAndDate,
   };
 
   // MORE SUSTAINABLE (D=300)
   const moreSustainableRawTarget = maintenanceMid - MORE_SUSTAINABLE_DEFICIT;
-  const moreSustainableRawCalories = roundToNearest10(moreSustainableRawTarget);
+  const moreSustainableRawCalories = roundDownTo25(moreSustainableRawTarget);
 
   let moreSustainableCalories: number;
-  let moreSustainableIsVisible: boolean;
-  let moreSustainableWarningLevel: 'none' | 'soft' | 'hard' | 'unsafe' = 'none';
-
-  if (moreSustainableRawCalories >= softFloor) {
-    // Case A: Normal path
-    moreSustainableCalories = moreSustainableRawCalories;
-    moreSustainableIsVisible = true;
-    moreSustainableWarningLevel = 'none';
-  } else {
-    // Case B: Clamp behavior
-    // Only show if maintenanceLow >= clampFloor + 75
-    if (maintenanceLow >= clampFloor + MAINTENANCE_BUFFER) {
-      moreSustainableCalories = clampFloor;
-      moreSustainableIsVisible = true;
-      moreSustainableWarningLevel = 'soft';
-    } else {
-      // Hide More sustainable
-      moreSustainableCalories = clampFloor;
-      moreSustainableIsVisible = false;
-      moreSustainableWarningLevel = 'none';
-    }
-  }
+  // Eligibility rule (weight loss only):
+  // - "More sustainable" exists only if >= HARD_FLOOR (1200)
+  // - Soft floors are messaging-only (no hiding)
+  moreSustainableCalories = moreSustainableRawCalories;
+  const moreSustainableIsVisible = moreSustainableCalories >= HARD_FLOOR;
+  // Warnings for weight loss are tiered and computed via getWeightLossCalorieWarning().
 
   const moreSustainableSafety = evaluateSafety(moreSustainableCalories);
   const moreSustainablePaceAndDate = calculatePaceAndDate(moreSustainableCalories);
@@ -567,9 +936,8 @@ export function getBaselineDeficitPlans(params: {
     caloriesPerDay: moreSustainableIsVisible ? moreSustainableCalories : null,
     isVisible: moreSustainableIsVisible,
     isSelectable: moreSustainableIsVisible && moreSustainableSafety.isSelectable,
-    warningLevel: moreSustainableIsVisible && moreSustainableWarningLevel !== 'none'
-      ? moreSustainableWarningLevel
-      : moreSustainableSafety.warningLevel,
+    warningLevel: moreSustainableSafety.warningLevel,
+    warningText: moreSustainableSafety.warningText,
     isRecommended: false, // Only if Standard has no warning
     ...moreSustainablePaceAndDate,
   };
@@ -588,7 +956,8 @@ export function getBaselineDeficitPlans(params: {
     caloriesPerDay: cautiousMinimumShouldShow ? CAUTIOUS_MINIMUM_CALORIES : null,
     isVisible: cautiousMinimumShouldShow,
     isSelectable: cautiousMinimumShouldShow && cautiousMinimumSafety.isSelectable,
-    warningLevel: cautiousMinimumShouldShow ? 'soft' : 'none',
+    warningLevel: 'none',
+    warningText: null,
     isRecommended: false, // Never recommended (always has warning)
     ...cautiousMinimumPaceAndDate,
   };
@@ -641,14 +1010,39 @@ export function getBaselineDeficitPlans(params: {
     cautiousMinimumPlan.isRecommended = false;
   }
 
+  // ESCAPE-HATCH: If "More sustainable" is not visible/selectable and maintenanceLow >= 1400,
+  // inject a 1200-calorie "More sustainable" fallback plan
+  let escapeHatchPlan: BaselinePlan | undefined = undefined;
+  if (!moreSustainablePlan.isVisible || !moreSustainablePlan.isSelectable) {
+    if (maintenanceLow >= 1400) {
+      const escapeHatchCalories = roundDownTo25(HARD_FLOOR); // 1200
+      const escapeHatchSafety = evaluateSafety(escapeHatchCalories);
+      const escapeHatchPaceAndDate = calculatePaceAndDate(escapeHatchCalories);
+      
+      escapeHatchPlan = {
+        key: 'sustainable_floor_1200',
+        title: 'More sustainable',
+        subtitle: 'Arrives later, easier to sustain.',
+        caloriesPerDay: escapeHatchCalories,
+        isVisible: true,
+        isSelectable: escapeHatchSafety.isSelectable,
+        warningLevel: escapeHatchSafety.warningLevel,
+        warningText: escapeHatchSafety.warningText,
+        isRecommended: false,
+        ...escapeHatchPaceAndDate,
+      };
+    }
+  }
+
   // DEFAULT SELECTION PRIORITY:
   // 1) Standard if selectable AND no warning (recommended state)
   // 2) Cautious Minimum if it exists (it is recommended in that scenario)
   // 3) More sustainable if selectable
-  // 4) Standard if selectable (even warned)
-  // 5) Aggressive if selectable
-  // 6) Otherwise leave none selected and keep Custom available
-  let defaultPlan: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'custom' | null = null;
+  // 4) Escape-hatch "More sustainable" (1200) if available
+  // 5) Standard if selectable (even warned)
+  // 6) Aggressive if selectable
+  // 7) Otherwise leave none selected and keep Custom available
+  let defaultPlan: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200' | 'custom' | null = null;
 
   if (standardPlan.isSelectable && standardPlan.warningLevel === 'none') {
     defaultPlan = 'standard';
@@ -656,6 +1050,8 @@ export function getBaselineDeficitPlans(params: {
     defaultPlan = 'cautiousMinimum';
   } else if (moreSustainablePlan.isSelectable) {
     defaultPlan = 'moreSustainable';
+  } else if (escapeHatchPlan && escapeHatchPlan.isSelectable) {
+    defaultPlan = 'sustainable_floor_1200';
   } else if (standardPlan.isSelectable) {
     defaultPlan = 'standard';
   } else if (aggressivePlan.isSelectable) {
@@ -664,18 +1060,35 @@ export function getBaselineDeficitPlans(params: {
     defaultPlan = 'custom';
   }
 
+  const plans: {
+    moreSustainable: BaselinePlan;
+    standard: BaselinePlan;
+    aggressive: BaselinePlan;
+    cautiousMinimum: BaselinePlan;
+    sustainable_floor_1200?: BaselinePlan;
+    custom: {
+      min: number;
+      max: number;
+    };
+  } = {
+    moreSustainable: moreSustainablePlan,
+    standard: standardPlan,
+    aggressive: aggressivePlan,
+    cautiousMinimum: cautiousMinimumPlan,
+    custom: {
+      min: HARD_HARD_STOP,
+      max: maintenanceLow + 200,
+    },
+  };
+
+  // Insert escape-hatch plan at the beginning if it exists
+  if (escapeHatchPlan) {
+    plans.sustainable_floor_1200 = escapeHatchPlan;
+  }
+
   return {
     status: 'OK',
-    plans: {
-      moreSustainable: moreSustainablePlan,
-      standard: standardPlan,
-      aggressive: aggressivePlan,
-      cautiousMinimum: cautiousMinimumPlan,
-      custom: {
-        min: HARD_HARD_STOP,
-        max: maintenanceLow + 200,
-      },
-    },
+    plans,
     defaultPlan,
   };
 }
@@ -743,12 +1156,10 @@ export function getWeightLossCaloriePlans(params: {
     // Use fixed deficit approach for sustainable (350 calories)
     const SUSTAINABLE_DEFICIT = 350;
     const sustainableRaw = lowerMaintenance - SUSTAINABLE_DEFICIT;
-    const sustainableCalories = roundToNearest10(sustainableRaw);
-    const sustainableCaloriesClamped = Math.max(sustainableCalories, softFloor);
+    const sustainableCalories = roundDownTo25(sustainableRaw);
+    const sustainableIsVisible = sustainableCalories >= HARD_FLOOR && sustainableCalories < lowerMaintenance;
     
-    const sustainableIsVisible = sustainableCaloriesClamped < lowerMaintenance;
-    
-    const acceleratedCalories = roundToNearest10(lowerMaintenance * 0.75); // Approximate maintenance
+    const acceleratedCalories = roundDownTo25(lowerMaintenance * 0.75); // Approximate maintenance
     const acceleratedIsVisible = acceleratedCalories >= HARD_FLOOR;
 
     let defaultPlan: 'sustainable' | 'accelerated' | 'custom' = 'custom';
@@ -770,7 +1181,7 @@ export function getWeightLossCaloriePlans(params: {
           warningLevel: 'none',
         },
       sustainable: {
-        dailyCalories: sustainableCaloriesClamped,
+        dailyCalories: sustainableCalories,
         isVisible: sustainableIsVisible,
       },
         accelerated: {
@@ -794,19 +1205,18 @@ export function getWeightLossCaloriePlans(params: {
   // This makes it available even when on-time is too aggressive
   const SUSTAINABLE_DEFICIT = 350;
   const sustainableRaw = lowerMaintenance - SUSTAINABLE_DEFICIT;
-  const sustainableCalories = roundToNearest10(sustainableRaw);
-  // Clamp to safe minimum for display
-  const sustainableCaloriesClamped = Math.max(sustainableCalories, softFloor);
+  const sustainableCalories = roundDownTo25(sustainableRaw);
   
-  // SUSTAINABLE: Visible if target < lowerMaintenance (after clamping to softFloor, it's always >= softFloor)
-  const sustainableIsVisible = sustainableCaloriesClamped < lowerMaintenance;
+  // SUSTAINABLE: Visible only if >= HARD_FLOOR and below maintenance.
+  // Soft floors are messaging-only (not eligibility).
+  const sustainableIsVisible = sustainableCalories >= HARD_FLOOR && sustainableCalories < lowerMaintenance;
   
   // ACCELERATED: Compute from baseline deficit (NO clamping)
   const acceleratedRaw = lowerMaintenance - (requiredDailyDeficit * 1.15);
-  const acceleratedCalories = roundToNearest10(acceleratedRaw);
+  const acceleratedCalories = roundDownTo25(acceleratedRaw);
 
-  // Round to nearest 10 for display
-  const onTimeCalories = roundToNearest10(baselineOnTimeCalories);
+  // Final calories for display/selection
+  const onTimeCalories = roundDownTo25(baselineOnTimeCalories);
 
   // ON-TIME: Always compute, eligibility based on floors
   let onTimeIsSelectable = onTimeCalories >= HARD_HARD_STOP;
@@ -816,14 +1226,11 @@ export function getWeightLossCaloriePlans(params: {
     onTimeWarningLevel = 'red_critical';
   } else if (onTimeCalories < HARD_FLOOR) {
     onTimeWarningLevel = 'red';
-  } else if (onTimeCalories < softFloor) {
-    onTimeWarningLevel = 'orange';
   }
 
   // ACCELERATED: Visible and selectable ONLY IF calories >= HARD_FLOOR
   const acceleratedIsVisible = acceleratedCalories >= HARD_FLOOR;
-  const acceleratedWarningLevel: 'none' | 'orange' = 
-    acceleratedIsVisible && acceleratedCalories < softFloor ? 'orange' : 'none';
+  const acceleratedWarningLevel: 'none' | 'orange' = 'none';
 
   // CUSTOM: min = HARD_HARD_STOP, max = lowerMaintenance + 200
   const customMax = lowerMaintenance + 200;
@@ -855,7 +1262,7 @@ export function getWeightLossCaloriePlans(params: {
           warningLevel: onTimeWarningLevel,
         },
         sustainable: {
-          dailyCalories: sustainableCaloriesClamped,
+          dailyCalories: sustainableCalories,
           isVisible: sustainableIsVisible, // Still check if sustainable is available
         },
         accelerated: {
@@ -885,7 +1292,7 @@ export function getWeightLossCaloriePlans(params: {
         warningLevel: onTimeWarningLevel,
       },
       sustainable: {
-        dailyCalories: sustainableCaloriesClamped,
+        dailyCalories: sustainableCalories,
         isVisible: sustainableIsVisible,
       },
       accelerated: {
@@ -918,7 +1325,7 @@ export function computeTdee(params: {
   bmr: number;
   activityCalories: number;
   activityMultiplier: number;
-  bmrMethod: 'mifflin' | 'katch';
+  bmrMethod: 'mifflin' | 'katch' | 'blend';
   usedBodyFat: boolean;
 } {
   const range = computeMaintenanceRange(params);

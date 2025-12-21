@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform, Modal, Alert } from 'react-native';
+import { View, TouchableOpacity, Pressable, StyleSheet, Platform, Modal, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemedText } from '@/components/themed-text';
@@ -17,7 +17,14 @@ import {
   computePaceAndEta,
   HARD_HARD_STOP,
   HARD_FLOOR,
+  roundDownTo25,
+  suggestCaloriePlans,
+  getWeightLossCalorieWarning,
+  CALORIES_PER_LB,
+  caloriesFromLbPerWeek,
+  type SuggestedCaloriePlan,
 } from '@/lib/onboarding/goal-calorie-nutrient-rules';
+import ActivityLevelModal from './ActivityLevelModal';
 
 interface DailyCalorieTargetStepProps {
   goalType: 'lose' | 'gain' | 'maintain' | 'recomp' | '' | null;
@@ -37,6 +44,7 @@ interface DailyCalorieTargetStepProps {
     caloriePlan: string;
     executionMode?: 'override';
   }) => void;
+  onActivityLevelChange?: (level: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high') => void;
   onErrorClear: () => void;
   loading: boolean;
   colors: typeof Colors.light;
@@ -62,13 +70,15 @@ const CalorieStepper: React.FC<CalorieStepperProps> = ({
   colors,
 }) => {
   const handleIncrement = () => {
-    const newValue = Math.min(max, value + step);
-    onValueChange(newValue);
+    const clamped = Math.max(min, Math.min(max, value + step));
+    const next = Math.max(min, roundDownTo25(clamped));
+    onValueChange(next);
   };
 
   const handleDecrement = () => {
-    const newValue = Math.max(min, value - step);
-    onValueChange(newValue);
+    const clamped = Math.max(min, Math.min(max, value - step));
+    const next = Math.max(min, roundDownTo25(clamped));
+    onValueChange(next);
   };
 
   return (
@@ -130,29 +140,65 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
   bodyFatPercent,
   weightUnit,
   onCalorieTargetChange,
+  onActivityLevelChange,
   onErrorClear,
   loading,
   colors,
 }) => {
   const { t } = useTranslation();
-  const [selectedPlan, setSelectedPlan] = useState<'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'custom' | null>(null);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+
+  type CaloriePlanKey =
+    | 'moreSustainable'
+    | 'standard'
+    | 'aggressive'
+    | 'cautiousMinimum'
+    | 'sustainable_floor_1200'
+    | 'maintain_leaner'
+    | 'maintain_standard'
+    | 'maintain_flexible'
+    | 'recomp_leaner'
+    | 'recomp_standard'
+    | 'recomp_muscle'
+    | 'gain_lean'
+    | 'gain_standard'
+    | 'gain_aggressive'
+    | 'custom';
+
+  const [selectedPlan, setSelectedPlan] = useState<CaloriePlanKey | null>(null);
   const [customCalories, setCustomCalories] = useState<number | null>(null);
   const [showCustomWarningModal, setShowCustomWarningModal] = useState(false);
   const [executionMode, setExecutionMode] = useState<'override' | undefined>(undefined);
 
+  const isWeightLossPresetKey = (
+    key: CaloriePlanKey
+  ): key is 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200' =>
+    key === 'moreSustainable' || key === 'standard' || key === 'aggressive' || key === 'cautiousMinimum' || key === 'sustainable_floor_1200';
+
   // Compute calculations if weight loss goal
   const isWeightLoss = goalType === 'lose';
+  const isMaintain = goalType === 'maintain';
+  const isRecomp = goalType === 'recomp';
+  const isGain = goalType === 'gain';
+  const isNonLoss = isMaintain || isRecomp || isGain;
 
-  const calculations = useMemo(() => {
-    if (!isWeightLoss || !currentWeightLb || !heightCm || !sexAtBirth || !activityLevel || !dobISO) {
+  // Gain preset pace definitions (pace-first approach)
+  const GAIN_PRESET_PACES: Record<string, number> = {
+    gain_lean: 0.4,
+    gain_standard: 0.6,
+    gain_aggressive: 1.3,
+  };
+
+  // Compute maintenance range for all goals (needed for BMR and activity display)
+  const maintenanceRange = useMemo(() => {
+    if (!currentWeightLb || !heightCm || !sexAtBirth || !activityLevel || !dobISO) {
       return null;
     }
 
     const ageYears = ageFromDob(dobISO);
     const weightKg = lbToKg(currentWeightLb);
 
-    // Compute maintenance range
-    const maintenanceRange = computeMaintenanceRange({
+    return computeMaintenanceRange({
       sexAtBirth: sexAtBirth as 'male' | 'female' | 'unknown',
       ageYears,
       heightCm,
@@ -160,6 +206,12 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
       bodyFatPct: bodyFatPercent,
       activityLevel,
     });
+  }, [currentWeightLb, heightCm, sexAtBirth, activityLevel, dobISO, bodyFatPercent]);
+
+  const calculations = useMemo(() => {
+    if (!isWeightLoss || !maintenanceRange) {
+      return null;
+    }
 
     // Get baseline deficit plans (new implementation)
     const plans = getBaselineDeficitPlans({
@@ -170,24 +222,51 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
       sexAtBirth: sexAtBirth as 'male' | 'female' | 'unknown',
     });
 
-    return {
-      maintenanceRange,
-      plans,
-    };
-  }, [isWeightLoss, currentWeightLb, targetWeightLb, heightCm, sexAtBirth, activityLevel, dobISO, bodyFatPercent]);
+      return {
+        plans,
+      };
+  }, [isWeightLoss, maintenanceRange, currentWeightLb, targetWeightLb, sexAtBirth]);
+
+  const nonLossSuggestions = useMemo(() => {
+    if (!isNonLoss || !currentWeightLb || !heightCm || !sexAtBirth || !activityLevel || !dobISO) {
+      return null;
+    }
+
+    const ageYears = ageFromDob(dobISO);
+    const weightKg = lbToKg(currentWeightLb);
+
+    return suggestCaloriePlans({
+      goalType: goalType as 'maintain' | 'recomp' | 'gain',
+      sexAtBirth: sexAtBirth as 'male' | 'female' | 'unknown',
+      ageYears,
+      heightCm,
+      weightKg,
+      bodyFatPct: bodyFatPercent,
+      activityLevel,
+      currentWeightLb,
+      targetWeightLb,
+    });
+  }, [isNonLoss, goalType, currentWeightLb, targetWeightLb, heightCm, sexAtBirth, activityLevel, dobISO, bodyFatPercent]);
 
   // Get current calorie target
   const currentCalorieTarget = useMemo(() => {
-    if (!calculations || !selectedPlan) return null;
+    if (!selectedPlan) return null;
 
     if (selectedPlan === 'custom' && customCalories !== null) {
       return customCalories;
     }
 
-    if (selectedPlan !== 'custom') {
+    if (isWeightLoss && calculations && selectedPlan !== 'custom' && isWeightLossPresetKey(selectedPlan)) {
       const plan = calculations.plans.plans[selectedPlan];
       // Type guard: check if it's a BaselinePlan (has isVisible property)
       if (plan && 'isVisible' in plan && plan.isVisible && plan.isSelectable && plan.caloriesPerDay !== null) {
+        return plan.caloriesPerDay;
+      }
+    }
+
+    if (isNonLoss && nonLossSuggestions && selectedPlan !== 'custom') {
+      const plan = nonLossSuggestions.plans.find((p) => p.key === selectedPlan);
+      if (plan && plan.isSelectable && isFinite(plan.caloriesPerDay) && plan.caloriesPerDay >= HARD_HARD_STOP) {
         return plan.caloriesPerDay;
       }
     }
@@ -198,18 +277,22 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     }
 
     return null;
-  }, [calculations, selectedPlan, customCalories]);
+  }, [calculations, nonLossSuggestions, isWeightLoss, isNonLoss, selectedPlan, customCalories]);
 
   // Initialize default selection and custom calories
   useEffect(() => {
     if (calculations && selectedPlan === null) {
       // Set default plan from rules
       if (calculations.plans.defaultPlan) {
-        setSelectedPlan(calculations.plans.defaultPlan);
+        setSelectedPlan(calculations.plans.defaultPlan as CaloriePlanKey);
         // The onCalorieTargetChange will be called by the other useEffect when currentCalorieTarget is computed
       }
     }
-    if (selectedPlan === 'custom' && customCalories === null && calculations) {
+    if (nonLossSuggestions && selectedPlan === null) {
+      setSelectedPlan(nonLossSuggestions.defaultPlanKey as CaloriePlanKey);
+    }
+    // Initialize customCalories always (not just when custom is selected) so expanded UI can render
+    if (customCalories === null && calculations) {
       // Default to standard plan calories if available, else more sustainable, else aggressive, else maintenance
       let defaultCalories: number;
       if (calculations.plans.plans.standard.isVisible && calculations.plans.plans.standard.caloriesPerDay !== null) {
@@ -220,38 +303,55 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
         defaultCalories = calculations.plans.plans.aggressive.caloriesPerDay;
       } else {
         // Fallback to maintenance calories
-        defaultCalories = calculations.maintenanceRange.lowerMaintenance;
+        defaultCalories = maintenanceRange?.lowerMaintenance ?? HARD_HARD_STOP;
       }
-      setCustomCalories(defaultCalories);
+      // Never allow below 700, even for pre-fill
+      const clampedCalories = Math.max(HARD_HARD_STOP, roundDownTo25(defaultCalories));
+      setCustomCalories(clampedCalories);
     }
-  }, [selectedPlan, customCalories, calculations]);
+    if (customCalories === null && nonLossSuggestions) {
+      const defaultPlan = nonLossSuggestions.plans.find((p) => p.key === nonLossSuggestions.defaultPlanKey);
+      const defaultCalories = defaultPlan?.caloriesPerDay ?? nonLossSuggestions.maintenance.mid;
+      // Never allow below 700, even for pre-fill
+      const clampedCalories = Math.max(HARD_HARD_STOP, roundDownTo25(defaultCalories));
+      setCustomCalories(clampedCalories);
+    }
+  }, [selectedPlan, customCalories, calculations, nonLossSuggestions]);
 
   // Clear selected plan if it becomes unselectable
   useEffect(() => {
-    if (calculations && selectedPlan && selectedPlan !== 'custom') {
+    if (isWeightLoss && calculations && selectedPlan && selectedPlan !== 'custom' && isWeightLossPresetKey(selectedPlan)) {
       const plan = calculations.plans.plans[selectedPlan];
       // Type guard: check if it's a BaselinePlan (has isSelectable property)
       if (plan && 'isSelectable' in plan && !plan.isSelectable) {
         // Fallback to default plan or custom
         if (calculations.plans.defaultPlan) {
-          setSelectedPlan(calculations.plans.defaultPlan);
+          setSelectedPlan(calculations.plans.defaultPlan as CaloriePlanKey);
         } else {
           setSelectedPlan('custom');
         }
       }
     }
-  }, [calculations, selectedPlan]);
+    if (nonLossSuggestions && selectedPlan && selectedPlan !== 'custom') {
+      const plan = nonLossSuggestions.plans.find((p) => p.key === selectedPlan);
+      if (plan && !plan.isSelectable) {
+        setSelectedPlan(nonLossSuggestions.defaultPlanKey as CaloriePlanKey);
+      }
+    }
+  }, [calculations, nonLossSuggestions, selectedPlan]);
 
   // Compute canProceed validation
   const canProceed = useMemo(() => {
-    if (!calculations || !selectedPlan) return false;
+    if (!selectedPlan) return false;
 
     if (selectedPlan === 'custom') {
       // Custom: must have valid calories >= HARD_HARD_STOP
       return customCalories !== null && 
              isFinite(customCalories) && 
              customCalories >= HARD_HARD_STOP;
-    } else {
+    }
+
+    if (isWeightLoss && calculations && isWeightLossPresetKey(selectedPlan)) {
       // Preset plan: must have valid calories from plan
       const plan = calculations.plans.plans[selectedPlan];
       if (!plan || !('isVisible' in plan) || !plan.isVisible || !plan.isSelectable) {
@@ -262,19 +362,19 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
              isFinite(planCalories) && 
              planCalories >= HARD_HARD_STOP;
     }
-  }, [calculations, selectedPlan, customCalories]);
 
-  // Debug log (temporary)
-  useEffect(() => {
-    if (calculations) {
-      console.log('DailyCalorieTarget selection', { 
-        selectedPlan, 
-        customCalories, 
-        currentCalorieTarget,
-        canProceed 
-      });
+    if (isNonLoss && nonLossSuggestions) {
+      const plan = nonLossSuggestions.plans.find((p) => p.key === selectedPlan);
+      return Boolean(
+        plan &&
+          plan.isSelectable &&
+          isFinite(plan.caloriesPerDay) &&
+          plan.caloriesPerDay >= HARD_HARD_STOP
+      );
     }
-  }, [selectedPlan, customCalories, currentCalorieTarget, canProceed, calculations]);
+
+    return false;
+  }, [calculations, nonLossSuggestions, isWeightLoss, isNonLoss, selectedPlan, customCalories]);
 
   // Notify parent of changes
   useEffect(() => {
@@ -297,39 +397,185 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
       onCalorieTargetChange({
         calorieTarget: currentCalorieTarget,
-        maintenanceCalories: calculations.maintenanceRange.lowerMaintenance,
+        maintenanceCalories: maintenanceRange?.lowerMaintenance ?? 0,
         caloriePlan: legacyPlanKey,
         executionMode,
       });
     }
   }, [currentCalorieTarget, calculations, selectedPlan, executionMode, onCalorieTargetChange]);
 
+  useEffect(() => {
+    if (currentCalorieTarget !== null && nonLossSuggestions && selectedPlan !== null) {
+      onCalorieTargetChange({
+        calorieTarget: currentCalorieTarget,
+        maintenanceCalories: nonLossSuggestions.maintenance.mid,
+        caloriePlan: selectedPlan,
+        executionMode: undefined,
+      });
+    }
+  }, [currentCalorieTarget, nonLossSuggestions, selectedPlan, onCalorieTargetChange]);
+
   // Check if custom calories exceed lowerMaintenance and show warning
   const handleCustomCaloriesChange = (newValue: number) => {
-    setCustomCalories(newValue);
-    if (calculations && newValue > calculations.maintenanceRange.lowerMaintenance && !executionMode) {
+    const minBound = Math.max(
+      HARD_HARD_STOP,
+      isWeightLoss
+        ? calculations?.plans.plans.custom.min ?? HARD_HARD_STOP
+        : nonLossSuggestions?.custom.min ?? HARD_HARD_STOP
+    );
+    const maxBound = isWeightLoss
+      ? calculations?.plans.plans.custom.max ?? HARD_HARD_STOP
+      : nonLossSuggestions?.custom.max ?? HARD_HARD_STOP;
+
+    const clamped = Math.max(minBound, Math.min(maxBound, newValue));
+    const next = Math.max(minBound, roundDownTo25(clamped));
+
+    // Select custom plan when stepper buttons are clicked
+    setSelectedPlan('custom');
+    setCustomCalories(next);
+    if (isWeightLoss && maintenanceRange && next > maintenanceRange.lowerMaintenance && !executionMode) {
       setShowCustomWarningModal(true);
     }
   };
 
   // Get warning text for custom calories
   const getCustomWarningText = (): { text: string; color: string } | null => {
-    if (!calculations || customCalories === null) return null;
-    const softFloor = sexAtBirth === 'male' ? 1400 : sexAtBirth === 'female' ? 1300 : 1400;
-    if (customCalories >= HARD_HARD_STOP && customCalories < HARD_FLOOR) {
-      // Calories are >= 700 but < 1200
-      return { text: '⚠️ Could be unsafe, consider changing your target date or weight', color: Colors.light.warning };
-    } else if (customCalories < HARD_FLOOR) {
-      return { text: t('onboarding.calorie_target.warning_unsafe'), color: Colors.light.warning };
-    } else if (customCalories < softFloor) {
-      return { text: 'Below our recommended minimum, proceed with caution', color: Colors.light.warning };
+    if (customCalories === null) return null;
+
+    if (isWeightLoss) {
+      if (!calculations) return null;
+      const { warningLevel, warningText } = getWeightLossCalorieWarning(customCalories);
+      if (warningText === null) return null;
+      
+      // Determine color: yellow if selected, otherwise based on warning level
+      const isCustomSelected = selectedPlan === 'custom';
+      let color: string;
+      if (isCustomSelected) {
+        color = getWarningColor(true); // Selected cards: always yellow
+      } else if (warningLevel === 'red') {
+        color = getWarningColor(false);
+      } else if (warningLevel === 'neutral') {
+        color = colors.textSecondary; // Neutral gray
+      } else {
+        color = getWarningColor(false); // fallback
+      }
+      
+      return {
+        text: warningLevel === 'red' ? `⚠️ ${warningText}` : warningText,
+        color,
+      };
     }
+
+    if (isNonLoss && nonLossSuggestions) {
+      const upper = nonLossSuggestions.maintenance.upper;
+      const lower = nonLossSuggestions.maintenance.lower;
+      const isCustomSelected = selectedPlan === 'custom';
+
+      // For maintenance/recomp, use unified low-calorie warnings (same as weight loss)
+      if (isMaintain || isRecomp) {
+        const { warningLevel, warningText } = getWeightLossCalorieWarning(customCalories);
+        if (warningText !== null) {
+          let color: string;
+          if (isCustomSelected) {
+            color = getWarningColor(true); // Selected cards: always yellow
+          } else if (warningLevel === 'red') {
+            color = getWarningColor(false);
+          } else if (warningLevel === 'neutral') {
+            color = colors.textSecondary; // Neutral gray
+          } else {
+            color = getWarningColor(false); // fallback
+          }
+          
+          return {
+            text: warningLevel === 'red' ? `⚠️ ${warningText}` : warningText,
+            color,
+          };
+        }
+        // No warning for >= 1200
+        return null;
+      }
+
+      // Gain goals keep existing warning logic
+      if (isGain && customCalories < lower) {
+        return { text: t('onboarding.calorie_target.gain_warning_below_maintenance'), color: getWarningColor(isCustomSelected) };
+      }
+      if (isGain && customCalories > upper + 700) {
+        return { text: t('onboarding.calorie_target.gain_warning_high'), color: getWarningColor(isCustomSelected) };
+      }
+    }
+
     return null;
+  };
+
+  // Compute pace and ETA for any goal type (loss, gain, etc.)
+  const computePaceAndEtaForGoal = (
+    maintenanceCals: number,
+    selectedTargetCals: number,
+    goalType: 'lose' | 'gain' | 'maintain' | 'recomp',
+    nowDate: Date = new Date()
+  ): {
+    paceLbsPerWeek: number | null;
+    etaWeeks: number | null;
+    etaDate: Date | null;
+    paceLine: string | null;
+    etaLine: string | null;
+  } => {
+    if (!currentWeightLb || !targetWeightLb) {
+      return {
+        paceLbsPerWeek: null,
+        etaWeeks: null,
+        etaDate: null,
+        paceLine: null,
+        etaLine: null,
+      };
+    }
+
+    // Calculate daily delta (positive for gain, negative for loss)
+    const dailyDelta = selectedTargetCals - maintenanceCals;
+
+    // Calculate pace in lbs/week
+    const lbPerWeek = (dailyDelta * 7) / CALORIES_PER_LB;
+
+    // Calculate weight delta
+    const weightDeltaLb = targetWeightLb - currentWeightLb;
+
+    // Edge handling: if pace is <= 0 or weight delta doesn't match goal direction
+    if (lbPerWeek <= 0 || (goalType === 'gain' && weightDeltaLb <= 0) || (goalType === 'lose' && weightDeltaLb >= 0)) {
+      return {
+        paceLbsPerWeek: null,
+        etaWeeks: null,
+        etaDate: null,
+        paceLine: null,
+        etaLine: null,
+      };
+    }
+
+    // Calculate weeks needed (round up to nearest week)
+    const weeksRaw = Math.abs(weightDeltaLb) / Math.abs(lbPerWeek);
+    const weeks = Math.ceil(weeksRaw);
+
+    // Calculate target date
+    const etaDate = new Date(nowDate);
+    etaDate.setDate(etaDate.getDate() + weeks * 7);
+
+    // Format pace line (weight loss format for all goals)
+    const paceLine = `~${roundTo1(Math.abs(lbPerWeek))} lb/week`;
+
+    // Format ETA line (weight loss format: ~X weeks (by DATE))
+    const etaLine = `~${weeks} week${weeks === 1 ? '' : 's'} (by ${formatDateForDisplay(etaDate.toISOString().split('T')[0])})`;
+
+    return {
+      paceLbsPerWeek: Math.round(Math.abs(lbPerWeek) * 10) / 10,
+      etaWeeks: weeks,
+      etaDate,
+      paceLine,
+      etaLine,
+    };
   };
 
   // Compute pace and ETA for custom calories (live updates)
   const customMeta = useMemo(() => {
-    if (!calculations || customCalories === null || !currentWeightLb) {
+    if (!isWeightLoss || !maintenanceRange || customCalories === null || !currentWeightLb) {
       return {
         paceLbsPerWeek: null,
         etaWeeks: null,
@@ -338,14 +584,41 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     }
 
     return computePaceAndEta({
-      maintenanceLow: calculations.maintenanceRange.lowerMaintenance,
-      maintenanceHigh: calculations.maintenanceRange.upperMaintenance,
+      maintenanceLow: maintenanceRange?.lowerMaintenance ?? 0,
+      maintenanceHigh: maintenanceRange?.upperMaintenance ?? 0,
       customCalories,
       currentWeightLb,
       targetWeightLb,
     });
   }, [
-    calculations,
+    isWeightLoss,
+    maintenanceRange,
+    customCalories,
+    currentWeightLb,
+    targetWeightLb,
+  ]);
+
+  // Compute pace and ETA for gain custom calories (live updates)
+  const customGainMeta = useMemo(() => {
+    if (!isGain || !maintenanceRange || customCalories === null || !currentWeightLb || !targetWeightLb) {
+      return {
+        paceLbsPerWeek: null,
+        etaWeeks: null,
+        etaDate: null,
+        paceLine: null,
+        etaLine: null,
+      };
+    }
+
+    const maintenanceMid = (maintenanceRange.lowerMaintenance + maintenanceRange.upperMaintenance) / 2;
+    return computePaceAndEtaForGoal(
+      maintenanceMid,
+      customCalories,
+      'gain'
+    );
+  }, [
+    isGain,
+    maintenanceRange,
     customCalories,
     currentWeightLb,
     targetWeightLb,
@@ -357,9 +630,10 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
   };
 
   const handleCustomWarningAdjust = () => {
-    // Clamp to lowerMaintenance
-    if (calculations && customCalories !== null) {
-      setCustomCalories(calculations.maintenanceRange.lowerMaintenance);
+    // Clamp to lowerMaintenance, but never below 700
+    if (maintenanceRange && customCalories !== null) {
+      const adjustedCalories = Math.max(HARD_HARD_STOP, roundDownTo25(maintenanceRange.lowerMaintenance));
+      setCustomCalories(adjustedCalories);
     }
     setShowCustomWarningModal(false);
   };
@@ -378,9 +652,31 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     return t(key);
   };
 
+  // Get goal-specific subtitle text
+  const getSubtitleText = (): string => {
+    if (!targetWeightLb) {
+      return 'Choose a daily calorie target: ';
+    }
+
+    const formattedWeight = formatWeight(targetWeightLb);
+
+    if (isWeightLoss) {
+      return `To reach ${formattedWeight}, choose a calorie target below maintenance: `;
+    } else if (isMaintain) {
+      return `To maintain at ${formattedWeight}, choose a calorie target near maintenance: `;
+    } else if (isRecomp) {
+      return `To recomposition at ${formattedWeight}, choose a calorie target near maintenance: `;
+    } else if (isGain) {
+      return `To gain toward ${formattedWeight}, choose a daily calorie target above maintenance: `;
+    }
+
+    // Fallback
+    return 'Choose a daily calorie target: ';
+  };
+
 
   // For non-weight-loss goals, show placeholder
-  if (!isWeightLoss) {
+  if (!isWeightLoss && !isNonLoss) {
     return (
       <View style={styles.stepContentAnimated}>
         <View style={styles.stepIllustration}>
@@ -423,7 +719,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
   // Weight loss goal - show full UI
   // Only show "missing data" if truly missing required inputs
-  if (!calculations) {
+  if (isWeightLoss && !calculations) {
     return (
       <View style={styles.stepContentAnimated}>
         <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
@@ -436,12 +732,84 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     );
   }
 
-  const { maintenanceRange, plans } = calculations;
+  if (isNonLoss && !nonLossSuggestions) {
+    return (
+      <View style={styles.stepContentAnimated}>
+        <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
+          {t('onboarding.calorie_target.title')}
+        </ThemedText>
+        <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
+          {t('onboarding.calorie_target.error_missing_data')}
+        </ThemedText>
+      </View>
+    );
+  }
+
+  const plans = isWeightLoss ? calculations?.plans ?? null : null;
+
+  const getNonLossContextLineKey = (): string => {
+    if (isMaintain) return 'onboarding.calorie_target.maintain_context_line';
+    if (isRecomp) return 'onboarding.calorie_target.recomp_context_line';
+    return 'onboarding.calorie_target.gain_context_line';
+  };
+
+  // Shared activity summary block (BMR + activity link + activity sentence)
+  const ActivitySummaryBlock = () => {
+    if (!maintenanceRange) return null;
+
+    return (
+      <>
+        {/* Line 1: BMR range */}
+        <ThemedText style={[styles.breakdownLine, { color: colors.text }]}>
+          {t('onboarding.calorie_target.bmr_range_line', {
+            lowerBmr: maintenanceRange.lowerBmr,
+            upperBmr: maintenanceRange.upperBmr,
+          })}
+        </ThemedText>
+
+        {/* Line 2: Adjust activity level link */}
+        {onActivityLevelChange && (
+          <TouchableOpacity 
+            onPress={() => setShowActivityModal(true)}
+            style={styles.adjustActivityLinkContainer}
+            {...getButtonAccessibilityProps(
+              'Adjust activity level',
+              'Double tap to adjust your activity level'
+            )}
+          >
+            <Text style={[styles.adjustActivityLink, { color: onboardingColors.primary }]}>
+              Adjust activity level
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Line 3: Activity calories range */}
+        <ThemedText style={[styles.breakdownLine, { color: colors.text }]}>
+          {t('onboarding.calorie_target.activity_range_line', {
+            lowerActivity: maintenanceRange.lowerActivityCalories,
+            upperActivity: maintenanceRange.upperActivityCalories,
+            activityLabel: getActivityLabel(),
+          })}
+        </ThemedText>
+      </>
+    );
+  };
+
+  // Helper to get warning color based on selection state
+  const getWarningColor = (isSelected: boolean): string => {
+    return isSelected ? Colors.light.warning : Colors.light.error;
+  };
 
   // Helper function to render a baseline deficit chip
-  const renderBaselineChip = (planKey: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum') => {
+  const renderBaselineChip = (planKey: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200') => {
+    if (!calculations) return null;
     const plan = calculations.plans.plans[planKey];
-    if (!plan.isVisible) return null;
+    if (!plan || !plan.isVisible) return null;
+    
+    // For aggressive plan: hide if disabled due to being below 700 kcal/day (unsupported)
+    if (planKey === 'aggressive' && !plan.isSelectable && plan.caloriesPerDay !== null && plan.caloriesPerDay < HARD_HARD_STOP) {
+      return null;
+    }
 
     const isSelected = selectedPlan === planKey;
     const isSelectable = plan.isSelectable;
@@ -455,25 +823,24 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
     // Format date display
     const dateText = plan.etaDateISO && plan.etaWeeks !== null && plan.etaWeeks > 0
-      ? `Est. reach in ~${plan.etaWeeks} week${plan.etaWeeks === 1 ? '' : 's'} (by ${formatDateForDisplay(plan.etaDateISO)})`
+      ? `~${plan.etaWeeks} week${plan.etaWeeks === 1 ? '' : 's'} (by ${formatDateForDisplay(plan.etaDateISO)})`
       : null;
 
-    // Get warning text
-    const getWarningText = (): string | null => {
-      if (!isSelectable && plan.caloriesPerDay !== null && plan.caloriesPerDay < HARD_HARD_STOP) {
-        return 'Below safe minimum';
-      }
-      if (plan.warningLevel === 'hard') {
-        // Calories are >= 700 but < 1200
-        return '⚠️ Could be unsafe, consider changing your target date or weight';
-      }
-      if (plan.warningLevel === 'soft') {
-        return 'Below our recommended minimum, proceed with caution';
-      }
-      return null;
-    };
-
-    const warningText = getWarningText();
+    // Get warning text from plan (computed by rules module)
+    const warningText = plan.warningText;
+    // Determine warning color based on level and selection state
+    let warningColor: string;
+    if (isSelected && isSelectable) {
+      // Selected cards: always use warning yellow for visibility
+      warningColor = getWarningColor(true);
+    } else if (plan.warningLevel === 'red') {
+      warningColor = getWarningColor(false);
+    } else if (plan.warningLevel === 'neutral') {
+      // Neutral gray for tier 2 (1000-1199) - only when not selected
+      warningColor = colors.textSecondary;
+    } else {
+      warningColor = getWarningColor(false); // fallback
+    }
 
     // Get title with recommended badge
     const titleText = plan.isRecommended
@@ -532,7 +899,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                   fontWeight: FontWeight.semibold,
                   color: isSelected ? onboardingColors.primary : Colors.light.textInverse,
                 }}>
-                  Recommended
+                  {t('onboarding.calorie_target.recommended_badge')}
                 </Text>
               </View>
             )}
@@ -541,16 +908,20 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
             {plan.caloriesPerDay !== null && isSelectable
               ? `${plan.caloriesPerDay} cal/day`
               : plan.caloriesPerDay !== null && !isSelectable
-              ? 'Below safe minimum'
+              ? plan.caloriesPerDay < HARD_HARD_STOP
+                ? planKey === 'standard'
+                  ? 'Try using Set Custom Pace instead'
+                  : 'Below 700 kcal/day is not supported. Choose another target date or weight.'
+                : 'Below safe minimum'
               : ''}
           </Text>
           {paceText && (
-            <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
+            <Text variant="caption" style={[styles.presetMetaText, { color: secondaryTextColor }]}>
               {paceText}
             </Text>
           )}
           {dateText && (
-            <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
+            <Text variant="caption" style={[styles.presetMetaText, { color: secondaryTextColor }]}>
               {dateText}
             </Text>
           )}
@@ -559,21 +930,186 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
               At the lower safety boundary.
             </Text>
           )}
+          {plan.subtitle && (
+            <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
+              {plan.subtitle}
+            </Text>
+          )}
           {warningText && (
             <ThemedText
               style={[
                 styles.warningText,
-                {
-                  color: isSelected && isSelectable ? Colors.light.warning : Colors.light.error,
-                },
+                { color: warningColor },
               ]}
             >
-              {warningText}
+              {plan.warningLevel === 'red' ? '⚠️ ' : ''}{warningText}
             </ThemedText>
           )}
-          {!isSelectable && plan.caloriesPerDay !== null && plan.caloriesPerDay < HARD_HARD_STOP && (
-            <ThemedText style={[styles.warningText, { color: Colors.light.error, fontSize: FontSize.sm + 2 }]}>
-              This plan is unsafe and cannot be selected.
+        </View>
+        {isSelected && isSelectable && (
+          <View style={styles.presetCheckmark}>
+            <IconSymbol name="checkmark.circle.fill" size={Spacing['2xl']} color={Colors.light.textInverse} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderNonLossChip = (plan: SuggestedCaloriePlan) => {
+    const isSelected = selectedPlan === plan.key;
+    const isSelectable = plan.isSelectable;
+    const textColor = isSelected && isSelectable ? Colors.light.textInverse : colors.text;
+    const secondaryTextColor = isSelected && isSelectable ? Colors.light.textInverse : colors.textSecondary;
+
+    // Compute pace and ETA for gain goals (use preset pace values)
+    let paceLine: string | null = null;
+    let etaLine: string | null = null;
+    if (isGain && maintenanceRange && currentWeightLb && targetWeightLb) {
+      const presetPace = GAIN_PRESET_PACES[plan.key];
+      if (presetPace !== undefined) {
+        // Use preset pace value directly (pace-first approach)
+        const lbPerWeek = presetPace;
+        const weightDeltaLb = targetWeightLb - currentWeightLb;
+        
+        if (weightDeltaLb > 0 && lbPerWeek > 0) {
+          // Calculate weeks needed (round up to nearest week)
+          const weeksRaw = Math.abs(weightDeltaLb) / Math.abs(lbPerWeek);
+          const weeks = Math.ceil(weeksRaw);
+          
+          // Calculate target date
+          const etaDate = new Date();
+          etaDate.setDate(etaDate.getDate() + weeks * 7);
+          
+          // Format pace line (weight loss format: ~X lb/week)
+          paceLine = `~${roundTo1(lbPerWeek)} lb/week`;
+          
+          // Format ETA line (weight loss format: ~X weeks (by DATE))
+          etaLine = `~${weeks} week${weeks === 1 ? '' : 's'} (by ${formatDateForDisplay(etaDate.toISOString().split('T')[0])})`;
+        } else {
+          paceLine = null;
+          etaLine = null;
+        }
+      } else {
+        // Fallback: calculate from calories (for custom or unknown plans)
+        const maintenanceMid = (maintenanceRange.lowerMaintenance + maintenanceRange.upperMaintenance) / 2;
+        const paceEta = computePaceAndEtaForGoal(
+          maintenanceMid,
+          plan.caloriesPerDay,
+          'gain'
+        );
+        paceLine = paceEta.paceLine;
+        etaLine = paceEta.etaLine;
+      }
+    }
+
+    // For maintenance/recomp, use unified low-calorie warnings (same as weight loss)
+    let warningText: string | null = null;
+    let warningLevel: 'none' | 'neutral' | 'red' | 'unsafe' = 'none';
+    if ((isMaintain || isRecomp) && plan.caloriesPerDay < HARD_FLOOR) {
+      const warning = getWeightLossCalorieWarning(plan.caloriesPerDay);
+      warningText = warning.warningText;
+      warningLevel = warning.warningLevel;
+    } else if (plan.warning) {
+      // For gain goals, use existing warning structure
+      warningText = t(plan.warning.textKey);
+      warningLevel = plan.warning.level === 'red' ? 'red' : plan.warning.level === 'orange' ? 'neutral' : 'none';
+    }
+
+    // Determine warning color based on level and selection state
+    let warningColor: string;
+    if (isSelected && isSelectable) {
+      // Selected cards: always use warning yellow for visibility
+      warningColor = getWarningColor(true);
+    } else if (warningLevel === 'red') {
+      warningColor = getWarningColor(false);
+    } else if (warningLevel === 'neutral') {
+      // Neutral gray for tier 2 (1000-1199) - only when not selected
+      warningColor = colors.textSecondary;
+    } else {
+      warningColor = getWarningColor(isSelected && isSelectable);
+    }
+
+    return (
+      <TouchableOpacity
+        key={plan.key}
+        style={[
+          styles.presetCard,
+          {
+            borderColor: isSelected && isSelectable ? onboardingColors.primary : colors.border,
+            backgroundColor: isSelected && isSelectable ? undefined : colors.background,
+            borderWidth: isSelected && isSelectable ? 0 : 1,
+            opacity: isSelectable ? 1 : 0.6,
+          },
+          isSelected && isSelectable && (Platform.OS === 'web'
+            ? {
+                background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              } as any
+            : { backgroundColor: onboardingColors.primary }),
+          Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
+        ]}
+        onPress={() => {
+          if (isSelectable) {
+            setSelectedPlan(plan.key as any);
+            setCustomCalories(null);
+            setExecutionMode(undefined);
+          }
+        }}
+        disabled={loading || !isSelectable}
+        {...getButtonAccessibilityProps(
+          `${t(plan.titleKey)}${isSelected ? ' selected' : ''}${!isSelectable ? ' (disabled)' : ''}`,
+          !isSelectable
+            ? t('onboarding.calorie_target.a11y_plan_below_safe_minimum')
+            : t('onboarding.calorie_target.a11y_select_plan', { planTitle: t(plan.titleKey) }),
+          loading || !isSelectable
+        )}
+      >
+        <View style={styles.presetContent}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <Text variant="h4" style={[styles.presetLabel, { color: textColor }]}>
+              {t(plan.titleKey)}
+            </Text>
+            {plan.isRecommended && (
+              <View style={{
+                backgroundColor: isSelected ? Colors.light.textInverse : onboardingColors.primary,
+                paddingHorizontal: Spacing.xs,
+                paddingVertical: 2,
+                borderRadius: BorderRadius.sm,
+              }}>
+                <Text style={{
+                  fontSize: FontSize.xs,
+                  fontWeight: FontWeight.semibold,
+                  color: isSelected ? onboardingColors.primary : Colors.light.textInverse,
+                }}>
+                  {t('onboarding.calorie_target.recommended_badge')}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text variant="body" style={[styles.presetCalories, { color: textColor }]}>
+            {isSelectable ? `${plan.caloriesPerDay} cal/day` : t('onboarding.calorie_target.below_safe_minimum')}
+          </Text>
+          <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
+            {t(plan.subtitleKey)}
+          </Text>
+          {paceLine && (
+            <Text variant="caption" style={[styles.presetMetaText, { color: secondaryTextColor }]}>
+              {paceLine}
+            </Text>
+          )}
+          {etaLine && (
+            <Text variant="caption" style={[styles.presetMetaText, { color: secondaryTextColor }]}>
+              {etaLine}
+            </Text>
+          )}
+          {warningText && (
+            <ThemedText style={[styles.warningText, { color: warningColor }]}>
+              {warningLevel === 'red' ? '⚠️ ' : ''}{warningText}
+            </ThemedText>
+          )}
+          {!isSelectable && (
+            <ThemedText style={[styles.warningText, { color: getWarningColor(false), fontSize: FontSize.sm + 2 }]}>
+              {t('onboarding.calorie_target.unsafe_cannot_select')}
             </ThemedText>
           )}
         </View>
@@ -625,71 +1161,116 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
       {/* Context Display */}
       <View style={styles.breakdownSection}>
-        {/* Line 2: BMR range */}
-        <ThemedText style={[styles.breakdownLine, { color: colors.text }]}>
-          {t('onboarding.calorie_target.bmr_range_line', {
-            lowerBmr: maintenanceRange.lowerBmr,
-            upperBmr: maintenanceRange.upperBmr,
-          })}
-        </ThemedText>
+        {/* Shared activity summary block (shown for all goals) */}
+        <ActivitySummaryBlock />
 
-        {/* Line 3: Activity calories range */}
-        <ThemedText style={[styles.breakdownLine, { color: colors.text }]}>
-          {t('onboarding.calorie_target.activity_range_line', {
-            lowerActivity: maintenanceRange.lowerActivityCalories,
-            upperActivity: maintenanceRange.upperActivityCalories,
-            activityLabel: getActivityLabel(),
-          })}
-        </ThemedText>
+        {/* Goal-specific content */}
+        {isWeightLoss && maintenanceRange && (
+          <>
+            {/* Maintenance range */}
+            {(() => {
+              const maintenanceText = t('onboarding.calorie_target.maintenance_range_line', {
+                lowerMaintenance: maintenanceRange.lowerMaintenance,
+                upperMaintenance: maintenanceRange.upperMaintenance,
+              });
+              const [label, range] = maintenanceText.split('\n');
 
-        {/* Line 4: Maintenance range */}
-        {(() => {
-          const maintenanceText = t('onboarding.calorie_target.maintenance_range_line', {
-            lowerMaintenance: maintenanceRange.lowerMaintenance,
-            upperMaintenance: maintenanceRange.upperMaintenance,
-          });
-          const [label, range] = maintenanceText.split('\n');
+              // If the translation doesn't include a newline, fall back to single-line render.
+              if (!range) {
+                return (
+                  <ThemedText style={[styles.breakdownLine, styles.breakdownLineBold, { color: colors.text }]}>
+                    {maintenanceText}
+                  </ThemedText>
+                );
+              }
 
-          // If the translation doesn't include a newline, fall back to single-line render.
-          if (!range) {
-            return (
-              <ThemedText style={[styles.breakdownLine, styles.breakdownLineBold, { color: colors.text }]}>
-                {maintenanceText}
-              </ThemedText>
-            );
-          }
+              return (
+                <>
+                  <ThemedText style={[styles.breakdownLine, styles.breakdownLineBold, { color: colors.text }]}>
+                    {label}
+                  </ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.breakdownLine,
+                      styles.breakdownLineBold,
+                      styles.breakdownLineMaintenanceRange,
+                      { color: colors.text },
+                    ]}
+                  >
+                    {range}
+                  </ThemedText>
+                </>
+              );
+            })()}
+          </>
+        )}
 
-          return (
-            <>
-              <ThemedText style={[styles.breakdownLine, styles.breakdownLineBold, { color: colors.text }]}>
-                {label}
-              </ThemedText>
-              <ThemedText
-                style={[
-                  styles.breakdownLine,
-                  styles.breakdownLineBold,
-                  styles.breakdownLineMaintenanceRange,
-                  { color: colors.text },
-                ]}
-              >
-                {range}
-              </ThemedText>
-            </>
-          );
-        })()}
+        {isNonLoss && nonLossSuggestions && (
+          <>
+            {/* Estimated maintenance range - split into 2 lines like weight loss */}
+            {(() => {
+              const maintenanceText = t('onboarding.calorie_target.estimated_maintenance_range_line', {
+                lower: nonLossSuggestions.maintenance.lower,
+                upper: nonLossSuggestions.maintenance.upper,
+              });
+              
+              // Try splitting by newline first (if translation has it)
+              let [label, range] = maintenanceText.split('\n');
+              
+              // If no newline, manually split at colon
+              if (!range) {
+                const colonIndex = maintenanceText.indexOf(':');
+                if (colonIndex !== -1) {
+                  label = maintenanceText.substring(0, colonIndex + 1).trim();
+                  range = maintenanceText.substring(colonIndex + 1).trim();
+                } else {
+                  // Fallback: split at "cal/day" if no colon
+                  const calDayIndex = maintenanceText.indexOf('cal/day');
+                  if (calDayIndex !== -1) {
+                    label = maintenanceText.substring(0, calDayIndex).trim();
+                    range = maintenanceText.substring(calDayIndex).trim();
+                  } else {
+                    // Last resort: single line
+                    return (
+                      <ThemedText style={[styles.breakdownLine, styles.breakdownLineBold, { color: colors.text }]}>
+                        {maintenanceText}
+                      </ThemedText>
+                    );
+                  }
+                }
+              }
+
+              return (
+                <>
+                  <ThemedText style={[styles.breakdownLine, styles.breakdownLineBold, { color: colors.text }]}>
+                    {label}
+                  </ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.breakdownLine,
+                      styles.breakdownLineBold,
+                      styles.breakdownLineMaintenanceRange,
+                      { color: colors.text },
+                    ]}
+                  >
+                    {range}
+                  </ThemedText>
+                </>
+              );
+            })()}
+          </>
+        )}
       </View>
 
       {/* Subtitle */}
       <ThemedText style={[styles.stepSubtitleModern, { color: colors.text }]}>
-        {targetWeightLb
-          ? `To reach ${formatWeight(targetWeightLb)}, choose a daily calorie target: `
-          : 'Choose a daily calorie target: '}
+        {getSubtitleText()}
       </ThemedText>
 
-      {/* Warning Banner for EXTREME_EDGE_CASE */}
-      {calculations.plans.status === 'EXTREME_EDGE_CASE' && (
+      {/* Warning Banner for EXTREME_EDGE_CASE (Weight Loss) */}
+      {isWeightLoss && calculations && calculations.plans.status === 'EXTREME_EDGE_CASE' && (
         <View style={[styles.warningBanner, { backgroundColor: `${Colors.light.warning}20`, borderColor: Colors.light.warning }]}>
-          <ThemedText style={[styles.warningBannerText, { color: Colors.light.warning }]}>
+          <ThemedText style={[styles.warningBannerText, { color: '#8A4A00' }]}>
             ⚠️ {calculations.plans.message}
           </ThemedText>
           <ThemedText style={[styles.warningBannerText, { color: Colors.light.textSecondary, marginTop: Spacing.xs }]}>
@@ -700,18 +1281,64 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
         </View>
       )}
 
+      {/* Warning Banner for Maintenance/Recomp when maintenanceLow < 1100 */}
+      {(() => {
+        const shouldShowGoalLimitWarning = 
+          maintenanceRange && 
+          maintenanceRange.lowerMaintenance < 1100 && 
+          (isMaintain || isRecomp);
+        
+        if (!shouldShowGoalLimitWarning) return null;
+
+        const warningMessage = 'This goal is beyond what the app can guide reliably.';
+        
+        const warningDetails = isMaintain
+          ? 'Based on your current data, maintenance targets at this range are hard to estimate accurately and small fluctuations can shift outcomes. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you\'re doing, or go back and adjust your goal.'
+          : 'Based on your current data, recomposition targets at this range are hard to set because progress depends heavily on training quality, protein, and recovery. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you\'re doing, or go back and adjust your goal.';
+
+        return (
+          <View style={[styles.warningBanner, { backgroundColor: `${Colors.light.warning}20`, borderColor: Colors.light.warning }]}>
+            <ThemedText style={[styles.warningBannerText, { color: '#8A4A00' }]}>
+              ⚠️ {warningMessage}
+            </ThemedText>
+            <ThemedText style={[styles.warningBannerText, { color: Colors.light.textSecondary, marginTop: Spacing.xs }]}>
+              {warningDetails}
+            </ThemedText>
+          </View>
+        );
+      })()}
+
 
       {/* Plan Options */}
       <View style={styles.presetsContainer}>
         {/* Baseline Deficit Chips */}
-        {calculations.plans.status !== 'EXTREME_EDGE_CASE' && (
+        {isWeightLoss && calculations && calculations.plans.status !== 'EXTREME_EDGE_CASE' && (
           <>
+            {calculations?.plans.plans.sustainable_floor_1200 && renderBaselineChip('sustainable_floor_1200')}
             {renderBaselineChip('moreSustainable')}
             {renderBaselineChip('standard')}
             {renderBaselineChip('aggressive')}
             {renderBaselineChip('cautiousMinimum')}
           </>
         )}
+
+        {isNonLoss && nonLossSuggestions && (() => {
+          // Hide presets for maintain/recomp when maintenanceLow < 1100 (same behavior as weight loss)
+          const shouldHidePresets = 
+            maintenanceRange && 
+            maintenanceRange.lowerMaintenance < 1100 && 
+            (isMaintain || isRecomp);
+          
+          if (shouldHidePresets) {
+            return null;
+          }
+          
+          return (
+            <>
+              {nonLossSuggestions.plans.map((p) => renderNonLossChip(p))}
+            </>
+          );
+        })()}
 
         {/* Custom Option */}
         {selectedPlan === 'custom' ? (
@@ -734,25 +1361,49 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                 <>
                   <CalorieStepper
                     value={customCalories}
-                    min={calculations.plans.plans.custom.min}
-                    max={calculations.plans.plans.custom.max}
-                    step={50}
+                    min={Math.max(
+                      HARD_HARD_STOP,
+                      isWeightLoss
+                        ? calculations?.plans.plans.custom.min ?? HARD_HARD_STOP
+                        : nonLossSuggestions?.custom.min ?? HARD_HARD_STOP
+                    )}
+                    max={
+                      isWeightLoss
+                        ? calculations?.plans.plans.custom.max ?? HARD_HARD_STOP
+                        : nonLossSuggestions?.custom.max ?? HARD_HARD_STOP
+                    }
+                    step={25}
                     onValueChange={handleCustomCaloriesChange}
                     disabled={loading}
                     colors={colors}
                   />
-                  {customMeta.paceLbsPerWeek !== null && customMeta.paceLbsPerWeek > 0 && (
-                    <Text variant="caption" style={[styles.presetDescription, { color: Colors.light.textInverse }]}>
+                  {isWeightLoss && customMeta.paceLbsPerWeek !== null && customMeta.paceLbsPerWeek > 0 && (
+                    <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
                       ~{roundTo1(customMeta.paceLbsPerWeek)} lb/week
                     </Text>
                   )}
-                  {customMeta.etaWeeks !== null && customMeta.etaWeeks > 0 && customMeta.etaDate && (
-                    <Text variant="caption" style={[styles.presetDescription, { color: Colors.light.textInverse }]}>
-                      Est. reach in ~{customMeta.etaWeeks} week{customMeta.etaWeeks === 1 ? '' : 's'} (by {formatDateForDisplay(customMeta.etaDate.toISOString().split('T')[0])})
+                  {isWeightLoss && customMeta.etaWeeks !== null && customMeta.etaWeeks > 0 && customMeta.etaDate && (
+                    <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
+                      ~{customMeta.etaWeeks} week{customMeta.etaWeeks === 1 ? '' : 's'} (by {formatDateForDisplay(customMeta.etaDate.toISOString().split('T')[0])})
+                    </Text>
+                  )}
+                  {isGain && customGainMeta.paceLbsPerWeek !== null && customGainMeta.paceLbsPerWeek > 0 && (
+                    <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
+                      ~{roundTo1(customGainMeta.paceLbsPerWeek)} lb/week
+                    </Text>
+                  )}
+                  {isGain && customGainMeta.etaWeeks !== null && customGainMeta.etaWeeks > 0 && customGainMeta.etaDate && (
+                    <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
+                      ~{customGainMeta.etaWeeks} week{customGainMeta.etaWeeks === 1 ? '' : 's'} (by {formatDateForDisplay(customGainMeta.etaDate.toISOString().split('T')[0])})
                     </Text>
                   )}
                   {getCustomWarningText() && (
-                    <ThemedText style={[styles.warningText, { color: getCustomWarningText()!.color }]}>
+                    <ThemedText
+                      style={[
+                        styles.warningText,
+                        { color: getCustomWarningText()!.color },
+                      ]}
+                    >
                       {getCustomWarningText()!.text}
                     </ThemedText>
                   )}
@@ -774,13 +1425,16 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
               },
               Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
             ]}
-            onPress={(e) => {
-              if (Platform.OS === 'web' && e) {
-                (e as any).preventDefault?.();
-              }
+            onPress={() => {
               setSelectedPlan('custom');
+              setCustomCalories((prev) => {
+                if (prev === null) return null;
+                // Never allow below 700, even for pre-fill
+                return Math.max(HARD_HARD_STOP, roundDownTo25(prev));
+              });
             }}
             disabled={loading}
+            activeOpacity={0.7}
             {...getButtonAccessibilityProps(
               t('onboarding.calorie_target.plan_custom'),
               'Double tap to select custom calorie target',
@@ -791,58 +1445,70 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
               <Text variant="h4" style={[styles.presetLabel, { color: colors.text }]}>
                 {t('onboarding.calorie_target.plan_custom')}
               </Text>
-              <Text variant="body" style={[styles.presetCalories, { color: colors.text }]}>
-                {t('onboarding.calorie_target.plan_custom_desc')}
-              </Text>
             </View>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Custom Warning Modal */}
-      <Modal
-        visible={showCustomWarningModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleCustomWarningAdjust}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <ThemedText type="title" style={[styles.modalTitle, { color: colors.text }]}>
-              {t('onboarding.calorie_target.custom_warning_title')}
-            </ThemedText>
-            <ThemedText style={[styles.modalMessage, { color: colors.textSecondary }]}>
-              {t('onboarding.calorie_target.custom_warning_message')}
-            </ThemedText>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: colors.border }]}
-                onPress={handleCustomWarningAdjust}
-                {...getButtonAccessibilityProps(
-                  t('onboarding.calorie_target.custom_warning_adjust'),
-                  'Double tap to adjust calories'
-                )}
-              >
-                <Text variant="body" style={[styles.modalButtonText, { color: colors.text }]}>
-                  {t('onboarding.calorie_target.custom_warning_adjust')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: onboardingColors.primary }]}
-                onPress={handleCustomWarningProceed}
-                {...getButtonAccessibilityProps(
-                  t('onboarding.calorie_target.custom_warning_proceed'),
-                  'Double tap to proceed anyway'
-                )}
-              >
-                <Text variant="body" style={[styles.modalButtonText, { color: Colors.light.textInverse }]}>
-                  {t('onboarding.calorie_target.custom_warning_proceed')}
-                </Text>
-              </TouchableOpacity>
+      {isWeightLoss && (
+        <Modal
+          visible={showCustomWarningModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleCustomWarningAdjust}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <ThemedText type="title" style={[styles.modalTitle, { color: colors.text }]}>
+                {t('onboarding.calorie_target.custom_warning_title')}
+              </ThemedText>
+              <ThemedText style={[styles.modalMessage, { color: colors.textSecondary }]}>
+                {t('onboarding.calorie_target.custom_warning_message')}
+              </ThemedText>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: colors.border }]}
+                  onPress={handleCustomWarningAdjust}
+                  {...getButtonAccessibilityProps(
+                    t('onboarding.calorie_target.custom_warning_adjust'),
+                    'Double tap to adjust calories'
+                  )}
+                >
+                  <Text variant="body" style={[styles.modalButtonText, { color: colors.text }]}>
+                    {t('onboarding.calorie_target.custom_warning_adjust')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: onboardingColors.primary }]}
+                  onPress={handleCustomWarningProceed}
+                  {...getButtonAccessibilityProps(
+                    t('onboarding.calorie_target.custom_warning_proceed'),
+                    'Double tap to proceed anyway'
+                  )}
+                >
+                  <Text variant="body" style={[styles.modalButtonText, { color: Colors.light.textInverse }]}>
+                    {t('onboarding.calorie_target.custom_warning_proceed')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
+
+      {/* Activity Level Modal */}
+      {onActivityLevelChange && showActivityModal && (
+        <ActivityLevelModal
+          initialActivityLevel={activityLevel || 'sedentary'}
+          onCancel={() => setShowActivityModal(false)}
+          onSave={(newActivityLevel) => {
+            onActivityLevelChange(newActivityLevel);
+            setShowActivityModal(false);
+          }}
+          colors={colors}
+        />
+      )}
     </View>
   );
 };
@@ -947,13 +1613,16 @@ const styles = StyleSheet.create({
   presetDescription: {
     fontSize: FontSize.sm + 2,
   },
+  presetMetaText: {
+    fontSize: FontSize.sm+2, // +2 vs presetDescription for "~x/week" and ETA lines
+  },
   presetCheckmark: {
     position: 'absolute',
     top: Spacing.lg,
     right: Spacing.lg,
   },
   warningText: {
-    fontSize: FontSize.sm + 6,
+    fontSize: FontSize.sm + 3,
     fontStyle: 'italic',
     marginTop: Spacing.xs,
   },
@@ -1083,5 +1752,14 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm + 2,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  adjustActivityLinkContainer: {
+    marginBottom: 6,
+    alignItems: 'center',
+  },
+  adjustActivityLink: {
+    fontSize: FontSize.sm + 2,
+    fontWeight: FontWeight.semibold,
+    textDecorationLine: 'underline',
   },
 });

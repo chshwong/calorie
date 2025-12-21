@@ -202,6 +202,7 @@ export default function OnboardingScreen() {
         currentWeightLb={currentWeightLb}
         currentWeightUnit={currentWeightUnit}
         currentBodyFatPercent={currentBodyFatPercent}
+        dobISO={dateOfBirthStep2 || null}
         sexAtBirth={sex}
         onCurrentWeightKgChange={(text) => {
           setCurrentWeightKg(text);
@@ -276,11 +277,14 @@ export default function OnboardingScreen() {
         heightUnit={heightUnit}
         firstName={preferredName || null}
         onCalorieTargetChange={(target) => {
-          console.log('onCalorieTargetChange', target);
           setCalorieTarget(target.calorieTarget);
           setMaintenanceCalories(target.maintenanceCalories);
           setCaloriePlan(target.caloriePlan);
           setCalorieExecutionMode(target.executionMode);
+        }}
+        onActivityLevelChange={(level) => {
+          setActivityLevel(level);
+          clearErrors();
         }}
         onErrorClear={clearErrors}
         loading={loading}

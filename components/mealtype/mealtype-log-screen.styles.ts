@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
-import { Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { Spacing, BorderRadius, FontSize, FontWeight, Shadows } from '@/constants/theme';
 
 export const styles = StyleSheet.create({
   container: {
@@ -87,9 +87,7 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     marginTop: 4,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    ...Shadows.lg,
     overflow: 'hidden',
     minWidth: 140,
   },

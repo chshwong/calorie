@@ -71,7 +71,7 @@ import { FoodLogMenuModal } from '@/components/mealtype/FoodLogMenuModal';
 import { MealTypeLogHeader } from '@/components/mealtype/MealTypeLogHeader';
 import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
 import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
-import { styles } from './mealtype-log-screen.styles';
+import { styles } from '@/components/mealtype/mealtype-log-screen.styles';
 
 type CalorieEntry = {
   id: string;

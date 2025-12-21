@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Modal, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
@@ -11,6 +11,7 @@ interface BodyFatRangesModalProps {
   visible: boolean;
   onClose: () => void;
   sex: 'male' | 'female' | '' | null;
+  ageYears?: number | null;
   colors: typeof Colors.light;
 }
 
@@ -95,14 +96,37 @@ const AGE_GROUP_LABELS: Record<AgeGroup, string> = {
 const DISCLAIMER_TEXT =
   'These ranges are broad population estimates based on fitness and health references. Individual body fat percentage varies by genetics, measurement method, and other factors. Use this only as a rough guide.';
 
-export function BodyFatRangesModal({ visible, onClose, sex, colors }: BodyFatRangesModalProps) {
+function mapAgeToDefaultAgeGroup(ageYears: number | null | undefined): AgeGroup | null {
+  if (ageYears === null || ageYears === undefined || !isFinite(ageYears)) return null;
+  if (ageYears <= 29) return '15_29';
+  if (ageYears >= 30 && ageYears <= 39) return '30s';
+  if (ageYears >= 40 && ageYears <= 59) return '40_50s';
+  if (ageYears >= 60) return '60_plus';
+  return null;
+}
+
+export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: BodyFatRangesModalProps) {
   const { t } = useTranslation();
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup>('15_29');
+  const wasVisibleRef = useRef(false);
 
   const normalizedSex = sex === 'male' || sex === 'female' ? sex : null;
   const chartData = normalizedSex ? BODY_FAT_DATA[normalizedSex][selectedAgeGroup] : [];
 
   const ageGroups: AgeGroup[] = ['15_29', '30s', '40_50s', '60_plus'];
+
+  // On open: preselect age group based on user's age (do not override while open)
+  useEffect(() => {
+    if (visible && !wasVisibleRef.current) {
+      const mapped = mapAgeToDefaultAgeGroup(ageYears);
+      if (mapped) {
+        setSelectedAgeGroup(mapped);
+      }
+      wasVisibleRef.current = true;
+    } else if (!visible && wasVisibleRef.current) {
+      wasVisibleRef.current = false;
+    }
+  }, [visible, ageYears]);
 
   return (
     <Modal

@@ -9,9 +9,14 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, LineHeigh
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 
+type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high';
+
 interface ActivityStepProps {
-  activityLevel: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high' | '';
-  onActivityLevelChange: (level: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high') => void;
+  mode?: 'wizard' | 'modal';
+  activityLevel?: ActivityLevel | '';
+  value?: ActivityLevel | '';
+  onChange?: (level: ActivityLevel) => void;
+  onActivityLevelChange?: (level: ActivityLevel) => void;
   onErrorClear: () => void;
   loading: boolean;
   colors: typeof Colors.light;
@@ -56,7 +61,10 @@ const ActivityIllustration = () => (
 );
 
 export const ActivityStep: React.FC<ActivityStepProps> = ({
+  mode = 'wizard',
   activityLevel,
+  value,
+  onChange,
   onActivityLevelChange,
   onErrorClear,
   loading,
@@ -65,20 +73,35 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
   const { t } = useTranslation();
   const [pressedCard, setPressedCard] = useState<string | null>(null);
   
+  // Use value/onChange in modal mode, activityLevel/onActivityLevelChange in wizard mode
+  const currentValue = mode === 'modal' ? (value || 'sedentary') : (activityLevel || '');
+  const handleChange = mode === 'modal' 
+    ? (level: ActivityLevel) => onChange?.(level)
+    : (level: ActivityLevel) => {
+        onActivityLevelChange?.(level);
+        onErrorClear();
+      };
+  
   return (
     <View style={styles.stepContentAnimated}>
-      {/* Illustration */}
-      <View style={styles.stepIllustration}>
-        <ActivityIllustration />
-      </View>
+      {/* Illustration - hide in modal mode */}
+      {mode === 'wizard' && (
+        <View style={styles.stepIllustration}>
+          <ActivityIllustration />
+        </View>
+      )}
       
-      {/* Title */}
-      <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
-        {t('onboarding.activity.title')}
-      </ThemedText>
-      <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
-        {t('onboarding.activity.subtitle')}
-      </ThemedText>
+      {/* Title - hide in modal mode */}
+      {mode === 'wizard' && (
+        <>
+          <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
+            {t('onboarding.activity.title')}
+          </ThemedText>
+          <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
+            {t('onboarding.activity.subtitle')}
+          </ThemedText>
+        </>
+      )}
       
       <View style={styles.goalContainer}>
         {[
@@ -88,7 +111,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
           { value: 'high' as const, labelKey: 'onboarding.activity.high.label', descriptionKey: 'onboarding.activity.high.description' },
           { value: 'very_high' as const, labelKey: 'onboarding.activity.very_high.label', descriptionKey: 'onboarding.activity.very_high.description' },
         ].map((activity) => {
-          const selected = activityLevel === activity.value;
+          const selected = currentValue === activity.value;
           const pressed = pressedCard === activity.value;
           
           // Compute shadow styles based on selection state
@@ -123,8 +146,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
                 Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
               ]}
               onPress={() => {
-                onActivityLevelChange(activity.value);
-                onErrorClear();
+                handleChange(activity.value);
               }}
               onPressIn={() => setPressedCard(activity.value)}
               onPressOut={() => setPressedCard(null)}

@@ -48,6 +48,8 @@ const limitWeightInput = (text: string): string => {
   return decPart !== undefined ? `${limitedInt}.${decPart}` : limitedInt;
 };
 
+const roundToNearestHalf = (n: number): number => Math.round(n * 2) / 2;
+
 export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
   goalWeightKg,
   goalWeightLb,
@@ -112,8 +114,8 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
     if (goalWeightSuggestion.ok) {
       // Format suggested weight in user's selected unit
       const suggestedWeight = currentWeightUnit === 'kg'
-        ? roundTo1(lbToKg(goalWeightSuggestion.suggestedLb))
-        : roundTo1(goalWeightSuggestion.suggestedLb);
+        ? roundToNearestHalf(lbToKg(goalWeightSuggestion.suggestedLb))
+        : roundToNearestHalf(goalWeightSuggestion.suggestedLb);
       
       const unit = currentWeightUnit === 'kg' ? 'kg' : 'lb';
       
@@ -356,7 +358,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
             <ThemedText style={[styles.metaLineLast, { color: colors.textSecondary }]}>
               {String(t('onboarding.goal_weight.suggest_prefix'))}{' '}
               <Text style={{ fontWeight: FontWeight.bold }}>
-                {roundTo1(currentWeightUnit === 'kg' ? lbToKg(goalWeightSuggestion.suggestedLb) : goalWeightSuggestion.suggestedLb)} {currentWeightUnit}
+                {roundToNearestHalf(currentWeightUnit === 'kg' ? lbToKg(goalWeightSuggestion.suggestedLb) : goalWeightSuggestion.suggestedLb)} {currentWeightUnit}
               </Text>
             </ThemedText>
           ) : goalWeightSuggestion ? (
