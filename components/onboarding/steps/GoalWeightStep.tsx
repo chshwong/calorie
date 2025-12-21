@@ -339,9 +339,6 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
       <ThemedText type="title" style={[styles.stepTitleModern, { color: colors.text }]}>
         {t('onboarding.goal_weight.title')}
       </ThemedText>
-      <ThemedText style={[styles.stepSubtitleModern, { color: colors.textSecondary }]}>
-        {t('onboarding.goal_weight.subtitle')}
-      </ThemedText>
       
       {/* Meta block for lose/gain */}
       {currentWeightLb !== null && (goalType === 'lose' || goalType === 'gain') && (
@@ -528,12 +525,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     marginBottom: Spacing.sm,
     textAlign: 'center',
-  },
-  stepSubtitleModern: {
-    fontSize: FontSize.md,
-    marginBottom: Spacing['2xl'],
-    textAlign: 'center',
-    lineHeight: FontSize.md * LineHeight.normal,
   },
   suggestionText: {
     fontSize: FontSize.base,

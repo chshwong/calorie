@@ -377,7 +377,7 @@
       "goal_weight_error_recomp_range_lb": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} lbs of your current weight.",
       "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight.",
       "suggested_placeholder": "Based on your data, we suggest: {{weight}} {{unit}}",
-      "suggest_prefix": "A smart place to start is:",
+      "suggest_prefix": "A smart place to start: ",
       "your_goal": "Your goal",
       "your_current_weight": "Your current weight",
       "nudge_hint": "Drag the slider to fine-tune your goal.",
