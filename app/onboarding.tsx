@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -25,6 +25,7 @@ import {
   GoalWeightStep,
   DailyCalorieTargetStep,
   DailyFocusTargetsStep,
+  LegalAgreementStep,
 } from '@/components/onboarding/steps';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
@@ -78,10 +79,6 @@ export default function OnboardingScreen() {
     goalWeightLb,
     setGoalWeightLb,
     goalWeightUnit,
-    timelineOption,
-    setTimelineOption,
-    customTargetDate,
-    setCustomTargetDate,
     calorieTarget,
     maintenanceCalories,
     caloriePlan,
@@ -92,7 +89,14 @@ export default function OnboardingScreen() {
     setCalorieExecutionMode,
     dailyTargets,
     setDailyTargets,
+    legalAgreeTerms,
+    setLegalAgreeTerms,
+    legalAgreePrivacy,
+    setLegalAgreePrivacy,
+    legalAcknowledgeRisk,
+    setLegalAcknowledgeRisk,
     loading,
+    isSubmitting,
     errorText,
     errorKey,
     errorParams,
@@ -121,9 +125,21 @@ export default function OnboardingScreen() {
     handleNext,
     handleBack,
     handleCompleteOnboarding,
+    handleProceedToLegal,
     shouldDisableNext,
     goalWeightSuggestion,
   } = useOnboardingForm();
+  
+  // Scroll to top when step changes
+  const scrollViewRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    // Scroll parent ScrollView to top when step changes
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    });
+  }, [currentStep]);
   
   // Step map for cleaner rendering
   const stepScreens: Record<number, React.ReactNode> = {
@@ -305,6 +321,19 @@ export default function OnboardingScreen() {
         onErrorClear={clearErrors}
         loading={loading}
         colors={colors}
+        stepKey={currentStep}
+      />
+    ),
+    10: (
+      <LegalAgreementStep
+        legalAgreeTerms={legalAgreeTerms}
+        legalAgreePrivacy={legalAgreePrivacy}
+        legalAcknowledgeRisk={legalAcknowledgeRisk}
+        onLegalAgreeTermsChange={setLegalAgreeTerms}
+        onLegalAgreePrivacyChange={setLegalAgreePrivacy}
+        onLegalAcknowledgeRiskChange={setLegalAcknowledgeRisk}
+        loading={loading}
+        colors={colors}
       />
     ),
   };
@@ -322,6 +351,7 @@ export default function OnboardingScreen() {
       }),
     ]}>
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={onboardingStyles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -338,7 +368,7 @@ export default function OnboardingScreen() {
                 <TouchableOpacity
                   style={onboardingStyles.backButton}
                   onPress={handleBack}
-                  disabled={loading}
+                  disabled={loading || isSubmitting}
                   {...getButtonAccessibilityProps('Back', 'Double tap to go back to previous step')}
                   {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
                 >
@@ -367,6 +397,7 @@ export default function OnboardingScreen() {
                 errorText={errorText}
               />
               
+              {/* CTA button inside content column for all steps */}
               <View style={onboardingStyles.buttonContainerModern}>
                 {currentStep < totalSteps ? (
                   <OnboardingPrimaryButton
@@ -377,13 +408,21 @@ export default function OnboardingScreen() {
                     testID="onboarding-next-button"
                   />
                 ) : (
-                  <OnboardingPrimaryButton
-                    label={loading ? t('onboarding.saving') : t('onboarding.complete_button')}
-                    onPress={handleCompleteOnboarding}
-                    disabled={false}
-                    loading={loading}
-                    testID="onboarding-complete-button"
-                  />
+                  <>
+                    <OnboardingPrimaryButton
+                      label={loading || isSubmitting ? t('onboarding.saving') : t('onboarding.legal_agree_cta')}
+                      onPress={async () => {
+                        // Ensure handler is properly awaited
+                        await handleProceedToLegal();
+                      }}
+                      disabled={shouldDisableNext() || isSubmitting}
+                      loading={loading || isSubmitting}
+                      testID="onboarding-legal-agree-button"
+                    />
+                    <ThemedText style={[onboardingStyles.legalCaption, { color: colors.textSecondary }]}>
+                      {t('onboarding.legal.confirmation_caption')}
+                    </ThemedText>
+                  </>
                 )}
               </View>
             </View>

@@ -11,7 +11,6 @@ import {
   validateActivityLevel as validateActivityLevelUtil, 
   validateWeightKg as validateWeightKgUtil, 
   validateBodyFatPercent as validateBodyFatPercentUtil,
-  validateTimeline as validateTimelineUtil, 
   validateSex as validateSexUtil, 
   validateGoal as validateGoalUtil 
 } from '@/utils/validation';
@@ -42,6 +41,7 @@ import {
   getLastDraftError 
 } from '@/lib/onboarding/onboarding-draft-sync';
 import type { DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
+import { fetchActiveLegalDocuments, acceptActiveLegalDocuments } from '@/lib/legal/legal-db';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 
@@ -51,7 +51,7 @@ export function useOnboardingForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 9; // Steps 1-9: Name, Sex, Height, Activity, Current Weight, Goal, Goal Weight, Daily Calorie Target, Daily Focus Targets
+  const totalSteps = 10; // Steps 1-10: Name, Sex, Height, Activity, Current Weight, Goal, Goal Weight, Daily Calorie Target, Daily Focus Targets, Legal Agreement
   
   // Step 6: Goal
   const [goal, setGoal] = useState<GoalType | ''>('');
@@ -110,17 +110,13 @@ export function useOnboardingForm() {
     });
   }, [goal, currentWeightLb, heightCm, sex, dateOfBirthStep2]);
   
-  // Step 8: Timeline
-  const [timelineOption, setTimelineOption] = useState<'3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date' | ''>('');
-  const [customTargetDate, setCustomTargetDate] = useState<string | null>(null);
-  
-  // Step 9: Daily Calorie Target
+  // Step 8: Daily Calorie Target
   const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
   const [maintenanceCalories, setMaintenanceCalories] = useState<number | null>(null);
   const [caloriePlan, setCaloriePlan] = useState<string | null>(null);
   const [calorieExecutionMode, setCalorieExecutionMode] = useState<'override' | undefined>(undefined);
   
-  // Step 10: Daily Focus Targets
+  // Step 9: Daily Focus Targets
   const [dailyTargets, setDailyTargets] = useState<{
     proteinGMin: number;
     fiberGMin: number;
@@ -130,7 +126,13 @@ export function useOnboardingForm() {
     waterMlTarget: number;
   } | null>(null);
   
+  // Step 10: Legal Agreement
+  const [legalAgreeTerms, setLegalAgreeTerms] = useState(false);
+  const [legalAgreePrivacy, setLegalAgreePrivacy] = useState(false);
+  const [legalAcknowledgeRisk, setLegalAcknowledgeRisk] = useState(false);
+  
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorTextState] = useState<string | null>(null);
   const [errorKey, setErrorKeyState] = useState<string | null>(null);
   const [errorParams, setErrorParamsState] = useState<Record<string, any> | undefined>(undefined);
@@ -636,15 +638,7 @@ export function useOnboardingForm() {
       }
     }
     
-    // Step 8: Timeline
-    if (timelineOption && ['3_months', '6_months', '12_months', 'no_deadline', 'custom_date'].includes(timelineOption)) {
-      draft.goal_timeframe = timelineOption as '3_months' | '6_months' | '12_months' | 'no_deadline' | 'custom_date';
-    }
-    if (customTargetDate) {
-      draft.goal_target_date = customTargetDate;
-    }
-    
-    // Step 9: Daily Calorie Target - only include if explicitly set (not null/undefined)
+    // Step 8: Daily Calorie Target - only include if explicitly set (not null/undefined)
     // Using daily_calorie_target (existing column name)
     if (calorieTarget !== null && calorieTarget !== undefined) {
       draft.daily_calorie_target = calorieTarget;
@@ -658,11 +652,6 @@ export function useOnboardingForm() {
     }
     
     return draft;
-  };
-  
-  const validateTimeline = (): string | null => {
-    const errorKey = validateTimelineUtil(timelineOption, customTargetDate || null);
-    return errorKey ? t(errorKey) : null;
   };
   
   const validateGoal = (): string | null => {
@@ -969,42 +958,6 @@ export function useOnboardingForm() {
     }, 100);
   };
   
-  const handleTimelineNext = () => {
-    clearErrors();
-    
-    // Validate timeline step
-    const validationError = validateTimeline();
-    if (validationError) {
-      setErrorText(validationError);
-      return;
-    }
-    
-    if (!user) {
-      setErrorText(t('onboarding.error_no_session'));
-      router.replace('/login');
-      return;
-    }
-    
-    // Build draft with timeline fields and schedule background save (fire-and-forget)
-    const draft = buildDraft();
-    setSyncStatus('saving');
-    scheduleDraftSave(draft, user.id, queryClient, 'step_timeline');
-    
-    // Move to next step immediately (optimistic, no blocking)
-    setCurrentStep(9);
-    
-    setTimeout(() => {
-      const { error } = getLastDraftError();
-      if (error) {
-        setSyncStatus('error');
-        lastSyncErrorRef.current = error;
-      } else {
-        setSyncStatus('idle');
-        setLastSavedAt(Date.now());
-      }
-    }, 100);
-  };
-  
   const handleCalorieTargetNext = () => {
     clearErrors();
     
@@ -1072,8 +1025,11 @@ export function useOnboardingForm() {
       // TimelineStep was removed, so this is now step 8
       handleCalorieTargetNext();
     } else if (currentStep === 9) {
-      // Daily focus targets step - handled by handleCompleteOnboarding
-      handleCompleteOnboarding();
+      // Daily focus targets step - proceed to legal agreement step
+      setCurrentStep(10);
+    } else if (currentStep === 10) {
+      // Legal agreement step - handled by handleProceedToLegal
+      handleProceedToLegal();
     }
   };
   
@@ -1138,6 +1094,9 @@ export function useOnboardingForm() {
     } else if (currentStep === 9) {
       // Daily Focus Targets step
       return !dailyTargets;
+    } else if (currentStep === 10) {
+      // Legal Agreement step - all three checkboxes must be checked
+      return !legalAgreeTerms || !legalAgreePrivacy || !legalAcknowledgeRisk;
     }
     return false;
   };
@@ -1149,7 +1108,10 @@ export function useOnboardingForm() {
     }
   };
   
-  const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = async (options?: { markComplete?: boolean; navigateTo?: string }) => {
+    const markComplete = options?.markComplete ?? true;
+    const destination = options?.navigateTo ?? '/(tabs)';
+
     const startTime = performance.now();
     clearErrors();
     
@@ -1162,13 +1124,6 @@ export function useOnboardingForm() {
     // Validate targets are set
     if (!dailyTargets) {
       setErrorText('Please set your daily focus targets.');
-      return;
-    }
-    
-    // Validate timeline step (should already be saved, but validate for safety)
-    const validationError = validateTimeline();
-    if (validationError) {
-      setErrorText(validationError);
       return;
     }
     
@@ -1215,38 +1170,15 @@ export function useOnboardingForm() {
       const bmr = calculateBMR(currentWeightKgValue, heightCmValue, ageNum, sex as 'male' | 'female');
       const tdee = calculateTDEE(bmr, activityLevel as ActivityLevel);
       
-      // Calculate timeline in weeks
-      let weeksToGoal: number | null = null;
-      let targetDate: string | null = null;
-      
-      if (timelineOption === '3_months') {
-        weeksToGoal = 12;
-      } else if (timelineOption === '6_months') {
-        weeksToGoal = 26;
-      } else if (timelineOption === '12_months') {
-        weeksToGoal = 52;
-      } else if (timelineOption === 'custom_date' && customTargetDate) {
-        const targetDateObj = new Date(customTargetDate);
-        const today = new Date();
-        const diffTime = targetDateObj.getTime() - today.getTime();
-        weeksToGoal = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-        targetDate = customTargetDate;
-        if (weeksToGoal < 1) weeksToGoal = null;
-      }
-      
       // Calculate required daily calorie difference
+      // No timeline/deadline - use mild deficit/surplus based on goal
       let dailyCalorieDiff = 0;
-      if (weeksToGoal && weeksToGoal > 0) {
-        dailyCalorieDiff = calculateRequiredDailyCalorieDiff(currentWeightKgValue, goalWeightKgValue, weeksToGoal);
+      if (goal === 'lose') {
+        dailyCalorieDiff = -250;
+      } else if (goal === 'gain') {
+        dailyCalorieDiff = 250;
       } else {
-        // No deadline - use mild deficit/surplus based on goal
-        if (goal === 'lose') {
-          dailyCalorieDiff = -250;
-        } else if (goal === 'gain') {
-          dailyCalorieDiff = 250;
-        } else {
-          dailyCalorieDiff = 0;
-        }
+        dailyCalorieDiff = 0;
       }
       
       // Calculate safe calorie target with safety limits
@@ -1261,7 +1193,9 @@ export function useOnboardingForm() {
         const draft = buildDraft();
         await flushDraftSave(draft, user.id, queryClient);
       } catch (error: any) {
-        setErrorText('Failed to save your information. Please try again.');
+        // Using 'any' here because error types from flushDraftSave can vary
+        // and we need to safely handle the error without type checking
+        setErrorText(t('onboarding.error_save_failed'));
         setLoading(false);
         return; // Keep user on final step
       }
@@ -1290,31 +1224,35 @@ export function useOnboardingForm() {
       
       const finalCaloriePlan = mapCaloriePlanToDb(caloriePlan);
       
-       const updateData: Record<string, any> = {
-         daily_calorie_target: finalCalorieTarget,
-         goal_target_date: targetDate,
-         goal_timeframe: timelineOption,
-         onboarding_complete: true,
-       };
-       
-       // Add optional fields only if they exist in schema (will be added via migration)
-       // For now, only include fields that definitely exist
-       if (finalMaintenanceCalories !== null) {
-         updateData.maintenance_calories = finalMaintenanceCalories;
-       }
-       if (finalCaloriePlan) {
-         updateData.calorie_plan = finalCaloriePlan;
-         updateData.onboarding_calorie_set_at = new Date().toISOString();
-       }
-       if (dailyTargets) {
-         updateData.protein_g_min = dailyTargets.proteinGMin;
-         updateData.fiber_g_min = dailyTargets.fiberGMin;
-         updateData.carbs_g_max = dailyTargets.carbsGMax;
-         updateData.sugar_g_max = dailyTargets.sugarGMax;
-         updateData.sodium_mg_max = dailyTargets.sodiumMgMax;
-         updateData.water_goal_ml = dailyTargets.waterMlTarget; // Using existing column name
-         updateData.onboarding_targets_set_at = new Date().toISOString();
-       }
+      const updateData: Record<string, any> = {
+        daily_calorie_target: finalCalorieTarget,
+        goal_target_date: null,
+        goal_timeframe: null,
+      };
+      
+      // Only set onboarding_complete when we are truly finished (after legal)
+      if (markComplete) {
+        updateData.onboarding_complete = true;
+      }
+      
+      // Add optional fields only if they exist in schema (will be added via migration)
+      // For now, only include fields that definitely exist
+      if (finalMaintenanceCalories !== null) {
+        updateData.maintenance_calories = finalMaintenanceCalories;
+      }
+      if (finalCaloriePlan) {
+        updateData.calorie_plan = finalCaloriePlan;
+        updateData.onboarding_calorie_set_at = new Date().toISOString();
+      }
+      if (dailyTargets) {
+        updateData.protein_g_min = dailyTargets.proteinGMin;
+        updateData.fiber_g_min = dailyTargets.fiberGMin;
+        updateData.carbs_g_max = dailyTargets.carbsGMax;
+        updateData.sugar_g_max = dailyTargets.sugarGMax;
+        updateData.sodium_mg_max = dailyTargets.sodiumMgMax;
+        updateData.water_goal_ml = dailyTargets.waterMlTarget; // Using existing column name
+        updateData.onboarding_targets_set_at = new Date().toISOString();
+      }
       
       // Perform final mutation with timeout and retry support
       const mutationStart = performance.now();
@@ -1329,11 +1267,13 @@ export function useOnboardingForm() {
       try {
         updatedProfile = await Promise.race([mutationPromise, timeoutPromise]);
       } catch (error: any) {
+        // Using 'any' here because Promise.race can reject with various error types
+        // (Error, string, object, etc.) and we need to check error.message safely
         if (error.message === 'TIMEOUT') {
           // Timeout occurred - show retry option
           const mutationTime = performance.now() - mutationStart;
           console.warn(`[handleCompleteOnboarding] Final mutation timeout after ${mutationTime.toFixed(2)}ms`);
-          setErrorText('Network is waking up... Please try again.');
+          setErrorText(t('onboarding.error_network_waking'));
           setLoading(false);
           return; // Allow user to retry by clicking Next again
         }
@@ -1349,20 +1289,96 @@ export function useOnboardingForm() {
       // Update cache with final profile
       queryClient.setQueryData(['userProfile', user.id], updatedProfile);
       
-      // Also refresh profile in AuthContext (fire-and-forget)
-      refreshProfile().catch(() => {}); // Fire-and-forget
+      // Also refresh profile in AuthContext - MUST await to prevent bounce
+      // This ensures AuthContext.onboardingComplete is updated before navigation
+      await refreshProfile();
       
       // Show warning if pace was adjusted
       if (warningMessage) {
         Alert.alert('Pace Adjusted', warningMessage);
       }
       
-      // Navigate to main app
-      router.replace('/(tabs)');
+      // Navigate to next destination ONLY after all DB writes complete
+      // This is the final step - navigation happens here after:
+      // 1. Draft flush completes
+      // 2. Profile update with onboarding_complete=true completes
+      // 3. Cache updates complete
+      // 4. AuthContext profile refresh completes (prevents bounce)
+      if (destination) {
+        router.replace(destination);
+      }
     } catch (error: any) {
-      const errorMessage = error.message || 'Failed to complete onboarding. Please try again.';
+      // Using 'any' here because error types can vary (Error, string, object, etc.)
+      // and we need to safely extract a message for display
+      const errorMessage = error.message || t('onboarding.error_complete_failed');
       setErrorText(errorMessage);
       setLoading(false);
+      // Note: isSubmitting is managed by handleProceedToLegal, not here
+      // This allows handleCompleteOnboarding to be called from other contexts
+    }
+  };
+
+  const handleProceedToLegal = async () => {
+    // Guard: prevent multiple submissions
+    if (isSubmitting) {
+      return;
+    }
+    
+    clearErrors();
+    
+    // A) Validate all legal checkboxes are checked
+    if (!legalAgreeTerms || !legalAgreePrivacy || !legalAcknowledgeRisk) {
+      setErrorText(t('onboarding.legal.error_all_required'));
+      return;
+    }
+    
+    if (!user) {
+      setErrorText(t('onboarding.error_no_session'));
+      router.replace('/login');
+      return;
+    }
+    
+    // Begin submission - set both loading states
+    setIsSubmitting(true);
+    setLoading(true);
+    
+    try {
+      // B) Fetch active legal documents
+      const activeDocs = await fetchActiveLegalDocuments();
+      
+      if (!activeDocs || activeDocs.length === 0) {
+        setErrorText(t('onboarding.legal.error_no_docs'));
+        setIsSubmitting(false);
+        setLoading(false);
+        return;
+      }
+      
+      // C) Insert acceptances into user_legal_acceptances and await completion
+      await acceptActiveLegalDocuments({
+        userId: user.id,
+        docs: activeDocs.map(d => ({ doc_type: d.doc_type, version: d.version })),
+      });
+      
+      // D) Persist onboarding completion - await this call; it must not be fire-and-forget
+      // This updates the profile with onboarding_complete=true and all final data
+      await handleCompleteOnboarding({
+        markComplete: true,
+        navigateTo: '/(tabs)',
+      });
+      
+      // E) Navigation happens inside handleCompleteOnboarding after all DB writes complete
+      // Reset submitting state after successful completion (component may unmount on navigation)
+      setIsSubmitting(false);
+      setLoading(false);
+      
+    } catch (error: any) {
+      // Using 'any' here because React Query and Supabase error types can vary
+      // (Error, string, object, etc.) and we need to safely extract a message for display
+      console.error('Error in handleProceedToLegal:', error);
+      setErrorText(error instanceof Error ? error.message : t('onboarding.error_complete_failed'));
+      setIsSubmitting(false);
+      setLoading(false);
+      // User stays on legal screen on error
     }
   };
   
@@ -1407,10 +1423,6 @@ export function useOnboardingForm() {
     setGoalWeightLb,
     goalWeightUnit,
     setGoalWeightUnit,
-    timelineOption,
-    setTimelineOption,
-    customTargetDate,
-    setCustomTargetDate,
     calorieTarget,
     maintenanceCalories,
     caloriePlan,
@@ -1421,7 +1433,14 @@ export function useOnboardingForm() {
     setCalorieExecutionMode,
     dailyTargets,
     setDailyTargets,
+    legalAgreeTerms,
+    setLegalAgreeTerms,
+    legalAgreePrivacy,
+    setLegalAgreePrivacy,
+    legalAcknowledgeRisk,
+    setLegalAcknowledgeRisk,
     loading,
+    isSubmitting,
     errorText,
     errorKey,
     errorParams,
@@ -1458,6 +1477,7 @@ export function useOnboardingForm() {
     handleNext,
     handleBack,
     handleCompleteOnboarding,
+    handleProceedToLegal,
     shouldDisableNext,
   };
 }
