@@ -411,6 +411,28 @@
     "error_no_session": "Aucune session utilisateur trouvée. Veuillez vous reconnecter."
   },
 
+  "legal": {
+    "title": "Reconnaissance juridique et sécurité",
+    "subtitle": "Passez en revue les Conditions d'utilisation, la Politique de confidentialité et l'Avis médical. Vous devez accepter avant d'utiliser l'application.",
+    "subtitle_settings": "Documents juridiques actuels et votre historique d'acceptation.",
+    "loading_docs": "Chargement du contenu légal...",
+    "error_loading": "Impossible de charger les documents légaux. Veuillez réessayer.",
+    "error_checkboxes": "Veuillez lire et cocher toutes les cases obligatoires.",
+    "checkbox_terms": "J'accepte les Conditions d'utilisation",
+    "checkbox_privacy": "J'accepte la Politique de confidentialité",
+    "checkbox_health": "Je comprends que cette application ne fournit pas de conseils médicaux et que je l'utilise à mes risques, y compris le risque de blessure grave ou de décès",
+    "cta": "Je comprends et j'accepte",
+    "continue": "Continuer",
+    "already_up_to_date": "Vous êtes déjà à jour sur tous les documents actifs.",
+    "acceptance_badge": "Accepté le {{date}}",
+    "updated_version": "Version {{version}}",
+    "expand_section": "Développer la section",
+    "collapse_section": "Réduire la section",
+    "view_only": "Vue en lecture seule",
+    "settings_title": "Juridique et sécurité",
+    "refresh": "Actualiser"
+  },
+
   "settings": {
     "title": "Paramètres",
     "profile_section": {

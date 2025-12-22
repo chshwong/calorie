@@ -131,6 +131,18 @@ export const onboardingStyles = StyleSheet.create({
     marginTop: 16,
     gap: 12,
   },
+  bottomActionContainer: {
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    ...Platform.select({
+      web: {
+        paddingHorizontal: 20,
+      },
+      default: {},
+    }),
+  },
   button: {
     padding: 16,
     borderRadius: 12,
@@ -155,6 +167,13 @@ export const onboardingStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  legalCaption: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
 });
 

@@ -38,6 +38,24 @@ export const PROFILES = {
     MED_DOSE_AMOUNT: { MIN: 0, MAX: 9999 },     // DB: med_log_dose_amount_range (nullable)
     WATER_PRESET_SLOT: { MIN: 1, MAX: 5 },      // DB: water_quick_presets_slot_check
   } as const;
+
+  // Daily nutrient target ranges (for onboarding and daily focus targets)
+  export const NUTRIENT_TARGETS = {
+    PROTEIN_G: { MIN: 80, MAX: 250, STEP: 5 },
+    // Slider range computation bounds
+    PROTEIN_SLIDER: { MIN: 30, MAX: 250 },
+    FIBER_G: { MIN: 22, MAX: 45, STEP: 1 },
+    // Slider range computation bounds
+    FIBER_SLIDER: { MIN: 10, MAX: 70 },
+    CARBS_G: { MIN: 120, MAX: 400, STEP: 10 },
+    // Slider range computation bounds
+    CARBS_SLIDER: { MIN: 10, MAX: 400 },
+    SUGAR_G: { MIN: 25, MAX: 70, STEP: 5 },
+    SODIUM_MG: { MIN: 1500, MAX: 3500, STEP: 100 },
+    // Slider range computation bounds
+    SODIUM_SLIDER: { MIN: 500, MAX: 7000 },
+    SUGAR_SLIDER: { MIN: 10, MAX: 100 },
+  } as const;
   
   // Policy (not shown in DB constraints you pasted) — keep separate and label clearly
   export const POLICY = {

@@ -7,6 +7,7 @@
  */
 
 import { lbToKg } from '@/lib/domain/weight-constants';
+import { NUTRIENT_TARGETS } from '@/constants/constraints';
 
 // Global constants - DO NOT hardcode these values elsewhere
 export const CALORIES_PER_LB = 3600;
@@ -1516,12 +1517,167 @@ export function suggestWeightLossNutrients(params: {
     sodiumMaxMg: sodiumMg,
     waterTargetMl: waterMl,
     clamps: {
-      protein: { min: 80, max: 250, step: 5 },
-      fiber: { min: 22, max: 45, step: 1 },
-      carbs: { min: 80, max: 300, step: 10 },
-      sugar: { min: 25, max: 70, step: 5 },
-      sodium: { min: 1500, max: 3500, step: 100 },
+      protein: { min: NUTRIENT_TARGETS.PROTEIN_G.MIN, max: NUTRIENT_TARGETS.PROTEIN_G.MAX, step: NUTRIENT_TARGETS.PROTEIN_G.STEP },
+      fiber: { min: NUTRIENT_TARGETS.FIBER_G.MIN, max: NUTRIENT_TARGETS.FIBER_G.MAX, step: NUTRIENT_TARGETS.FIBER_G.STEP },
+      carbs: { min: NUTRIENT_TARGETS.CARBS_G.MIN, max: NUTRIENT_TARGETS.CARBS_G.MAX, step: NUTRIENT_TARGETS.CARBS_G.STEP },
+      sugar: { min: NUTRIENT_TARGETS.SUGAR_G.MIN, max: NUTRIENT_TARGETS.SUGAR_G.MAX, step: NUTRIENT_TARGETS.SUGAR_G.STEP },
+      sodium: { min: NUTRIENT_TARGETS.SODIUM_MG.MIN, max: NUTRIENT_TARGETS.SODIUM_MG.MAX, step: NUTRIENT_TARGETS.SODIUM_MG.STEP },
       water: { min: 1800, max: 4500, step: 100 },
     },
   };
+}
+
+/**
+ * Compute suggested daily focus targets based on user inputs
+ * Per engineering guidelines: Domain logic lives in plain TS modules with no React/browser/UI imports.
+ */
+export interface SuggestedTargets {
+  proteinGMin: { value: number; min: number; max: number; step: number };
+  fiberGMin: { value: number; min: number; max: number; step: number };
+  carbsGMax: { value: number; min: number; max: number; step: number; isPrimary?: boolean };
+  sugarGMax: { value: number; min: number; max: number; step: number };
+  sodiumMgMax: { value: number; min: number; max: number; step: number };
+}
+
+export function computeSuggestedTargets(
+  goalType: 'lose' | 'gain' | 'maintain' | 'recomp' | '' | null,
+  currentWeightLb: number | null,
+  targetWeightLb: number | null,
+  heightCm: number | null,
+  sexAtBirth: 'male' | 'female' | '' | null,
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high' | ''
+): SuggestedTargets | null {
+  if (!goalType || currentWeightLb === null) {
+    return null;
+  }
+
+  const weightLb = targetWeightLb !== null ? targetWeightLb : currentWeightLb;
+  const isWeightLoss = goalType === 'lose';
+
+  // For weight loss, use the rules module
+  if (isWeightLoss && sexAtBirth && activityLevel) {
+    const suggestions = suggestWeightLossNutrients({
+      goalWeightLb: weightLb,
+      currentWeightLb,
+      sexAtBirth: sexAtBirth as 'male' | 'female' | 'unknown',
+      activityLevel,
+    });
+
+    return {
+      proteinGMin: {
+        value: suggestions.proteinMinG,
+        min: suggestions.clamps.protein.min,
+        max: suggestions.clamps.protein.max,
+        step: suggestions.clamps.protein.step,
+      },
+      fiberGMin: {
+        value: suggestions.fiberMinG,
+        min: suggestions.clamps.fiber.min,
+        max: suggestions.clamps.fiber.max,
+        step: suggestions.clamps.fiber.step,
+      },
+      carbsGMax: {
+        value: suggestions.carbsMaxG,
+        min: suggestions.clamps.carbs.min,
+        max: suggestions.clamps.carbs.max,
+        step: suggestions.clamps.carbs.step,
+        isPrimary: true,
+      },
+      sugarGMax: {
+        value: suggestions.sugarMaxG,
+        min: suggestions.clamps.sugar.min,
+        max: suggestions.clamps.sugar.max,
+        step: suggestions.clamps.sugar.step,
+      },
+      sodiumMgMax: {
+        value: suggestions.sodiumMaxMg,
+        min: suggestions.clamps.sodium.min,
+        max: suggestions.clamps.sodium.max,
+        step: suggestions.clamps.sodium.step,
+      },
+    };
+  }
+
+  // For non-weight-loss, use simplified logic (can be enhanced later)
+  // Protein (always primary)
+  let proteinMultiplier = 0.6; // sedentary default
+  if (activityLevel === 'light' || activityLevel === 'moderate') {
+    proteinMultiplier = 0.75;
+  } else if (activityLevel === 'high' || activityLevel === 'very_high') {
+    proteinMultiplier = 0.85;
+  }
+  proteinMultiplier = clamp(proteinMultiplier, 0.5, 1.0);
+  let proteinG = Math.round(weightLb * proteinMultiplier);
+  proteinG = clamp(proteinG, NUTRIENT_TARGETS.PROTEIN_G.MIN, NUTRIENT_TARGETS.PROTEIN_G.MAX);
+  proteinG = Math.round(proteinG / NUTRIENT_TARGETS.PROTEIN_G.STEP) * NUTRIENT_TARGETS.PROTEIN_G.STEP;
+
+  // Fiber (always primary)
+  let fiberG = 28; // unknown default
+  if (sexAtBirth === 'female') {
+    fiberG = 25;
+  } else if (sexAtBirth === 'male') {
+    fiberG = 30;
+  }
+  if (weightLb > 190) {
+    fiberG += 5;
+  }
+  if (activityLevel === 'high' || activityLevel === 'very_high') {
+    fiberG += 3;
+  }
+  fiberG = clamp(Math.round(fiberG), NUTRIENT_TARGETS.FIBER_G.MIN, NUTRIENT_TARGETS.FIBER_G.MAX);
+
+  // Carbs (secondary for non-weight-loss)
+  let carbsG: number;
+  if (activityLevel === 'sedentary') {
+    carbsG = 220;
+  } else if (activityLevel === 'light' || activityLevel === 'moderate') {
+    carbsG = 260;
+  } else {
+    carbsG = 320;
+  }
+  carbsG = clamp(carbsG, NUTRIENT_TARGETS.CARBS_G.MIN, NUTRIENT_TARGETS.CARBS_G.MAX);
+  carbsG = Math.round(carbsG / NUTRIENT_TARGETS.CARBS_G.STEP) * NUTRIENT_TARGETS.CARBS_G.STEP;
+
+  // Sugar (secondary)
+  const sugarG = 40;
+  const sugarGClamped = clamp(sugarG, NUTRIENT_TARGETS.SUGAR_G.MIN, NUTRIENT_TARGETS.SUGAR_G.MAX);
+  const sugarGFinal = Math.round(sugarGClamped / NUTRIENT_TARGETS.SUGAR_G.STEP) * NUTRIENT_TARGETS.SUGAR_G.STEP;
+
+  // Sodium (secondary)
+  let sodiumMg = 2300;
+  if (activityLevel === 'high' || activityLevel === 'very_high') {
+    sodiumMg = 2600;
+  }
+  sodiumMg = clamp(sodiumMg, NUTRIENT_TARGETS.SODIUM_MG.MIN, NUTRIENT_TARGETS.SODIUM_MG.MAX);
+  sodiumMg = Math.round(sodiumMg / NUTRIENT_TARGETS.SODIUM_MG.STEP) * NUTRIENT_TARGETS.SODIUM_MG.STEP;
+
+  return {
+    proteinGMin: { value: proteinG, min: NUTRIENT_TARGETS.PROTEIN_G.MIN, max: NUTRIENT_TARGETS.PROTEIN_G.MAX, step: NUTRIENT_TARGETS.PROTEIN_G.STEP },
+    fiberGMin: { value: fiberG, min: NUTRIENT_TARGETS.FIBER_G.MIN, max: NUTRIENT_TARGETS.FIBER_G.MAX, step: NUTRIENT_TARGETS.FIBER_G.STEP },
+    carbsGMax: { value: carbsG, min: NUTRIENT_TARGETS.CARBS_G.MIN, max: NUTRIENT_TARGETS.CARBS_G.MAX, step: NUTRIENT_TARGETS.CARBS_G.STEP, isPrimary: false },
+    sugarGMax: { value: sugarGFinal, min: NUTRIENT_TARGETS.SUGAR_G.MIN, max: NUTRIENT_TARGETS.SUGAR_G.MAX, step: NUTRIENT_TARGETS.SUGAR_G.STEP },
+    sodiumMgMax: { value: sodiumMg, min: NUTRIENT_TARGETS.SODIUM_MG.MIN, max: NUTRIENT_TARGETS.SODIUM_MG.MAX, step: NUTRIENT_TARGETS.SODIUM_MG.STEP },
+  };
+}
+
+/**
+ * Compute slider ranges for a nutrient based on recommended value
+ * Per engineering guidelines: Domain logic lives in plain TS modules with no React/browser/UI imports.
+ */
+export function computeSliderRange(
+  recommendedValue: number,
+  config: {
+    minOffset: number;
+    maxOffset: number;
+    step: number;
+    minFloor?: number;
+    maxCeiling?: number;
+  }
+): { min: number; max: number; step: number } {
+  const min = Math.max(config.minFloor ?? 0, recommendedValue - config.minOffset);
+  const max = Math.min(
+    config.maxCeiling ?? Infinity,
+    recommendedValue + config.maxOffset
+  );
+  return { min, max, step: config.step };
 }

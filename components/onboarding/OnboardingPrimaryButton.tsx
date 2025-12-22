@@ -15,6 +15,7 @@ interface OnboardingPrimaryButtonProps {
   disabled?: boolean;
   loading?: boolean;
   testID?: string;
+  fullWidth?: boolean;
 }
 
 export const OnboardingPrimaryButton: React.FC<OnboardingPrimaryButtonProps> = ({
@@ -23,6 +24,7 @@ export const OnboardingPrimaryButton: React.FC<OnboardingPrimaryButtonProps> = (
   disabled = false,
   loading = false,
   testID,
+  fullWidth = false,
 }) => {
   const { t } = useTranslation();
   
@@ -33,6 +35,7 @@ export const OnboardingPrimaryButton: React.FC<OnboardingPrimaryButtonProps> = (
         getMinTouchTargetStyle(),
         {
           opacity: (loading || disabled) ? 0.6 : 1,
+          ...(fullWidth ? { width: '100%' } : {}),
           ...(Platform.OS === 'web' ? getFocusStyle('#fff') : {}),
           ...Platform.select({
             web: {

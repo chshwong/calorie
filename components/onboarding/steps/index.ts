@@ -5,8 +5,8 @@ export { ActivityStep } from './ActivityStep';
 export { CurrentWeightStep } from './CurrentWeightStep';
 export { GoalStep } from './GoalStep';
 export { GoalWeightStep } from './GoalWeightStep';
-export { TimelineStep } from './TimelineStep';
 export { DailyCalorieTargetStep } from './DailyCalorieTargetStep';
 export { DailyFocusTargetsStep } from './DailyFocusTargetsStep';
+export { LegalAgreementStep } from './LegalAgreementStep';
 export type { DailyFocusTargets } from './DailyFocusTargetsStep';
 

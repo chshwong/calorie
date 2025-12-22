@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "build": "expo export --platform web",
     "build:web": "expo export --platform web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "seed:legal": "tsx scripts/seed-legal-docs.ts"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -65,6 +66,7 @@
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2"
   },
   "private": true

@@ -345,7 +345,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               )}
             >
               <ThemedText style={[styles.bfLinkText, { color: colors.tint }]}>
-                📑Reference
+                ℹ️ Reference
               </ThemedText>
             </TouchableOpacity>
           </View>

@@ -586,8 +586,7 @@ export default function SettingsScreen() {
             icon="hand.raised.fill"
             title={t('settings.privacy.privacy_policy')}
             onPress={() => {
-              // TODO: Navigate to privacy policy
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.privacy.privacy_policy') }));
+              router.push('/(tabs)/legal');
             }}
           />
         </SettingSection>
@@ -605,8 +604,7 @@ export default function SettingsScreen() {
             icon="doc.text.fill"
             title={t('settings.about.terms_of_service')}
             onPress={() => {
-              // TODO: Navigate to terms
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.about.terms_of_service') }));
+              router.push('/(tabs)/legal');
             }}
           />
           <SettingItem
