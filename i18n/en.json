@@ -276,7 +276,7 @@
     },
     "name_age": {
       "title": "A bit about you",
-      "subtitle": "Your date of birth helps us calculate your calorie needs accurately.",
+      "subtitle": "Your date of birth helps us calculate your calorie needs more accurately.",
       "preferred_name_label": "Preferred Name",
       "preferred_name_placeholder": "How do you like to be called?",
       "preferred_name_helper": "Allowed: letters, numbers, spaces, and ' - . One emoji max.",
