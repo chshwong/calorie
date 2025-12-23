@@ -9,6 +9,7 @@ import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Layout, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -194,7 +195,7 @@ function formatMealEntryLabel(entry: CalorieEntry): string {
 
 export default function FoodLogHomeScreen() {
   const { t } = useTranslation();
-  const { signOut, loading, retrying, user } = useAuth();
+  const { signOut, loading, retrying, user, profile: authProfile } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
@@ -321,6 +322,9 @@ export default function FoodLogHomeScreen() {
   const cachedProfile =
     profile ?? queryClient.getQueryData(['userProfile', user?.id]);
   const isProfileLoading = profileLoading && !cachedProfile;
+  
+  // Get effective profile (from useUserProfile hook or AuthContext)
+  const effectiveProfile = cachedProfile ?? authProfile;
 
   // Background prefetch for mealtype-log tab data (after Home data is ready)
   // Use default meal type 'late_night' (same as mealtype-log default)
@@ -626,6 +630,10 @@ export default function FoodLogHomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <OfflineBanner />
+      <TightBrandHeader
+        avatarUrl={effectiveProfile?.avatar_url ?? null}
+        onPressAvatar={() => {}}
+      />
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContentContainer} 
