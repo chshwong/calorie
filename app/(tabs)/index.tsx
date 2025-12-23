@@ -713,7 +713,6 @@ export default function FoodLogHomeScreen() {
               <SummaryCardHeader
                 titleKey="home.summary.title_other"
                 icon="fork.knife"
-                module="food"
                 isLoading={showLoadingSpinner}
                 rightContent={
                   entries.length > 0 ? (

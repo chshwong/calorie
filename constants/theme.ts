@@ -18,9 +18,17 @@ import { Platform } from 'react-native';
 // COLORS
 // ============================================================================
 
+
+
+
+//brand colors
+const salmonColorDark ='#E9876F';
+const salmonColorLight ='#B8553F';
+const greenColorDark ='#DCF048';
+const greenColorLight ='#526C19';
+
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#5BB8FF';
-
 // Standardized grey color used across the entire app
 // This is the primary grey for secondary text, icons, and UI elements
 // Light mode: Dark grey close to primary text for high contrast (similar to Tailwind gray-700)
@@ -54,7 +62,7 @@ export const CategoryColors = {
 
 // Dashboard accent colors (MyFitnessPal-style bright colors)
 export const DashboardAccents = {
-  food: '#3B82F6',      // Bright blue for calories
+  food: salmonColorLight,      // Dark Salmon for calories
   exercise: '#F59E0B',  // Orange for exercise
   meds: '#10B981',      // Teal/green for meds
   streak: '#A855F7',    // Purple for streaks
@@ -110,13 +118,13 @@ export const Colors = {
     dashboardBackground: '#F5F7FA', // Very light neutral (MyFitnessPal style)
     
     // Accent
-    tint: tintColorLight,
-    tintLight: tintColorLight + '20',
+    tint: salmonColorLight,
+    tintLight: salmonColorLight + '20',
     
     // UI Elements
     icon: StandardGrey.light,
     tabIconDefault: StandardGrey.light,
-    tabIconSelected: tintColorLight,
+    tabIconSelected: salmonColorLight,
     border: '#E5E5E5',
     borderSecondary: '#D1D1D1',
     cardBorder: 'rgba(15, 23, 42, 0.06)', // Subtle card border
@@ -155,13 +163,13 @@ export const Colors = {
     dashboardBackground: '#0F172A', // Dark blue-grey
     
     // Accent
-    tint: tintColorDark,
-    tintLight: tintColorDark + '20',
+    tint: salmonColorDark,
+    tintLight: salmonColorDark + '20',
     
     // UI Elements
     icon: StandardGrey.dark,
     tabIconDefault: StandardGrey.dark,
-    tabIconSelected: tintColorDark,
+    tabIconSelected: salmonColorDark,
     border: '#38383A',
     borderSecondary: '#48484A',
     cardBorder: 'rgba(255, 255, 255, 0.08)', // Subtle card border for dark mode

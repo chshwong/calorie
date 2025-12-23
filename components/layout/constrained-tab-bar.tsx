@@ -21,7 +21,6 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
   );
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const isLargeDesktop = Platform.OS === 'web' && screenWidth >= 1024;
   
   // Freeze safe-area bottom inset on web (always use 0)
   const insets = useSafeAreaInsets();
@@ -50,21 +49,21 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
     ? (tabBarStyle as any).borderTopColor
     : colors.border;
 
-  // On large desktop screens, wrap the tab bar content in a constrained container
-  if (isLargeDesktop) {
+  // On web, always wrap the tab bar content in a fixed container to prevent jump
+  if (Platform.OS === 'web') {
     return (
       <View style={[styles.fullWidthContainer, { backgroundColor, borderTopColor }]}>
-        <View style={styles.footerInner}>
+        <View style={[styles.footerInner, screenWidth < 1024 && styles.footerInnerMobile]}>
           <BottomTabBar 
             {...props} 
             style={[
               props.style,
               {
-                backgroundColor: 'transparent',
+                height: 54,
+                paddingBottom: 0,
+                marginBottom: 0,
                 borderTopWidth: 0,
-                // Ensure no dynamic height changes on web
-                height: Platform.OS === 'web' ? 54 : undefined,
-                paddingBottom: Platform.OS === 'web' ? 0 : bottomInset,
+                backgroundColor: 'transparent',
               },
             ]}
           />
@@ -73,8 +72,7 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
     );
   }
 
-  // On mobile/tablet, use the default tab bar without constraints
-  // Override safe area insets on web to prevent dynamic height changes
+  // On native platforms (iOS/Android), use the default tab bar without constraints
   return (
     <BottomTabBar 
       {...props}
@@ -117,6 +115,9 @@ const styles = StyleSheet.create({
         display: 'flex',
       },
     }),
+  },
+  footerInnerMobile: {
+    maxWidth: '100%',
   },
 });
 

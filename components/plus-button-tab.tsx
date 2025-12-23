@@ -5,18 +5,29 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Image } from 'react-native';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { useQuickAdd } from '@/contexts/quick-add-context';
+import PitDarkSvg from '@/assets/brand/Logo_DarkMode_PitOnly.svg';
+import PitDarkPng from '@/assets/brand/Logo_DarkMode_PitOnly.png';
+import PitLightSvg from '@/assets/brand/Logo_LightMode_PitOnly-01.svg';
+import PitLightPng from '@/assets/brand/Logo_LightMode_PitOnly-01.png';
+
+const FAB_SIZE = 52;
 
 export function PlusButtonTab(props: BottomTabBarButtonProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const activeColor = colors.tint;
   const { setQuickAddVisible } = useQuickAdd();
+  const isDark = colorScheme === 'dark';
+
+  // Select the correct mascot asset based on theme
+  const PitSvg = isDark ? PitDarkSvg : PitLightSvg;
+  const pitPng = isDark ? PitDarkPng : PitLightPng;
 
   // Explicitly ignore any active/selected state - this button is never "selected"
   // Always use solid accent color regardless of route
@@ -36,7 +47,11 @@ export function PlusButtonTab(props: BottomTabBarButtonProps) {
       )}
     >
       <View style={[styles.plusButton, { backgroundColor: activeColor }]}>
-        <Text style={styles.plusButtonText}>+</Text>
+        {Platform.OS !== 'web' || true ? (
+          <PitSvg width={FAB_SIZE} height={FAB_SIZE} />
+        ) : (
+          <Image source={pitPng} style={{ width: FAB_SIZE, height: FAB_SIZE }} resizeMode="contain" />
+        )}
       </View>
     </Pressable>
   );
@@ -57,17 +72,13 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   plusButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 30,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 8,
-  },
-  plusButtonText: {
-    fontSize: 26,
-    fontWeight: '600',
-    color: '#ffffff',
+    overflow: 'hidden',
   },
 });
 

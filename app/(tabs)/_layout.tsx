@@ -120,7 +120,7 @@ function TabLayoutContent() {
   const handleMoreSettings = () => {
     setMoreMenuVisible(false);
     // Navigate to your existing Settings screen
-    router.push('/(tabs)/settings');
+    router.push('/settings');
   };
 
   const handleMoreExercise = () => {
@@ -319,16 +319,29 @@ function TabLayoutContent() {
             headerShown: false,
             tabBarButton: HapticTab,
             tabBar: (props) => <ConstrainedTabBar {...props} />,
-            tabBarStyle: {
-              backgroundColor: colors.background,
-              borderTopColor: colors.border,
-              height: 54,
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 9999,
-            },
+            tabBarStyle: [
+              {
+                backgroundColor: colors.background,
+                borderTopColor: colors.border,
+                borderTopWidth: 0,
+                height: 54,
+                zIndex: 9999,
+              },
+              Platform.select({
+                web: {
+                  position: 'fixed',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  paddingBottom: 0,
+                  marginBottom: 0,
+                },
+                default: {
+                  position: 'absolute',
+                  bottom: 0,
+                },
+              }),
+            ],
             tabBarLabelStyle: {
               fontSize: FontSize.sm, // increased by ~2 points from default
             },
