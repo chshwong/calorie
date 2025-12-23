@@ -582,13 +582,6 @@ export default function SettingsScreen() {
               Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.privacy.export_data') }));
             }}
           />
-          <SettingItem
-            icon="hand.raised.fill"
-            title={t('settings.privacy.privacy_policy')}
-            onPress={() => {
-              router.push('/(tabs)/legal');
-            }}
-          />
         </SettingSection>
 
         {/* About */}
@@ -602,9 +595,10 @@ export default function SettingsScreen() {
           />
           <SettingItem
             icon="doc.text.fill"
-            title={t('settings.about.terms_of_service')}
+            title={t('settings.about.legal')}
+            subtitle={t('settings.about.legal_subtitle')}
             onPress={() => {
-              router.push('/(tabs)/legal');
+              router.push('/settings/legal');
             }}
           />
           <SettingItem

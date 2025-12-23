@@ -330,7 +330,7 @@ function TabLayoutContent() {
               zIndex: 9999,
             },
             tabBarLabelStyle: {
-              fontSize: FontSize.base, // increased by ~2 points from default
+              fontSize: FontSize.sm, // increased by ~2 points from default
             },
           }}>
         <Tabs.Screen

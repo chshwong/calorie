@@ -1,3 +1,5 @@
+import Lottie from "lottie-react";
+import animationData from "../assets/lottie/Wobbling.json";
 import { useState, useEffect } from 'react';
 import {
   View,
@@ -286,21 +288,30 @@ export default function LoginScreen() {
         <View style={[styles.cardContainer, { maxWidth: isDesktop ? 440 : '100%' }]}>
           <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
             {/* Header */}
-            <View style={styles.header}>
-              <ThemedText 
-                type="title" 
-                style={[styles.title, { color: colors.text }]}
-                accessibilityRole="header"
-              >
-                {t('auth.login.title')}
-              </ThemedText>
-              <ThemedText 
-                style={[styles.subtitle, { color: colors.textSecondary }]}
-                accessibilityRole="text"
-              >
-                {t('auth.login.subtitle')}
-              </ThemedText>
-            </View>
+<View style={styles.header}>
+  <Lottie
+    animationData={animationData}
+    loop
+    autoplay
+    style={{ width: 220, height: 220, marginBottom: 12 }}
+  />
+
+  <ThemedText 
+    type="title" 
+    style={[styles.title, { color: colors.text }]}
+    accessibilityRole="header"
+  >
+    {t('auth.login.title')}
+  </ThemedText>
+
+  <ThemedText 
+    style={[styles.subtitle, { color: colors.textSecondary }]}
+    accessibilityRole="text"
+  >
+    {t('auth.login.subtitle')}
+  </ThemedText>
+</View>
+
 
             {/* Form */}
             <View style={styles.form}>

@@ -516,7 +516,7 @@
       "close": "Close",
       "done": "Done",
       "continue_reading": "Continue reading",
-      "scroll_to_enable": "Scroll to the end to enable acceptance.",
+      "scroll_to_enable": "Read till the end to enable acceptance.",
       "can_accept_now": "You can now accept this document.",
       "open_scroll_enable": "Open and scroll to the end of this document to enable agreement",
       "double_tap_check": "Double tap to {{action}} {{label}}",
@@ -608,6 +608,8 @@
     "about": {
       "title": "About",
       "app_version": "App Version",
+      "legal": "Legal",
+      "legal_subtitle": "Terms, Privacy, and Disclaimer",
       "terms_of_service": "Terms of Service",
       "help_support": "Help & Support"
     },
