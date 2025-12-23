@@ -415,9 +415,6 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.logoHeader}>
-        <BrandLogoFull width={220} accessibilityLabel="AvoVibe full logo" />
-      </View>
       <View style={[styles.header, { borderBottomColor: colors.separator }]}>
         <TouchableOpacity
           style={[
@@ -442,6 +439,10 @@ export default function SettingsScreen() {
           {t('settings.title')}
         </ThemedText>
         <View style={styles.headerRight} />
+      </View>
+
+      <View style={styles.logoBlock}>
+        <BrandLogoFull width={220} accessibilityLabel="AvoVibe full logo" />
       </View>
 
       <ScrollView 
@@ -747,11 +748,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  logoHeader: {
+  logoBlock: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 12,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 14,
   },
   header: {
     flexDirection: 'row',
