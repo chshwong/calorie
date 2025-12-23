@@ -21,6 +21,8 @@ import {
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
+import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
+import BrandLogoFull from '@/components/brand/BrandLogoFull';
 
 type SettingsPreferences = {
   units: 'metric' | 'imperial';
@@ -413,6 +415,9 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <View style={styles.logoHeader}>
+        <BrandLogoFull width={220} accessibilityLabel="AvoVibe full logo" />
+      </View>
       <View style={[styles.header, { borderBottomColor: colors.separator }]}>
         <TouchableOpacity
           style={[
@@ -623,6 +628,9 @@ export default function SettingsScreen() {
 
         {/* About */}
         <SettingSection title={t('settings.about.title')}>
+          <View style={styles.mascotContainer}>
+            <BrandLogoMascotOnly width={80} />
+          </View>
           <SettingItem
             icon="info.circle.fill"
             title={t('settings.about.app_version')}
@@ -738,6 +746,12 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  logoHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    marginBottom: 8,
   },
   header: {
     flexDirection: 'row',
@@ -876,6 +890,12 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  mascotContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginBottom: 8,
   },
 });
 

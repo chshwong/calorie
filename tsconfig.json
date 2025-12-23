@@ -13,6 +13,7 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "react-native-web-refresh-control.d.ts"
+    "react-native-web-refresh-control.d.ts",
+    "types/**/*.d.ts"
   ]
 }
