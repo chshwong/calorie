@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Platform, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router, useRouter, useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { setLanguage, languageNames, SupportedLanguage } from '../i18n';
 import { ThemedView } from '@/components/themed-view';
@@ -22,7 +22,7 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
-import BrandLogoFull from '@/components/brand/BrandLogoFull';
+import BrandLogoNoTag from '@/components/brand/BrandLogoNoTag';
 
 type SettingsPreferences = {
   units: 'metric' | 'imperial';
@@ -36,8 +36,25 @@ export default function SettingsScreen() {
   const { signOut, user } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  
+  // Safe back handler to prevent "GO_BACK" error on web refresh/direct entry
+  const handleBack = () => {
+    // @ts-ignore - canGoBack exists on navigation but types can vary
+    const canGoBack = typeof (navigation as any)?.canGoBack === 'function'
+      ? (navigation as any).canGoBack()
+      : false;
+
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+
+    // Fallback when no history (web refresh / direct URL)
+    router.replace('/(tabs)');
+  };
   
   // Use React Query hooks for profile data (shared cache with Home screen)
   const { data: profile, isLoading: profileLoading } = useUserProfile();
@@ -422,7 +439,7 @@ export default function SettingsScreen() {
             getMinTouchTargetStyle(),
             { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
           ]}
-          onPress={() => router.back()}
+          onPress={handleBack}
           activeOpacity={0.7}
           {...getButtonAccessibilityProps(
             'Back',
@@ -442,7 +459,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.logoBlock}>
-        <BrandLogoFull width={220} accessibilityLabel="AvoVibe full logo" />
+        <BrandLogoNoTag width={220} accessibilityLabel="AvoVibe logo" />
       </View>
 
       <ScrollView 
