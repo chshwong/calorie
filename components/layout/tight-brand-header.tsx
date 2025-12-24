@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md, // 12px
+    paddingHorizontal: Spacing.md, // 12px    
     width: '100%',
   },
   spacer: {

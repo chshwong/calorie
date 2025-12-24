@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
@@ -56,8 +56,9 @@ export default function SettingsScreen() {
     router.replace('/(tabs)');
   };
   
-  // Use React Query hooks for profile data (shared cache with Home screen)
-  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  // Use React Query hooks for user config data (shared cache with Home screen)
+  const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility in this file
   const updateProfileMutation = useUpdateProfile();
   
   // Use i18n's current language as the source of truth
@@ -474,15 +475,15 @@ export default function SettingsScreen() {
             <IconSymbol name="person.fill" size={32} color={colors.tint} />
           </View>
           <View style={styles.profileInfo}>
-            {profileLoading ? (
+            {userConfigLoading && !userConfig ? (
               <ActivityIndicator size="small" color={colors.tint} />
             ) : (
               <>
                 <ThemedText type="title" style={[styles.profileName, { color: colors.text }]}>
-                  {profile?.first_name || t('settings.profile_section.user_fallback')}
+                  {userConfig?.first_name || t('settings.profile_section.user_fallback')}
                 </ThemedText>
                 <ThemedText style={[styles.profileEmail, { color: colors.textSecondary }]}>
-                  {user?.email || ''}
+                  {userConfig?.email || user?.email || ''}
                 </ThemedText>
               </>
             )}

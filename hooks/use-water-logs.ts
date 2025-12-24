@@ -434,7 +434,8 @@ export function useWaterDaily(options?: {
 
       // If today's goal was updated, also invalidate profile to refresh profile.water_goal_ml
       if (isToday) {
-        queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
+        queryClient.invalidateQueries({ queryKey: ['userConfig', userId] });
+        queryClient.invalidateQueries({ queryKey: ['userProfile', userId] }); // Backward compatibility
       }
     },
     onSettled: () => {

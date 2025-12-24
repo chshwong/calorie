@@ -18,7 +18,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useWaterDaily } from '@/hooks/use-water-logs';
 import type { WaterDaily } from '@/lib/services/waterLogs';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal, WATER_LIMITS } from '@/utils/waterUnits';
 import { getLastNDays, addDays, formatDateForDisplay, getDateString } from '@/utils/calculations';
 import { useWaterQuickAddPresets } from '@/hooks/use-water-quick-add-presets';
@@ -64,8 +64,9 @@ export default function WaterScreen() {
     });
   };
 
-  // Get profile for water unit preference
-  const { data: profile } = useUserProfile();
+  // Get user config for water unit preference
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
 
   // Get water data (last 14 days for history, using selected date)
   const { todayWater, history, isLoading, addWater, setGoal, setTotal, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal, addWaterError } = useWaterDaily({ 

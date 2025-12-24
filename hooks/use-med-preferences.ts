@@ -83,7 +83,8 @@ export function useUpdateMedPreferences() {
       // Invalidate preferences query
       queryClient.invalidateQueries({ queryKey: ['medPreferences', userId] });
       // Also invalidate profile query
-      queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
+      queryClient.invalidateQueries({ queryKey: ['userConfig', userId] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile', userId] }); // Backward compatibility
     },
   });
 }

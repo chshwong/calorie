@@ -17,7 +17,7 @@ import { useSelectedDate } from '@/hooks/use-selected-date';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useQueryClient } from '@tanstack/react-query';
@@ -304,7 +304,7 @@ export default function FoodLogHomeScreen() {
     [prefetchDateData, router]
   );
 
-  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
 
   const {
     data: calorieEntries,
@@ -318,13 +318,13 @@ export default function FoodLogHomeScreen() {
   const showLoadingSpinner =
     entriesLoading && entries.length === 0 && calorieEntries === undefined;
 
-  // Profile: use cache immediately
-  const cachedProfile =
-    profile ?? queryClient.getQueryData(['userProfile', user?.id]);
-  const isProfileLoading = profileLoading && !cachedProfile;
+  // UserConfig: use cache immediately
+  const cachedUserConfig =
+    userConfig ?? queryClient.getQueryData(['userConfig', user?.id]);
+  const isUserConfigLoading = userConfigLoading && !cachedUserConfig;
   
-  // Get effective profile (from useUserProfile hook or AuthContext)
-  const effectiveProfile = cachedProfile ?? authProfile;
+  // Get effective profile (from useUserConfig hook or AuthContext fallback)
+  const effectiveProfile = cachedUserConfig ?? authProfile;
 
   // Background prefetch for mealtype-log tab data (after Home data is ready)
   // Use default meal type 'late_night' (same as mealtype-log default)
@@ -509,9 +509,9 @@ export default function FoodLogHomeScreen() {
     }, [user?.id, refetchEntries])
   );
 
-  const profileNotFound = !cachedProfile && !isProfileLoading && !loading && !retrying && user;
+  const profileNotFound = !cachedUserConfig && !isUserConfigLoading && !loading && !retrying && user;
 
-  const showLoadingModal = !cachedProfile && isProfileLoading;
+  const showLoadingModal = !cachedUserConfig && isUserConfigLoading;
 
   const { dailyTotals, groupedEntries } = useMemo(() => {
     const totals = calculateDailyTotals(entries, dataByMealType);

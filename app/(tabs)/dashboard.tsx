@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Dimensions, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -164,13 +164,32 @@ export default function DashboardScreen() {
   // Use shared date hook
   const {
     selectedDate,
-    setSelectedDate,
     selectedDateString,
     isToday,
     today,
-    calendarViewMonth,
-    setCalendarViewMonth,
   } = useSelectedDate();
+
+  // Calendar view month state (local to component for date picker modal)
+  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
+    return new Date(selectedDate);
+  });
+
+  // Update calendar view month when selectedDate changes
+  useEffect(() => {
+    setCalendarViewMonth(new Date(selectedDate));
+  }, [selectedDate]);
+
+  // Helper function to navigate with new date (updates URL param)
+  const navigateWithDate = useCallback(
+    (date: Date) => {
+      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      router.replace({
+        pathname: '/dashboard',
+        params: { date: dateString }
+      });
+    },
+    [router]
+  );
 
   // Animated values for cross-fade on date change (MUST be before early return)
   const foodValueAnim = useRef(new Animated.Value(1)).current;
@@ -286,7 +305,7 @@ export default function DashboardScreen() {
   const handleDateSelect = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
     if (!isNaN(date.getTime())) {
-      setSelectedDate(date);
+      navigateWithDate(date);
     }
   };
 
@@ -366,7 +385,7 @@ export default function DashboardScreen() {
             <DateHeader
           showGreeting={true}
           selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
+          setSelectedDate={navigateWithDate}
           selectedDateString={selectedDateString}
           isToday={isToday}
           getDisplayDate={(t) => {
@@ -389,13 +408,13 @@ export default function DashboardScreen() {
           goBackOneDay={() => {
             const newDate = new Date(selectedDate);
             newDate.setDate(newDate.getDate() - 1);
-            setSelectedDate(newDate);
+            navigateWithDate(newDate);
           }}
           goForwardOneDay={() => {
             if (!isToday) {
               const newDate = new Date(selectedDate);
               newDate.setDate(newDate.getDate() + 1);
-              setSelectedDate(newDate);
+              navigateWithDate(newDate);
             }
           }}
           calendarViewMonth={calendarViewMonth}

@@ -23,7 +23,7 @@ import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 
 // Create QueryClient with sensible defaults
 // TEMPORARY: Added logging and reduced refetch to diagnose idle performance issues
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes (temporarily increased from 60s)
@@ -69,7 +69,9 @@ if (typeof window !== 'undefined') {
   persistQueryClient({
     queryClient,
     persister,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 180 * 24 * 60 * 60 * 1000, // 180 days - ensures userConfig and logs persist
+    // Do NOT exclude userConfig - it should be persisted
+    // Only exclude truly volatile/huge/sensitive queries if needed
   });
 }
 
@@ -207,6 +209,7 @@ function ThemeProviderWrapper() {
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(minimal)" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />

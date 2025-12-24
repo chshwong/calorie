@@ -25,7 +25,7 @@ import { useMedLogsForDate } from '@/hooks/use-med-logs';
 import { useExerciseSummaryForRecentDays } from '@/hooks/use-exercise-logs';
 import { useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
 import { calculateDailyTotals } from '@/utils/dailyTotals';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { getEntriesForDateRange } from '@/lib/services/calorieEntries';
 
 /**
@@ -35,7 +35,8 @@ export function useDailyFoodSummary(dateString: string) {
   const { user } = useAuth();
   const userId = user?.id;
   const { data: entries = [] } = useDailyEntries(dateString);
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
 
   const totals = calculateDailyTotals(entries);
   
@@ -69,7 +70,8 @@ export function useDailyFoodSummary(dateString: string) {
 export function useWeeklyFoodCalories(endDateString: string, days: number = 7) {
   const { user } = useAuth();
   const userId = user?.id;
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
 
   // Calculate date range
   const endDate = new Date(endDateString + 'T00:00:00');

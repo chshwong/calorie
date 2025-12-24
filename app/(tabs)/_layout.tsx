@@ -12,7 +12,7 @@ import { Colors, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
 import type { FocusModule } from '@/utils/types';
 import { getLocalDateString } from '@/utils/calculations';
@@ -30,9 +30,9 @@ function TabLayoutContent() {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   
-  // Get user profile for focus module preferences
-  const { data: profileData, isLoading: profileLoading } = useUserProfile();
-  const effectiveProfile = authProfile || profileData;
+  // Get user config for focus module preferences
+  const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
+  const effectiveProfile = userConfig || authProfile;
   const focusModule1: FocusModule = (effectiveProfile?.focus_module_1) || 'Food';
   const focusModule2: FocusModule = (effectiveProfile?.focus_module_2) || 'Exercise';
   const focusModule3: FocusModule = (effectiveProfile?.focus_module_3) || 'Med';
@@ -41,7 +41,7 @@ function TabLayoutContent() {
   // This ensures users with onboarding_complete = false always stay on /onboarding
   useEffect(() => {
     // Wait for auth and profile to load
-    if (authLoading || profileLoading) {
+    if (authLoading || userConfigLoading) {
       return;
     }
 
@@ -55,7 +55,7 @@ function TabLayoutContent() {
         router.replace('/onboarding');
       }
     }
-  }, [authLoading, profileLoading, user, effectiveProfile, router]);
+  }, [authLoading, userConfigLoading, user, effectiveProfile, router]);
   
   // Compute the remaining module
   const ALL_MODULES: FocusModule[] = ['Food', 'Exercise', 'Med', 'Water'];

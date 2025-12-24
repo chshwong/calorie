@@ -1287,7 +1287,14 @@ export function useOnboardingForm() {
       }
       
       // Update cache with final profile
-      queryClient.setQueryData(['userProfile', user.id], updatedProfile);
+      // Update userConfig cache (preserve email from existing cache)
+      const existingUserConfig = queryClient.getQueryData<any>(['userConfig', user.id]);
+      const updatedUserConfig = {
+        ...updatedProfile,
+        email: existingUserConfig?.email ?? null, // Preserve email from auth
+      };
+      queryClient.setQueryData(['userConfig', user.id], updatedUserConfig);
+      queryClient.setQueryData(['userProfile', user.id], updatedProfile); // Backward compatibility
       
       // Also refresh profile in AuthContext - MUST await to prevent bounce
       // This ensures AuthContext.onboardingComplete is updated before navigation

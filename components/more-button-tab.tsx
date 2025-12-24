@@ -5,9 +5,9 @@
  */
 
 import React from 'react';
-import { PlatformPressable } from '@react-navigation/elements';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
+import { TabPressable } from '@/components/layout/tab-pressable';
 
 type MoreButtonTabProps = BottomTabBarButtonProps & {
   onPressCustom?: () => void;
@@ -15,7 +15,7 @@ type MoreButtonTabProps = BottomTabBarButtonProps & {
 
 export function MoreButtonTab({ onPressCustom, ...props }: MoreButtonTabProps) {
   return (
-    <PlatformPressable
+    <TabPressable
       {...props}
       onPress={(e) => {
         if (onPressCustom) {

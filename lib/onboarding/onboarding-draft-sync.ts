@@ -198,7 +198,13 @@ async function performDraftSave(reason: string): Promise<void> {
       
       // Update React Query cache with the draft (optimistic update)
       // This keeps the app consistent even if network is slow
-      currentQueryClient.setQueryData(['userProfile', currentUserId], updatedProfile);
+      const existingUserConfig = currentQueryClient.getQueryData<any>(['userConfig', currentUserId]);
+      const updatedUserConfig = {
+        ...updatedProfile,
+        email: existingUserConfig?.email ?? null, // Preserve email from auth
+      };
+      currentQueryClient.setQueryData(['userConfig', currentUserId], updatedUserConfig);
+      currentQueryClient.setQueryData(['userProfile', currentUserId], updatedProfile); // Backward compatibility
       
       lastError = null;
     } catch (error: any) {
@@ -266,7 +272,13 @@ export async function flushDraftSave(
       }
       
       // Update cache
-      queryClient.setQueryData(['userProfile', userId], updatedProfile);
+      const existingUserConfig = queryClient.getQueryData<any>(['userConfig', userId]);
+      const updatedUserConfig = {
+        ...updatedProfile,
+        email: existingUserConfig?.email ?? null, // Preserve email from auth
+      };
+      queryClient.setQueryData(['userConfig', userId], updatedUserConfig);
+      queryClient.setQueryData(['userProfile', userId], updatedProfile); // Backward compatibility
       
       lastError = null;
     } catch (error: any) {
@@ -282,7 +294,13 @@ export async function flushDraftSave(
           throw new Error('Failed to flush draft on retry');
         }
         
-        queryClient.setQueryData(['userProfile', userId], updatedProfile);
+        const existingUserConfig = queryClient.getQueryData<any>(['userConfig', userId]);
+        const updatedUserConfig = {
+          ...updatedProfile,
+          email: existingUserConfig?.email ?? null, // Preserve email from auth
+        };
+        queryClient.setQueryData(['userConfig', userId], updatedUserConfig);
+        queryClient.setQueryData(['userProfile', userId], updatedProfile); // Backward compatibility
         lastError = null;
       } catch (retryError: any) {
         lastError = retryError;

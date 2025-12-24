@@ -30,7 +30,8 @@ export function useDeleteWeightLog(userId: string) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['weightLogs180d', userId] });
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
+      queryClient.invalidateQueries({ queryKey: ['userConfig', userId] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile', userId] }); // Backward compatibility
     },
   });
 }

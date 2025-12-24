@@ -9,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { updateUserProfile } from '@/lib/services/profile';
 import { syncTodayWaterGoalWithProfile } from '@/lib/services/waterLogs';
 import { setPersistentCache } from '@/lib/persistentCache';
+import { userConfigQueryKey } from '@/hooks/use-user-config';
+import type { UserConfig } from '@/lib/services/userConfig';
 
 /**
  * Hook for updating user profile
@@ -30,8 +32,19 @@ export function useUpdateProfile() {
     onSuccess: async (updatedProfile, variables) => {
       // Update the cache with the new profile data
       if (userId) {
+        // Update userConfig cache (preserve email from existing cache)
+        const existingUserConfig = queryClient.getQueryData<UserConfig | null>(userConfigQueryKey(userId));
+        const updatedUserConfig: UserConfig = {
+          ...updatedProfile,
+          email: existingUserConfig?.email ?? null, // Preserve email from auth
+        };
+        queryClient.setQueryData(userConfigQueryKey(userId), updatedUserConfig);
+        queryClient.invalidateQueries({ queryKey: userConfigQueryKey(userId) });
+        
+        // Also update old userProfile key for backward compatibility (can remove later)
         queryClient.setQueryData(['userProfile', userId], updatedProfile);
         queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
+        
         updateProfileState(updatedProfile);
         setPersistentCache('profile', updatedProfile);
       }

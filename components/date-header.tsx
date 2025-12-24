@@ -7,7 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Spacing, FontSize, ModuleThemes, type ModuleType } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { getGreetingKey } from '@/utils/bmi';
 import {
   getButtonAccessibilityProps,
@@ -58,7 +58,8 @@ export function DateHeader({
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
   
   // Get module accent color if module is provided
   const moduleAccent = module ? ModuleThemes[module].accent : colors.tint;

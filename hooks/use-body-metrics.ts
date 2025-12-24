@@ -1,14 +1,14 @@
 /**
  * React Query hook for body metrics (age, height, weight, BMI)
  * 
- * Reuses cached profile data from useUserProfile hook.
+ * Reuses cached user config data from useUserConfig hook.
  * Does not trigger additional Supabase calls.
  * 
  * Query key: ['bodyMetrics', userId]
  */
 
 import { useMemo } from 'react';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { ageFromDob } from '@/utils/calculations';
 import { calculateBmi, getBmiClassification, getBmiClassificationKey, lbsToKg } from '@/utils/bodyMetrics';
 
@@ -30,7 +30,8 @@ export type BodyMetrics = {
  * @returns BodyMetrics object with age, height, weight, BMI, and loading/error states
  */
 export function useBodyMetrics(): BodyMetrics {
-  const { data: profile, isLoading, error } = useUserProfile();
+  const { data: userConfig, isLoading, error } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
 
   const metrics = useMemo(() => {
     if (!profile) {

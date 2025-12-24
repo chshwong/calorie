@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 import { setLanguage, isLanguageSupported } from '@/i18n';
 import { ensureProfileExists } from '@/lib/services/profileService';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { queryClient } from '@/app/_layout';
+import { prefetchUserConfig } from '@/hooks/use-user-config';
 
 const PROFILE_CACHE_KEY = 'profile';
 const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -185,7 +187,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 2) Auth state is now known; stop global loading here
         setLoading(false);
   
-        // 3) Load profile from Supabase in the background – do NOT block global loading
+        // 3) Prefetch userConfig immediately (for instant availability in Home/Settings)
+        prefetchUserConfig(queryClient, session.user.id).catch((err) => {
+          console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+        });
+  
+        // 4) Load profile from Supabase in the background – do NOT block global loading
         fetchProfile(session.user.id, true);
       } else {
         // No session: clear profile and stop loading
@@ -267,6 +274,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         // Reset retry count on new session
         profileFetchRetryCount.current = 0;
+        // Prefetch userConfig immediately (for instant availability in Home/Settings)
+        prefetchUserConfig(queryClient, session.user.id).catch((err) => {
+          console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+        });
         await fetchProfile(session.user.id, true);
       } else {
         setProfile(null);

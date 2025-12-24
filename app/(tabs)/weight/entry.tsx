@@ -17,7 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight } from '@/constants/theme';
 import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
@@ -43,7 +43,8 @@ export default function WeightEntryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
   const { user } = useAuth();
   const userId = user?.id;
   const { date: dateParam, weightLb: weightLbParam, bodyFatPercent: bodyFatParam, entryId: entryIdParam, weighedAt: weighedAtParam, mode: modeParam } =

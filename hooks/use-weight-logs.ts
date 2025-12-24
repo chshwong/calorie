@@ -325,7 +325,8 @@ export function useSaveWeightEntry() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
       queryClient.invalidateQueries({ queryKey: ['weightLogs180d'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['userConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] }); // Backward compatibility
     },
   });
 }

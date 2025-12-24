@@ -12,7 +12,7 @@ import {
   getLatestWeightEntry,
   getLatestBodyFatEntry,
 } from '@/hooks/use-weight-logs';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
@@ -33,7 +33,8 @@ export default function WeightHomeScreen() {
   }, []);
   const [selectedDate, setSelectedDate] = useState<Date>(todayLocal);
   const [chartWidth, setChartWidth] = useState<number>(0);
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
   const updateProfile = useUpdateProfile();
   const [showMenu, setShowMenu] = useState(false);
   const { days, isLoading, isFetching } = useWeightHomeData(7, selectedDate);

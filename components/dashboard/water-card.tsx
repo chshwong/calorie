@@ -13,7 +13,7 @@ import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { Colors, BorderRadius, Shadows, Spacing, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useWaterDaily } from '@/hooks/use-water-logs';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { formatWaterDisplay, WaterUnit, fromMl, getEffectiveGoal } from '@/utils/waterUnits';
 import { ModuleThemes } from '@/constants/theme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
@@ -33,7 +33,8 @@ export function WaterCard({ onPress }: WaterCardProps) {
 
   // Get water data
   const { todayWater, isLoading } = useWaterDaily({ daysBack: 0 });
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
   
   // Get unit preference (default to metric)
   const unitPreference = (profile?.water_unit_preference as 'metric' | 'imperial') || 'metric';

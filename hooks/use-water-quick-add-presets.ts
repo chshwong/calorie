@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import { getWaterQuickAddPresets, type QuickAddPreset } from '@/utils/waterQuickAddPresets';
 import { WaterUnit } from '@/utils/waterUnits';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { useWaterDaily } from '@/hooks/use-water-logs';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 
@@ -18,7 +18,8 @@ import { useSelectedDate } from '@/hooks/use-selected-date';
  * Uses profile.water_unit for today, or water_daily.water_unit for past dates
  */
 export function useWaterQuickAddPresets() {
-  const { data: profile } = useUserProfile();
+  const { data: userConfig } = useUserConfig();
+  const profile = userConfig; // Alias for backward compatibility
   const { selectedDateString, isToday } = useSelectedDate();
   const { todayWater } = useWaterDaily({ 
     daysBack: 0,
