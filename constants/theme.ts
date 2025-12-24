@@ -433,6 +433,9 @@ export const Layout = {
   /** Maximum content width for centered layouts */
   maxContentWidth: 600,
   
+  /** Desktop page container max width (canonical desktop width) */
+  desktopMaxWidth: 900,
+  
   /** Standard screen padding */
   screenPadding: Spacing.lg,
   

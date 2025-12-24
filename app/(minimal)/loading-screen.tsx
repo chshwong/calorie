@@ -9,24 +9,35 @@
  * Mobile-first, respects dark/light mode, matches Home container width on desktop.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, Dimensions } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Lottie from 'lottie-react';
 import animationData from '../../assets/lottie/Wobbling.json';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadingQuotes } from '@/i18n/quotes/loadingQuotes';
 
-// Home container max width (from DesktopPageContainer)
-const HOME_MAX_WIDTH = 900;
-
 export default function LoadingScreen() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
+  // Animated loading dots state
+  const [dotsCount, setDotsCount] = useState(0);
+
+  // Animate loading dots: 0 → 1 → 2 → 3 → 0 (loop)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDotsCount((prev) => (prev + 1) % 4);
+    }, 450); // 450ms per step
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Pick random quote once per mount
   const quote = useMemo(() => {
     if (loadingQuotes.length === 0) return '';
@@ -37,15 +48,18 @@ export default function LoadingScreen() {
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = screenWidth >= 768;
 
+  // Loading text with animated dots (i18n compliant)
+  const loadingText = t('common.loading') + '.'.repeat(dotsCount);
+
   return (
     <ThemedView style={styles.container}>
       <View 
         style={[
           styles.contentContainer,
-          isDesktop && { maxWidth: HOME_MAX_WIDTH },
+          isDesktop && { maxWidth: Layout.desktopMaxWidth },
         ]}
       >
-        {/* Vertical column: Lottie -> Quote -> Logo */}
+        {/* Main content column: Lottie -> Quote -> Logo */}
         <View style={styles.column}>
           {/* Lottie Animation */}
           <View style={styles.lottieContainer}>
@@ -56,17 +70,32 @@ export default function LoadingScreen() {
             />
           </View>
 
+          {/* Spacer between Lottie and Quote */}
+          <View style={styles.spacer} />
+
           {/* Quote Text - Between animation and logo */}
           {quote && (
-            <ThemedText style={[styles.quoteText, { color: colors.textSecondary }]}>
-              {quote}
-            </ThemedText>
+            <View style={styles.quoteWrapper}>
+              <ThemedText style={[styles.quoteText, { color: colors.textSecondary }]}>
+                {quote}
+              </ThemedText>
+            </View>
           )}
+
+          {/* Spacer between Quote and Logo */}
+          <View style={styles.spacer} />
 
           {/* Logo_Name&Tag - Below quote */}
           <View style={styles.logoContainer}>
             <BrandLogoNameAndTag width={220} />
           </View>
+        </View>
+
+        {/* Loading text at bottom - separate from main column */}
+        <View style={styles.loadingTextContainer}>
+          <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+            {loadingText}
+          </ThemedText>
         </View>
       </View>
     </ThemedView>
@@ -80,11 +109,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contentContainer: {
+    flex: 1,
     width: '100%',
     paddingHorizontal: Spacing.md, // 16px on mobile
-    paddingVertical: Spacing.xl, // 24px vertical padding
     alignItems: 'center',
-    justifyContent: 'center',
     ...Platform.select({
       web: {
         paddingHorizontal: Spacing.lg, // 24px on desktop
@@ -92,7 +120,7 @@ const styles = StyleSheet.create({
     }),
   },
   column: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
@@ -100,11 +128,19 @@ const styles = StyleSheet.create({
   lottieContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.md, // 16px (2-line gap)
   },
   lottie: {
     width: 200,
     height: 200,
+  },
+  spacer: {
+    height: Spacing['2xl'], // 24px - consistent gap between elements
+  },
+  quoteWrapper: {
+    width: '100%',
+    maxWidth: 420, // Constrain quote width for readability
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
   },
   quoteText: {
     fontSize: Platform.select({ web: 14, default: 13 }),
@@ -112,14 +148,33 @@ const styles = StyleSheet.create({
     lineHeight: Platform.select({ web: 20, default: 18 }),
     fontStyle: 'italic',
     opacity: 0.8,
-    marginVertical: Spacing.sm, // 10px (8-12px range)
-    paddingHorizontal: Spacing.md,
-    maxWidth: '100%',
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.xxl, // 32px (4-line gap)
+  },
+  loadingTextContainer: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: Platform.select({
+      web: Spacing['2xl'], // 24px
+      default: Spacing['2xl'] + 20, // 44px (24px + safe area)
+    }),
+    paddingTop: Spacing.lg, // 16px gap from logo
+    minWidth: 100, // Fixed width to prevent layout shift
+  },
+  loadingText: {
+    fontSize: Platform.select({ web: 14, default: 13 }), // +2px from previous
+    textAlign: 'center',
+    opacity: 0.65,
+    marginTop: 0,
+    marginBottom: 0,
+    fontFamily: Platform.select({
+      web: 'Inter, system-ui, sans-serif',
+      default: undefined, // Use system default on native
+    }),
+    letterSpacing: 0.5, // Slight spacing for better readability
   },
 });
 

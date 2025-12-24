@@ -6,7 +6,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
-    "loading": "Loading...",
+    "loading": "Loading",
     "error": "Error",
     "success": "Success",
     "ok": "OK",
@@ -1615,7 +1615,7 @@
       "chart_7d": "7d min",
       "streak": "Ex streak"
     },
-    "loading": "Loading...",
+    "loading": "Loading",
     "meds": {
       "title": "Meds",
       "items": "{{count}} {{items}}",

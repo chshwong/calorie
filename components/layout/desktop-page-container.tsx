@@ -16,7 +16,7 @@
 
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Layout } from '@/constants/theme';
 
 type DesktopPageContainerProps = {
   children: React.ReactNode;
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md, // 16px on mobile
   },
   containerDesktop: {
-    maxWidth: 900, // Canonical desktop width matching Exercise screen
+    maxWidth: Layout.desktopMaxWidth, // Canonical desktop width matching Exercise screen
     alignSelf: 'center',
     paddingHorizontal: Spacing.lg, // 16px on desktop (matching user requirements)
   },
