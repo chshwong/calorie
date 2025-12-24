@@ -5,6 +5,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   useWeightHomeData,
@@ -14,6 +15,7 @@ import {
 } from '@/hooks/use-weight-logs';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
@@ -26,6 +28,7 @@ export default function WeightHomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { profile: authProfile } = useAuth();
   const todayLocal = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -35,6 +38,7 @@ export default function WeightHomeScreen() {
   const [chartWidth, setChartWidth] = useState<number>(0);
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
+  const effectiveProfile = userConfig || authProfile; // For avatar
   const updateProfile = useUpdateProfile();
   const [showMenu, setShowMenu] = useState(false);
   const { days, isLoading, isFetching } = useWeightHomeData(7, selectedDate);
@@ -158,6 +162,10 @@ export default function WeightHomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContentContainer}
       >
+        <TightBrandHeader
+          avatarUrl={effectiveProfile?.avatar_url ?? null}
+          onPressAvatar={() => router.push('/settings')}
+        />
         <View style={styles.scrollContent}>
           <DesktopPageContainer>
             <ScreenHeaderContainer>
@@ -454,7 +462,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     width: '100%',
-    padding: Layout.screenPadding,
+    paddingTop: Spacing.none, // 0px - minimal gap between logo and greeting
+    paddingHorizontal: Layout.screenPadding,
+    paddingBottom: Layout.screenPadding,
     ...(Platform.OS !== 'web' && {
       paddingBottom: 100, // match home mobile bottom padding
     }),

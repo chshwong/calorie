@@ -630,10 +630,6 @@ export default function FoodLogHomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <OfflineBanner />
-      <TightBrandHeader
-        avatarUrl={effectiveProfile?.avatar_url ?? null}
-        onPressAvatar={() => {}}
-      />
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContentContainer} 
@@ -656,6 +652,10 @@ export default function FoodLogHomeScreen() {
         scrollEventThrottle={Platform.OS === 'web' ? 16 : undefined}
         contentOffset={Platform.OS === 'web' && isPulling ? { x: 0, y: -Math.min(pullToRefreshDistance, 80) } : undefined}
       >
+        <TightBrandHeader
+          avatarUrl={effectiveProfile?.avatar_url ?? null}
+          onPressAvatar={() => {}}
+        />
         <View style={styles.scrollContent}>
           {/* Desktop Container for Header and Content */}
           <DesktopPageContainer>
@@ -1302,7 +1302,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     width: '100%',
-    padding: Layout.screenPadding,
+    paddingTop: Spacing.none, // 0px - minimal gap between logo and greeting
+    paddingHorizontal: Layout.screenPadding,
+    paddingBottom: Layout.screenPadding,
     ...(Platform.OS === 'web' && {
       paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
     }),

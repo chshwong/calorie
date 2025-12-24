@@ -10,6 +10,7 @@ import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { BarChart } from '@/components/charts/bar-chart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +33,7 @@ import {
 
 export default function WaterScreen() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -67,6 +68,7 @@ export default function WaterScreen() {
   // Get user config for water unit preference
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
+  const effectiveProfile = userConfig || authProfile; // For avatar
 
   // Get water data (last 14 days for history, using selected date)
   const { todayWater, history, isLoading, addWater, setGoal, setTotal, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal, addWaterError } = useWaterDaily({ 
@@ -332,9 +334,14 @@ export default function WaterScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
+        contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
       >
+        <TightBrandHeader
+          avatarUrl={effectiveProfile?.avatar_url ?? null}
+          onPressAvatar={() => router.push('/settings')}
+        />
+        <View style={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}>
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
           {/* Standardized Header Container */}
@@ -590,6 +597,7 @@ export default function WaterScreen() {
           </View>
         </View>
         </DesktopPageContainer>
+        </View>
       </ScrollView>
 
       {/* Custom Input Modal */}
@@ -907,8 +915,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  scrollContentContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    ...Platform.select({
+      web: {
+        minHeight: '100%',
+      },
+    }),
+  },
   scrollContent: {
-    padding: Layout.screenPadding,
+    width: '100%',
+    paddingTop: Spacing.none, // 0px - minimal gap between logo and greeting
+    paddingHorizontal: Layout.screenPadding,
+    paddingBottom: Layout.screenPadding,
     ...(Platform.OS === 'web' && {
       paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
     }),

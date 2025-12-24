@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -14,6 +13,7 @@ import { QuickAddChip } from '@/components/common/quick-add-chip';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -33,6 +33,7 @@ import { TEXT_LIMITS, RANGES } from '@/constants/constraints';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
+import { useUserConfig } from '@/hooks/use-user-config';
 import {
   useMedLogsForDate,
   useMedSummaryForRecentDays,
@@ -424,11 +425,14 @@ function MedSectionContainer({ children, style }: MedSectionContainerProps) {
 
 export default function MedsHomeScreen() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
+  
+  // Get user config for avatar
+  const { data: userConfig } = useUserConfig();
+  const effectiveProfile = userConfig || authProfile;
 
   // Use shared date hook - always derived from URL params
   const {
@@ -958,10 +962,15 @@ export default function MedsHomeScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}
+        contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
+        <TightBrandHeader
+          avatarUrl={effectiveProfile?.avatar_url ?? null}
+          onPressAvatar={() => router.push('/settings')}
+        />
+        <View style={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}>
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
           {/* Standardized Header Container */}
@@ -1643,6 +1652,7 @@ export default function MedsHomeScreen() {
           </View>
         </MedSectionContainer>
         </DesktopPageContainer>
+        </View>
       </ScrollView>
 
       {/* Delete Confirmation Modal */}
@@ -1940,8 +1950,20 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContentContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    ...Platform.select({
+      web: {
+        minHeight: '100%',
+      },
+    }),
+  },
   scrollContent: {
-    padding: Layout.screenPadding,
+    width: '100%',
+    paddingTop: Spacing.none, // 0px - minimal gap between logo and greeting
+    paddingHorizontal: Layout.screenPadding,
+    paddingBottom: Layout.screenPadding,
     ...(Platform.OS === 'web' && {
       paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding
     }),

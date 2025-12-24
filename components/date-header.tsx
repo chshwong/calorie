@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   welcomeText: {
-    fontSize: Platform.select({ web: 18, default: 16 }),
+    fontSize: Platform.select({ web: 16, default: 14 }),
     fontWeight: 'bold',
     letterSpacing: -0.3,
     flexShrink: 1,

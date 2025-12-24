@@ -459,16 +459,15 @@ export default function SettingsScreen() {
         <View style={styles.headerRight} />
       </View>
 
-      <View style={styles.logoBlock}>
-        <BrandLogoNoTag width={220} accessibilityLabel="AvoVibe logo" />
-      </View>
-
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.scrollContent}>
+        <View style={styles.logoBlock}>
+          <BrandLogoNoTag width={220} accessibilityLabel="AvoVibe logo" />
+        </View>
         {/* Profile Section */}
         <View style={[styles.profileSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.profileIconContainer, { backgroundColor: colors.tint + '20' }]}>

@@ -9,6 +9,7 @@ import { DateHeader } from '@/components/date-header';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { PremiumCard } from '@/components/dashboard/premium-card';
 import { StatTile } from '@/components/dashboard/stat-tile';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -20,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, DashboardAccents } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
+import { useUserConfig } from '@/hooks/use-user-config';
 import {
   useDailyFoodSummary,
   useWeeklyFoodCalories,
@@ -156,10 +158,14 @@ function generateInsights(
 
 export default function DashboardScreen() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  
+  // Get user config for avatar
+  const { data: userConfig } = useUserConfig();
+  const effectiveProfile = userConfig || authProfile;
 
   // Use shared date hook
   const {
@@ -373,10 +379,15 @@ export default function DashboardScreen() {
         />
       )}
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 60 }]}
+        contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
+        <TightBrandHeader
+          avatarUrl={effectiveProfile?.avatar_url ?? null}
+          onPressAvatar={() => router.push('/settings')}
+        />
+        <View style={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 60 }]}>
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
           {/* Standardized Header Container */}
@@ -866,6 +877,7 @@ export default function DashboardScreen() {
           </View>
         </DashboardSectionContainer>
         </DesktopPageContainer>
+        </View>
       </ScrollView>
     </ThemedView>
   );
@@ -882,8 +894,19 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContentContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    ...Platform.select({
+      web: {
+        minHeight: '100%',
+      },
+    }),
+  },
   scrollContent: {
-    padding: Layout.screenPadding,
+    width: '100%',
+    paddingTop: Spacing.none, // 0px - minimal gap between logo and greeting
+    paddingHorizontal: Layout.screenPadding,
     paddingBottom: Layout.screenPadding + Layout.sectionGapCompact,
     ...(Platform.OS === 'web' && {
       paddingHorizontal: 0, // DesktopPageContainer handles horizontal padding

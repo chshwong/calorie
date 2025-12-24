@@ -28,7 +28,6 @@ type TightBrandHeaderProps = {
  * - Very short height (default 44px)
  * - Center: AvoVibe logo (auto light/dark)
  * - Right: User profile picture in a circle (tap target)
- * - Bottom divider line
  */
 export function TightBrandHeader({
   avatarUrl,
@@ -108,9 +107,6 @@ export function TightBrandHeader({
           )}
         </Pressable>
       </View>
-      
-      {/* Bottom divider */}
-      <View style={[styles.divider, { backgroundColor: colors.separator }]} />
     </SafeAreaView>
   );
 }
@@ -123,7 +119,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md, // 12px    
+    paddingHorizontal: Spacing.md, // 12px
+    paddingTop: Spacing.xs, // 4px
+    paddingBottom: Spacing.xs, // 4px
     width: '100%',
   },
   spacer: {
@@ -153,10 +151,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth, // 1px hairline
-    width: '100%',
   },
 });
 
