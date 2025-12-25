@@ -24,8 +24,19 @@ import { useUserConfig, userConfigQueryKey } from '@/hooks/use-user-config';
 import type { UserConfig } from '@/lib/services/userConfig';
 import LoadingScreen from '@/app/(minimal)/loading-screen';
 
+// Navigation timing constants
+// Note: These are component-specific timing values, not validation limits.
+// Validation limits would go in constants/constraints.ts per guideline 7.
 const MIN_DISPLAY_TIME_MS = 300;
-const MAX_WAIT_TIME_MS = 1000; // Reduced from 2000ms for faster startup
+const MAX_WAIT_TIME_MS = 1000;
+const MAX_DURATION_MS = 10000; // 10s guaranteed fallback - never hang forever
+
+// Route mapping for decision-based navigation
+const ROUTE_MAP: Record<"login" | "onboarding" | "home", "/login" | "/onboarding" | "/(tabs)"> = {
+  login: '/login' as const,
+  onboarding: '/onboarding' as const,
+  home: '/(tabs)' as const,
+} as const;
 
 export default function StartupGate() {
   const router = useRouter();
@@ -33,13 +44,15 @@ export default function StartupGate() {
   const { session, user, loading: authLoading, isPasswordRecovery } = useAuth();
   
   // Trigger userConfig query in background (for refetch), but don't wait for it
-  const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
+  // Uses React Query hook per guideline 4: All UI data loaded via React Query
+  const { data: userConfig } = useUserConfig();
   
   const [hasNavigated, setHasNavigated] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
-  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const maxWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxWaitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track minimum display time
   useEffect(() => {
@@ -50,11 +63,42 @@ export default function StartupGate() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Setup maxDuration fallback timer (10s) - ALWAYS routes somewhere, never hangs
+  useEffect(() => {
+    if (maxDurationTimeoutRef.current) return;
+    
+    maxDurationTimeoutRef.current = setTimeout(() => {
+      if (hasNavigated) return;
+      
+      // Force navigation after maxDuration - choose safest route
+      if (authLoading) {
+        // Auth not ready => route to login (safe)
+        router.replace('/login');
+      } else if (!session || !user) {
+        // No session => route to login
+        router.replace('/login');
+      } else {
+        // Have session but onboarding unknown => route to onboarding (safer than home)
+        router.replace('/onboarding');
+      }
+      setHasNavigated(true);
+    }, MAX_DURATION_MS);
+
+    return () => {
+      if (maxDurationTimeoutRef.current) {
+        clearTimeout(maxDurationTimeoutRef.current);
+      }
+    };
+  }, [router, hasNavigated, authLoading, session, user]);
+
   // Helper: Get onboarding status from cache immediately, fallback to network data
+  // Per guideline 4: UI must NOT block while cached data refetches in background
+  // Per guideline 10: UI must NEVER block rendering if cached data exists
   const getOnboardingStatus = (): boolean | null => {
     if (!user?.id) return null;
     
     // First try: read from React Query cache immediately (no network wait)
+    // This respects guideline 4.1: Startup-critical data MUST render from cache if available
     const cachedConfig = queryClient.getQueryData<UserConfig | null>(
       userConfigQueryKey(user.id)
     );
@@ -72,11 +116,38 @@ export default function StartupGate() {
     return null;
   };
 
-  // Navigation logic
+  // Single decision function: returns route or null (unknown)
+  const getDecision = (): "login" | "onboarding" | "home" | null => {
+    // A) If auth is not ready => return null
+    if (authLoading) {
+      return null;
+    }
+
+    // B) If auth ready and no session/user => return "login"
+    if (!session || !user) {
+      return "login";
+    }
+
+    // C) If signed in: check onboarding_complete
+    const onboardingStatus = getOnboardingStatus();
+    
+    // If onboarding_complete is explicitly true/false => return route
+    if (onboardingStatus === true) {
+      return "home";
+    }
+    if (onboardingStatus === false) {
+      return "onboarding";
+    }
+    
+    // Else return null (unknown)
+    return null;
+  };
+
+  // STEP 3: Early-exit effect (no timers) - routes immediately when decision is known
   useEffect(() => {
     if (hasNavigated || !router) return;
 
-    // 1) Password recovery takes precedence
+    // Password recovery takes precedence
     if (isPasswordRecovery()) {
       const elapsed = Date.now() - startTimeRef.current;
       const delay = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed);
@@ -88,37 +159,14 @@ export default function StartupGate() {
       return;
     }
 
-    // 2) Wait for auth to be ready (session restore complete)
-    if (authLoading) {
-      return; // Still loading auth state
-    }
-
-    // 3) No session: route to login
-    if (!session) {
-      const elapsed = Date.now() - startTimeRef.current;
-      const delay = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed);
-      
-      navigationTimeoutRef.current = setTimeout(() => {
-        router.replace('/login');
-        setHasNavigated(true);
-      }, delay);
-      return;
-    }
-
-    // 4) Have session: check onboarding status from cache first
-    const onboardingStatus = getOnboardingStatus();
+    // Get decision
+    const decision = getDecision();
     
-    // If we have onboarding status (from cache or network), decide immediately
-    if (onboardingStatus !== null) {
-      const onboardingComplete = onboardingStatus;
-      
-      // Only navigate if minimum time has elapsed
+    // If decision is known, route immediately (after min time if needed)
+    if (decision !== null) {
       if (minTimeElapsed) {
-        if (!onboardingComplete) {
-          router.replace('/onboarding');
-        } else {
-          router.replace('/(tabs)');
-        }
+        // Navigate immediately
+        router.replace(ROUTE_MAP[decision]);
         setHasNavigated(true);
       } else {
         // Wait for minimum time, then navigate
@@ -126,25 +174,27 @@ export default function StartupGate() {
         const remaining = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed);
         
         navigationTimeoutRef.current = setTimeout(() => {
-          if (!onboardingComplete) {
-            router.replace('/onboarding');
-          } else {
-            router.replace('/(tabs)');
-          }
+          router.replace(ROUTE_MAP[decision]);
           setHasNavigated(true);
         }, remaining);
       }
       return;
     }
 
-    // 5) Onboarding status unknown (cache miss, network still loading)
-    // Set max wait timeout - after this, route to onboarding (safer default)
+    // Decision is null (unknown) - set max wait timeout
+    // After MAX_WAIT_TIME_MS, route to onboarding (safer default)
     if (!maxWaitTimeoutRef.current) {
       maxWaitTimeoutRef.current = setTimeout(() => {
-        // After max wait, if onboarding is still unknown, treat as not onboarded
-        // (safer to send to onboarding than to home)
+        // Check decision one more time before routing
+        const finalDecision = getDecision();
+        
         if (minTimeElapsed && !hasNavigated) {
-          router.replace('/onboarding');
+          if (finalDecision !== null) {
+            router.replace(ROUTE_MAP[finalDecision]);
+          } else {
+            // Still unknown => route to onboarding (safer than home)
+            router.replace('/onboarding');
+          }
           setHasNavigated(true);
         }
       }, MAX_WAIT_TIME_MS);
@@ -157,7 +207,6 @@ export default function StartupGate() {
     session,
     user,
     userConfig,
-    userConfigLoading,
     isPasswordRecovery,
     minTimeElapsed,
   ]);
@@ -170,6 +219,9 @@ export default function StartupGate() {
       }
       if (maxWaitTimeoutRef.current) {
         clearTimeout(maxWaitTimeoutRef.current);
+      }
+      if (maxDurationTimeoutRef.current) {
+        clearTimeout(maxDurationTimeoutRef.current);
       }
     };
   }, []);
