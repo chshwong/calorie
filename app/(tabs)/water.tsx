@@ -6,11 +6,10 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { DateHeader } from '@/components/date-header';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
-import { TightBrandHeader } from '@/components/layout/tight-brand-header';
+import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
+import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { BarChart } from '@/components/charts/bar-chart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,15 +45,7 @@ export default function WaterScreen() {
     today,
   } = useSelectedDate();
   
-  // Calendar view month state (local to component for date picker modal)
-  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
-    return new Date(selectedDate);
-  });
-  
-  // Update calendar view month when selectedDate changes
-  useEffect(() => {
-    setCalendarViewMonth(new Date(selectedDate));
-  }, [selectedDate]);
+  // Calendar view month state removed - now handled by DatePickerButton component
   
   // Helper function to navigate with new date (updates URL param)
   const navigateWithDate = (date: Date) => {
@@ -331,57 +322,54 @@ export default function WaterScreen() {
     );
   }
 
+  // Format date for display (same logic as index.tsx)
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const yesterday = new Date(todayDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const currentYear = todayDate.getFullYear();
+  const selectedYear = selectedDate.getFullYear();
+  const isCurrentYear = selectedYear === currentYear;
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+    month: 'short',
+    day: 'numeric',
+    ...(isCurrentYear ? {} : { year: 'numeric' }),
+  };
+  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
+  const dateText = isToday
+    ? `${t('common.today')}, ${formattedDate}`
+    : selectedDate.getTime() === yesterday.getTime()
+    ? `${t('common.yesterday')}, ${formattedDate}`
+    : formattedDate;
+
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContentContainer}
-        showsVerticalScrollIndicator={false}
+      <CollapsibleModuleHeader
+        dateText={dateText}
+        rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
+        preferredName={effectiveProfile?.first_name ?? undefined}
+        rightAction={
+          <DatePickerButton
+            selectedDate={selectedDate}
+            onDateSelect={navigateWithDate}
+            today={today}
+            module="water"
+          />
+        }
+        goBackOneDay={() => {
+          navigateWithDate(addDays(selectedDate, -1));
+        }}
+        goForwardOneDay={() => {
+          if (!isToday) {
+            navigateWithDate(addDays(selectedDate, 1));
+          }
+        }}
+        isToday={isToday}
+        module="water"
       >
-        <TightBrandHeader
-          avatarUrl={effectiveProfile?.avatar_url ?? null}
-          onPressAvatar={() => router.push('/settings')}
-        />
-        <View style={[styles.scrollContent, { paddingBottom: Layout.screenPadding + 80 }]}>
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
-          {/* Standardized Header Container */}
-          <ScreenHeaderContainer>
-            {/* Date Header */}
-            <DateHeader
-              showGreeting={true}
-              selectedDate={selectedDate}
-              setSelectedDate={navigateWithDate}
-              selectedDateString={selectedDateString}
-              isToday={isToday}
-              getDisplayDate={(t) => {
-                const todayDate = new Date();
-                todayDate.setHours(0, 0, 0, 0);
-                const selectedDateNormalized = new Date(selectedDate);
-                selectedDateNormalized.setHours(0, 0, 0, 0);
-                const yesterday = addDays(todayDate, -1);
-                
-                const formattedDate = formatDateForDisplay(selectedDate, today);
-                
-                if (selectedDateNormalized.getTime() === todayDate.getTime()) {
-                  return `${t('common.today')}, ${formattedDate}`;
-                } else if (selectedDateNormalized.getTime() === yesterday.getTime()) {
-                  return `${t('common.yesterday')}, ${formattedDate}`;
-                }
-                return formattedDate;
-              }}
-              goBackOneDay={() => {
-                navigateWithDate(addDays(selectedDate, -1));
-              }}
-              goForwardOneDay={() => {
-                if (!isToday) {
-                  navigateWithDate(addDays(selectedDate, 1));
-                }
-              }}
-              calendarViewMonth={calendarViewMonth}
-              setCalendarViewMonth={setCalendarViewMonth}
-              today={today}
-            />
-          </ScreenHeaderContainer>
 
           {/* Today's Water Section - Card */}
           <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
@@ -597,8 +585,7 @@ export default function WaterScreen() {
           </View>
         </View>
         </DesktopPageContainer>
-        </View>
-      </ScrollView>
+      </CollapsibleModuleHeader>
 
       {/* Custom Input Modal */}
       <Modal

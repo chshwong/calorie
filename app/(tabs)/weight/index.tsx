@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
-import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
+import { DatePickerButton } from '@/components/header/DatePickerButton';
 import {
   useWeightHomeData,
   useWeightLogs180d,
@@ -20,11 +20,11 @@ import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { formatLocalTime, getLocalDateKey } from '@/utils/dateTime';
-import { DateHeader } from '@/components/date-header';
-import { formatRelativeDateLabel, addDaysLocal } from '@/utils/dateLabels';
+import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 export default function WeightHomeScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -44,6 +44,7 @@ export default function WeightHomeScreen() {
   const { days, isLoading, isFetching } = useWeightHomeData(7, selectedDate);
   const weight180Query = useWeightLogs180d();
   const todayKey = getLocalDateKey(todayLocal);
+  const isToday = getLocalDateKey(selectedDate) === getLocalDateKey(todayLocal);
 
   const unit: 'kg' | 'lbs' = profile?.weight_unit === 'kg' ? 'kg' : 'lbs';
   const latestEntry = weight180Query.data ? getLatestWeightEntry(weight180Query.data) : null;
@@ -157,48 +158,75 @@ export default function WeightHomeScreen() {
     return `${value.toFixed(1)} ${displayUnit}`;
   };
 
+  // Format date for display (same logic as index.tsx)
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const yesterday = new Date(todayDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const selectedDateNormalized = new Date(selectedDate);
+  selectedDateNormalized.setHours(0, 0, 0, 0);
+  const currentYear = todayDate.getFullYear();
+  const selectedYear = selectedDate.getFullYear();
+  const isCurrentYear = selectedYear === currentYear;
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    ...(isToday || selectedDateNormalized.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+    month: 'short',
+    day: 'numeric',
+    ...(isCurrentYear ? {} : { year: 'numeric' }),
+  };
+  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
+  const dateText = isToday
+    ? `${t('common.today')}, ${formattedDate}`
+    : selectedDateNormalized.getTime() === yesterday.getTime()
+    ? `${t('common.yesterday')}, ${formattedDate}`
+    : formattedDate;
+
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContentContainer}
+      <CollapsibleModuleHeader
+        dateText={dateText}
+        rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
+        preferredName={effectiveProfile?.first_name ?? undefined}
+        rightAction={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <DatePickerButton
+              selectedDate={selectedDate}
+              onDateSelect={setSelectedDate}
+              today={todayLocal}
+            />
+            <TouchableOpacity
+              style={styles.gearButton}
+              onPress={() => setShowMenu((prev) => !prev)}
+              activeOpacity={0.7}
+              disabled={false}
+            >
+              <IconSymbol name="gearshape" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        }
+        goBackOneDay={() => {
+          const newDate = new Date(selectedDate);
+          newDate.setDate(newDate.getDate() - 1);
+          setSelectedDate(newDate);
+        }}
+        goForwardOneDay={() => {
+          if (!isToday) {
+            const newDate = new Date(selectedDate);
+            newDate.setDate(newDate.getDate() + 1);
+            setSelectedDate(newDate);
+          }
+        }}
+        isToday={isToday}
+        module="weight"
       >
-        <TightBrandHeader
-          avatarUrl={effectiveProfile?.avatar_url ?? null}
-          onPressAvatar={() => router.push('/settings')}
-        />
-        <View style={styles.scrollContent}>
-          <DesktopPageContainer>
-            <ScreenHeaderContainer>
-              <DateHeader
-                showGreeting
-                selectedDate={selectedDate}
-                today={todayLocal}
-                isToday={getLocalDateKey(selectedDate) === getLocalDateKey(todayLocal)}
-                getDisplayDate={() => formatRelativeDateLabel(selectedDate, todayLocal)}
-                goBackOneDay={() => setSelectedDate((d) => addDaysLocal(d, -1))}
-                goForwardOneDay={() =>
-                  setSelectedDate((d) =>
-                    getLocalDateKey(d) === getLocalDateKey(todayLocal) ? d : addDaysLocal(d, 1)
-                  )
-                }
-                rightActions={
-                  <TouchableOpacity
-                    style={styles.gearButton}
-                    onPress={() => setShowMenu((prev) => !prev)}
-                    activeOpacity={0.7}
-                    disabled={false}
-                  >
-                    <IconSymbol name="gearshape" size={22} color={colors.text} />
-                  </TouchableOpacity>
-                }
-              />
-              <View style={{ marginTop: Spacing.sm }}>
-                <ThemedText style={{ color: colors.textSecondary }}>
-                  Latest: {latestWeightDisplay} • {latestBodyFatDisplay}
-                  {latestTimestamp ? ` · ${formatLocalTime(latestTimestamp)}` : ''}
-                </ThemedText>
-              </View>
-            </ScreenHeaderContainer>
+        <DesktopPageContainer>
+          {/* Latest weight info line */}
+          <View style={{ marginTop: Spacing.sm, marginBottom: Spacing.md }}>
+            <ThemedText style={{ color: colors.textSecondary }}>
+              Latest: {latestWeightDisplay} • {latestBodyFatDisplay}
+              {latestTimestamp ? ` · ${formatLocalTime(latestTimestamp)}` : ''}
+            </ThemedText>
+          </View>
 
           <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
             <View style={{ marginBottom: Spacing.sm, gap: Spacing.xs }}>
@@ -377,9 +405,8 @@ export default function WeightHomeScreen() {
                 </ThemedText>
               </TouchableOpacity>
             </View>
-          </DesktopPageContainer>
-        </View>
-      </ScrollView>
+        </DesktopPageContainer>
+      </CollapsibleModuleHeader>
 
       <Modal
         visible={showMenu}

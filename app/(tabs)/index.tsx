@@ -10,6 +10,9 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { TightBrandHeader } from '@/components/layout/tight-brand-header';
+import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
+import { DatePickerButton } from '@/components/header/DatePickerButton';
+import { getGreetingKey } from '@/utils/bmi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Layout, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -228,7 +231,6 @@ export default function FoodLogHomeScreen() {
   // Pull-to-refresh state for web
   const [pullToRefreshDistance, setPullToRefreshDistance] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
   const pullStartY = useRef<number | null>(null);
   const pullDistance = useRef<number>(0);
   
@@ -251,15 +253,6 @@ export default function FoodLogHomeScreen() {
   // Mutation for copying mealtype entries
   const copyMealtypeMutation = useCopyMealtypeEntries();
 
-  // Calendar view month state (local to component for date picker modal)
-  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
-    return new Date(selectedDate);
-  });
-  
-  // Update calendar view month when selectedDate changes
-  useEffect(() => {
-    setCalendarViewMonth(new Date(selectedDate));
-  }, [selectedDate]);
 
   const prefetchDateData = useCallback(
     (dateString: string) => {
@@ -368,66 +361,6 @@ export default function FoodLogHomeScreen() {
     }
   }, [user?.id, queryClient]);
 
-  // Generate calendar days for a given month
-  const generateCalendarDays = (viewMonth: Date) => {
-    const year = viewMonth.getFullYear();
-    const month = viewMonth.getMonth();
-    
-    // First day of the month
-    const firstDay = new Date(year, month, 1);
-    // Last day of the month
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // Get the day of the week for the first day (0 = Sunday, 1 = Monday, etc.)
-    const firstDayOfWeek = firstDay.getDay();
-    
-    // Days array to return
-    const days: (number | null)[] = [];
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDayOfWeek; i++) {
-      days.push(null);
-    }
-    
-    // Add all days of the month
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      days.push(day);
-    }
-    
-    return days;
-  };
-
-  // Navigate to previous month
-  const handlePreviousMonth = () => {
-    const newMonth = new Date(calendarViewMonth);
-    newMonth.setMonth(newMonth.getMonth() - 1);
-    setCalendarViewMonth(newMonth);
-  };
-
-  // Navigate to next month
-  const handleNextMonth = () => {
-    const newMonth = new Date(calendarViewMonth);
-    newMonth.setMonth(newMonth.getMonth() + 1);
-    setCalendarViewMonth(newMonth);
-  };
-
-  // Check if a date is today (for calendar)
-  const isTodayInCalendar = (day: number, viewMonth: Date) => {
-    if (!day) return false;
-    const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
-    date.setHours(0, 0, 0, 0);
-    return date.getTime() === today.getTime();
-  };
-
-  // Check if a date is selected (for calendar)
-  const isSelectedInCalendar = (day: number, viewMonth: Date) => {
-    if (!day) return false;
-    const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
-    date.setHours(0, 0, 0, 0);
-    const selected = new Date(selectedDate);
-    selected.setHours(0, 0, 0, 0);
-    return date.getTime() === selected.getTime();
-  };
 
   // Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
@@ -627,16 +560,62 @@ export default function FoodLogHomeScreen() {
     );
   };
 
+  // Construct greeting text
+  const hour = new Date().getHours();
+  const greetingKey = getGreetingKey(hour);
+  const greeting = t(greetingKey);
+  const greetingText = `${greeting}, ${effectiveProfile?.first_name || ''}!`;
+
+  // Construct date text
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const yesterday = new Date(todayDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const currentYear = todayDate.getFullYear();
+  const selectedYear = selectedDate.getFullYear();
+  const isCurrentYear = selectedYear === currentYear;
+  const dateOptions: Intl.DateTimeFormatOptions = { 
+    ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+    month: 'short', 
+    day: 'numeric',
+    ...(isCurrentYear ? {} : { year: 'numeric' })
+  };
+  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
+  const dateText = isToday
+    ? `${t('common.today')}, ${formattedDate}`
+    : selectedDate.getTime() === yesterday.getTime()
+    ? `${t('common.yesterday')}, ${formattedDate}`
+    : formattedDate;
+
   return (
     <ThemedView style={styles.container}>
       <OfflineBanner />
-      <ScrollView 
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContentContainer} 
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={!isPulling}
-        bounces={true}
-        alwaysBounceVertical={true}
+      <CollapsibleModuleHeader
+        greetingText={greetingText}
+        dateText={dateText}
+        rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
+        preferredName={effectiveProfile?.first_name ?? undefined}
+        rightAction={
+          <DatePickerButton
+            selectedDate={selectedDate}
+            onDateSelect={navigateWithDate}
+            today={today}
+          />
+        }
+        goBackOneDay={() => {
+          const newDate = new Date(selectedDate);
+          newDate.setDate(newDate.getDate() - 1);
+          navigateWithDate(newDate);
+        }}
+        goForwardOneDay={() => {
+          if (!isToday) {
+            const newDate = new Date(selectedDate);
+            newDate.setDate(newDate.getDate() + 1);
+            navigateWithDate(newDate);
+          }
+        }}
+        isToday={isToday}
+        module="food"
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl
@@ -650,63 +629,9 @@ export default function FoodLogHomeScreen() {
         }
         onScroll={Platform.OS === 'web' ? handleWebScroll : undefined}
         scrollEventThrottle={Platform.OS === 'web' ? 16 : undefined}
-        contentOffset={Platform.OS === 'web' && isPulling ? { x: 0, y: -Math.min(pullToRefreshDistance, 80) } : undefined}
       >
-        <TightBrandHeader
-          avatarUrl={effectiveProfile?.avatar_url ?? null}
-          onPressAvatar={() => {}}
-        />
-        <View style={styles.scrollContent}>
-          {/* Desktop Container for Header and Content */}
-          <DesktopPageContainer>
-            {/* Standardized Header Container */}
-            <ScreenHeaderContainer>
-              {/* Date Header with Greeting and Navigation */}
-              <DateHeader
-                showGreeting={true}
-                selectedDate={selectedDate}
-                setSelectedDate={navigateWithDate}
-                selectedDateString={selectedDateString}
-                isToday={isToday}
-                getDisplayDate={(t) => {
-                  const todayDate = new Date();
-                  todayDate.setHours(0, 0, 0, 0);
-                  const yesterday = new Date(todayDate);
-                  yesterday.setDate(yesterday.getDate() - 1);
-                  const currentYear = todayDate.getFullYear();
-                  const selectedYear = selectedDate.getFullYear();
-                  const isCurrentYear = selectedYear === currentYear;
-                  const dateOptions: Intl.DateTimeFormatOptions = { 
-                    ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
-                    month: 'short', 
-                    day: 'numeric',
-                    ...(isCurrentYear ? {} : { year: 'numeric' })
-                  };
-                  const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
-                  if (isToday) {
-                    return `${t('common.today')}, ${formattedDate}`;
-                  } else if (selectedDate.getTime() === yesterday.getTime()) {
-                    return `${t('common.yesterday')}, ${formattedDate}`;
-                  }
-                  return formattedDate;
-                }}
-                goBackOneDay={() => {
-                  const newDate = new Date(selectedDate);
-                  newDate.setDate(newDate.getDate() - 1);
-                  navigateWithDate(newDate);
-                }}
-                goForwardOneDay={() => {
-                  if (!isToday) {
-                    const newDate = new Date(selectedDate);
-                    newDate.setDate(newDate.getDate() + 1);
-                    navigateWithDate(newDate);
-                  }
-                }}
-                calendarViewMonth={calendarViewMonth}
-                setCalendarViewMonth={setCalendarViewMonth}
-                today={today}
-              />
-            </ScreenHeaderContainer>
+        {/* Desktop Container for Header and Content */}
+        <DesktopPageContainer>
 
             {/* Daily Totals Summary */}
             <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>
@@ -1143,8 +1068,7 @@ export default function FoodLogHomeScreen() {
             </View>
           </View>
           </DesktopPageContainer>
-        </View>
-      </ScrollView>
+      </CollapsibleModuleHeader>
 
       {/* Meal Type Options Menu Modal */}
       <Modal

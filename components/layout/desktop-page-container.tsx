@@ -51,7 +51,7 @@ export function DesktopPageContainer({ children, style }: DesktopPageContainerPr
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    paddingHorizontal: Spacing.md, // 16px on mobile
+    paddingHorizontal: 0, // Full width on mobile - no padding for edge-to-edge
   },
   containerDesktop: {
     maxWidth: Layout.desktopMaxWidth, // Canonical desktop width matching Exercise screen
