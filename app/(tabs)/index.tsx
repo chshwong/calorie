@@ -44,6 +44,7 @@ import {
 } from '@/utils/accessibility';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-meta';
+import { MacroGauge } from '@/components/MacroGauge';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -51,8 +52,8 @@ type MealTypeCopyButtonProps = {
   mealTypeLabel: string;
   selectedDate: Date;
   isToday: boolean;
-  colors: typeof Colors.light;
-  t: (key: string) => string;
+  colors: typeof Colors.light | typeof Colors.dark;
+  t: (key: string, options?: any) => string;
 };
 
 function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, colors, t }: MealTypeCopyButtonProps) {
@@ -264,8 +265,6 @@ export default function FoodLogHomeScreen() {
           queryFn: () => getEntriesForDate(user.id, dateString),
           staleTime: 10 * 60 * 1000,
           gcTime: 24 * 60 * 60 * 1000,
-          refetchOnWindowFocus: false,
-          refetchOnMount: false,
         });
       }
 
@@ -276,8 +275,6 @@ export default function FoodLogHomeScreen() {
           queryFn: () => getMealtypeMetaByDate(user.id!, dateString),
           staleTime: 10 * 60 * 1000,
           gcTime: 24 * 60 * 60 * 1000,
-          refetchOnWindowFocus: false,
-          refetchOnMount: false,
         });
       }
     },
@@ -451,6 +448,27 @@ export default function FoodLogHomeScreen() {
     const grouped = groupEntriesByMealType(entries, dataByMealType);
     return { dailyTotals: totals, groupedEntries: grouped };
   }, [dataByMealType, entries, selectedDateString]);
+
+  const proteinConsumed = Number(dailyTotals?.protein ?? 0);
+  // AUTHORITATIVE: onboarding target column only (no legacy fallbacks)
+  const proteinTarget = Number((effectiveProfile as any)?.protein_g_min ?? 0);
+
+  const fiberConsumed = Number(dailyTotals?.fiber ?? 0);
+  const fiberTarget = Number((effectiveProfile as any)?.fiber_g_min ?? 0);
+
+  // DEV ONLY: bust caches once so new profile columns show up immediately
+  const didInvalidateProfileQueriesRef = useRef(false);
+  useEffect(() => {
+    if (!__DEV__) return;
+    if (didInvalidateProfileQueriesRef.current) return;
+    if (!user?.id) return;
+    didInvalidateProfileQueriesRef.current = true;
+
+    // userConfig is the primary cache that backs effectiveProfile on Home
+    queryClient.invalidateQueries({ queryKey: ['userConfig', user.id] });
+    // userProfile is used elsewhere (onboarding/profile screens)
+    queryClient.invalidateQueries({ queryKey: ['userProfile', user.id] });
+  }, [queryClient, user?.id]);
 
   // Use meal type order from shared types
   const sortedMealTypes = MEAL_TYPE_ORDER;
@@ -791,6 +809,53 @@ export default function FoodLogHomeScreen() {
                 </View>
               </View>
             )}
+          </View>
+
+          <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+            <View
+              style={[
+                { flexDirection: 'row' },
+                // Web supports gap/columnGap reliably; native fallback uses marginRight on items
+                Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
+              ]}
+            >
+              {/* Protein */}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.background,
+                  borderRadius: 16,
+                  paddingVertical: 10,
+                  ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}),
+                }}
+              >
+                <MacroGauge label="Protein" value={proteinConsumed} target={proteinTarget} unit="g" size="sm" />
+              </View>
+
+              {/* Fiber */}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.background,
+                  borderRadius: 16,
+                  paddingVertical: 10,
+                  ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}),
+                }}
+              >
+                <MacroGauge label="Fiber" value={fiberConsumed} target={fiberTarget} unit="g" size="sm" />
+              </View>
+
+              {/* Keep 3rd slot empty for future Carbs */}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.background,
+                  borderRadius: 16,
+                  paddingVertical: 10,
+                  opacity: 0.15,
+                }}
+              />
+            </View>
           </View>
 
           {/* Today's Calorie Entries */}

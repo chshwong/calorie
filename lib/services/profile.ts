@@ -9,12 +9,40 @@
 import { supabase } from '@/lib/supabase';
 
 /**
+ * ProfileRow (local type)
+ * NOTE: We use select('*') for profiles, so runtime includes all columns.
+ * This type exists to ensure onboarding target columns are not "forgotten" in TS.
+ */
+export type ProfileRow = {
+  user_id: string;
+  first_name?: string | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  height_cm?: number | null;
+  weight_lb?: number | null;
+  height_unit?: string | null;
+  weight_unit?: string | null;
+  onboarding_complete?: boolean | null;
+
+  // Onboarding target columns (authoritative)
+  protein_g_min: number | null;
+  fiber_g_min: number | null;
+  carbs_g_max: number | null;
+  sugar_g_max: number | null;
+  sodium_mg_max: number | null;
+  onboarding_targets_set_at: string | null;
+
+  // Allow other columns without constantly updating this type
+  [key: string]: any;
+};
+
+/**
  * Fetch user profile by user ID
  * 
  * @param userId - The user's ID
  * @returns Profile object or null if not found/error
  */
-export async function getUserProfile(userId: string): Promise<any | null> {
+export async function getUserProfile(userId: string): Promise<ProfileRow | null> {
   if (!userId) {
     return null;
   }
@@ -35,7 +63,7 @@ export async function getUserProfile(userId: string): Promise<any | null> {
       return null;
     }
 
-    return data;
+    return data as ProfileRow;
   } catch (error) {
     console.error('Exception fetching profile:', error);
     return null;

@@ -36,12 +36,21 @@ export type UserConfig = {
   // Daily Goals/Targets
   daily_calorie_goal: number | null;
   daily_calorie_goal_upper: number | null;
+  // NOTE: daily_protein_goal_g is legacy. Do not use it for the Protein gauge.
   daily_protein_goal_g: number | null;
   max_carbs_goal_g: number | null;
   max_fats_goal_g: number | null;
   fibre_target_g: number | null;
   sodium_target_mg: number | null;
   sugar_target_g: number | null;
+
+  // Onboarding target columns (authoritative targets)
+  protein_g_min: number | null;
+  fiber_g_min: number | null;
+  carbs_g_max: number | null;
+  sugar_g_max: number | null;
+  sodium_mg_max: number | null;
+  onboarding_targets_set_at: string | null;
   
   // Water goal
   goal_ml: number | null;
