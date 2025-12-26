@@ -686,7 +686,7 @@ export default function FoodLogHomeScreen() {
 
                     {/* Carbs */}
                     <View style={{ flex: 1 }}>
-                      <MacroGauge label="Carbs ≤" value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                      <MacroGauge label="Carbs" value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
                     </View>
                   </View>
                 </View>

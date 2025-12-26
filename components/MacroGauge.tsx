@@ -48,6 +48,11 @@ export function MacroGauge({
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
 
+  const isDark = scheme === 'dark';
+
+  // Track color must be visible in dark mode (current backgroundSecondary is too close)
+  const trackColor = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.10)';
+
   const safeTarget = Number.isFinite(target) && target > 0 ? target : 0;
 
   // Scale: BOTH modes land the target at 75% of the gauge (headroom to the right)
@@ -126,7 +131,7 @@ export function MacroGauge({
         {/* Grey track */}
         <Path
           d={fullArc}
-          stroke={colors.backgroundSecondary}
+          stroke={trackColor}
           strokeWidth={stroke}
           fill="none"
           strokeLinecap="round"
@@ -220,7 +225,7 @@ export function MacroGauge({
           x={cx}
           y={cy - (isSm ? 8 : 10)}
           fontSize={isSm ? 12 : 13}
-          fontWeight="600"
+          fontFamily="Inter_600SemiBold"
           fill={colors.text}
           textAnchor="middle"
         >
@@ -242,10 +247,12 @@ const styles = StyleSheet.create({
   value: {
     marginTop: -2,
     fontSize: 12,
+    fontFamily: 'Inter_400Regular',
   },
   valueSm: {
     marginTop: -2,
     fontSize: 12,
+    fontFamily: 'Inter_400Regular',
   },
 });
 
