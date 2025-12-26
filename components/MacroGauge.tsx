@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Text as SvgText, Polygon, G } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -11,6 +11,7 @@ type MacroGaugeProps = {
   target: number;  // goal
   unit?: string;
   size?: 'sm' | 'md'; // new
+  mode?: 'min' | 'max';
 };
 
 const clamp = (n: number, min: number, max: number) =>
@@ -42,16 +43,22 @@ export function MacroGauge({
   target,
   unit = 'g',
   size = 'md',
+  mode = 'min',
 }: MacroGaugeProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
 
   const safeTarget = Number.isFinite(target) && target > 0 ? target : 0;
 
-  // Scale: goal at 75%
+  // Scale: BOTH modes land the target at 75% of the gauge (headroom to the right)
   const gaugeMax = safeTarget > 0 ? safeTarget / 0.75 : 1;
+
+  // Needle/arc progress is always against gaugeMax (pins at end if over gaugeMax)
   const v = clamp(value, 0, gaugeMax);
-  const pct = v / gaugeMax;
+  const pct = v / gaugeMax; // 0..1
+
+  // For max-mode warning colors, we compare against the true target (not gaugeMax)
+  const pctOfTarget = safeTarget > 0 ? value / safeTarget : 0;
 
   const angle = 180 - 180 * pct;
 
@@ -71,7 +78,47 @@ export function MacroGauge({
   const filledArc =
     pct > 0 ? arcPath(cx, cy, r, 180, angle) : null;
 
-  const needleEnd = polar(cx, cy, r - 18, angle);
+  // Needle should touch the inner edge of the arc stroke
+  const needleLen = r - stroke / 2;
+  const needleEnd = polar(cx, cy, needleLen, angle);
+
+  // Target is always at 75% of gauge => angle = 180 - 180*0.75 = 45deg
+  const targetAngle = 45;
+
+  // Place marker at centerline of the stroke
+  const markerPoint = polar(cx, cy, r, targetAngle);
+
+  // A slightly outward point for tick direction
+  const markerOut = polar(cx, cy, r + (isSm ? 6 : 8), targetAngle);
+
+  const PINK = '#FF5FA2';
+  const ORANGE = '#FFA500';
+  const GREEN = '#2ECC71';
+  const RED = '#FF3B30';
+
+  const markerColor = mode === 'max' ? RED : GREEN;
+
+  let filledColor = ORANGE;
+
+  if (mode === 'max') {
+    // max-mode uses % of the TRUE target
+    // Green: first 85%
+    // Orange: 85%–99%
+    // Pink: 100%–105%
+    // Red: >105%
+    if (pctOfTarget > 1.05) filledColor = RED;
+    else if (pctOfTarget >= 1.0) filledColor = PINK;
+    else if (pctOfTarget >= 0.85) filledColor = ORANGE;
+    else filledColor = GREEN;
+  } else {
+    // min-mode uses GAUGE progress (target hits at 75% of gauge)
+    // Pink: 0%–25% of gauge
+    // Orange: 25%–<75% of gauge
+    // Green: >=75% (target reached)
+    if (pct >= 0.75) filledColor = GREEN;
+    else if (pct <= 0.25) filledColor = PINK;
+    else filledColor = ORANGE;
+  }
 
   return (
     <View style={styles.container}>
@@ -89,28 +136,89 @@ export function MacroGauge({
         {filledArc && (
           <Path
             d={filledArc}
-            stroke={pct >= 0.75 ? '#2ECC71' : '#FFA500'}
+            stroke={filledColor}
             strokeWidth={stroke}
             fill="none"
             strokeLinecap="round"
           />
         )}
 
-        {/* Needle */}
+        {/* Target marker tick (at 75% point) */}
         <Line
-          x1={cx}
-          y1={cy}
-          x2={needleEnd.x}
-          y2={needleEnd.y}
-          stroke={colors.tint}
-          strokeWidth={3}
+          x1={markerPoint.x}
+          y1={markerPoint.y}
+          x2={markerOut.x}
+          y2={markerOut.y}
+          stroke={markerColor}
+          strokeWidth={isSm ? 2 : 2.5}
           strokeLinecap="round"
         />
+
+        {/* Needle */}
+        {(() => {
+          // Direction vector from center to needleEnd
+          const dx = needleEnd.x - cx;
+          const dy = needleEnd.y - cy;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+          // Unit direction
+          const ux = dx / len;
+          const uy = dy / len;
+
+          // Perpendicular unit
+          const px = -uy;
+          const py = ux;
+
+          // Needle thickness scales with size
+          const baseHalf = isSm ? 2.2 : 3.0;
+
+          // Tip length (triangle)
+          const tipLen = isSm ? 7 : 10;
+
+          // Triangle tip point (at needleEnd)
+          const tipX = needleEnd.x;
+          const tipY = needleEnd.y;
+
+          // Triangle base center slightly behind the tip
+          const baseCX = tipX - ux * tipLen;
+          const baseCY = tipY - uy * tipLen;
+
+          // Base corners
+          const b1x = baseCX + px * baseHalf;
+          const b1y = baseCY + py * baseHalf;
+          const b2x = baseCX - px * baseHalf;
+          const b2y = baseCY - py * baseHalf;
+
+          // Stem ends at triangle base center
+          const stemEndX = baseCX;
+          const stemEndY = baseCY;
+
+          return (
+            <>
+              {/* Stem */}
+              <Line
+                x1={cx}
+                y1={cy}
+                x2={stemEndX}
+                y2={stemEndY}
+                stroke={colors.tint}
+                strokeWidth={isSm ? 2 : 3}
+                strokeLinecap="round"
+              />
+
+              {/* Pointy tip */}
+              <Polygon
+                points={`${tipX},${tipY} ${b1x},${b1y} ${b2x},${b2y}`}
+                fill={colors.tint}
+              />
+            </>
+          );
+        })()}
         <Circle cx={cx} cy={cy} r={5} fill={colors.tint} />
 
         <SvgText
           x={cx}
-          y={cy - (isSm ? 10 : 12)}
+          y={cy - (isSm ? 8 : 10)}
           fontSize={isSm ? 12 : 13}
           fontWeight="600"
           fill={colors.text}

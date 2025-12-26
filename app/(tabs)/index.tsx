@@ -456,6 +456,9 @@ export default function FoodLogHomeScreen() {
   const fiberConsumed = Number(dailyTotals?.fiber ?? 0);
   const fiberTarget = Number((effectiveProfile as any)?.fiber_g_min ?? 0);
 
+  const carbsConsumed = Number(dailyTotals?.carbs ?? 0);
+  const carbsMax = Number((effectiveProfile as any)?.carbs_g_max ?? 0);
+
   // DEV ONLY: bust caches once so new profile columns show up immediately
   const didInvalidateProfileQueriesRef = useRef(false);
   useEffect(() => {
@@ -852,9 +855,11 @@ export default function FoodLogHomeScreen() {
                   backgroundColor: colors.background,
                   borderRadius: 16,
                   paddingVertical: 10,
-                  opacity: 0.15,
+                  ...(Platform.OS !== 'web' ? { marginRight: 0 } : {}),
                 }}
-              />
+              >
+                <MacroGauge label="Carbs ≤" value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+              </View>
             </View>
           </View>
 
