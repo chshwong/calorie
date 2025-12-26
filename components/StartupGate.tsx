@@ -8,16 +8,15 @@
  * 
  * Decisions made (in order):
  * - Auth session restored (signed in/out known)
- * - Onboarding status from cache (immediate) or network (max 1.5s wait)
+ * - Onboarding status from cache (immediate) or network (when available)
  * 
  * Safeguards:
- * - Minimum display time: 300ms (avoid flicker)
- * - Maximum wait: 1000ms (then route even if network still loading)
- * - Never blocks on heavy data queries (logs, goals, etc.)
+ * - Early-exit as soon as destination is known (no timers)
+ * - Guaranteed maxDuration fallback (10s): never hangs forever
  */
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig, userConfigQueryKey } from '@/hooks/use-user-config';
@@ -25,10 +24,7 @@ import type { UserConfig } from '@/lib/services/userConfig';
 import LoadingScreen from '@/app/(minimal)/loading-screen';
 
 // Navigation timing constants
-// Note: These are component-specific timing values, not validation limits.
-// Validation limits would go in constants/constraints.ts per guideline 7.
-const MIN_DISPLAY_TIME_MS = 300;
-const MAX_WAIT_TIME_MS = 1000;
+// Note: MAX_DURATION_MS is a guaranteed safety fallback. Do not remove.
 const MAX_DURATION_MS = 10000; // 10s guaranteed fallback - never hang forever
 
 // Route mapping for decision-based navigation
@@ -40,6 +36,7 @@ const ROUTE_MAP: Record<"login" | "onboarding" | "home", "/login" | "/onboarding
 
 export default function StartupGate() {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { session, user, loading: authLoading, isPasswordRecovery } = useAuth();
   
@@ -48,53 +45,33 @@ export default function StartupGate() {
   const { data: userConfig } = useUserConfig();
   
   const [hasNavigated, setHasNavigated] = useState(false);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-  const startTimeRef = useRef<number>(Date.now());
-  const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const maxWaitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasNavigatedRef = useRef(false);
 
-  // Track minimum display time
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, MIN_DISPLAY_TIME_MS);
+  const authReady = !authLoading;
+  const hasSession = !!session && !!user;
+  const userId = user?.id ?? null;
 
-    return () => clearTimeout(timer);
-  }, []);
+  // Keep latest values available to the 10s timeout callback (avoid stale closures)
+  const latestRef = useRef<{
+    authReady: boolean;
+    hasSession: boolean;
+    userId: string | null;
+    onboardingComplete: boolean | null;
+    pathname: string | null;
+  }>({
+    authReady,
+    hasSession,
+    userId,
+    onboardingComplete: null,
+    pathname: pathname ?? null,
+  });
 
-  // Setup maxDuration fallback timer (10s) - ALWAYS routes somewhere, never hangs
-  useEffect(() => {
-    if (maxDurationTimeoutRef.current) return;
-    
-    maxDurationTimeoutRef.current = setTimeout(() => {
-      if (hasNavigated) return;
-      
-      // Force navigation after maxDuration - choose safest route
-      if (authLoading) {
-        // Auth not ready => route to login (safe)
-        router.replace('/login');
-      } else if (!session || !user) {
-        // No session => route to login
-        router.replace('/login');
-      } else {
-        // Have session but onboarding unknown => route to onboarding (safer than home)
-        router.replace('/onboarding');
-      }
-      setHasNavigated(true);
-    }, MAX_DURATION_MS);
-
-    return () => {
-      if (maxDurationTimeoutRef.current) {
-        clearTimeout(maxDurationTimeoutRef.current);
-      }
-    };
-  }, [router, hasNavigated, authLoading, session, user]);
-
-  // Helper: Get onboarding status from cache immediately, fallback to network data
+  // Helper: Read onboarding_complete from the SAME source as today:
+  // - React Query cache first, then `useUserConfig()`
   // Per guideline 4: UI must NOT block while cached data refetches in background
   // Per guideline 10: UI must NEVER block rendering if cached data exists
-  const getOnboardingStatus = (): boolean | null => {
+  const getOnboardingComplete = (): boolean | null => {
     if (!user?.id) return null;
     
     // First try: read from React Query cache immediately (no network wait)
@@ -104,32 +81,36 @@ export default function StartupGate() {
     );
     
     if (cachedConfig !== undefined) {
-      return cachedConfig?.onboarding_complete ?? false;
+      const value = cachedConfig?.onboarding_complete;
+      return typeof value === 'boolean' ? value : null;
     }
     
     // Second try: use network data if available (may still be loading)
     if (userConfig !== undefined) {
-      return userConfig?.onboarding_complete ?? false;
+      const value = userConfig?.onboarding_complete;
+      return typeof value === 'boolean' ? value : null;
     }
     
     // Unknown: cache miss and network not ready
     return null;
   };
 
+  const onboardingComplete = useMemo(() => getOnboardingComplete(), [queryClient, user?.id, userConfig]);
+
   // Single decision function: returns route or null (unknown)
   const getDecision = (): "login" | "onboarding" | "home" | null => {
     // A) If auth is not ready => return null
-    if (authLoading) {
+    if (!authReady) {
       return null;
     }
 
     // B) If auth ready and no session/user => return "login"
-    if (!session || !user) {
+    if (!hasSession) {
       return "login";
     }
 
     // C) If signed in: check onboarding_complete
-    const onboardingStatus = getOnboardingStatus();
+    const onboardingStatus = onboardingComplete;
     
     // If onboarding_complete is explicitly true/false => return route
     if (onboardingStatus === true) {
@@ -143,19 +124,108 @@ export default function StartupGate() {
     return null;
   };
 
-  // STEP 3: Early-exit effect (no timers) - routes immediately when decision is known
+  const clearMaxDurationTimeout = () => {
+    if (maxDurationTimeoutRef.current) {
+      clearTimeout(maxDurationTimeoutRef.current);
+      maxDurationTimeoutRef.current = null;
+    }
+  };
+
+  const navigateOnce = (decision: "login" | "onboarding" | "home") => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    clearMaxDurationTimeout();
+    router.replace(ROUTE_MAP[decision]);
+    setHasNavigated(true);
+  };
+
+  // STEP 6 — Minimal production console diagnostics (TEMP): once per mount
   useEffect(() => {
-    if (hasNavigated || !router) return;
+    if (process.env.NODE_ENV === 'production') {
+      // One log per mount to debug startup hangs in production environments (e.g. Vercel)
+      console.log('[StartupGate] mount', {
+        authReady: latestRef.current.authReady,
+        hasSession: latestRef.current.hasSession,
+        userId: latestRef.current.userId,
+        onboarding_complete: latestRef.current.onboardingComplete,
+        pathname: latestRef.current.pathname,
+      });
+    }
+  }, []);
+
+  // Keep latest values updated for logging + timeout routing decisions
+  useEffect(() => {
+    latestRef.current = {
+      authReady,
+      hasSession,
+      userId,
+      onboardingComplete,
+      pathname: pathname ?? null,
+    };
+  }, [authReady, hasSession, userId, onboardingComplete, pathname]);
+
+  // STEP 4/5 — Keep the maxDuration timeout, but make it safe + reliable (start once)
+  useEffect(() => {
+    if (maxDurationTimeoutRef.current) return;
+
+    maxDurationTimeoutRef.current = setTimeout(() => {
+      if (hasNavigatedRef.current) return;
+
+      const snap = latestRef.current;
+
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[StartupGate] maxDuration timeout', {
+          authReady: snap.authReady,
+          hasSession: snap.hasSession,
+          userId: snap.userId,
+          onboarding_complete: snap.onboardingComplete,
+          pathname: snap.pathname,
+        });
+      }
+
+      // On timeout, ALWAYS route somewhere safe:
+      // - If auth not ready => "/login"
+      // - Else if signed in but onboarding_complete unknown => "/onboarding"
+      // - Else use normal decision
+      if (!snap.authReady) {
+        hasNavigatedRef.current = true;
+        router.replace('/login');
+        setHasNavigated(true);
+        return;
+      }
+
+      if (!snap.hasSession) {
+        hasNavigatedRef.current = true;
+        router.replace('/login');
+        setHasNavigated(true);
+        return;
+      }
+
+      if (snap.onboardingComplete === null) {
+        hasNavigatedRef.current = true;
+        router.replace('/onboarding');
+        setHasNavigated(true);
+        return;
+      }
+
+      navigateOnce(snap.onboardingComplete ? 'home' : 'onboarding');
+    }, MAX_DURATION_MS);
+
+    return () => {
+      clearMaxDurationTimeout();
+    };
+  }, [router]);
+
+  // STEP 3 — Early-exit effect (no timers): route immediately when decision becomes known
+  useEffect(() => {
+    if (hasNavigatedRef.current || hasNavigated) return;
 
     // Password recovery takes precedence
     if (isPasswordRecovery()) {
-      const elapsed = Date.now() - startTimeRef.current;
-      const delay = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed);
-      
-      navigationTimeoutRef.current = setTimeout(() => {
-        router.replace('/reset-password');
-        setHasNavigated(true);
-      }, delay);
+      hasNavigatedRef.current = true;
+      clearMaxDurationTimeout();
+      router.replace('/reset-password');
+      setHasNavigated(true);
       return;
     }
 
@@ -164,62 +234,22 @@ export default function StartupGate() {
     
     // If decision is known, route immediately (after min time if needed)
     if (decision !== null) {
-      if (minTimeElapsed) {
-        // Navigate immediately
-        router.replace(ROUTE_MAP[decision]);
-        setHasNavigated(true);
-      } else {
-        // Wait for minimum time, then navigate
-        const elapsed = Date.now() - startTimeRef.current;
-        const remaining = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed);
-        
-        navigationTimeoutRef.current = setTimeout(() => {
-          router.replace(ROUTE_MAP[decision]);
-          setHasNavigated(true);
-        }, remaining);
-      }
+      navigateOnce(decision);
       return;
     }
-
-    // Decision is null (unknown) - set max wait timeout
-    // After MAX_WAIT_TIME_MS, route to onboarding (safer default)
-    if (!maxWaitTimeoutRef.current) {
-      maxWaitTimeoutRef.current = setTimeout(() => {
-        // Check decision one more time before routing
-        const finalDecision = getDecision();
-        
-        if (minTimeElapsed && !hasNavigated) {
-          if (finalDecision !== null) {
-            router.replace(ROUTE_MAP[finalDecision]);
-          } else {
-            // Still unknown => route to onboarding (safer than home)
-            router.replace('/onboarding');
-          }
-          setHasNavigated(true);
-        }
-      }, MAX_WAIT_TIME_MS);
-    }
   }, [
-    router,
-    queryClient,
     hasNavigated,
-    authLoading,
     session,
     user,
-    userConfig,
     isPasswordRecovery,
-    minTimeElapsed,
+    authReady,
+    hasSession,
+    onboardingComplete,
   ]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-      if (maxWaitTimeoutRef.current) {
-        clearTimeout(maxWaitTimeoutRef.current);
-      }
       if (maxDurationTimeoutRef.current) {
         clearTimeout(maxDurationTimeoutRef.current);
       }
