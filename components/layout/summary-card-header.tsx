@@ -26,6 +26,8 @@ type SummaryCardHeaderProps = {
   isLoading?: boolean;
   /** Optional right-side content (e.g., entry count, action buttons) */
   rightContent?: React.ReactNode;
+  /** Optional right-side title text (e.g., "124 cal") */
+  rightTitle?: string;
   /** Optional subtitle text shown below title */
   subtitle?: string;
   /** Custom style for the header container */
@@ -46,6 +48,7 @@ export function SummaryCardHeader({
   onPressSettings,
   isLoading,
   rightContent,
+  rightTitle,
   subtitle,
   style,
 }: SummaryCardHeaderProps) {
@@ -89,6 +92,12 @@ export function SummaryCardHeader({
         
         {/* Right side: Loading indicator, Settings button, or custom content */}
         <View style={styles.headerRight}>
+          {rightTitle ? (
+            <ThemedText type="subtitle" style={[styles.rightTitle, { color: colors.tint }]}>
+              {rightTitle}
+            </ThemedText>
+          ) : null}
+
           {isLoading ? (
             <ActivityIndicator size="small" color={colors.tint} />
           ) : rightContent ? (
@@ -158,6 +167,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     fontSize: FontSize.sm,
     lineHeight: FontSize.sm * 1.5,
+  },
+  rightTitle: {
+    ...Typography.h4,
+    fontSize: FontSize.lg,
+    fontWeight: Typography.h4.fontWeight,
+    lineHeight: FontSize.lg * 1.2,
   },
 });
 

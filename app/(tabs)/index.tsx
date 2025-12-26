@@ -660,97 +660,35 @@ export default function FoodLogHomeScreen() {
                 titleKey="home.summary.title_other"
                 icon="fork.knife"
                 isLoading={showLoadingSpinner}
-                rightContent={
-                  entries.length > 0 ? (
-                    <ThemedText style={[styles.entryCount, { color: colors.textSecondary }]}>
-                      {t('home.summary.entry', { count: entries.length })}
-                    </ThemedText>
-                  ) : undefined
-                }
+                rightTitle={`${Math.round(Number(dailyTotals?.calories ?? 0))} cal`}
                 style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
               />
             
             {(entries.length > 0 || !showLoadingSpinner) && (
               <View style={styles.dailyTotalsContent}>
-                <View style={styles.dailyTotalsMainRow}>
-                  {/* Total Calories - Left Side */}
-                  <View style={styles.dailyTotalItem}>
-                    <ThemedText style={[styles.dailyTotalLabel, { color: colors.textSecondary }]}>{t('home.summary.total_calories')}</ThemedText>
-                    <ThemedText style={[styles.dailyTotalValue, { color: colors.tint }]}>
-                      {dailyTotals.calories} {t('units.kcal')}
-                    </ThemedText>
-                  </View>
+                {/* Macro Gauges Row */}
+                <View style={{ marginTop: 6 }}>
+                  <View
+                    style={[
+                      { flexDirection: 'row' },
+                      Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
+                    ]}
+                  >
+                    {/* Protein */}
+                    <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
+                      <MacroGauge label="Protein" value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
+                    </View>
 
-                  {/* Macro Gauge - Right Side */}
-                  {(dailyTotals.protein > 0 || dailyTotals.carbs > 0 || dailyTotals.fat > 0) && (() => {
-                    const totalMacros = dailyTotals.protein + dailyTotals.carbs + dailyTotals.fat;
-                    const proteinFlex = totalMacros > 0 ? dailyTotals.protein : 0;
-                    const carbsFlex = totalMacros > 0 ? dailyTotals.carbs : 0;
-                    const fatFlex = totalMacros > 0 ? dailyTotals.fat : 0;
-                    
-                    const segments = [];
-                    if (proteinFlex > 0) segments.push({ flex: proteinFlex, color: '#10B981' });
-                    if (carbsFlex > 0) segments.push({ flex: carbsFlex, color: '#F59E0B' });
-                    if (fatFlex > 0) segments.push({ flex: fatFlex, color: '#8B5CF6' });
-                    
-                    return (
-                      <View style={styles.dailyMacrosContainer}>
-                        {/* Horizontal Gauge Bar */}
-                        <View style={styles.macroGaugeBar}>
-                          {segments.map((segment, index) => {
-                            const isFirst = index === 0;
-                            const isLast = index === segments.length - 1;
-                            const borderRadius = Platform.select({ web: 5, default: 4 });
-                            
-                            return (
-                              <View
-                                key={index}
-                                style={[
-                                  styles.macroGaugeSegment,
-                                  {
-                                    flex: segment.flex,
-                                    backgroundColor: segment.color,
-                                    borderTopLeftRadius: isFirst ? borderRadius : 0,
-                                    borderBottomLeftRadius: isFirst ? borderRadius : 0,
-                                    borderTopRightRadius: isLast ? borderRadius : 0,
-                                    borderBottomRightRadius: isLast ? borderRadius : 0,
-                                  },
-                                ]}
-                              />
-                            );
-                          })}
-                        </View>
-                        
-                        {/* Compact Legend */}
-                        <View style={styles.macroLegend}>
-                          {dailyTotals.protein > 0 && (
-                            <View style={styles.macroLegendItem}>
-                              <View style={[styles.macroLegendDot, { backgroundColor: '#10B981' }]} />
-                              <ThemedText style={[styles.macroLegendText, { color: colors.textSecondary }]}>
-                                {t('home.summary.protein')} {dailyTotals.protein}{t('units.g')}
-                              </ThemedText>
-                            </View>
-                          )}
-                          {dailyTotals.carbs > 0 && (
-                            <View style={styles.macroLegendItem}>
-                              <View style={[styles.macroLegendDot, { backgroundColor: '#F59E0B' }]} />
-                              <ThemedText style={[styles.macroLegendText, { color: colors.textSecondary }]}>
-                                {t('home.summary.carbs')} {dailyTotals.carbs}{t('units.g')}
-                              </ThemedText>
-                            </View>
-                          )}
-                          {dailyTotals.fat > 0 && (
-                            <View style={styles.macroLegendItem}>
-                              <View style={[styles.macroLegendDot, { backgroundColor: '#8B5CF6' }]} />
-                              <ThemedText style={[styles.macroLegendText, { color: colors.textSecondary }]}>
-                                {t('home.summary.fat')} {dailyTotals.fat}{t('units.g')}
-                              </ThemedText>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    );
-                  })()}
+                    {/* Fiber */}
+                    <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
+                      <MacroGauge label="Fiber" value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
+                    </View>
+
+                    {/* Carbs */}
+                    <View style={{ flex: 1 }}>
+                      <MacroGauge label="Carbs ≤" value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                    </View>
+                  </View>
                 </View>
                 
                 {/* Sub-fats Section - Collapsible */}
@@ -812,55 +750,6 @@ export default function FoodLogHomeScreen() {
                 </View>
               </View>
             )}
-          </View>
-
-          <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-            <View
-              style={[
-                { flexDirection: 'row' },
-                // Web supports gap/columnGap reliably; native fallback uses marginRight on items
-                Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
-              ]}
-            >
-              {/* Protein */}
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.background,
-                  borderRadius: 16,
-                  paddingVertical: 10,
-                  ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}),
-                }}
-              >
-                <MacroGauge label="Protein" value={proteinConsumed} target={proteinTarget} unit="g" size="sm" />
-              </View>
-
-              {/* Fiber */}
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.background,
-                  borderRadius: 16,
-                  paddingVertical: 10,
-                  ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}),
-                }}
-              >
-                <MacroGauge label="Fiber" value={fiberConsumed} target={fiberTarget} unit="g" size="sm" />
-              </View>
-
-              {/* Keep 3rd slot empty for future Carbs */}
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.background,
-                  borderRadius: 16,
-                  paddingVertical: 10,
-                  ...(Platform.OS !== 'web' ? { marginRight: 0 } : {}),
-                }}
-              >
-                <MacroGauge label="Carbs ≤" value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
-              </View>
-            </View>
           </View>
 
           {/* Today's Calorie Entries */}

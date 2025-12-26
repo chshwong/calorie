@@ -48,7 +48,7 @@
     },
     "summary": {
       "title_today": "Today's Summary",
-      "title_other": "Summary",
+      "title_other": "Day Summary",
       "entry_one": "{{count}} entry",
       "entry_other": "{{count}} entries",
       "total_calories": "Total Calories",
