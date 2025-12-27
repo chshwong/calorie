@@ -1,15 +1,15 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import { Platform } from 'react-native';
-import { setLanguage, isLanguageSupported } from '@/i18n';
-import { ensureProfileExists } from '@/lib/services/profileService';
+import { isLanguageSupported, setLanguage } from '@/i18n';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
-import { queryClient } from '@/lib/query-client';
 import { prefetchUserConfig } from '@/lib/prefetch-user-config';
+import { queryClient } from '@/lib/query-client';
+import { ensureProfileExists } from '@/lib/services/profileService';
+import { supabase } from '@/lib/supabase';
+import { Session, User } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 const PROFILE_CACHE_KEY = 'profile';
-const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000 *180; // 24 hours x 180
 
 type AuthContextType = {
   session: Session | null;

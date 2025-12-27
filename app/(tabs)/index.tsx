@@ -22,8 +22,9 @@ import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
-import { useUserConfig } from '@/hooks/use-user-config';
+import { userConfigQueryKey, useUserConfig } from '@/hooks/use-user-config';
 import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
+import { getPersistentCache } from '@/lib/persistentCache';
 import { fetchBundles } from '@/lib/services/bundles';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-meta';
@@ -305,19 +306,28 @@ export default function FoodLogHomeScreen() {
     refetch: refetchEntries,
   } = useDailyEntries(selectedDateString);
 
-  // Entries: use cache immediately
-  const entries = calorieEntries ?? [];
-  // Only show loading spinner if we're doing initial load AND have no data at all
-  // placeholderData should provide cached data immediately, so if calorieEntries is undefined,
+  // Entries: use cache immediately - also check persistent cache directly as fallback
+  // This ensures we have data even if React Query cache hasn't rehydrated yet
+  const persistentEntries = useMemo(() => {
+    if (!user?.id || !selectedDateString) return null;
+    const cacheKey = `dailyEntries:${user.id}:${selectedDateString}`;
+    return getPersistentCache<CalorieEntry[]>(cacheKey, 120 * 24 * 60 * 60 * 1000);
+  }, [user?.id, selectedDateString]);
+  
+  const entries = calorieEntries ?? persistentEntries ?? [];
+  
+  // Only show loading spinner if we're doing initial load AND have no data at all (including persistent cache)
+  // placeholderData should provide cached data immediately, so if we have no data from any source,
   // it means there's truly no cached data and we're doing a fresh fetch
   const showLoadingSpinner =
     entriesLoading && 
     entries.length === 0 && 
-    calorieEntries === undefined;
+    calorieEntries === undefined &&
+    persistentEntries === null;
 
-  // UserConfig: use cache immediately
+  // UserConfig: use cache immediately - use canonical query key
   const cachedUserConfig =
-    userConfig ?? queryClient.getQueryData(['userConfig', user?.id]);
+    userConfig ?? queryClient.getQueryData(userConfigQueryKey(user?.id ?? null));
   const isUserConfigLoading = userConfigLoading && !cachedUserConfig;
   
   // Get effective profile (from useUserConfig hook or AuthContext fallback)
@@ -503,7 +513,8 @@ export default function FoodLogHomeScreen() {
 
   const profileNotFound = !cachedUserConfig && !isUserConfigLoading && !loading && !retrying && user;
 
-  const showLoadingModal = !cachedUserConfig && isUserConfigLoading;
+  // Disabled: showLoadingModal blocks the page. Instead, render with neutral values if userConfig is missing.
+  // const showLoadingModal = !cachedUserConfig && isUserConfigLoading;
 
   const { dailyTotals, groupedEntries } = useMemo(() => {
     const totals = calculateDailyTotals(entries, dataByMealType);

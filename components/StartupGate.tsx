@@ -12,7 +12,7 @@
  * 
  * Safeguards:
  * - Early-exit as soon as destination is known (no timers)
- * - Guaranteed maxDuration fallback (10s): never hangs forever
+ * - Guaranteed maxDuration fallback (5s): never hangs forever
  */
 
 import LoadingScreen from '@/app/(minimal)/loading-screen';
@@ -28,7 +28,7 @@ import { Platform } from 'react-native';
 
 // Navigation timing constants
 // Note: MAX_DURATION_MS is a guaranteed safety fallback. Do not remove.
-const MAX_DURATION_MS = 5000; // 10s guaranteed fallback - never hang forever
+const MAX_DURATION_MS = 5000; // 5s guaranteed fallback - never hang forever
 
 // Route mapping for decision-based navigation
 const ROUTE_MAP: Record<"login" | "onboarding" | "home", "/login" | "/onboarding" | "/(tabs)"> = {
@@ -85,7 +85,7 @@ export default function StartupGate() {
     };
   }, [userId]);
 
-  // Keep latest values available to the 10s timeout callback (avoid stale closures)
+  // Keep latest values available to the 5s timeout callback (avoid stale closures)
   const latestRef = useRef<{
     authReady: boolean;
     hasSession: boolean;
