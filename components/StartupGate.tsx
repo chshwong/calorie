@@ -18,8 +18,8 @@
 import LoadingScreen from '@/app/(minimal)/loading-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig, userConfigQueryKey } from '@/hooks/use-user-config';
-import type { UserConfig } from '@/lib/services/userConfig';
 import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
+import type { UserConfig } from '@/lib/services/userConfig';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,7 +27,7 @@ import { Platform } from 'react-native';
 
 // Navigation timing constants
 // Note: MAX_DURATION_MS is a guaranteed safety fallback. Do not remove.
-const MAX_DURATION_MS = 10000; // 10s guaranteed fallback - never hang forever
+const MAX_DURATION_MS = 5000; // 10s guaranteed fallback - never hang forever
 
 // Route mapping for decision-based navigation
 const ROUTE_MAP: Record<"login" | "onboarding" | "home", "/login" | "/onboarding" | "/(tabs)"> = {

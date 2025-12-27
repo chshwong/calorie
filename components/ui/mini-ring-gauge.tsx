@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Text as SvgText } from 'react-native-svg';
 import { Colors, FontFamilies, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
 type MiniRingGaugeProps = {
   label: string; // e.g. "Sodium"
@@ -91,7 +91,7 @@ export function MiniRingGauge({
 
   const cx = vbW / 2;
   const cy = vbH / 2.5 + (size === 'xs' ? 3 : 5);
-  const r = size === 'xs' ? 30 : 36;
+  const r = size === 'xs' ? 32 : 39;
 
   const fullArc = arcPath(cx, cy, r, START_DEG, END_DEG);
   const filledArc = pct > 0 ? arcPath(cx, cy, r, START_DEG, angle) : null;
