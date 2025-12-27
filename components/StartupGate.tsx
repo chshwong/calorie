@@ -19,6 +19,7 @@ import LoadingScreen from '@/app/(minimal)/loading-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig, userConfigQueryKey } from '@/hooks/use-user-config';
 import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
+import { DEFAULT_CACHE_MAX_AGE_MS, getPersistentCache } from '@/lib/persistentCache';
 import type { UserConfig } from '@/lib/services/userConfig';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
@@ -100,7 +101,7 @@ export default function StartupGate() {
   });
 
   // Helper: Read onboarding_complete from the SAME source as today:
-  // - Tiny persisted flag store first, then React Query cache, then `useUserConfig()`
+  // - Tiny persisted flag store first, then persistent cache, then React Query cache, then `useUserConfig()`
   // Per guideline 4: UI must NOT block while cached data refetches in background
   // Per guideline 10: UI must NEVER block rendering if cached data exists
   const getOnboardingComplete = (): boolean | null => {
@@ -114,7 +115,16 @@ export default function StartupGate() {
         : nativeOnboardingCompleteRef.current ?? null;
     if (typeof persistedVal === 'boolean') return persistedVal;
 
-    // Second try: React Query cache immediately (no network wait)
+    // Second try: persistent cache for userConfig (synchronous, survives reloads)
+    const persistentUserConfig = getPersistentCache<UserConfig | null>(
+      `userConfig:${userId}`,
+      DEFAULT_CACHE_MAX_AGE_MS
+    );
+    if (persistentUserConfig?.onboarding_complete !== undefined) {
+      return persistentUserConfig.onboarding_complete === true;
+    }
+
+    // Third try: React Query cache immediately (no network wait)
     const cachedConfig = queryClient.getQueryData<UserConfig | null>(
       userConfigQueryKey(userId)
     );
@@ -122,7 +132,7 @@ export default function StartupGate() {
     const cachedVal = cachedConfig?.onboarding_complete;
     if (typeof cachedVal === 'boolean') return cachedVal;
     
-    // Third try: use network data if available (may still be loading)
+    // Fourth try: use network data if available (may still be loading)
     const netVal = userConfig?.onboarding_complete;
     if (typeof netVal === 'boolean') return netVal;
     
@@ -263,7 +273,7 @@ export default function StartupGate() {
     // Get decision
     const decision = getDecision();
     
-    // If decision is known, route immediately (after min time if needed)
+    // If decision is known, route immediately (no delays)
     if (decision !== null) {
       navigateOnce(decision);
       return;
@@ -276,6 +286,7 @@ export default function StartupGate() {
     authReady,
     hasSession,
     onboardingComplete,
+    nativeOnboardingFlagTick, // Include this to trigger re-evaluation when native flag loads
   ]);
 
   // Cleanup timeouts on unmount

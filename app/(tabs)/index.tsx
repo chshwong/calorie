@@ -1,54 +1,51 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, RefreshControl, Alert } from 'react-native';
-import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { DateHeader } from '@/components/date-header';
-import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { ScreenHeaderContainer } from '@/components/layout/screen-header-container';
-import { SummaryCardHeader } from '@/components/layout/summary-card-header';
-import { TightBrandHeader } from '@/components/layout/tight-brand-header';
+import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
+import { CopyMealtypeModal } from '@/components/copy-mealtype-modal';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
-import { getGreetingKey } from '@/utils/bmi';
-import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Layout, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useSelectedDate } from '@/hooks/use-selected-date';
-import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
-import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
-import { storage, STORAGE_KEYS } from '@/lib/storage';
-import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
-import { useUserConfig } from '@/hooks/use-user-config';
-import { useDailyEntries } from '@/hooks/use-daily-entries';
-import { toDateKey, addDays } from '@/utils/dateKey';
-import { getLocalDateKey } from '@/utils/dateTime';
-import { useQueryClient } from '@tanstack/react-query';
-import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
-import { fetchRecentFoods } from '@/lib/services/recentFoods';
-import { fetchCustomFoods } from '@/lib/services/customFoods';
-import { fetchBundles } from '@/lib/services/bundles';
-import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
-import { showAppToast } from '@/components/ui/app-toast';
-import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
-import { OfflineBanner } from '@/components/OfflineBanner';
-import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
-import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
-import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { MacroGauge } from '@/components/MacroGauge';
 import { NoteEditor } from '@/components/note-editor';
-import { CopyMealtypeModal } from '@/components/copy-mealtype-modal';
-import {
-  getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
-  getFocusStyle,
-} from '@/utils/accessibility';
+import { OfflineBanner } from '@/components/OfflineBanner';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { showAppToast } from '@/components/ui/app-toast';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
+import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
+import { BorderRadius, Colors, FontSize, Layout, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
+import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
+import { useSelectedDate } from '@/hooks/use-selected-date';
+import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
+import { useUserConfig } from '@/hooks/use-user-config';
+import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
+import { fetchBundles } from '@/lib/services/bundles';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-meta';
-import { MacroGauge } from '@/components/MacroGauge';
-import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
-import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
+import { fetchCustomFoods } from '@/lib/services/customFoods';
+import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
+import { fetchRecentFoods } from '@/lib/services/recentFoods';
+import { storage, STORAGE_KEYS } from '@/lib/storage';
+import {
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle,
+} from '@/utils/accessibility';
+import { getGreetingKey } from '@/utils/bmi';
+import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
+import { addDays, toDateKey } from '@/utils/dateKey';
+import { getLocalDateKey } from '@/utils/dateTime';
+import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -310,8 +307,13 @@ export default function FoodLogHomeScreen() {
 
   // Entries: use cache immediately
   const entries = calorieEntries ?? [];
+  // Only show loading spinner if we're doing initial load AND have no data at all
+  // placeholderData should provide cached data immediately, so if calorieEntries is undefined,
+  // it means there's truly no cached data and we're doing a fresh fetch
   const showLoadingSpinner =
-    entriesLoading && entries.length === 0 && calorieEntries === undefined;
+    entriesLoading && 
+    entries.length === 0 && 
+    calorieEntries === undefined;
 
   // UserConfig: use cache immediately
   const cachedUserConfig =

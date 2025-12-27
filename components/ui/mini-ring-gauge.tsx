@@ -90,8 +90,8 @@ export function MiniRingGauge({
   const stroke = size === 'xs' ? 5 : 6;
 
   const cx = vbW / 2;
-  const cy = vbH / 2.5 + (size === 'xs' ? 3 : 5);
   const r = size === 'xs' ? 32 : 39;
+  const cy = vbH / 2.5 + (size === 'xs' ? 3 : 5);
 
   const fullArc = arcPath(cx, cy, r, START_DEG, END_DEG);
   const filledArc = pct > 0 ? arcPath(cx, cy, r, START_DEG, angle) : null;
