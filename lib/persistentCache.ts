@@ -1,17 +1,14 @@
+import { Platform } from 'react-native';
+
 /**
  * PERSISTENT CACHE UTILITY
- * 
- * Provides a simple caching layer on top of platform storage (localStorage/AsyncStorage)
- * with automatic JSON serialization and optional TTL support.
- * 
+ *
  * Per engineering guidelines:
- * - Wraps browser APIs in adapter modules
- * - Platform-agnostic (web vs mobile ready)
+ * - Persistent storage access is centralized here.
+ * - Platform branching is contained to this module (no localStorage / AsyncStorage usage elsewhere).
  */
 
 export const DEFAULT_CACHE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000; // 180 days
-
-import { Platform } from 'react-native';
 
 type CacheEntry<T> = {
   data: T;
@@ -35,6 +32,38 @@ function getStorage() {
 
 export function buildKey(key: string) {
   return `${CACHE_PREFIX}:${key}`;
+}
+
+/**
+ * Raw storage helpers (NO key prefix):
+ *
+ * Used for tiny, startup-critical flags that must be readable without waiting for React Query
+ * cache hydration. This still adheres to the "persistent storage access only via this module"
+ * guideline, while allowing keys that must remain unprefixed by design.
+ */
+export function getRawStringSyncWeb(key: string): string | null {
+  if (Platform.OS !== 'web') return null;
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  return window.localStorage.getItem(key);
+}
+
+export async function getRawString(key: string): Promise<string | null> {
+  // Web resolves synchronously; native implementation lives in `persistentCache.native.ts`.
+  return getRawStringSyncWeb(key);
+}
+
+export async function setRawString(key: string, value: string): Promise<void> {
+  // Web resolves synchronously; native implementation lives in `persistentCache.native.ts`.
+  if (Platform.OS !== 'web') return;
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  window.localStorage.setItem(key, value);
+}
+
+export async function removeRawString(key: string): Promise<void> {
+  // Web resolves synchronously; native implementation lives in `persistentCache.native.ts`.
+  if (Platform.OS !== 'web') return;
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  window.localStorage.removeItem(key);
 }
 
 /**

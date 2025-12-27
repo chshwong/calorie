@@ -19,9 +19,11 @@ import LoadingScreen from '@/app/(minimal)/loading-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig, userConfigQueryKey } from '@/hooks/use-user-config';
 import type { UserConfig } from '@/lib/services/userConfig';
+import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 // Navigation timing constants
 // Note: MAX_DURATION_MS is a guaranteed safety fallback. Do not remove.
@@ -45,12 +47,42 @@ export default function StartupGate() {
   const { data: userConfig } = useUserConfig();
   
   const [hasNavigated, setHasNavigated] = useState(false);
+  const [nativeOnboardingFlagTick, setNativeOnboardingFlagTick] = useState(0);
   const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasNavigatedRef = useRef(false);
+  const nativeOnboardingCompleteRef = useRef<boolean | null | undefined>(undefined);
 
   const authReady = !authLoading;
   const hasSession = !!session && !!user;
   const userId = user?.id ?? null;
+
+  // Native-only: populate a ref from AsyncStorage ASAP (do not block UI).
+  // This allows onboarding routing decisions *before* React Query cache rehydration completes.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    nativeOnboardingCompleteRef.current = undefined;
+    if (!userId) return;
+
+    let cancelled = false;
+    onboardingFlagStore
+      .read(userId)
+      .then((val) => {
+        if (cancelled) return;
+        nativeOnboardingCompleteRef.current = val; // boolean if found; null if missing/invalid
+        setNativeOnboardingFlagTick((x) => x + 1);
+      })
+      .catch(() => {
+        // Treat as "not found" on read errors; fall back to cache/network.
+        if (cancelled) return;
+        nativeOnboardingCompleteRef.current = null;
+        setNativeOnboardingFlagTick((x) => x + 1);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Keep latest values available to the 10s timeout callback (avoid stale closures)
   const latestRef = useRef<{
@@ -68,22 +100,29 @@ export default function StartupGate() {
   });
 
   // Helper: Read onboarding_complete from the SAME source as today:
-  // - React Query cache first, then `useUserConfig()`
+  // - Tiny persisted flag store first, then React Query cache, then `useUserConfig()`
   // Per guideline 4: UI must NOT block while cached data refetches in background
   // Per guideline 10: UI must NEVER block rendering if cached data exists
   const getOnboardingComplete = (): boolean | null => {
-    if (!user?.id) return null;
+    if (!userId) return null;
     
-    // First try: read from React Query cache immediately (no network wait)
-    // This respects guideline 4.1: Startup-critical data MUST render from cache if available
+    // First try: tiny persisted flag store (sync on web / as-fast-as-possible on native)
+    // This intentionally avoids waiting for React Query cache rehydration.
+    const persistedVal =
+      Platform.OS === 'web'
+        ? onboardingFlagStore.readSyncWeb(userId)
+        : nativeOnboardingCompleteRef.current ?? null;
+    if (typeof persistedVal === 'boolean') return persistedVal;
+
+    // Second try: React Query cache immediately (no network wait)
     const cachedConfig = queryClient.getQueryData<UserConfig | null>(
-      userConfigQueryKey(user.id)
+      userConfigQueryKey(userId)
     );
     
     const cachedVal = cachedConfig?.onboarding_complete;
     if (typeof cachedVal === 'boolean') return cachedVal;
     
-    // Second try: use network data if available (may still be loading)
+    // Third try: use network data if available (may still be loading)
     const netVal = userConfig?.onboarding_complete;
     if (typeof netVal === 'boolean') return netVal;
     
@@ -91,7 +130,23 @@ export default function StartupGate() {
     return null;
   };
 
-  const onboardingComplete = useMemo(() => getOnboardingComplete(), [queryClient, user?.id, userConfig]);
+  const onboardingComplete = useMemo(
+    () => getOnboardingComplete(),
+    // nativeOnboardingFlagTick forces re-evaluation after AsyncStorage read fills the ref
+    [queryClient, userId, userConfig, nativeOnboardingFlagTick]
+  );
+
+  // Keep tiny persisted store in sync whenever userConfig produces a boolean.
+  useEffect(() => {
+    if (!userId) return;
+    const val = userConfig?.onboarding_complete;
+    if (typeof val !== 'boolean') return;
+
+    // Fire-and-forget; routing should never wait on this write.
+    onboardingFlagStore.write(userId, val).catch(() => {
+      // ignore
+    });
+  }, [userId, userConfig?.onboarding_complete]);
 
   // Single decision function: returns route or null (unknown)
   const getDecision = (): "login" | "onboarding" | "home" | null => {
