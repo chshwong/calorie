@@ -20,7 +20,8 @@
     "day": "Jour",
     "unexpected_error": "Une erreur inattendue s'est produite. Veuillez réessayer.",
     "today": "Aujourd'hui",
-    "yesterday": "Hier"
+    "yesterday": "Hier",
+    "no_target": "Aucun objectif"
   },
 
   "home": {
@@ -51,6 +52,7 @@
       "entry_one": "{{count}} entrée",
       "entry_other": "{{count}} entrées",
       "total_calories": "Calories totales",
+      "remaining": "restant",
       "more_details": "Plus de détails",
       "protein": "Protéines",
       "carbs": "Glucides",

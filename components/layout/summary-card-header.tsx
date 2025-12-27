@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ViewStyle, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, FontSize, Typography, ModuleThemes, type ModuleType } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -15,7 +15,7 @@ type SummaryCardHeaderProps = {
   /** i18n key for the title (e.g., 'home.summary.title_other') */
   titleKey: string;
   /** Optional module icon name (SF Symbols) */
-  icon?: string;
+  icon?: IconSymbolName;
   /** Optional MaterialCommunityIcons name (for exercise/meds) */
   materialIcon?: string;
   /** Module type for accent color */
@@ -129,7 +129,7 @@ export function SummaryCardHeader({
 const styles = StyleSheet.create({
   header: {
     paddingTop: 0, // No top padding - card container already provides padding
-    paddingBottom: Spacing.md, // Keep bottom padding for spacing below
+    paddingBottom: Spacing.xs, // was md
     paddingHorizontal: Spacing.lg,
   },
   headerWithNegativeMargin: {

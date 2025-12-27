@@ -1,9 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { Colors, FontFamilies, GaugeText } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTranslation } from 'react-i18next';
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import Svg, { Circle, Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
+import { ensureContrast } from '@/theme/contrast';
 
 type MacroGaugeProps = {
   label: string;
@@ -46,13 +48,14 @@ export function MacroGauge({
   size = 'md',
   mode = 'min',
 }: MacroGaugeProps) {
+  const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
+  const modeKey = (scheme ?? 'light') as 'light' | 'dark';
 
   const isDark = scheme === 'dark';
 
-  // Track color must be visible in dark mode (current backgroundSecondary is too close)
-  const trackColor = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.10)';
+  const trackColor = colors.chartGrey;
 
   const safeTarget = Number.isFinite(target) && target > 0 ? target : 0;
 
@@ -92,7 +95,9 @@ export function MacroGauge({
   const stroke = isSm ? 8 : 14;
 
   const cx = vbW / 2;
-  const cy = vbH - (isSm ? 10 : 18);
+  // Reduce unused bottom space inside the SVG so the value row sits closer to the arc.
+  // (Does not change arc size; only its vertical position within the viewBox.)
+  const cy = vbH - (isSm ? 6 : 10);
   const r = isSm ? 46 : 100;
 
   const fullArc = arcPath(cx, cy, r, 180, 0, 1);
@@ -116,10 +121,12 @@ export function MacroGauge({
   // A slightly outward point for tick direction
   const markerOut = polar(cx, cy, r + (isSm ? 6 : 8), targetAngle);
 
-  const PINK = '#FF5FA2';
-  const ORANGE = '#FFA500';
-  const GREEN = '#2ECC71';
-  const RED = '#FF3B30';
+  // NOTE: Arc colors are intentionally NOT contrast-adjusted (per design).
+  // Only the consumed value text below is contrast-guarded for WCAG AA.
+  const PINK = colors.chartPink;
+  const ORANGE = colors.chartOrange;
+  const GREEN = colors.chartGreen;
+  const RED = colors.chartRed;
 
   // For carbs only:
   // - dark mode: keep the dark mask you like
@@ -151,6 +158,12 @@ export function MacroGauge({
     else if (pct <= 0.25) filledColor = PINK;
     else filledColor = ORANGE;
   }
+
+  // Single source of truth: this is the same color used for the active arc state.
+  const activeColor = safeTarget > 0 ? filledColor : undefined;
+  const consumedColor = activeColor ? ensureContrast(activeColor, colors.card, modeKey, 4.5) : undefined;
+  const consumedFormatted = `${Math.round(value)}${unit}`;
+  const targetFormatted = safeTarget > 0 ? `${Math.round(safeTarget)}${unit}` : t('common.no_target');
 
   return (
     <View style={styles.container}>
@@ -351,8 +364,8 @@ export function MacroGauge({
         <SvgText
           x={cx}
           y={cy - (isSm ? 8 : 10)}
-          fontSize={isSm ? 12 : 13}
-          fontFamily="Inter_600SemiBold"
+          fontSize={isSm ? GaugeText.macroGauge.label.md.fontSize : GaugeText.macroGauge.label.md.fontSize}
+          fontFamily={FontFamilies.semibold}
           fill={colors.text}
           textAnchor="middle"
         >
@@ -361,7 +374,14 @@ export function MacroGauge({
       </Svg>
 
       <ThemedText style={[styles.value, isSm && styles.valueSm]}>
-        {Math.round(value)}{unit} / {safeTarget > 0 ? `${Math.round(safeTarget)}${unit}` : 'No target'}
+        {safeTarget > 0 ? (
+          <>
+            <Text style={consumedColor ? { color: consumedColor } : undefined}>{consumedFormatted}</Text>
+            <Text>{` / ${targetFormatted}`}</Text>
+          </>
+        ) : (
+          <Text>{`${consumedFormatted} / ${targetFormatted}`}</Text>
+        )}
       </ThemedText>
     </View>
   );
@@ -372,15 +392,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   value: {
-    marginTop: -2,
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    marginTop: 2,
+    fontSize: GaugeText.macroGauge.value.md.fontSize,
+    lineHeight: Math.round(GaugeText.macroGauge.value.md.fontSize * 1.15),
+    fontFamily: FontFamilies.regular,
   },
   valueSm: {
-    marginTop: -2,
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    marginTop: 2,
+    fontSize: GaugeText.macroGauge.value.sm.fontSize,
+    lineHeight: Math.round(GaugeText.macroGauge.value.sm.fontSize * 1.15),
+    fontFamily: FontFamilies.regular,
   },
 });
+
+export const MACRO_GAUGE_TEXT = {
+  label: GaugeText.macroGauge.label,
+  value: GaugeText.macroGauge.value,
+};
 
 

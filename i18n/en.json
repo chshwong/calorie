@@ -21,7 +21,8 @@
     "unexpected_error": "An unexpected error occurred. Please try again.",
     "today": "Today",
     "yesterday": "Yesterday",
-    "add": "Add"
+    "add": "Add",
+    "no_target": "No target"
   },
 
   "home": {
@@ -52,6 +53,7 @@
       "entry_one": "{{count}} entry",
       "entry_other": "{{count}} entries",
       "total_calories": "Total Calories",
+      "remaining": "remaining",
       "more_details": "More Details",
       "protein": "Protein",
       "carbs": "Carbs",

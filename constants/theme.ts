@@ -24,11 +24,6 @@ import { Platform } from 'react-native';
 //brand colors
 const salmonColorDark ='#E9876F';
 const salmonColorLight ='#B8553F';
-const greenColorDark ='#DCF048';
-const greenColorLight ='#526C19';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#5BB8FF';
 // Standardized grey color used across the entire app
 // This is the primary grey for secondary text, icons, and UI elements
 // Light mode: Dark grey close to primary text for high contrast (similar to Tailwind gray-700)
@@ -120,6 +115,12 @@ export const Colors = {
     // Accent
     tint: salmonColorLight,
     tintLight: salmonColorLight + '20',
+    appTeal: '#2FA4A9',
+    chartGrey: '#E6E6E6', // chartGreyLightMode
+    chartGreen: '#2ECC71', // chartGreen (shared)
+    chartOrange: '#FFA500', // chartOrange (shared)
+    chartPink: '#FF5FA2', // chartPink (shared)
+    chartRed: '#FF3B30', // chartRed (shared)
     
     // UI Elements
     icon: StandardGrey.light,
@@ -165,6 +166,12 @@ export const Colors = {
     // Accent
     tint: salmonColorDark,
     tintLight: salmonColorDark + '20',
+    appTeal: '#5BC2C6',
+    chartGrey: '#3A3A3A', // chartGreyDarkMode
+    chartGreen: '#2ECC71', // chartGreen (shared)
+    chartOrange: '#FFA500', // chartOrange (shared)
+    chartPink: '#FF5FA2', // chartPink (shared)
+    chartRed: '#FF3B30', // chartRed (shared)
     
     // UI Elements
     icon: StandardGrey.dark,
@@ -249,6 +256,7 @@ export const BorderRadius = {
 export const FontSize = {
   xs: 10,
   sm: 12,
+  gaugeLabelMd: 13,
   base: 14,
   md: 16,
   lg: 18,
@@ -267,6 +275,26 @@ export const FontWeight = {
   semibold: '600' as const,
   bold: '700' as const,
 };
+
+// Font families used in react-native-svg text. Keep in sync with app font loading.
+export const FontFamilies = {
+  regular: 'Inter_400Regular',
+  semibold: 'Inter_600SemiBold',
+} as const;
+
+// Shared gauge typography (kept in theme to avoid hardcoded font sizes in components)
+export const GaugeText = {
+  macroGauge: {
+    label: {
+      md: { fontSize: FontSize.gaugeLabelMd, fontWeight: FontWeight.semibold },
+      sm: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+    },
+    value: {
+      md: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+      sm: { fontSize: FontSize.base, fontWeight: FontWeight.semibold },
+    },
+  },
+} as const;
 
 /**
  * Line heights

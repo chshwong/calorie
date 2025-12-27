@@ -23,6 +23,7 @@ import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { toDateKey, addDays } from '@/utils/dateKey';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
@@ -45,6 +46,7 @@ import {
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-meta';
 import { MacroGauge } from '@/components/MacroGauge';
+import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -507,13 +509,25 @@ export default function FoodLogHomeScreen() {
 
   const proteinConsumed = Number(dailyTotals?.protein ?? 0);
   // AUTHORITATIVE: onboarding target column only (no legacy fallbacks)
-  const proteinTarget = Number((effectiveProfile as any)?.protein_g_min ?? 0);
+  // NOTE: effectiveProfile typing is behind current DB schema; remove this cast once profile types are regenerated.
+  const profileGoals = effectiveProfile as unknown as {
+    protein_g_min?: number | null;
+    fiber_g_min?: number | null;
+    carbs_g_max?: number | null;
+    daily_calorie_target?: number | null;
+    goal_type?: 'lose' | 'maintain' | 'recomp' | 'gain' | null;
+  };
+  const proteinTarget = Number(profileGoals?.protein_g_min ?? 0);
 
   const fiberConsumed = Number(dailyTotals?.fiber ?? 0);
-  const fiberTarget = Number((effectiveProfile as any)?.fiber_g_min ?? 0);
+  const fiberTarget = Number(profileGoals?.fiber_g_min ?? 0);
 
   const carbsConsumed = Number(dailyTotals?.carbs ?? 0);
-  const carbsMax = Number((effectiveProfile as any)?.carbs_g_max ?? 0);
+  const carbsMax = Number(profileGoals?.carbs_g_max ?? 0);
+
+  const calorieConsumed = Number(dailyTotals?.calories ?? 0);
+  const calorieTarget = Number(profileGoals?.daily_calorie_target ?? 0);
+  const goalType = (profileGoals?.goal_type ?? 'maintain') as 'lose' | 'maintain' | 'recomp' | 'gain';
 
   // DEV ONLY: bust caches once so new profile columns show up immediately
   const didInvalidateProfileQueriesRef = useRef(false);
@@ -714,33 +728,42 @@ export default function FoodLogHomeScreen() {
                 titleKey="home.summary.title_other"
                 icon="fork.knife"
                 isLoading={showLoadingSpinner}
-                rightTitle={`${Math.round(Number(dailyTotals?.calories ?? 0))} cal`}
-                style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
+                style={{
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.separator,
+                  paddingHorizontal: 0,
+                  paddingBottom: 2,
+                }}
               />
+
+              <View style={styles.calorieGaugeWrap}>
+                <CalorieCurvyGauge consumed={calorieConsumed} target={calorieTarget} goalType={goalType} />
+              </View>
             
             {(entries.length > 0 || !showLoadingSpinner) && (
               <View style={styles.dailyTotalsContent}>
                 {/* Macro Gauges Row */}
-                <View style={{ marginTop: 6 }}>
+                <View style={styles.macroGaugeRowWrap}>
                   <View
                     style={[
                       { flexDirection: 'row' },
+                      // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
                       Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
                     ]}
                   >
                     {/* Protein */}
                     <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
-                      <MacroGauge label="Protein" value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
+                      <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
                     </View>
 
                     {/* Fiber */}
                     <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
-                      <MacroGauge label="Fiber" value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
+                      <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
                     </View>
 
                     {/* Carbs */}
                     <View style={{ flex: 1 }}>
-                      <MacroGauge label="Carbs" value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                      <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
                     </View>
                   </View>
                 </View>
@@ -1227,6 +1250,14 @@ export default function FoodLogHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  calorieGaugeWrap: {
+    paddingHorizontal: 0, // card already has left/right padding
+    marginTop: -6, // pull gauge closer to header
+    marginBottom: -18, // pull macro gauges up under the curve
+  },
+  macroGaugeRowWrap: {
+    marginTop: -10, // extra tightening (safe on web + native)
   },
   scrollContentContainer: {
     flexGrow: 1,
