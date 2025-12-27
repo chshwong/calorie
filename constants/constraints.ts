@@ -56,7 +56,7 @@ export const PROFILES = {
     SODIUM_SLIDER: { MIN: 500, MAX: 7000 },
     SUGAR_SLIDER: { MIN: 10, MAX: 100 },
   } as const;
-  
+
   // Policy (not shown in DB constraints you pasted) — keep separate and label clearly
   export const POLICY = {
     DOB: { MIN_AGE_YEARS: 13, MAX_AGE_YEARS: 120 },

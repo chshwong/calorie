@@ -18,6 +18,7 @@ import { Colors, Layout, Spacing, FontSize, BorderRadius } from '@/constants/the
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { calculateDailyTotals, groupEntriesByMealType, formatEntriesForDisplay } from '@/utils/dailyTotals';
+import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { useUserConfig } from '@/hooks/use-user-config';
@@ -47,6 +48,7 @@ import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-meta';
 import { MacroGauge } from '@/components/MacroGauge';
 import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
+import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -529,6 +531,42 @@ export default function FoodLogHomeScreen() {
   const calorieTarget = Number(profileGoals?.daily_calorie_target ?? 0);
   const goalType = (profileGoals?.goal_type ?? 'maintain') as 'lose' | 'maintain' | 'recomp' | 'gain';
 
+  // NOTE: profile/dailyTotals typing is behind current DB schema; remove these narrow casts once types are regenerated.
+  const sodiumConsumedMg = Number(
+    (dailyTotals as unknown as { sodium_mg?: number | null })?.sodium_mg ?? dailyTotals?.sodium ?? 0
+  );
+  const sodiumMaxMg = Number((effectiveProfile as unknown as { sodium_mg_max?: number | null })?.sodium_mg_max ?? 0);
+
+  const sugarConsumedG = Number(
+    (dailyTotals as unknown as { sugar_g?: number | null })?.sugar_g ?? dailyTotals?.sugar ?? 0
+  );
+  const sugarMaxG = Number((effectiveProfile as unknown as { sugar_g_max?: number | null })?.sugar_g_max ?? 0);
+
+  const satFatConsumedG = Number(
+    (dailyTotals as unknown as { sat_fat_g?: number | null })?.sat_fat_g ??
+      (dailyTotals as unknown as { sat_fat?: number | null })?.sat_fat ??
+      (dailyTotals as unknown as { saturated_fat?: number | null })?.saturated_fat ??
+      dailyTotals?.saturatedFat ??
+      0
+  );
+  const satFatLimitG = NUTRIENT_LIMITS.satFatG;
+
+  // IMPORTANT: Trans Fat should not be integer-rounded (MiniRingGauge will ceil to nearest 0.1 for display).
+  // Prefer summing from raw entries (may include decimals), then fall back to totals if needed.
+  const transFatConsumedG = useMemo(() => {
+    const raw = entries.reduce((sum, entry) => sum + (entry.trans_fat_g ?? 0), 0);
+    if (Number.isFinite(raw)) return raw;
+
+    return Number(
+      (dailyTotals as unknown as { trans_fat_g?: number | null })?.trans_fat_g ??
+        (dailyTotals as unknown as { trans_fat?: number | null })?.trans_fat ??
+        (dailyTotals as unknown as { transfat?: number | null })?.transfat ??
+        dailyTotals?.transFat ??
+        0
+    );
+  }, [dailyTotals, entries]);
+  const transFatLimitG = NUTRIENT_LIMITS.transFatG;
+
   // DEV ONLY: bust caches once so new profile columns show up immediately
   const didInvalidateProfileQueriesRef = useRef(false);
   useEffect(() => {
@@ -786,7 +824,9 @@ export default function FoodLogHomeScreen() {
                     accessibilityState={{ expanded: summaryExpanded }}
                   >
                     <View style={styles.subFatsHeaderRight}>
-                      <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>{t('home.summary.more_details')}</ThemedText>
+                      <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>
+                        {summaryExpanded ? 'Hide other limits' : 'Other limits'}
+                      </ThemedText>
                       <IconSymbol 
                         name={summaryExpanded ? "chevron.up" : "chevron.down"} 
                         size={16} 
@@ -797,30 +837,48 @@ export default function FoodLogHomeScreen() {
                     </View>
                   </TouchableOpacity>
                   {summaryExpanded && (
-                    <View style={styles.subFatsRow}>
-                      <View style={styles.subFatItem}>
-                        <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.saturated_fat')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
-                          {dailyTotals.saturatedFat}{t('units.g')}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.subFatItem}>
-                        <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.trans_fat')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
-                          {dailyTotals.transFat}{t('units.g')}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.subFatItem}>
-                        <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.sugar')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
-                          {dailyTotals.sugar}{t('units.g')}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.subFatItem}>
-                        <ThemedText style={[styles.subFatLabel, { color: colors.textSecondary }]}>{t('home.summary.sodium')}</ThemedText>
-                        <ThemedText style={[styles.subFatValue, { color: colors.textSecondary }]}>
-                          {dailyTotals.sodium}{t('units.mg')}
-                        </ThemedText>
+                    <View style={styles.miniGaugeSection}>
+                      <View style={styles.miniGaugeRow}>
+                        <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                          <MiniRingGauge
+                            label={t('home.summary.sugar')}
+                            value={sugarConsumedG}
+                            target={sugarMaxG}
+                            unit={t('units.g')}
+                            size="xs"
+                          />
+                        </View>
+
+                        <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                          <MiniRingGauge
+                            label={t('home.summary.sodium')}
+                            value={sodiumConsumedMg}
+                            target={sodiumMaxMg}
+                            unit={t('units.mg')}
+                            size="xs"
+                          />
+                        </View>
+
+                        <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                          <MiniRingGauge
+                            label={t('home.summary.saturated_fat')}
+                            value={satFatConsumedG}
+                            target={satFatLimitG}
+                            unit={t('units.g')}
+                            size="xs"
+                          />
+                        </View>
+
+                        <View style={styles.miniGaugeItem}>
+                          <MiniRingGauge
+                            label={t('home.summary.trans_fat')}
+                            value={transFatConsumedG}
+                            target={transFatLimitG}
+                            unit={t('units.g')}
+                            size="xs"
+                            valueFormat="ceilToTenth"
+                          />
+                        </View>
                       </View>
                     </View>
                   )}
@@ -1492,6 +1550,19 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  miniGaugeSection: {
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  miniGaugeRow: {
+    flexDirection: 'row',
+  },
+  miniGaugeItem: {
+    flex: 1,
+  },
+  miniGaugeItemSpaced: {
+    marginRight: Spacing.sm,
+  },
   dailyTotalsContent: {
     gap: 0,
   },
@@ -1603,9 +1674,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   subFatsTitle: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '600',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   subFatsRow: {
