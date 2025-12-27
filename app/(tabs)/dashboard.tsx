@@ -16,6 +16,7 @@ import { BarChart } from '@/components/charts/bar-chart';
 import { CircularStat } from '@/components/dashboard/circular-stat';
 import { BodyStatsRow } from '@/components/body/body-stats-row';
 import { WaterCard } from '@/components/dashboard/water-card';
+import { AvocadoGauge } from '@/components/gauges/AvocadoGauge';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, DashboardAccents } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -165,6 +166,13 @@ export default function DashboardScreen() {
   // Get user config for avatar
   const { data: userConfig } = useUserConfig();
   const effectiveProfile = userConfig || authProfile;
+
+  // Goal type drives calorie gauge color rules (mirrors Home / CalorieCurvyGauge).
+  const rawGoalType = userConfig?.goal_type;
+  const goalType: 'lose' | 'maintain' | 'recomp' | 'gain' =
+    rawGoalType === 'lose' || rawGoalType === 'maintain' || rawGoalType === 'recomp' || rawGoalType === 'gain'
+      ? rawGoalType
+      : 'maintain';
 
   // Use shared date hook
   const {
@@ -478,15 +486,14 @@ export default function DashboardScreen() {
 
             {/* Calories CircularStat - Remaining */}
             <View style={[styles.caloriesRow, isMobile && styles.caloriesRowMobile]}>
-              <CircularStat
-                value={foodSummary.caloriesTotal}
-                max={foodSummary.caloriesGoal}
-                label=""
-                subtitle={t('dashboard.food.remaining')}
-                accentColor={colors.accentFood}
-                size={isSmallScreen ? "medium" : "large"}
-                mode="remaining"
-                showLabel={false}
+              <AvocadoGauge
+                consumed={Number(foodSummary.caloriesTotal)}
+                target={Number(foodSummary.caloriesGoal)}
+                goalType={goalType}
+                size={isSmallScreen ? 190 : 220}
+                strokeWidth={8}
+                surfaceBg={colors.card}
+                showLabel
               />
               <View style={[styles.caloriesInfo, isMobile && styles.caloriesInfoMobile]}>
                 <View style={styles.caloriesInfoRow}>
