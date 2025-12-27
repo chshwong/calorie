@@ -23,6 +23,7 @@ import {
   type ExerciseLog,
 } from '@/lib/services/exerciseLogs';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+import { toDateKey } from '@/utils/dateKey';
 
 
 
@@ -30,12 +31,15 @@ import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from
 /**
  * Hook to fetch exercise logs for a specific date
  */
-export function useExerciseLogsForDate(dateString: string) {
+export function useExerciseLogsForDate(dateString: string | Date) {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
 
-  const cacheKey = exerciseLogsCacheKey(userId, dateString);
+  // Normalize to canonical date key
+  const dateKey = toDateKey(dateString);
+
+  const cacheKey = exerciseLogsCacheKey(userId, dateKey);
 
   // Persistent snapshot (survives full reloads)
   const snapshot =
@@ -44,13 +48,13 @@ export function useExerciseLogsForDate(dateString: string) {
       : null;
 
   return useQuery<ExerciseLog[]>({
-    queryKey: ['exerciseLogs', userId, dateString],
+    queryKey: ['exerciseLogs', userId, dateKey],
     // DB call + write-through to persistent cache
     queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      const data = await getExerciseLogsForDate(userId, dateString);
+      const data = await getExerciseLogsForDate(userId, dateKey);
 
       if (cacheKey !== null) {
         setPersistentCache(cacheKey, data);
@@ -58,7 +62,7 @@ export function useExerciseLogsForDate(dateString: string) {
 
       return data;
     },
-    enabled: !!userId && !!dateString,
+    enabled: !!userId && !!dateKey,
     staleTime: 60 * 1000, // 60 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
 
@@ -71,7 +75,7 @@ export function useExerciseLogsForDate(dateString: string) {
       const cachedData = queryClient.getQueryData<ExerciseLog[]>([
         'exerciseLogs',
         userId,
-        dateString,
+        dateKey,
       ]);
       if (cachedData !== undefined) {
         return cachedData;

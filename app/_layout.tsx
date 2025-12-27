@@ -21,24 +21,8 @@ import { ToastProvider } from '@/components/ui/app-toast';
 import { DebugOverlay } from '@/components/DebugOverlay';
 import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 
-// Create QueryClient with sensible defaults
-// TEMPORARY: Added logging and reduced refetch to diagnose idle performance issues
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes (temporarily increased from 60s)
-      gcTime: 180 * 24 * 60 * 60 * 1000, // 180 days (temporarily increased from 5min)
-      retry: 1,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false, // TEMPORARY: disable refetch on reconnect
-      refetchOnMount: false, // TEMPORARY: disable refetch on mount
-    },
-    mutations: {
-      onError: (err: any) => console.log('[RQ] mutation error', err),
-      onSuccess: (data: any) => console.log('[RQ] mutation success', data),
-    },
-  },
-});
+// Import QueryClient from separate module to avoid circular dependency with AuthContext
+import { queryClient } from '@/lib/query-client';
 
 // TEMPORARY: Add global query logging via event system
 if (typeof window !== 'undefined') {

@@ -443,12 +443,9 @@ function TabLayoutContent() {
           <Pressable
             style={[
               styles.quickAddOverlay,
-              Platform.OS === 'web' && {
-                pointerEvents: isQuickAddVisible ? 'auto' : 'none' as any,
-              }
+              { pointerEvents: isQuickAddVisible ? 'auto' : 'none' },
             ]}
             onPress={() => setQuickAddVisible(false)}
-            pointerEvents={isQuickAddVisible ? 'auto' : 'none'}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.quickAddSheet}>
@@ -490,12 +487,9 @@ function TabLayoutContent() {
           <Pressable
             style={[
               styles.moreMenuOverlay,
-              Platform.OS === 'web' && {
-                pointerEvents: isMoreMenuVisible ? 'auto' : 'none' as any,
-              }
+              { pointerEvents: isMoreMenuVisible ? 'auto' : 'none' },
             ]}
             onPress={() => setMoreMenuVisible(false)}
-            pointerEvents={isMoreMenuVisible ? 'auto' : 'none'}
           >
             <View style={styles.moreMenuSheet}>
               <View style={styles.moreMenuHandle} />

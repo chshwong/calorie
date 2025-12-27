@@ -13,15 +13,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import type { CalorieEntry } from '@/utils/types';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { toDateKey } from '@/utils/dateKey';
 
 const DAILY_ENTRIES_MAX_AGE_MS = 120 * 24 * 60 * 60 * 1000; // ~180 days
 
-export function useDailyEntries(entryDate: string) {
+export function useDailyEntries(entryDate: string | Date) {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
 
-  const cacheKey = entriesCacheKey(userId, entryDate);
+  // Normalize to canonical date key
+  const dateKey = toDateKey(entryDate);
+
+  const cacheKey = entriesCacheKey(userId, dateKey);
 
   // NEW: read persistent snapshot once when hook is created
   const snapshot =
@@ -30,29 +34,31 @@ export function useDailyEntries(entryDate: string) {
       : null;
 
   return useQuery<CalorieEntry[]>({
-    queryKey: ['entries', userId, entryDate],
+    queryKey: ['entries', userId, dateKey],
     queryFn: async () => {
       const networkStart = performance.now();
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      const data = await getEntriesForDate(userId, entryDate);
+      const data = await getEntriesForDate(userId, dateKey);
 
       if (cacheKey !== null) {
         setPersistentCache(cacheKey, data);
       }
 
       // Only log in development mode for slow fetches (>500ms) to help identify performance issues
-      const fetchTime = performance.now() - networkStart;
-      if (__DEV__ && fetchTime > 500) {
-        console.log(
-          `[useDailyEntries] slow network fetch for ${cacheKey} returned ${data.length} rows in ${Math.round(fetchTime)}ms`
-        );
+      if (process.env.NODE_ENV !== 'production') {
+        const fetchTime = performance.now() - networkStart;
+        if (fetchTime > 500) {
+          console.log(
+            `[useDailyEntries] slow network fetch for ${cacheKey} returned ${data.length} rows in ${Math.round(fetchTime)}ms`
+          );
+        }
       }
 
       return data;
     },
-    enabled: !!userId && !!entryDate,
+    enabled: !!userId && !!dateKey,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
     refetchOnWindowFocus: false,
@@ -68,7 +74,7 @@ export function useDailyEntries(entryDate: string) {
       const cachedData = queryClient.getQueryData<CalorieEntry[]>([
         'entries',
         userId,
-        entryDate,
+        dateKey,
       ]);
       if (cachedData !== undefined) {
         return cachedData;

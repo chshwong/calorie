@@ -59,7 +59,9 @@ export function useUpdateProfile() {
           }
         } catch (error) {
           // Log error but don't fail the profile update
-          console.error('Error syncing today water goal with profile:', error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('Error syncing today water goal with profile:', error);
+          }
         }
       }
 

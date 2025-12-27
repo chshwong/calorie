@@ -75,13 +75,17 @@ export async function getWaterDailyForDateRange(
       .order('date', { ascending: false });
 
     if (error) {
-      console.error('Error fetching water daily logs:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error fetching water daily logs:', error);
+      }
       return [];
     }
 
     return data || [];
   } catch (error) {
-    console.error('Exception fetching water daily logs:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception fetching water daily logs:', error);
+    }
     return [];
   }
 }
@@ -116,13 +120,17 @@ export async function getWaterDailyForDate(
       if (error.code === 'PGRST116') {
         return null;
       }
-      console.error('Error fetching water daily log:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error fetching water daily log:', error);
+      }
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Exception fetching water daily log:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception fetching water daily log:', error);
+    }
     return null;
   }
 }
@@ -173,7 +181,9 @@ export async function addWater(
         .single();
 
       if (error) {
-        console.error('Error updating water daily log:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error updating water daily log:', error);
+        }
         return null;
       }
 
@@ -212,7 +222,9 @@ export async function addWater(
           .single();
 
         if (error) {
-          console.error('Error updating new water daily log:', error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('Error updating new water daily log:', error);
+          }
           return waterDaily; // Return the created record even if update fails
         }
 
@@ -222,7 +234,9 @@ export async function addWater(
       return waterDaily;
     }
   } catch (error) {
-    console.error('Exception adding water:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception adding water:', error);
+    }
     return null;
   }
 }
@@ -285,7 +299,9 @@ export async function setWaterGoal(
       .single();
 
     if (error) {
-      console.error('Error updating water goal:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error updating water goal:', error);
+      }
       return null;
     }
 
@@ -301,13 +317,17 @@ export async function setWaterGoal(
         });
       } catch (profileError) {
         // Log error but don't fail the water goal update
-        console.error('Error updating profile goal:', profileError);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error updating profile goal:', profileError);
+        }
       }
     }
 
     return data;
   } catch (error) {
-    console.error('Exception setting water goal:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception setting water goal:', error);
+    }
     return null;
   }
 }
@@ -364,13 +384,17 @@ export async function getOrCreateWaterDailyForDate(
       .single();
 
     if (error) {
-      console.error('Error creating water daily log:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error creating water daily log:', error);
+      }
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Exception getting or creating water daily:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception getting or creating water daily:', error);
+    }
     return null;
   }
 }
@@ -434,7 +458,9 @@ export async function syncTodayWaterWithProfile(
         .single();
 
       if (error) {
-        console.error('Error syncing today water with profile:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error syncing today water with profile:', error);
+        }
         return null;
       }
 
@@ -457,14 +483,18 @@ export async function syncTodayWaterWithProfile(
         .single();
 
       if (error) {
-        console.error('Error creating today water daily with synced settings:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error creating today water daily with synced settings:', error);
+        }
         return null;
       }
 
       return data;
     }
   } catch (error) {
-    console.error('Exception syncing today water with profile:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception syncing today water with profile:', error);
+    }
     return null;
   }
 }
@@ -509,7 +539,9 @@ export async function updateWaterUnitAndGoal(
     // Sync today's water_daily with profile
     return await syncTodayWaterWithProfile(userId);
   } catch (error) {
-    console.error('Exception updating water unit and goal:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception updating water unit and goal:', error);
+    }
     throw error;
   }
 }
@@ -561,13 +593,17 @@ export async function updateWaterTotal(
       .single();
 
     if (error) {
-      console.error('Error updating water total:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error updating water total:', error);
+      }
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Exception updating water total:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Exception updating water total:', error);
+    }
     return null;
   }
 }

@@ -198,7 +198,9 @@ export function WebBarcodeScanner({
         let timeoutFired = false;
         const timeoutPromise = new Promise((_, reject) => {
           startTimeoutRef.current = setTimeout(() => {
-            console.error('[WebBarcodeScanner] Camera start timeout after 8 seconds');
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('[WebBarcodeScanner] Camera start timeout after 8 seconds');
+            }
             timeoutFired = true;
             reject(new Error('Camera start timed out after 8 seconds'));
           }, 8000); // 8 second timeout
@@ -207,7 +209,9 @@ export function WebBarcodeScanner({
         // Also set a direct timeout as backup to FORCE update UI after 8 seconds
         // This will work even if Promise.race fails or hangs
         uiTimeoutRef.current = setTimeout(() => {
-          console.error('[WebBarcodeScanner] FORCE timeout - directly updating UI after 8 seconds');
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('[WebBarcodeScanner] FORCE timeout - directly updating UI after 8 seconds');
+          }
           // Force update state directly - this bypasses any promise issues
           const timeoutError = 'Camera start timed out. Please try again or use file upload.';
           setError(t('mealtype_log.scanner.camera_timeout', timeoutError));
@@ -228,7 +232,9 @@ export function WebBarcodeScanner({
         }, 8000);
         
         try {
-          console.log('[WebBarcodeScanner] Starting camera with 8 second timeout...');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[WebBarcodeScanner] Starting camera with 8 second timeout...');
+          }
           // Race between camera start and timeout
           await Promise.race([startCamera(), timeoutPromise]);
           
@@ -242,7 +248,9 @@ export function WebBarcodeScanner({
             uiTimeoutRef.current = null;
           }
           
-          console.log('[WebBarcodeScanner] Camera started successfully');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[WebBarcodeScanner] Camera started successfully');
+          }
           setIsScanning(true);
           setIsInitializing(false);
           onPermissionGranted?.();
@@ -257,11 +265,15 @@ export function WebBarcodeScanner({
             uiTimeoutRef.current = null;
           }
           
-          console.error('[WebBarcodeScanner] Camera start error:', startError);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('[WebBarcodeScanner] Camera start error:', startError);
+          }
           
           // Check if it's a timeout error
           if (startError?.message?.includes('timed out') || timeoutFired) {
-            console.error('[WebBarcodeScanner] Camera start timeout detected');
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('[WebBarcodeScanner] Camera start timeout detected');
+            }
             // Try to clean up the scanner
             if (scannerRef.current) {
               try {

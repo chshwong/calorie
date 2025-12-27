@@ -9,51 +9,57 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMealtypeMetaByDate, type MealtypeMeta } from '@/lib/services/calories-entries-mealtype-meta';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+import { toDateKey } from '@/utils/dateKey';
 
 export interface MealtypeMetaByMealType {
   [mealType: string]: MealtypeMeta | null;
 }
 
-export function useMealtypeMeta(entryDate: string) {
+export function useMealtypeMeta(entryDate: string | Date) {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
 
-  const cacheKey = userId ? `mealtypeMeta:${userId}:${entryDate}` : null;
+  // Normalize to canonical date key
+  const dateKey = toDateKey(entryDate);
+
+  const cacheKey = userId ? `mealtypeMeta:${userId}:${dateKey}` : null;
   const snapshot =
     cacheKey !== null
       ? getPersistentCache<MealtypeMeta[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
       : null;
 
   const { data: metaArray = [], isLoading, isFetching, refetch } = useQuery<MealtypeMeta[]>({
-    queryKey: ['mealtypeMeta', userId, entryDate],
+    queryKey: ['mealtypeMeta', userId, dateKey],
     queryFn: () => {
       const networkStart = performance.now();
-      if (!userId || !entryDate) {
+      if (!userId || !dateKey) {
         return [];
       }
-      return getMealtypeMetaByDate(userId, entryDate).then((result) => {
+      return getMealtypeMetaByDate(userId, dateKey).then((result) => {
         if (cacheKey) {
           setPersistentCache(cacheKey, result);
         }
         // Only log in development mode for slow fetches (>500ms) to help identify performance issues
-        const fetchTime = performance.now() - networkStart;
-        if (__DEV__ && fetchTime > 500) {
-          console.log(
-            `[useMealtypeMeta] slow network fetch for ${cacheKey} returned ${result.length} rows in ${Math.round(fetchTime)}ms`
-          );
+        if (process.env.NODE_ENV !== 'production') {
+          const fetchTime = performance.now() - networkStart;
+          if (fetchTime > 500) {
+            console.log(
+              `[useMealtypeMeta] slow network fetch for ${cacheKey} returned ${result.length} rows in ${Math.round(fetchTime)}ms`
+            );
+          }
         }
         return result;
       });
     },
-    enabled: !!userId && !!entryDate,
+    enabled: !!userId && !!dateKey,
     staleTime: 10 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     placeholderData: (previous) => {
       if (previous !== undefined) return previous;
-      const cached = queryClient.getQueryData<MealtypeMeta[]>(['mealtypeMeta', userId, entryDate]);
+      const cached = queryClient.getQueryData<MealtypeMeta[]>(['mealtypeMeta', userId, dateKey]);
       if (cached) return cached;
       return snapshot ?? undefined;
     },

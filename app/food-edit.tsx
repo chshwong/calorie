@@ -70,7 +70,9 @@ export default function FoodEditScreen() {
     try {
       return JSON.parse(entryPayloadParam) as CalorieEntry;
     } catch (error) {
-      console.warn('Failed to parse entry payload for food-edit:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Failed to parse entry payload for food-edit:', error);
+      }
       return null;
     }
   }, [entryPayloadParam]);

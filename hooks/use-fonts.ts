@@ -85,10 +85,12 @@ export function useAppFonts() {
         event.filename?.includes('fontfaceobserver');
 
       if (isFontTimeoutError) {
-        console.warn(
-          '[Fonts] Web font failed to load within timeout (global handler), falling back to system fonts.',
-          event.error || event.message
-        );
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            '[Fonts] Web font failed to load within timeout (global handler), falling back to system fonts.',
+            event.error || event.message
+          );
+        }
         if (isMounted && !fontsResolved) {
           fontsResolved = true;
           if (timeoutId) {
@@ -114,10 +116,12 @@ export function useAppFonts() {
         String(error).includes('6000ms');
 
       if (isFontTimeoutError) {
-        console.warn(
-          '[Fonts] Font loading promise rejected (global handler), falling back to system fonts.',
-          error
-        );
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            '[Fonts] Font loading promise rejected (global handler), falling back to system fonts.',
+            error
+          );
+        }
         if (isMounted && !fontsResolved) {
           fontsResolved = true;
           if (timeoutId) {
@@ -142,9 +146,11 @@ export function useAppFonts() {
         timeoutId = setTimeout(() => {
           if (isMounted && !fontsResolved) {
             fontsResolved = true;
-            console.warn(
-              '[Fonts] Font loading timeout reached (5s), continuing with system fonts.'
-            );
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn(
+                '[Fonts] Font loading timeout reached (5s), continuing with system fonts.'
+              );
+            }
             setFontsLoaded(true);
             setFontError(null);
           }
@@ -170,10 +176,12 @@ export function useAppFonts() {
           }
         } catch (err) {
           // IMPORTANT: Do NOT rethrow the error. Just log and continue.
-          console.warn(
-            '[Fonts] Web fonts failed to load or timed out. Falling back to system fonts.',
-            err
-          );
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(
+              '[Fonts] Web fonts failed to load or timed out. Falling back to system fonts.',
+              err
+            );
+          }
           
           if (isMounted && !fontsResolved) {
             fontsResolved = true;
@@ -189,10 +197,12 @@ export function useAppFonts() {
         }
       } catch (err) {
         // Catch any unexpected errors in the outer try block
-        console.warn(
-          '[Fonts] Unexpected error during font loading. Falling back to system fonts.',
-          err
-        );
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            '[Fonts] Unexpected error during font loading. Falling back to system fonts.',
+            err
+          );
+        }
         if (isMounted && !fontsResolved) {
           fontsResolved = true;
           if (timeoutId) {

@@ -110,7 +110,9 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
         if (isMobile) {
           // On mobile, still try camera - some mobile browsers allow camera on local IPs
           // The camera component will handle the actual error if it fails
-          console.log('[BarcodeScannerMode] Not secure context on mobile, but will try camera anyway');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[BarcodeScannerMode] Not secure context on mobile, but will try camera anyway');
+          }
           setMode('camera');
           setCameraAvailable(true);
           setIsChecking(false);
@@ -148,12 +150,16 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
             
             // Log permission state but don't act on it - always try camera
             if (permissionStatus?.state === 'denied') {
-              console.log('[BarcodeScannerMode] Camera permission denied, but will still try camera on mobile');
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[BarcodeScannerMode] Camera permission denied, but will still try camera on mobile');
+              }
             }
           }
         } catch (permErr) {
           // Permission query not supported or failed - that's okay, try camera anyway
-          console.log('[BarcodeScannerMode] Could not check permission, will try camera on mobile');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[BarcodeScannerMode] Could not check permission, will try camera on mobile');
+          }
         }
         
         // CRITICAL: On mobile, ALWAYS set to camera mode - never file-upload
@@ -177,7 +183,9 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
         }
       } catch (enumErr) {
         // enumerateDevices might fail without permission - that's okay, try camera anyway
-        console.log('[BarcodeScannerMode] Could not enumerate devices, will try camera anyway');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[BarcodeScannerMode] Could not enumerate devices, will try camera anyway');
+        }
       }
 
       // Check permission status if the API is available
@@ -212,7 +220,9 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
       setIsChecking(false);
 
     } catch (err: any) {
-      console.error('[BarcodeScannerMode] Error checking camera:', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[BarcodeScannerMode] Error checking camera:', err);
+      }
       // On error, default to camera mode and let the camera component handle the error
       // This is better UX - try camera first, fallback to file upload only if camera actually fails
       setError(err?.message || 'Failed to check camera availability');
@@ -232,7 +242,9 @@ export function useBarcodeScannerMode(): BarcodeScannerModeResult {
         // On mobile, run a quick check but don't let it change mode to file-upload
         checkCameraAvailability().catch(() => {
           // Even if check fails, keep camera mode on mobile
-          console.log('[BarcodeScannerMode] Check failed on mobile, keeping camera mode');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[BarcodeScannerMode] Check failed on mobile, keeping camera mode');
+          }
         });
       } else {
         // On desktop, run full check

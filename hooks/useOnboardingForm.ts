@@ -1271,8 +1271,10 @@ export function useOnboardingForm() {
         // (Error, string, object, etc.) and we need to check error.message safely
         if (error.message === 'TIMEOUT') {
           // Timeout occurred - show retry option
-          const mutationTime = performance.now() - mutationStart;
-          console.warn(`[handleCompleteOnboarding] Final mutation timeout after ${mutationTime.toFixed(2)}ms`);
+          if (process.env.NODE_ENV !== 'production') {
+            const mutationTime = performance.now() - mutationStart;
+            console.warn(`[handleCompleteOnboarding] Final mutation timeout after ${mutationTime.toFixed(2)}ms`);
+          }
           setErrorText(t('onboarding.error_network_waking'));
           setLoading(false);
           return; // Allow user to retry by clicking Next again

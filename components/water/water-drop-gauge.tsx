@@ -197,8 +197,10 @@ function WaterDropGaugeComponent({
           width={config.width}
           height={config.height}
           viewBox={DROPLET_VIEWBOX}
-          style={styles.svg}
-          {...(Platform.OS === 'web' && { pointerEvents: 'none' })}
+          style={[
+            styles.svg,
+            Platform.OS === 'web' && { pointerEvents: 'none' },
+          ]}
         >
           <Defs>
             {/* ClipPath for droplet shape - uses exact same DROPLET_PATH as outline */}

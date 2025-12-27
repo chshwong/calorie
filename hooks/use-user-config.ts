@@ -22,6 +22,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserConfig, type UserConfig } from '@/lib/services/userConfig';
+import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
 
 /**
  * Query key factory for userConfig
@@ -31,18 +32,16 @@ export function userConfigQueryKey(userId: string | null): readonly ['userConfig
 }
 
 /**
- * Prefetch user config (call this when auth is ready)
+ * @deprecated Use prefetchUserConfig from '@/lib/prefetch-user-config' instead
+ * This export is kept for backwards compatibility but will be removed
  */
 export function prefetchUserConfig(
   queryClient: ReturnType<typeof useQueryClient>,
   userId: string
 ): Promise<void> {
-  return queryClient.prefetchQuery({
-    queryKey: userConfigQueryKey(userId),
-    queryFn: () => getUserConfig(userId),
-    staleTime: 24 * 60 * 60 * 1000, // 24 hours
-    gcTime: 180 * 24 * 60 * 60 * 1000, // 180 days
-  });
+  // Re-export from the separate module to avoid circular dependency
+  const { prefetchUserConfig: prefetch } = require('@/lib/prefetch-user-config');
+  return prefetch(queryClient, userId);
 }
 
 /**
@@ -62,12 +61,27 @@ export function useUserConfig() {
   const userId = user?.id ?? null;
   const queryClient = useQueryClient();
 
+  const cacheKey = userConfigCacheKey(userId);
+
+  // Persistent snapshot (survives full reloads)
+  const snapshot =
+    cacheKey !== null
+      ? getPersistentCache<UserConfig | null>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      : null;
+
   return useQuery({
     queryKey: userConfigQueryKey(userId),
     enabled: !!userId,
     queryFn: async () => {
       if (!userId) throw new Error('User not authenticated');
-      return getUserConfig(userId);
+      const data = await getUserConfig(userId);
+
+      // Write to persistent cache on success
+      if (cacheKey !== null) {
+        setPersistentCache(cacheKey, data);
+      }
+
+      return data;
     },
     staleTime: 24 * 60 * 60 * 1000, // 24 hours - prevents immediate refetch on every mount
     gcTime: 180 * 24 * 60 * 60 * 1000, // 180 days - ensures persistent cache
@@ -76,11 +90,20 @@ export function useUserConfig() {
     refetchOnReconnect: false,
     refetchOnMount: false, // Don't refetch if cached data exists
 
-    // Show cached data instantly
+    // Priority: previousData → in-memory cache → persistent snapshot
     placeholderData: (previousData) => {
       if (previousData !== undefined) return previousData;
-      return queryClient.getQueryData<UserConfig | null>(userConfigQueryKey(userId));
+
+      const cachedData = queryClient.getQueryData<UserConfig | null>(userConfigQueryKey(userId));
+      if (cachedData !== undefined) return cachedData;
+
+      return snapshot ?? undefined;
     },
   });
+}
+
+function userConfigCacheKey(userId: string | null): string | null {
+  if (!userId) return null;
+  return `userConfig:${userId}`;
 }
 

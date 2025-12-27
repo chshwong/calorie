@@ -284,8 +284,8 @@ export default function ExternalCacheFoodPromotionPage() {
             throw new Error(`Failed to delete row ${row.id.substring(0, 8)}...: ${deleteError.message || deleteError.code || 'Unknown error'}`);
           }
           
-          // Log successful deletion (in development)
-          if (__DEV__ && deleteData && deleteData.length > 0) {
+          // Log successful deletion (in development only)
+          if (process.env.NODE_ENV !== 'production' && deleteData && deleteData.length > 0) {
             console.log('Successfully deleted row:', row.id);
           }
         }

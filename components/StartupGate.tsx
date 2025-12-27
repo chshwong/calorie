@@ -15,13 +15,13 @@
  * - Guaranteed maxDuration fallback (10s): never hangs forever
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
+import LoadingScreen from '@/app/(minimal)/loading-screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig, userConfigQueryKey } from '@/hooks/use-user-config';
 import type { UserConfig } from '@/lib/services/userConfig';
-import LoadingScreen from '@/app/(minimal)/loading-screen';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Navigation timing constants
 // Note: MAX_DURATION_MS is a guaranteed safety fallback. Do not remove.
@@ -80,16 +80,12 @@ export default function StartupGate() {
       userConfigQueryKey(user.id)
     );
     
-    if (cachedConfig !== undefined) {
-      const value = cachedConfig?.onboarding_complete;
-      return typeof value === 'boolean' ? value : null;
-    }
+    const cachedVal = cachedConfig?.onboarding_complete;
+    if (typeof cachedVal === 'boolean') return cachedVal;
     
     // Second try: use network data if available (may still be loading)
-    if (userConfig !== undefined) {
-      const value = userConfig?.onboarding_complete;
-      return typeof value === 'boolean' ? value : null;
-    }
+    const netVal = userConfig?.onboarding_complete;
+    if (typeof netVal === 'boolean') return netVal;
     
     // Unknown: cache miss and network not ready
     return null;
@@ -139,19 +135,7 @@ export default function StartupGate() {
     setHasNavigated(true);
   };
 
-  // STEP 6 — Minimal production console diagnostics (TEMP): once per mount
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'production') {
-      // One log per mount to debug startup hangs in production environments (e.g. Vercel)
-      console.log('[StartupGate] mount', {
-        authReady: latestRef.current.authReady,
-        hasSession: latestRef.current.hasSession,
-        userId: latestRef.current.userId,
-        onboarding_complete: latestRef.current.onboardingComplete,
-        pathname: latestRef.current.pathname,
-      });
-    }
-  }, []);
+  // Removed production console diagnostics - no logs in production
 
   // Keep latest values updated for logging + timeout routing decisions
   useEffect(() => {
@@ -173,15 +157,7 @@ export default function StartupGate() {
 
       const snap = latestRef.current;
 
-      if (process.env.NODE_ENV === 'production') {
-        console.log('[StartupGate] maxDuration timeout', {
-          authReady: snap.authReady,
-          hasSession: snap.hasSession,
-          userId: snap.userId,
-          onboarding_complete: snap.onboardingComplete,
-          pathname: snap.pathname,
-        });
-      }
+      // Removed production console diagnostics - no logs in production
 
       // On timeout, ALWAYS route somewhere safe:
       // - If auth not ready => "/login"

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useLocalSearchParams } from 'expo-router';
+import { toDateKey, getTodayKey } from '@/utils/dateKey';
 
 /**
  * Hook for managing selected date - always derived from URL params
@@ -32,12 +33,9 @@ export function useSelectedDate() {
     return new Date(today);
   }, [dateParam, today]);
   
-  // Format selected date as YYYY-MM-DD for SQL query
+  // Format selected date as YYYY-MM-DD using canonical dateKey utility
   const selectedDateString = useMemo(() => {
-    const year = selectedDate.getFullYear();
-    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-    const day = String(selectedDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return toDateKey(selectedDate);
   }, [selectedDate]);
   
   // Check if selected date is from current year

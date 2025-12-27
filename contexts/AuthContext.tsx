@@ -5,8 +5,8 @@ import { Platform } from 'react-native';
 import { setLanguage, isLanguageSupported } from '@/i18n';
 import { ensureProfileExists } from '@/lib/services/profileService';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
-import { queryClient } from '@/app/_layout';
-import { prefetchUserConfig } from '@/hooks/use-user-config';
+import { queryClient } from '@/lib/query-client';
+import { prefetchUserConfig } from '@/lib/prefetch-user-config';
 
 const PROFILE_CACHE_KEY = 'profile';
 const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -189,7 +189,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
         // 3) Prefetch userConfig immediately (for instant availability in Home/Settings)
         prefetchUserConfig(queryClient, session.user.id).catch((err) => {
-          console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+          }
         });
   
         // 4) Load profile from Supabase in the background – do NOT block global loading
@@ -200,7 +202,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     }).catch((error) => {
-      console.error('[AuthProvider] Error getting initial session:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[AuthProvider] Error getting initial session:', error);
+      }
       if (mountedRef.current) {
         setSession(null);
         setUser(null);
@@ -276,7 +280,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileFetchRetryCount.current = 0;
         // Prefetch userConfig immediately (for instant availability in Home/Settings)
         prefetchUserConfig(queryClient, session.user.id).catch((err) => {
-          console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+          }
         });
         await fetchProfile(session.user.id, true);
       } else {

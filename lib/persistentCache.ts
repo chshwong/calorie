@@ -52,7 +52,9 @@ export function setPersistentCache<T>(key: string, data: T) {
 
     storage.setItem(buildKey(key), JSON.stringify(entry));
   } catch (e) {
-    console.warn('[persistentCache] set failed for key', key, e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[persistentCache] set failed for key', key, e);
+    }
   }
 }
 
@@ -64,10 +66,14 @@ export function setPersistentCache<T>(key: string, data: T) {
 export function getPersistentCache<T>(key: string, maxAgeMs?: number): T | null {
   try {
     const storage = getStorage();
-    if (!storage) return null;
+    if (!storage) {
+      return null;
+    }
 
     const raw = storage.getItem(buildKey(key));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
 
     const entry = JSON.parse(raw) as CacheEntry<T>;
     if (maxAgeMs && Date.now() - entry.savedAt > maxAgeMs) {
@@ -76,7 +82,9 @@ export function getPersistentCache<T>(key: string, maxAgeMs?: number): T | null 
 
     return entry.data;
   } catch (e) {
-    console.warn('[persistentCache] get failed for key', key, e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[persistentCache] get failed for key', key, e);
+    }
     return null;
   }
 }
@@ -90,7 +98,9 @@ export function removePersistentCache(key: string) {
     if (!storage) return;
     storage.removeItem(buildKey(key));
   } catch (e) {
-    console.warn('[persistentCache] remove failed for key', key, e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[persistentCache] remove failed for key', key, e);
+    }
   }
 }
 

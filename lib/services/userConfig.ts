@@ -110,7 +110,9 @@ export async function getUserConfig(userId: string): Promise<UserConfig | null> 
       const { data: { user } } = await supabase.auth.getUser();
       email = user?.email ?? null;
     } catch (authError) {
-      console.warn('Could not fetch email from auth:', authError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Could not fetch email from auth:', authError);
+      }
       // Continue without email - profile data is still valid
     }
 

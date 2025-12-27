@@ -22,7 +22,7 @@ import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
-import { getLocalDateKey } from '@/utils/dateTime';
+import { toDateKey, addDays } from '@/utils/dateKey';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
@@ -283,16 +283,17 @@ export default function FoodLogHomeScreen() {
 
   // Helper function to navigate with new date (updates URL param)
   const navigateWithDate = useCallback(
-    (date: Date) => {
-      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      prefetchDateData(dateString);
+    (date: Date | string) => {
+      const dateKey = toDateKey(date);
+      prefetchDateData(dateKey);
       router.replace({
         pathname: '/',
-        params: { date: dateString }
+        params: { date: dateKey }
       });
     },
     [prefetchDateData, router]
   );
+
 
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
 
@@ -315,6 +316,61 @@ export default function FoodLogHomeScreen() {
   
   // Get effective profile (from useUserConfig hook or AuthContext fallback)
   const effectiveProfile = cachedUserConfig ?? authProfile;
+
+  // Prefetch adjacent dates for instant navigation
+  useEffect(() => {
+    if (!user?.id || !selectedDateString) return;
+
+    // Calculate previous and next dates using canonical dateKey utility
+    const prevDateKey = addDays(selectedDateString, -1);
+    const nextDateKey = addDays(selectedDateString, 1);
+
+    // Prefetch previous day
+    const prevEntriesKey = ['entries', user.id, prevDateKey];
+    if (!queryClient.getQueryData(prevEntriesKey)) {
+      // Silently prefetch (removed verbose logging)
+      queryClient.prefetchQuery({
+        queryKey: prevEntriesKey,
+        queryFn: () => getEntriesForDate(user.id, prevDateKey),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 24 * 60 * 60 * 1000,
+      });
+    }
+
+    const prevMetaKey = ['mealtypeMeta', user.id, prevDateKey];
+    if (!queryClient.getQueryData(prevMetaKey)) {
+      queryClient.prefetchQuery({
+        queryKey: prevMetaKey,
+        queryFn: () => getMealtypeMetaByDate(user.id, prevDateKey),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 24 * 60 * 60 * 1000,
+      });
+    }
+
+    // Prefetch next day (only if not today)
+    if (!isToday) {
+      const nextEntriesKey = ['entries', user.id, nextDateKey];
+      if (!queryClient.getQueryData(nextEntriesKey)) {
+        // Silently prefetch (removed verbose logging)
+        queryClient.prefetchQuery({
+          queryKey: nextEntriesKey,
+          queryFn: () => getEntriesForDate(user.id, nextDateKey),
+          staleTime: 10 * 60 * 1000,
+          gcTime: 24 * 60 * 60 * 1000,
+        });
+      }
+
+      const nextMetaKey = ['mealtypeMeta', user.id, nextDateKey];
+      if (!queryClient.getQueryData(nextMetaKey)) {
+        queryClient.prefetchQuery({
+          queryKey: nextMetaKey,
+          queryFn: () => getMealtypeMetaByDate(user.id, nextDateKey),
+          staleTime: 10 * 60 * 1000,
+          gcTime: 24 * 60 * 60 * 1000,
+        });
+      }
+    }
+  }, [user?.id, selectedDateString, isToday, queryClient]);
 
   // Background prefetch for mealtype-log tab data (after Home data is ready)
   // Use default meal type 'late_night' (same as mealtype-log default)
@@ -624,15 +680,13 @@ export default function FoodLogHomeScreen() {
           />
         }
         goBackOneDay={() => {
-          const newDate = new Date(selectedDate);
-          newDate.setDate(newDate.getDate() - 1);
-          navigateWithDate(newDate);
+          const prevDateKey = addDays(selectedDateString, -1);
+          navigateWithDate(prevDateKey);
         }}
         goForwardOneDay={() => {
           if (!isToday) {
-            const newDate = new Date(selectedDate);
-            newDate.setDate(newDate.getDate() + 1);
-            navigateWithDate(newDate);
+            const nextDateKey = addDays(selectedDateString, 1);
+            navigateWithDate(nextDateKey);
           }
         }}
         isToday={isToday}

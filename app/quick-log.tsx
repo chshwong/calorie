@@ -51,7 +51,9 @@ export default function QuickLogScreen() {
     try {
       return JSON.parse(entryPayloadParam) as CalorieEntry;
     } catch (error) {
-      console.warn('Failed to parse entry payload for quick-log:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Failed to parse entry payload for quick-log:', error);
+      }
       return null;
     }
   }, [entryPayloadParam]);

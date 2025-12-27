@@ -208,13 +208,13 @@ export const TabBar: React.FC<TabBarProps> = ({
       {/* single global elastic underline - always render if we have any layouts */}
       {Object.keys(layouts).length > 0 && (
         <Animated.View
-          pointerEvents="none"
           style={[
             styles.underline,
             {
               transform: [{ translateX }],
               width: underlineWidth,
               backgroundColor: finalUnderlineColor,
+              pointerEvents: 'none',
             },
           ]}
         />

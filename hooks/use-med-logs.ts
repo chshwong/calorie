@@ -21,17 +21,21 @@ import {
   type MedLog,
 } from '@/lib/services/medLogs';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+import { toDateKey } from '@/utils/dateKey';
 
 
 /**
  * Hook to fetch med logs for a specific date
  */
-export function useMedLogsForDate(dateString: string) {
+export function useMedLogsForDate(dateString: string | Date) {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
 
-  const cacheKey = medLogsCacheKey(userId, dateString);
+  // Normalize to canonical date key
+  const dateKey = toDateKey(dateString);
+
+  const cacheKey = medLogsCacheKey(userId, dateKey);
 
   // Persistent snapshot (survives full reloads)
   const snapshot =
@@ -40,13 +44,13 @@ export function useMedLogsForDate(dateString: string) {
       : null;
 
   return useQuery<MedLog[]>({
-    queryKey: ['medLogs', userId, dateString],
+    queryKey: ['medLogs', userId, dateKey],
     // DB call + write-through to persistent cache
     queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      const data = await getMedLogsForDate(userId, dateString);
+      const data = await getMedLogsForDate(userId, dateKey);
 
       if (cacheKey !== null) {
         setPersistentCache(cacheKey, data);
@@ -54,7 +58,7 @@ export function useMedLogsForDate(dateString: string) {
 
       return data;
     },
-    enabled: !!userId && !!dateString,
+    enabled: !!userId && !!dateKey,
     staleTime: 60 * 1000, // 60 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
 
@@ -67,7 +71,7 @@ export function useMedLogsForDate(dateString: string) {
       const cachedData = queryClient.getQueryData<MedLog[]>([
         'medLogs',
         userId,
-        dateString,
+        dateKey,
       ]);
       if (cachedData !== undefined) {
         return cachedData;
