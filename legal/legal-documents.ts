@@ -151,3 +151,4 @@ export function getLocalActiveLegalDocuments(): LegalDocument[] {
   return LOCAL_LEGAL_DOCUMENTS.filter((doc) => doc.isActive);
 }
 
+

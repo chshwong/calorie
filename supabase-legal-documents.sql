@@ -26,3 +26,4 @@ create table if not exists public.user_legal_acceptances (
 create index if not exists user_legal_acceptances_user_doc_idx
   on public.user_legal_acceptances (user_id, doc_type);
 
+
