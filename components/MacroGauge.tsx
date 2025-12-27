@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Line, Circle, Text as SvgText, Polygon, G } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import React, { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
 
 type MacroGaugeProps = {
   label: string;
@@ -30,11 +30,12 @@ const arcPath = (
   cy: number,
   r: number,
   start: number,
-  end: number
+  end: number,
+  sweepFlag: 0 | 1
 ) => {
   const s = polar(cx, cy, r, start);
   const e = polar(cx, cy, r, end);
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`;
+  return `M ${s.x} ${s.y} A ${r} ${r} 0 0 ${sweepFlag} ${e.x} ${e.y}`;
 };
 
 export function MacroGauge({
@@ -67,6 +68,21 @@ export function MacroGauge({
 
   const angle = 180 - 180 * pct;
 
+  const aNow = angle; // current needle angle (180 -> 0)
+
+  // Convert % of TARGET to an angle on the gauge.
+  const angleForPctOfTarget = (pctTarget: number) => {
+    // target is at 75% of gauge
+    const pctGauge = clamp(pctTarget * 0.75, 0, 1);
+    return 180 - 180 * pctGauge;
+  };
+
+  // Carbs zones expressed as angles on the gauge
+  const a85 = angleForPctOfTarget(0.85);
+  const a99 = angleForPctOfTarget(0.99);
+  const a100 = angleForPctOfTarget(1.0);
+  const a105 = angleForPctOfTarget(1.05);
+
   const isSm = size === 'sm';
 
   // SVG scales to parent width; keep a stable aspect ratio via viewBox
@@ -79,9 +95,13 @@ export function MacroGauge({
   const cy = vbH - (isSm ? 10 : 18);
   const r = isSm ? 46 : 100;
 
-  const fullArc = arcPath(cx, cy, r, 180, 0);
-  const filledArc =
-    pct > 0 ? arcPath(cx, cy, r, 180, angle) : null;
+  const fullArc = arcPath(cx, cy, r, 180, 0, 1);
+  const filledArc = useMemo(() => {
+    if (pct <= 0) return null;
+    // min-mode only: fill from left (180) -> needle angle along the TOP arc
+    if (mode !== 'max') return arcPath(cx, cy, r, 180, angle, 1);
+    return null; // max-mode uses spectrum zones, not filledArc
+  }, [pct, mode, cx, cy, r, angle]);
 
   // Needle should touch the inner edge of the arc stroke
   const needleLen = r - stroke / 2;
@@ -101,7 +121,14 @@ export function MacroGauge({
   const GREEN = '#2ECC71';
   const RED = '#FF3B30';
 
-  const markerColor = mode === 'max' ? RED : GREEN;
+  // For carbs only:
+  // - dark mode: keep the dark mask you like
+  // - light mode: opaque light-mode mask
+  const consumedMaskColor = isDark
+    ? 'rgba(60,60,60,0.92)'          // keep dark mode exactly
+    : 'rgba(180,180,180,1)';         // opaque light-mode mask
+
+  const markerColor = mode === 'max' ? PINK : GREEN;
 
   let filledColor = ORANGE;
 
@@ -128,17 +155,19 @@ export function MacroGauge({
   return (
     <View style={styles.container}>
       <Svg width="100%" height={isSm ? 78 : 140} viewBox={`0 0 ${vbW} ${vbH}`}>
-        {/* Grey track */}
-        <Path
-          d={fullArc}
-          stroke={trackColor}
-          strokeWidth={stroke}
-          fill="none"
-          strokeLinecap="round"
-        />
+        {/* Grey track (min mode only; max mode draws its own grey base track) */}
+        {mode !== 'max' && (
+          <Path
+            d={fullArc}
+            stroke={trackColor}
+            strokeWidth={stroke}
+            fill="none"
+            strokeLinecap="round"
+          />
+        )}
 
-        {/* Filled portion */}
-        {filledArc && (
+        {/* Filled portion - min mode only */}
+        {mode !== 'max' && filledArc && (
           <Path
             d={filledArc}
             stroke={filledColor}
@@ -148,16 +177,103 @@ export function MacroGauge({
           />
         )}
 
+        {/* Carbs: static zone track + grey consumed overlay */}
+        {mode === 'max' && (
+          <>
+            {/* 1) STATIC colored track (zones) on TOP arc */}
+            {(() => {
+              // Convert % of TARGET to gauge angle:
+              // target is at 75% of gauge => pctGauge = pctTarget * 0.75
+              const ang = (pctTarget: number) => {
+                const pctGauge = clamp(pctTarget * 0.75, 0, 1);
+                return 180 - 180 * pctGauge;
+              };
+
+              // Your requested zones on GAUGE:
+              // Green: first 85% of the 75% target range => 0..0.85 target
+              // Orange: 0.85..1.05 target
+              // Red: >1.05 target (rest of gauge)
+              const aGreenEnd = ang(0.85);
+              const aOrangeEnd = ang(1.05);
+
+              return (
+                <>
+                  {/* Green zone: 0 -> 85% target */}
+                  <Path
+                    d={arcPath(cx, cy, r, 180, aGreenEnd, 1)}
+                    stroke={GREEN}
+                    strokeWidth={stroke}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+
+                  {/* Orange zone: 85% -> 105% target */}
+                  <Path
+                    d={arcPath(cx, cy, r, aGreenEnd, aOrangeEnd, 1)}
+                    stroke={ORANGE}
+                    strokeWidth={stroke}
+                    fill="none"
+                    strokeLinecap="butt"
+                  />
+
+                  {/* Red zone: beyond 105% target -> end of gauge */}
+                  <Path
+                    d={arcPath(cx, cy, r, aOrangeEnd, 0, 1)}
+                    stroke={RED}
+                    strokeWidth={stroke}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                </>
+              );
+            })()}
+
+            {/* Grey-out CONSUMED portion (left of needle): 180° -> needle, forced on top arc */}
+            {pct > 0 && (
+              <Path
+                // Start a hair past 180 to cover the rounded cap at the far left
+                d={arcPath(
+                  cx,
+                  cy,
+                  r,
+                  181,
+                  clamp(aNow, 0, 180),
+                  1
+                )}
+                stroke={consumedMaskColor}
+                strokeWidth={stroke}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+          </>
+        )}
+
         {/* Target marker tick (at 75% point) */}
-        <Line
-          x1={markerPoint.x}
-          y1={markerPoint.y}
-          x2={markerOut.x}
-          y2={markerOut.y}
-          stroke={markerColor}
-          strokeWidth={isSm ? 2 : 2.5}
-          strokeLinecap="round"
-        />
+        {mode === 'max' ? (
+          // CAP STOP BAR (thicker + squared)
+          <Line
+            x1={markerPoint.x}
+            y1={markerPoint.y}
+            x2={markerOut.x}
+            y2={markerOut.y}
+            stroke={markerColor}
+            strokeWidth={isSm ? 4 : 5}
+            strokeLinecap="butt"
+          />
+        ) : (
+          // MIN MODE TICK (thin + rounded)
+          <Line
+            x1={markerPoint.x}
+            y1={markerPoint.y}
+            x2={markerOut.x}
+            y2={markerOut.y}
+            stroke={markerColor}
+            strokeWidth={isSm ? 2.2 : 2.8}
+            strokeLinecap="round"
+          />
+        )}
 
         {/* Needle */}
         {(() => {
@@ -219,7 +335,18 @@ export function MacroGauge({
             </>
           );
         })()}
-        <Circle cx={cx} cy={cy} r={5} fill={colors.tint} />
+        {mode === 'max' ? (
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={5}
+            fill={colors.background}
+            stroke={colors.tint}
+            strokeWidth={2}
+          />
+        ) : (
+          <Circle cx={cx} cy={cy} r={5} fill={colors.tint} />
+        )}
 
         <SvgText
           x={cx}
