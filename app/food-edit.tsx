@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { Colors, Spacing } from '@/constants/theme';
+import { RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,7 +44,6 @@ type FoodEditRouteParams = {
 };
 
 const MAX_QUANTITY = 100000;
-const MAX_CALORIES = 10000;
 const MAX_MACRO = 9999.99;
 const ENTRY_STALE_MS = 15 * 60 * 1000; // 15 minutes
 const LONG_CACHE_MS = 180 * 24 * 60 * 60 * 1000; // ~180 days for stable by-id data
@@ -564,6 +564,16 @@ export default function FoodEditScreen() {
     return itemName.trim().length > 0 && quantity && parseFloat(quantity) > 0 && calories && parseFloat(calories) >= 0;
   }, [calories, itemName, quantity]);
 
+  const caloriesLimitKcal = RANGES.CALORIES_KCAL.MAX;
+  const totalCalories = useMemo(() => {
+    const parsed = parseFloat(calories);
+    if (!isNaN(parsed) && isFinite(parsed)) return parsed;
+    return 0;
+  }, [calories]);
+  const isCaloriesOverLimit = totalCalories > caloriesLimitKcal;
+
+  const isSaveDisabled = loading || !isFormValid() || isCaloriesOverLimit;
+
   // Safe navigation helper: go back if possible, else navigate to mealtype-log
   const goBackSafely = useCallback((fallbackParams?: { entryDate?: string; mealType?: string }) => {
     if (router.canGoBack()) {
@@ -587,6 +597,7 @@ export default function FoodEditScreen() {
       return;
     }
     isSavingRef.current = true;
+    try {
 
     setItemNameError('');
     setQuantityError('');
@@ -614,6 +625,11 @@ export default function FoodEditScreen() {
       return;
     }
 
+    // Calorie limit validation is derived from current computed calories (no latched error state).
+    if (isCaloriesOverLimit) {
+      return;
+    }
+
     if (!user?.id) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.user_not_found'));
       return;
@@ -634,17 +650,8 @@ export default function FoodEditScreen() {
       return;
     }
 
-    // Enforce 5,000 calorie limit (match Quick Log behavior)
-    if (parsedCalories > 5000) {
-      const errorMsg = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
-        `Current: ${parsedCalories.toLocaleString()} calories\n` +
-        `Maximum: 5,000 calories per entry\n\n` +
-        `SOLUTIONS:\n` +
-        `• Reduce the quantity\n` +
-        `• Split into ${Math.ceil(parsedCalories / 5000)} separate entries`;
-
-      setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
-      Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
+    // Re-check against the latest computed calories at submit time.
+    if (totalCalories > caloriesLimitKcal) {
       return;
     }
 
@@ -652,12 +659,6 @@ export default function FoodEditScreen() {
       const errorMsg = `Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}.`;
       setQuantityError(errorMsg);
       Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: MAX_QUANTITY.toLocaleString() }));
-      return;
-    }
-
-    if (parsedCalories > MAX_CALORIES) {
-      const errorMsg = 'Cannot exceed 10,000 cal per entry.';
-      setCaloriesError(errorMsg);
       return;
     }
 
@@ -788,17 +789,16 @@ export default function FoodEditScreen() {
     // Note: Don't reset isSavingRef here since we're navigating away
     } catch (error: any) {
       Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
-      isSavingRef.current = false; // Reset on error
     } finally {
       setLoading(false);
-      // Only reset if we're not navigating away (error case)
-      if (isSavingRef.current) {
-        // If we reach here without navigating, something went wrong - reset
-        isSavingRef.current = false;
-      }
+    }
+    } finally {
+      // Always reset the submit latch (prevents "sticky" Save after failed validation).
+      isSavingRef.current = false;
     }
   }, [
     calories,
+    caloriesLimitKcal,
     carbs,
     entryDate,
     entryDateParam,
@@ -806,6 +806,7 @@ export default function FoodEditScreen() {
     fat,
     fiber,
     goBackSafely,
+    isCaloriesOverLimit,
     itemName,
     mealType,
     mealTypeParam,
@@ -818,6 +819,7 @@ export default function FoodEditScreen() {
     sodium,
     sugar,
     t,
+    totalCalories,
     transFat,
     unit,
     user?.id,
@@ -859,12 +861,13 @@ export default function FoodEditScreen() {
           <TouchableOpacity
             style={styles.checkmarkButton}
             onPress={handleSaveEntry}
+            disabled={isSaveDisabled}
             activeOpacity={0.7}
           >
             <IconSymbol
               name="checkmark"
               size={24}
-              color={colors.tint}
+              color={isSaveDisabled ? colors.icon : colors.tint}
             />
           </TouchableOpacity>
         </View>
@@ -897,7 +900,7 @@ export default function FoodEditScreen() {
                   maxLength={4}
                   returnKeyType="done"
                   onSubmitEditing={() => {
-                    if (isFormValid() && !loading) {
+                    if (!isSaveDisabled) {
                       handleSaveEntry();
                     }
                   }}
@@ -928,6 +931,11 @@ export default function FoodEditScreen() {
                   {caloriesError ? (
                     <ThemedText style={styles.errorText}>
                       {caloriesError}
+                    </ThemedText>
+                  ) : null}
+                  {isCaloriesOverLimit ? (
+                    <ThemedText style={styles.errorText}>
+                      {t('mealtype_log.errors.calories_exceed_5000_limit')}
                     </ThemedText>
                   ) : null}
                 </View>
@@ -988,12 +996,12 @@ export default function FoodEditScreen() {
                 style={[
                   styles.saveButton,
                   {
-                    backgroundColor: loading || !isFormValid() ? colors.icon : colors.tint,
-                    opacity: loading || !isFormValid() ? 0.5 : 1,
+                    backgroundColor: isSaveDisabled ? colors.icon : colors.tint,
+                    opacity: isSaveDisabled ? 0.5 : 1,
                   },
                 ]}
                 onPress={handleSaveEntry}
-                disabled={loading || !isFormValid()}
+                disabled={isSaveDisabled}
                 activeOpacity={0.8}
               >
                 {loading ? (
