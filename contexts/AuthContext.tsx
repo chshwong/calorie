@@ -8,8 +8,14 @@ import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
-const PROFILE_CACHE_KEY = 'profile';
-const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000 *180; // 24 hours x 180
+const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000 * 180; // 24 hours x 180
+const PROFILE_TIMEOUT_MS = 7000; // 7 second timeout for profile fetch
+
+// Profile cache key per user
+const profileCacheKey = (userId: string) => `profile:${userId}`;
+
+// DEV-only: Track timeout occurrences
+let profileTimeoutCount = 0;
 
 type AuthContextType = {
   session: Session | null;
@@ -46,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const profileFetchRetryCount = useRef(0);
-  const profileRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const profileRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<any | null>(null); // Ref to track profile for closures
   const userRef = useRef<User | null>(null); // Ref to track user for closures
   const isPasswordRecoveryRef = useRef(false); // Track if we're in password recovery mode
@@ -59,12 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile, user]);
 
   const fetchProfile = async (userId: string, isInitialLoad = false) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
     try {
-      // Add timeout to prevent hanging
+      // Add cancellable timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 7000); // 10 second timeout
+        timeoutId = setTimeout(() => {
+          if (process.env.NODE_ENV !== 'production') {
+            profileTimeoutCount += 1;
+            console.warn(`[AuthContext] Profile fetch timeout #${profileTimeoutCount} for user ${userId}`);
+          }
+          reject(new Error('Profile fetch timeout'));
+        }, PROFILE_TIMEOUT_MS);
       });
 
+      // Query profiles table using user_id column (confirmed: profiles table uses user_id, not id)
+      // RLS policy: USING (auth.uid() = user_id) ensures users can only read their own profile
       const fetchPromise = supabase
         .from('profiles')
         .select('*')
@@ -80,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const newProfile = await ensureProfileExists(userId);
           if (newProfile) {
             setProfile(newProfile);
-            saveProfileSnapshot(newProfile);
+            saveProfileSnapshot(userId, newProfile);
             profileFetchRetryCount.current = 0;
             setRetrying(false);
             setLoading(false);
@@ -114,6 +130,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } else {
+        // DEV-only sanity check: verify returned profile belongs to the requesting user
+        if (process.env.NODE_ENV !== 'production' && data && (data.user_id ?? data.id) !== userId) {
+          console.warn(
+            `[AuthContext] Profile fetch returned profile for different user! ` +
+            `Requested: ${userId}, Got: ${data.user_id ?? data.id}`
+          );
+        }
+        
         // Check if user is active (treat null as inactive for safety)
         if (data && (data.is_active === false || data.is_active === null)) {
           // User account is inactive, sign them out
@@ -128,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         
         setProfile(data);
-        saveProfileSnapshot(data);
+        saveProfileSnapshot(userId, data);
         profileFetchRetryCount.current = 0; // Reset retry count on success
         setRetrying(false);
         setLoading(false);
@@ -164,6 +188,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRetrying(false);
         setLoading(false);
       }
+    } finally {
+      // Always clear timeout to prevent fixed-duration behavior
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
     }
   };
 
@@ -179,7 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
       if (session?.user) {
         // 1) Hydrate from persistent snapshot (if for same user)
-        const snapshot = loadProfileSnapshot();
+        const snapshot = loadProfileSnapshot(session.user.id);
         if (snapshot && snapshot.user_id === session.user.id) {
           setProfile(snapshot);
         }
@@ -316,6 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Periodically check if profile is missing but user is logged in, and retry fetching
   // Only run this check if profile is truly missing (not just loading)
+  // IMPORTANT: Never set loading=true here - profile fetch should never block startup
   useEffect(() => {
     if (!user || profile || loading) return;
 
@@ -329,11 +360,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Also check that we're not already in a retry cycle
       if (currentUser && !currentProfile && !loading && profileFetchRetryCount.current === 0) {
         // Only show retrying if we previously had a profile (reconnection scenario)
+        // Never set loading=true - profile fetch is background operation
         if (profileRef.current) {
           setRetrying(true);
-        } else {
-          setLoading(true);
         }
+        // Fetch in background without blocking
         fetchProfile(currentUser.id, false);
       }
     }, 60000); // Check every 60 seconds (reduced frequency)
@@ -420,7 +451,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshProfile,
         updateProfileState: (profileData) => {
           setProfile(profileData);
-          saveProfileSnapshot(profileData);
+          if (user?.id && profileData) {
+            saveProfileSnapshot(user.id, profileData);
+          }
         },
       }}
     >
@@ -431,10 +464,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export const useAuth = () => useContext(AuthContext);
 
-function loadProfileSnapshot() {
-  return getPersistentCache<any>(PROFILE_CACHE_KEY, PROFILE_MAX_AGE_MS);
+function loadProfileSnapshot(userId: string) {
+  return getPersistentCache<any>(profileCacheKey(userId), PROFILE_MAX_AGE_MS);
 }
 
-function saveProfileSnapshot(profile: any) {
-  setPersistentCache(PROFILE_CACHE_KEY, profile);
+function saveProfileSnapshot(userId: string, profile: any) {
+  setPersistentCache(profileCacheKey(userId), profile);
 }
