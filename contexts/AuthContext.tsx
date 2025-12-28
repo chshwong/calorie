@@ -21,7 +21,12 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   profile: any | null;
+  /**
+   * authLoading represents ONLY Supabase session restoration readiness.
+   * It must NEVER be blocked by profile fetching.
+   */
   loading: boolean;
+  authReady: boolean;
   retrying: boolean;
   isAdmin: boolean;
   onboardingComplete: boolean;
@@ -36,6 +41,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
+  authReady: false,
   retrying: false,
   isAdmin: false,
   onboardingComplete: false,
@@ -49,7 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  // authReady is ONLY about session restoration; it must never wait on fetchProfile().
+  const [authReady, setAuthReady] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const profileFetchRetryCount = useRef(0);
   const profileRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,12 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             saveProfileSnapshot(userId, newProfile);
             profileFetchRetryCount.current = 0;
             setRetrying(false);
-            setLoading(false);
           } else {
             // Failed to create profile
             setProfile(null);
             setRetrying(false);
-            setLoading(false);
           }
         } else {
           // Don't clear profile immediately on error - keep last known profile if user is still logged in
@@ -126,7 +131,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }, retryDelay);
           } else {
             setRetrying(false);
-            setLoading(false);
           }
         }
       } else {
@@ -143,7 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // User account is inactive, sign them out
           setProfile(null);
           setRetrying(false);
-          setLoading(false);
           // Clear state and sign out from Supabase
           setSession(null);
           setUser(null);
@@ -155,7 +158,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         saveProfileSnapshot(userId, data);
         profileFetchRetryCount.current = 0; // Reset retry count on success
         setRetrying(false);
-        setLoading(false);
         
         // Apply user's language preference from profile
         if (data?.language_preference && isLanguageSupported(data.language_preference)) {
@@ -186,7 +188,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, retryDelay);
       } else {
         setRetrying(false);
-        setLoading(false);
       }
     } finally {
       // Always clear timeout to prevent fixed-duration behavior
@@ -206,6 +207,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
       setSession(session);
       setUser(session?.user ?? null);
+      // Session is now known; mark auth as ready immediately (do NOT wait on profile).
+      setAuthReady(true);
   
       if (session?.user) {
         // 1) Hydrate from persistent snapshot (if for same user)
@@ -214,22 +217,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(snapshot);
         }
   
-        // 2) Auth state is now known; stop global loading here
-        setLoading(false);
-  
-        // 3) Prefetch userConfig immediately (for instant availability in Home/Settings)
+        // Prefetch userConfig immediately (for instant availability in Home/Settings)
         prefetchUserConfig(queryClient, session.user.id).catch((err) => {
           if (process.env.NODE_ENV !== 'production') {
             console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
           }
         });
   
-        // 4) Load profile from Supabase in the background – do NOT block global loading
-        fetchProfile(session.user.id, true);
+        // Load profile from Supabase in the background – do NOT block auth readiness
+        void fetchProfile(session.user.id, true);
       } else {
-        // No session: clear profile and stop loading
+        // No session: clear profile (auth is already ready)
         setProfile(null);
-        setLoading(false);
       }
     }).catch((error) => {
       if (process.env.NODE_ENV !== 'production') {
@@ -239,7 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         setUser(null);
         setProfile(null);
-        setLoading(false);
+        // Even on error, auth state is now known (treat as signed out).
+        setAuthReady(true);
       }
     });
     
@@ -247,7 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mountedRef.current) return;
       
       // Handle password recovery event
@@ -259,10 +259,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setSession(session);
         setUser(session?.user ?? null);
+        setAuthReady(true);
         if (session?.user) {
-          await fetchProfile(session.user.id, true);
-        } else {
-          setLoading(false);
+          void fetchProfile(session.user.id, true);
         }
         return;
       }
@@ -280,50 +279,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      // Don't refetch profile on token refresh if we already have one
-      // Only refetch on actual sign in/out events
-      if (event === 'TOKEN_REFRESHED' && profileRef.current && session?.user) {
-        setSession(session);
-        setUser(session?.user ?? null);
-        return;
-      }
-      
       // Handle INITIAL_SESSION - this fires after getSession() completes
       // The session should already be set by getSession(), but we'll set it again to be safe
       // and ensure loading state is correct
       if (event === 'INITIAL_SESSION') {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (!session?.user) {
-          setProfile(null);
-          setLoading(false);
-        }
-        // If we have a user, fetchProfile was already called in getSession() handler
-        // Don't call it again here to avoid duplicate calls
+        // Keep this handler simple: auth state is known.
+        setAuthReady(true);
         return;
       }
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // Reset retry count on new session
-        profileFetchRetryCount.current = 0;
-        // Prefetch userConfig immediately (for instant availability in Home/Settings)
-        prefetchUserConfig(queryClient, session.user.id).catch((err) => {
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+
+      // Keep auth readiness tied ONLY to session state knowledge.
+      // For SIGNED_IN / USER_UPDATED / TOKEN_REFRESHED:
+      // - update session/user
+      // - mark auth ready immediately
+      // - fetchProfile fire-and-forget (do not await)
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setAuthReady(true);
+
+        if (session?.user) {
+          // Hydrate from snapshot quickly (if present), then fetch in background.
+          const snapshot = loadProfileSnapshot(session.user.id);
+          if (snapshot && snapshot.user_id === session.user.id) {
+            setProfile(snapshot);
           }
-        });
-        await fetchProfile(session.user.id, true);
-      } else {
+
+          profileFetchRetryCount.current = 0;
+          prefetchUserConfig(queryClient, session.user.id).catch((err) => {
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+            }
+          });
+
+          void fetchProfile(session.user.id, false);
+        }
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
         setProfile(null);
         setRetrying(false);
-        setLoading(false);
+        setAuthReady(true);
         // Clear any pending retries
         if (profileRetryTimeoutRef.current) {
           clearTimeout(profileRetryTimeoutRef.current);
           profileRetryTimeoutRef.current = null;
         }
+        return;
       }
     });
 
@@ -348,7 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Only run this check if profile is truly missing (not just loading)
   // IMPORTANT: Never set loading=true here - profile fetch should never block startup
   useEffect(() => {
-    if (!user || profile || loading) return;
+    if (!user || profile || !authReady) return;
 
     // If user is logged in but profile is null, wait a bit then retry
     // Use a longer interval to avoid excessive checks
@@ -358,7 +363,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentProfile = profileRef.current;
       // Only retry if profile is still missing and we haven't exceeded retry limit
       // Also check that we're not already in a retry cycle
-      if (currentUser && !currentProfile && !loading && profileFetchRetryCount.current === 0) {
+      if (currentUser && !currentProfile && authReady && profileFetchRetryCount.current === 0) {
         // Only show retrying if we previously had a profile (reconnection scenario)
         // Never set loading=true - profile fetch is background operation
         if (profileRef.current) {
@@ -370,7 +375,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 60000); // Check every 60 seconds (reduced frequency)
 
     return () => clearInterval(checkInterval);
-  }, [user, profile, loading]);
+  }, [user, profile, authReady]);
 
   const signOut = async () => {
     try {
@@ -379,7 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setRetrying(false);
-      setLoading(true); // Set loading while signing out
+      setAuthReady(true);
       
       // Sign out from Supabase - this should clear the session
       const { error } = await supabase.auth.signOut();
@@ -411,7 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       setUser(null);
       setProfile(null);
-      setLoading(false);
+      setAuthReady(true);
     } catch (error) {
       console.error('Sign out exception:', error);
       // Even if there's an error, clear local state
@@ -419,7 +424,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setRetrying(false);
-      setLoading(false);
+      setAuthReady(true);
     }
   };
 
@@ -435,6 +440,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   // Calculate onboardingComplete from profile
   const onboardingComplete = profile?.onboarding_complete === true;
+  const authLoading = !authReady;
 
   return (
     <AuthContext.Provider
@@ -442,7 +448,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         user,
         profile,
-        loading,
+        loading: authLoading,
+        authReady,
         retrying,
         isAdmin,
         onboardingComplete,
