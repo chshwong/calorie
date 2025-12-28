@@ -9,7 +9,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000 * 180; // 24 hours x 180
-const PROFILE_TIMEOUT_MS = 7000; // 7 second timeout for profile fetch
+const PROFILE_TIMEOUT_MS = 4000; // 7 second timeout for profile fetch
 
 // Profile cache key per user
 const profileCacheKey = (userId: string) => `profile:${userId}`;
