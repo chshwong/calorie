@@ -13,6 +13,7 @@ import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibilit
 import { NumericUnitInput } from '@/components/forms/NumericUnitInput';
 import { BodyFatRangesModal } from '@/components/onboarding/body-fat-ranges-modal';
 import { ageFromDob } from '@/utils/calculations';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface CurrentWeightStepProps {
   currentWeightKg: string;
@@ -70,6 +71,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const [bfModalOpen, setBfModalOpen] = useState(false);
   const ageYears = dobISO ? ageFromDob(dobISO) : null;
   
@@ -116,9 +118,10 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               width: 148,
               height: 148,
               borderRadius: BorderRadius['3xl'],
-              backgroundColor: Colors.light.background,
+              // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+              backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
               borderWidth: 2,
-              borderColor: `${onboardingColors.primary}50`,
+              borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
               alignItems: 'center',
               justifyContent: 'flex-start',
               paddingTop: Spacing.lg,
@@ -222,7 +225,14 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               key={unitOption.value}
               style={[
                 styles.unitPill,
-                selected ? styles.unitPillSelected : styles.unitPillUnselected,
+                selected ? styles.unitPillSelected : null,
+                !selected
+                  ? {
+                      // Unselected should be passive (no "white pill" in dark mode)
+                      backgroundColor: colors.surfaceInteractive,
+                      borderWidth: 0,
+                    }
+                  : null,
                 {
                   transform: [{ scale: selected ? 1.02 : 1 }],
                 },
@@ -241,7 +251,7 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
             >
               <Text
                 variant="body"
-                style={{ color: selected ? Colors.light.textInverse : onboardingColors.primary }}
+                style={{ color: selected ? Colors.light.textInverse : colors.textMutedOnDark }}
               >
                 {unitOption.label}
               </Text>
@@ -446,10 +456,6 @@ const styles = StyleSheet.create({
   },
   unitPillSelected: {
     borderWidth: 0,
-  },
-  unitPillUnselected: {
-    backgroundColor: Colors.light.background,
-    borderColor: Colors.light.border,
   },
   heightInputContainer: {
     marginTop: Spacing.none, // Reduced from Spacing.md to bring input closer to unit toggle

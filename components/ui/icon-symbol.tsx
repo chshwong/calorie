@@ -25,6 +25,7 @@ const MAPPING = {
   'pencil': 'edit',
   'fork.knife': 'restaurant',
   'calendar': 'calendar-today',
+  'desktopcomputer': 'computer',
   'xmark': 'close',
   'person.fill': 'account-circle',
   'lock.fill': 'lock',

@@ -8,6 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ageFromDob } from '@/utils/calculations';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import {
@@ -146,6 +147,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const [showActivityModal, setShowActivityModal] = useState(false);
 
   type CaloriePlanKey =
@@ -696,9 +698,10 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                 width: 148,
                 height: 148,
                 borderRadius: BorderRadius['3xl'],
-                backgroundColor: Colors.light.background,
+                // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+                backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
                 borderWidth: Spacing.xs,
-                borderColor: `${onboardingColors.primary}50`,
+                borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -1142,9 +1145,10 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
               width: 148,
               height: 148,
               borderRadius: BorderRadius['3xl'],
-              backgroundColor: Colors.light.background,
+              // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+              backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
               borderWidth: Spacing.xs,
-              borderColor: `${onboardingColors.primary}50`,
+              borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
               alignItems: 'center',
               justifyContent: 'center',
             }}

@@ -22,8 +22,12 @@ import { Platform } from 'react-native';
 
 
 //brand colors
-const salmonColorDark ='#E9876F';
-const salmonColorLight ='#B8553F';
+export const salmonColorDark ='#E9876F';
+export const salmonColorLight ='#B8553F';
+export const brandGreenColorDark ='#DCF048';
+export const brandGreencolorLight ='#526C19';
+
+
 // Standardized grey color used across the entire app
 // This is the primary grey for secondary text, icons, and UI elements
 // Light mode: Dark grey close to primary text for high contrast (similar to Tailwind gray-700)
@@ -105,17 +109,30 @@ export const Colors = {
     textMuted: '#6B7280',
     textSubtle: '#9CA3AF',
     textInverse: '#FFFFFF',
+    textOnSoft: '#0B0F10',
+    textMutedOnDark: StandardGrey.light,
     
     // Backgrounds
     background: '#FFFFFF',
     backgroundSecondary: '#F9F9F9',
     backgroundTertiary: '#F2F2F2',
     dashboardBackground: '#F5F7FA', // Very light neutral (MyFitnessPal style)
+    surfaceSoft: '#EEF6F8',
+    surfaceSoft2: '#F2F5F7',
+    // Illustration surfaces (used for onboarding hero/illustration cards; not for inputs/toggles/buttons)
+    illustrationSurface: '#EEF6F8',
+    illustrationSurfaceDim: '#E4EFF3',
+    // Interactive surfaces (inputs, toggles, buttons) should use this token.
+    // Light mode keeps a subtle neutral to preserve hierarchy.
+    surfaceInteractive: '#F9F9F9',
+    strokeOnSoft: '#C8E4EC',
+    strokeOnSoftStrong: '#BFDDE6',
     
     // Accent
     tint: salmonColorLight,
     tintLight: salmonColorLight + '20',
     appTeal: '#2FA4A9',
+    softGlow: '#2FA4A9' + '1A',
     chartGrey: '#E6E6E6', // chartGreyLightMode
     chartGreen: '#2ECC71', // chartGreen (shared)
     chartOrange: '#FFA500', // chartOrange (shared)
@@ -156,17 +173,29 @@ export const Colors = {
     textMuted: '#9CA3AF',
     textSubtle: '#6B7280',
     textInverse: '#11181C',
+    textOnSoft: '#0B0F10',
+    textMutedOnDark: '#B8C4C8',
     
     // Backgrounds
     background: '#121212',
     backgroundSecondary: '#1C1C1E',
     backgroundTertiary: '#2C2C2E',
     dashboardBackground: '#0F172A', // Dark blue-grey
+    surfaceSoft: '#EEF6F8',
+    surfaceSoft2: '#F2F5F7',
+    // Illustration surfaces (used for onboarding hero/illustration cards; not for inputs/toggles/buttons)
+    illustrationSurface: '#EEF6F8',
+    illustrationSurfaceDim: '#E4EFF3',
+    // Interactive surfaces (inputs, toggles, buttons) should use this token.
+    surfaceInteractive: '#0E1416',
+    strokeOnSoft: '#C8E4EC',
+    strokeOnSoftStrong: '#BFDDE6',
     
     // Accent
     tint: salmonColorDark,
     tintLight: salmonColorDark + '20',
     appTeal: '#5BC2C6',
+    softGlow: '#5BC2C6' + '1A',
     chartGrey: '#3A3A3A', // chartGreyDarkMode
     chartGreen: '#2ECC71', // chartGreen (shared)
     chartOrange: '#FFA500', // chartOrange (shared)

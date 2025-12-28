@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ColoredBrandName } from '@/components/brand/ColoredBrandName';
 import { Colors } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -25,6 +26,8 @@ import {
   GoalWeightStep,
   DailyCalorieTargetStep,
   DailyFocusTargetsStep,
+  ModulePreferencesStep,
+  PlanStep,
   LegalAgreementStep,
 } from '@/components/onboarding/steps';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
@@ -39,7 +42,9 @@ import { kgToLb } from '@/lib/domain/weight-constants';
 export default function OnboardingScreen() {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  // Many onboarding step components currently type `colors` as `typeof Colors.light`.
+  // At runtime we pass either light/dark; this cast keeps TS happy without changing behavior.
+  const colors = Colors[colorScheme] as typeof Colors.light;
   
   const {
     // State
@@ -89,6 +94,12 @@ export default function OnboardingScreen() {
     setCalorieExecutionMode,
     dailyTargets,
     setDailyTargets,
+    modulePreferences,
+    setModulePreferences,
+    selectedPlan,
+    setSelectedPlan,
+    premiumInsisted,
+    setPremiumInsisted,
     legalAgreeTerms,
     setLegalAgreeTerms,
     legalAgreePrivacy,
@@ -258,7 +269,7 @@ export default function OnboardingScreen() {
         goalWeightKg={goalWeightKg}
         goalWeightLb={goalWeightLb}
         currentWeightUnit={currentWeightUnit}
-        goalType={goal}
+        goalType={goal ? goal : null}
         currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
         heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
         sexAtBirth={sex}
@@ -281,7 +292,7 @@ export default function OnboardingScreen() {
     ),
     8: (
       <DailyCalorieTargetStep
-        goalType={goal}
+        goalType={goal ? goal : null}
         currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
         targetWeightLb={goalWeightLb ? parseFloat(goalWeightLb) : (goalWeightKg ? kgToLb(parseFloat(goalWeightKg)) : null)}
         heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
@@ -309,7 +320,7 @@ export default function OnboardingScreen() {
     ),
     9: (
       <DailyFocusTargetsStep
-        goalType={goal}
+        goalType={goal ? goal : null}
         currentWeightLb={currentWeightLb ? parseFloat(currentWeightLb) : null}
         targetWeightLb={goalWeightLb ? parseFloat(goalWeightLb) : (goalWeightKg ? kgToLb(parseFloat(goalWeightKg)) : null)}
         heightCm={heightCm ? parseFloat(heightCm.toString()) : null}
@@ -325,6 +336,23 @@ export default function OnboardingScreen() {
       />
     ),
     10: (
+      <ModulePreferencesStep
+        selectedModules={modulePreferences}
+        onSelectedModulesChange={setModulePreferences}
+        loading={loading}
+        colors={colors}
+      />
+    ),
+    11: (
+      <PlanStep
+        selectedPlan={selectedPlan}
+        onSelectedPlanChange={setSelectedPlan}
+        onPremiumInsist={() => setPremiumInsisted(true)}
+        loading={loading}
+        colors={colors}
+      />
+    ),
+    12: (
       <LegalAgreementStep
         legalAgreeTerms={legalAgreeTerms}
         legalAgreePrivacy={legalAgreePrivacy}
@@ -377,8 +405,9 @@ export default function OnboardingScreen() {
               ) : (
                 <View style={onboardingStyles.backButton} />
               )}
-              <ThemedText type="title" style={[onboardingStyles.headerTitle, { color: colors.tint }]}>
-                {t('onboarding.title')}
+              <ThemedText type="title" style={onboardingStyles.headerTitle}>
+                {t('onboarding.header_prefix')}
+                <ColoredBrandName />
               </ThemedText>
               <View style={onboardingStyles.backButton} />
             </View>

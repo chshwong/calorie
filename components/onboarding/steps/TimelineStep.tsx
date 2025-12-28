@@ -10,6 +10,7 @@ import { TrajectorySummary } from '@/components/onboarding/TrajectorySummary';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Shadows } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle, AccessibilityHints } from '@/utils/accessibility';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   LOSS_PACES_LB_PER_WEEK,
   computeTargetDateFromPace,
@@ -48,6 +49,7 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const [pressedCard, setPressedCard] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   
@@ -268,9 +270,10 @@ export const TimelineStep: React.FC<TimelineStepProps> = ({
               width: 148, // Illustration-specific size - not a theme token
               height: 148, // Illustration-specific size - not a theme token
               borderRadius: BorderRadius['3xl'],
-              backgroundColor: Colors.light.background,
+              // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+              backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
               borderWidth: Spacing.xs,
-              borderColor: `${onboardingColors.primary}50`,
+              borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
               alignItems: 'center',
               justifyContent: 'center',
               position: 'relative',

@@ -6,6 +6,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, FontSize, FontWeight, BorderRadius, Spacing, Layout, Typography, Shadows, LineHeight } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface SexStepProps {
   sex: 'male' | 'female' | '';
@@ -15,9 +16,7 @@ interface SexStepProps {
   colors: typeof Colors.light;
 }
 
-const GenderIllustration = () => {
-  const colorScheme = 'light'; // Illustration uses fixed colors
-  const colors = Colors[colorScheme];
+const GenderIllustration = ({ colors, isDark }: { colors: typeof Colors.light; isDark: boolean }) => {
   
   return (
     <View
@@ -33,8 +32,9 @@ const GenderIllustration = () => {
         style={[
           styles.illustrationInner,
           {
-            backgroundColor: colors.background,
-            borderColor: `${onboardingColors.primary}50`,
+            // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+            backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
+            borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
           },
         ]}
       >
@@ -77,6 +77,7 @@ export const SexStep: React.FC<SexStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const [pressedCard, setPressedCard] = useState<string | null>(null);
   
   const isSelected = (value: string) => sex === value;
@@ -85,7 +86,7 @@ export const SexStep: React.FC<SexStepProps> = ({
     <View style={styles.stepContentAnimated}>
       {/* SVG Illustration */}
       <View style={styles.stepIllustration}>
-        <GenderIllustration />
+        <GenderIllustration colors={colors} isDark={isDark} />
       </View>
       
       {/* Title */}

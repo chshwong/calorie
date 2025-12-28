@@ -13,6 +13,7 @@ import { lbToKg, kgToLb, MAINTAIN_RECOMP_PCT, MAINTAIN_RECOMP_ABS_CAP_LB } from 
 import { roundTo1, roundTo3 } from '@/utils/bodyMetrics';
 import { WeightNudgePicker } from '@/components/onboarding/WeightNudgePicker';
 import { PROFILES } from '@/constants/constraints';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface GoalWeightStepProps {
   goalWeightKg: string;
@@ -69,6 +70,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
 
   // Compute suggestion text and placeholder from suggestion result (derived, not state)
   const { suggestionText, placeholder, suggestedWeightLb } = useMemo(() => {
@@ -317,9 +319,10 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               width: 148, // Illustration-specific size - not a theme token
               height: 148, // Illustration-specific size - not a theme token
               borderRadius: BorderRadius['3xl'],
-              backgroundColor: Colors.light.background,
+              // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+              backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
               borderWidth: Spacing.xs, // Using theme token for border width
-              borderColor: `${onboardingColors.primary}50`,
+              borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
               alignItems: 'center',
               justifyContent: 'center',
               position: 'relative',

@@ -10,6 +10,7 @@ import { getButtonAccessibilityProps } from '@/utils/accessibility';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { type LegalDocumentRow } from '@/lib/legal/legal-db';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 
 interface LegalAgreementStepProps {
@@ -35,6 +36,7 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const { data: documents = [], isLoading: loadingDocs, error: queryError, refetch } = useLegalDocuments();
   const [openDocKey, setOpenDocKey] = useState<string | null>(null);
   const [openedOnce, setOpenedOnce] = useState<Record<string, boolean>>({});
@@ -120,7 +122,16 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
       {/* Illustration */}
       <View style={styles.stepIllustration}>
         <View style={styles.illustrationOuter}>
-          <View style={styles.illustrationInner}>
+          <View
+            style={[
+              styles.illustrationInner,
+              {
+                // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+                backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
+                borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
+              },
+            ]}
+          >
             {/* Icon size 100px is illustration-specific, not typography (per guidelines 8.1) */}
             <MaterialCommunityIcons name="file-document-outline" size={100} color={onboardingColors.primary} />
           </View>
@@ -405,7 +416,8 @@ const styles = StyleSheet.create({
     width: 148,
     height: 148,
     borderRadius: BorderRadius['3xl'],
-    backgroundColor: Colors.light.background,
+    // Base (light mode) decorative surface; dark mode override is applied at render-time via theme tokens.
+    backgroundColor: Colors.light.surfaceSoft2,
     borderWidth: Spacing.xs,
     borderColor: `${onboardingColors.primary}50`,
     alignItems: 'center',

@@ -8,6 +8,7 @@ import { filterNumericInput } from '@/utils/inputFilters';
 import { getButtonAccessibilityProps } from '@/utils/accessibility';
 import { ftInToCm, cmToFtIn, roundTo1 } from '@/utils/bodyMetrics';
 import { NumericUnitInput, NumericUnitInputRow } from '@/components/forms/NumericUnitInput';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface HeightStepProps {
   heightCm: string;
@@ -25,8 +26,8 @@ interface HeightStepProps {
 }
 
 const HeightIllustration = () => {
-  const colorScheme = 'light'; // Illustration uses fixed colors
-  const colors = Colors[colorScheme];
+  const isDark = useColorScheme() === 'dark';
+  const colors = Colors[useColorScheme() ?? 'light'];
   
   return (
     <View
@@ -42,8 +43,9 @@ const HeightIllustration = () => {
         style={[
           styles.illustrationInner,
           {
-            backgroundColor: colors.background,
-            borderColor: `${onboardingColors.primary}50`,
+            // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+            backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
+            borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
           },
         ]}
       >
@@ -205,8 +207,8 @@ export const HeightStep: React.FC<HeightStepProps> = ({
                   ),
                 },
                 !selected && {
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
+                  backgroundColor: colors.surfaceInteractive,
+                  borderWidth: 0,
                   ...(Platform.OS === 'web' ? { boxShadow: 'none' as any, transition: 'all 0.2s ease' as any } : {}),
                 },
               ]}
@@ -223,7 +225,7 @@ export const HeightStep: React.FC<HeightStepProps> = ({
               <ThemedText
                 style={[
                   styles.unitPillText,
-                  { color: selected ? colors.textInverse : onboardingColors.primary },
+                  { color: selected ? colors.textInverse : colors.textMutedOnDark },
                 ]}
               >
                 {unitOption.label}

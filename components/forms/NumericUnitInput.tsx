@@ -11,6 +11,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getInputAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface NumericUnitInputProps {
   value: string;
@@ -47,10 +48,11 @@ export const NumericUnitInput: React.FC<NumericUnitInputProps> = ({
   backgroundColor,
   textColor,
 }) => {
-  const colors = Colors.light;
+  const scheme = useColorScheme() ?? 'light';
+  const colors = Colors[scheme];
   
-  const inputBorderColor = borderColor || (error ? Colors.light.error : colors.border);
-  const inputBackgroundColor = backgroundColor || Colors.light.background;
+  const inputBorderColor = borderColor || (error ? colors.error : colors.border);
+  const inputBackgroundColor = backgroundColor || colors.surfaceInteractive;
   const inputTextColor = textColor || colors.text;
 
   return (
@@ -67,7 +69,7 @@ export const NumericUnitInput: React.FC<NumericUnitInputProps> = ({
           Platform.OS === 'web' ? getFocusStyle(onboardingColors.primary) : {},
         ]}
         placeholder={placeholder}
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textMutedOnDark ?? colors.textSecondary}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}

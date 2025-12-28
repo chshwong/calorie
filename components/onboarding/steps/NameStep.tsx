@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { AvatarUploader } from '@/components/AvatarUploader';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AppearanceCycleRow } from '@/components/onboarding/AppearanceCycleRow';
 import { Colors, FontSize, FontWeight, BorderRadius, Spacing, Layout, Typography } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { ageFromDob } from '@/utils/calculations';
@@ -13,6 +14,7 @@ import { filterPreferredNameInput, normalizeSpaces } from '@/utils/inputFilters'
 import { checkProfanity } from '@/utils/profanity';
 import { POLICY } from '@/constants/constraints';
 import { getInputAccessibilityProps, getButtonAccessibilityProps, getFocusStyle, getWebAccessibilityProps } from '@/utils/accessibility';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface NameStepProps {
   preferredName: string;
@@ -52,6 +54,13 @@ export const NameStep: React.FC<NameStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const { themeMode, setThemeMode } = useTheme();
+
+  const cycleThemeMode = () => {
+    const currentMode = themeMode ?? 'auto';
+    const nextMode = currentMode === 'auto' ? 'light' : currentMode === 'light' ? 'dark' : 'auto';
+    void setThemeMode(nextMode);
+  };
 
   return (
     <View style={styles.stepContent}>
@@ -174,6 +183,10 @@ export const NameStep: React.FC<NameStepProps> = ({
           title={t('date_picker.select_date_of_birth')}
         />
       </View>
+
+      <View style={styles.inputContainer}>
+        <AppearanceCycleRow mode={(themeMode ?? 'auto') as 'auto' | 'light' | 'dark'} onPress={cycleThemeMode} />
+      </View>
     </View>
   );
 };
@@ -229,7 +242,7 @@ const styles = StyleSheet.create({
     ...Typography.body,
   },
   helperText: {
-    ...Typography.bodySmall,
+    ...Typography.bodyLarge,
     marginTop: Spacing.xs,
     paddingLeft: Spacing.xs,
   },

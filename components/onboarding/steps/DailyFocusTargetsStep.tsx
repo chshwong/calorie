@@ -18,6 +18,7 @@ import { NUTRIENT_TARGETS } from '@/constants/constraints';
 import { TargetSlider } from '@/components/inputs/TargetSlider';
 import { OnboardingScrollScreen } from '@/components/onboarding/OnboardingScrollScreen';
 import { NutrientReferenceModal, type NutrientType } from '@/components/onboarding/nutrient-reference-modal';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface DailyFocusTargetsStepProps {
   goalType: 'lose' | 'gain' | 'maintain' | 'recomp' | '' | null;
@@ -480,6 +481,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
   stepKey,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const { width } = useWindowDimensions();
   const [expandedSecondary, setExpandedSecondary] = useState(false);
   const [referenceModal, setReferenceModal] = useState<{ visible: boolean; nutrientType: NutrientType | null }>({
@@ -765,9 +767,10 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                     width: 148,
                     height: 148,
                     borderRadius: BorderRadius['3xl'],
-                    backgroundColor: Colors.light.background,
+                    // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+                    backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
                     borderWidth: Spacing.xs,
-                    borderColor: `${onboardingColors.primary}50`,
+                    borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}

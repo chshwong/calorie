@@ -8,6 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, LineHeight } from '@/constants/theme';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high';
 
@@ -22,7 +23,7 @@ interface ActivityStepProps {
   colors: typeof Colors.light;
 }
 
-const ActivityIllustration = () => (
+const ActivityIllustration = ({ colors, isDark }: { colors: typeof Colors.light; isDark: boolean }) => (
   <View
     style={{
       width: 172,
@@ -39,9 +40,10 @@ const ActivityIllustration = () => (
         width: 148,
         height: 148,
         borderRadius: BorderRadius['3xl'],
-        backgroundColor: Colors.light.background,
+        // Decorative hero surface: reduce glare in dark mode (do NOT use for inputs/toggles/buttons)
+        backgroundColor: isDark ? colors.illustrationSurfaceDim : colors.background,
         borderWidth: 2,
-        borderColor: `${onboardingColors.primary}50`,
+        borderColor: isDark ? colors.strokeOnSoftStrong : `${onboardingColors.primary}50`,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
@@ -71,6 +73,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
   colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const [pressedCard, setPressedCard] = useState<string | null>(null);
   
   // Use value/onChange in modal mode, activityLevel/onActivityLevelChange in wizard mode
@@ -87,7 +90,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
       {/* Illustration - hide in modal mode */}
       {mode === 'wizard' && (
         <View style={styles.stepIllustration}>
-          <ActivityIllustration />
+          <ActivityIllustration colors={colors} isDark={isDark} />
         </View>
       )}
       

@@ -28,7 +28,7 @@ import {
   filterPreferredNameInput, 
   normalizeSpaces 
 } from '@/utils/inputFilters';
-import { updateProfile } from '@/lib/services/profileService';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { uploadUserAvatar, setProfileAvatarUrl } from '@/lib/avatar/avatar-service';
 import { checkProfanity } from '@/utils/profanity';
 import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
@@ -44,6 +44,8 @@ import type { DailyFocusTargets } from '@/components/onboarding/steps/DailyFocus
 import { fetchActiveLegalDocuments, acceptActiveLegalDocuments } from '@/lib/legal/legal-db';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
+type ModulePreference = 'Exercise' | 'Med' | 'Water';
+type PlanSelection = 'free' | 'premium';
 
 export function useOnboardingForm() {
   const { t } = useTranslation();
@@ -51,7 +53,7 @@ export function useOnboardingForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 10; // Steps 1-10: Name, Sex, Height, Activity, Current Weight, Goal, Goal Weight, Daily Calorie Target, Daily Focus Targets, Legal Agreement
+  const totalSteps = 12; // Steps 1-12: ... Daily Focus Targets, Module Preferences, Plan, Legal Agreement
   
   // Step 6: Goal
   const [goal, setGoal] = useState<GoalType | ''>('');
@@ -117,14 +119,15 @@ export function useOnboardingForm() {
   const [calorieExecutionMode, setCalorieExecutionMode] = useState<'override' | undefined>(undefined);
   
   // Step 9: Daily Focus Targets
-  const [dailyTargets, setDailyTargets] = useState<{
-    proteinGMin: number;
-    fiberGMin: number;
-    carbsGMax: number;
-    sugarGMax: number;
-    sodiumMgMax: number;
-    waterMlTarget: number;
-  } | null>(null);
+  const [dailyTargets, setDailyTargets] = useState<DailyFocusTargets | null>(null);
+
+  // Step 10: Module Preferences (tap-to-rank Top 2; Food is implied as #1)
+  const [modulePreferences, setModulePreferences] = useState<ModulePreference[]>([]);
+  const modulePrefsPrefilledRef = useRef(false);
+
+  // Step 11: Plan (fake premium) — local-only
+  const [selectedPlan, setSelectedPlan] = useState<PlanSelection>('free');
+  const [premiumInsisted, setPremiumInsisted] = useState(false);
   
   // Step 10: Legal Agreement
   const [legalAgreeTerms, setLegalAgreeTerms] = useState(false);
@@ -163,6 +166,27 @@ export function useOnboardingForm() {
   
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+
+  // Prefill module preferences for back navigation / returning users
+  useEffect(() => {
+    if (modulePrefsPrefilledRef.current) return;
+    if (!profile) return;
+
+    const picks: ModulePreference[] = [];
+    const add = (value: any) => {
+      if ((value === 'Exercise' || value === 'Med' || value === 'Water') && !picks.includes(value)) {
+        picks.push(value);
+      }
+    };
+    add(profile.focus_module_2);
+    add(profile.focus_module_3);
+
+    modulePrefsPrefilledRef.current = true;
+    setModulePreferences(picks.slice(0, 2));
+  }, [profile]);
+
+  // Canonical profile update mutation (React Query) per engineering guidelines
+  const updateProfileMutation = useUpdateProfile();
   
   // Redirect to login if no user
   useEffect(() => {
@@ -1025,9 +1049,36 @@ export function useOnboardingForm() {
       // TimelineStep was removed, so this is now step 8
       handleCalorieTargetNext();
     } else if (currentStep === 9) {
-      // Daily focus targets step - proceed to legal agreement step
+      // Daily focus targets step - proceed to module preferences step
       setCurrentStep(10);
     } else if (currentStep === 10) {
+      // Module preferences step - save focus modules (Food is implied as #1), then proceed to legal
+      if (user) {
+        const defaults: ModulePreference[] = ['Exercise', 'Med', 'Water'];
+        const picks = modulePreferences.slice(0, 2);
+        const fallbacks = defaults.filter((m) => !picks.includes(m));
+
+        const focus2 = picks[0] ?? fallbacks[0];
+        const focus3 = picks[1] ?? fallbacks[1];
+
+        // Fire-and-forget: do not block Next
+        updateProfileMutation.mutate({
+          focus_module_1: 'Food',
+          focus_module_2: focus2,
+          focus_module_3: focus3,
+        });
+      }
+
+      setCurrentStep(11);
+    } else if (currentStep === 11) {
+      // Plan step - proceed to legal (toast nudge if Premium selected)
+      if (selectedPlan === 'premium' && !premiumInsisted) {
+        // Non-blocking: user still proceeds.
+        const { showAppToast } = require('@/components/ui/app-toast');
+        showAppToast(t('onboarding.plan.premium_next_nudge'));
+      }
+      setCurrentStep(12);
+    } else if (currentStep === 12) {
       // Legal agreement step - handled by handleProceedToLegal
       handleProceedToLegal();
     }
@@ -1095,6 +1146,12 @@ export function useOnboardingForm() {
       // Daily Focus Targets step
       return !dailyTargets;
     } else if (currentStep === 10) {
+      // Module Preferences step - user can proceed with 0 selections
+      return false;
+    } else if (currentStep === 11) {
+      // Plan step - always allow Next
+      return false;
+    } else if (currentStep === 12) {
       // Legal Agreement step - all three checkboxes must be checked
       return !legalAgreeTerms || !legalAgreePrivacy || !legalAcknowledgeRisk;
     }
@@ -1250,7 +1307,6 @@ export function useOnboardingForm() {
         updateData.carbs_g_max = dailyTargets.carbsGMax;
         updateData.sugar_g_max = dailyTargets.sugarGMax;
         updateData.sodium_mg_max = dailyTargets.sodiumMgMax;
-        updateData.water_goal_ml = dailyTargets.waterMlTarget; // Using existing column name
         updateData.onboarding_targets_set_at = new Date().toISOString();
       }
       
@@ -1258,7 +1314,8 @@ export function useOnboardingForm() {
       const mutationStart = performance.now();
       const MUTATION_TIMEOUT_MS = 5000; // 5 second timeout
       
-      const mutationPromise = updateProfile(user.id, updateData);
+      // Use React Query mutation (updates caches + AuthContext) per engineering guidelines.
+      const mutationPromise = updateProfileMutation.mutateAsync(updateData);
       const timeoutPromise = new Promise<null>((_, reject) => {
         setTimeout(() => reject(new Error('TIMEOUT')), MUTATION_TIMEOUT_MS);
       });
@@ -1288,15 +1345,7 @@ export function useOnboardingForm() {
         throw new Error('Failed to save profile');
       }
       
-      // Update cache with final profile
-      // Update userConfig cache (preserve email from existing cache)
-      const existingUserConfig = queryClient.getQueryData<any>(['userConfig', user.id]);
-      const updatedUserConfig = {
-        ...updatedProfile,
-        email: existingUserConfig?.email ?? null, // Preserve email from auth
-      };
-      queryClient.setQueryData(['userConfig', user.id], updatedUserConfig);
-      queryClient.setQueryData(['userProfile', user.id], updatedProfile); // Backward compatibility
+      // Cache updates are handled by `useUpdateProfile` onSuccess.
       
       // Also refresh profile in AuthContext - MUST await to prevent bounce
       // This ensures AuthContext.onboardingComplete is updated before navigation
@@ -1442,6 +1491,12 @@ export function useOnboardingForm() {
     setCalorieExecutionMode,
     dailyTargets,
     setDailyTargets,
+    modulePreferences,
+    setModulePreferences,
+    selectedPlan,
+    setSelectedPlan,
+    premiumInsisted,
+    setPremiumInsisted,
     legalAgreeTerms,
     setLegalAgreeTerms,
     legalAgreePrivacy,
