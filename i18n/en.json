@@ -71,7 +71,7 @@
       "next_month": "Next month",
       "previous_day": "Previous day",
       "next_day": "Next day",
-      "select_date": "Select date",
+      "select_date": "Select Date",
       "today_button": "Today",
       "weekdays": ["S", "M", "T", "W", "T", "F", "S"]
     },

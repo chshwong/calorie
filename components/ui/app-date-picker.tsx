@@ -67,20 +67,23 @@ export function AppDatePicker({
   
   const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => new Date(value));
   const [showYearMonthPicker, setShowYearMonthPicker] = useState(false);
+  const [pendingDate, setPendingDate] = useState<Date>(() => new Date(value));
   const yearScrollViewRef = useRef<ScrollView>(null);
   const monthScrollViewRef = useRef<ScrollView>(null);
   
-  // Update calendar view month when value changes
+  // Update calendar view month and pendingDate when value changes or modal opens
   useEffect(() => {
     if (visible) {
-      setCalendarViewMonth(new Date(value));
+      const newDate = new Date(value);
+      setCalendarViewMonth(newDate);
+      setPendingDate(newDate);
     }
   }, [value, visible]);
   
   // Auto-scroll to current year when year picker opens
   useEffect(() => {
     if (showYearMonthPicker && yearScrollViewRef.current) {
-      const currentYear = calendarViewMonth.getFullYear();
+      const currentYear = pendingDate.getFullYear();
       const today = new Date();
       const maxYear = maximumDate ? maximumDate.getFullYear() : (minimumDate ? 2100 : today.getFullYear());
       const minYear = minimumDate ? minimumDate.getFullYear() : maxYear - 150;
@@ -94,7 +97,7 @@ export function AppDatePicker({
         });
       }, 100);
     }
-  }, [showYearMonthPicker, calendarViewMonth, minimumDate, maximumDate]);
+  }, [showYearMonthPicker, pendingDate, minimumDate, maximumDate]);
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -167,7 +170,7 @@ export function AppDatePicker({
     if (!day) return false;
     const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
     date.setHours(0, 0, 0, 0);
-    const selected = new Date(value);
+    const selected = new Date(pendingDate);
     selected.setHours(0, 0, 0, 0);
     return date.getTime() === selected.getTime();
   };
@@ -187,21 +190,26 @@ export function AppDatePicker({
     const newDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
     newDate.setHours(0, 0, 0, 0);
     if (!isDateDisabled(day, calendarViewMonth)) {
-      onChange(newDate);
-      onClose();
+      setPendingDate(newDate);
+      // Do not close modal or call onChange - wait for "Select Date" button
     }
   };
   
   const handleYearMonthSelect = (year: number, month: number) => {
     const newDate = new Date(year, month, 1);
+    let adjustedDate = newDate;
     if (newDate < minDate) {
-      setCalendarViewMonth(new Date(minDate));
+      adjustedDate = new Date(minDate);
     } else if (maxDate !== undefined && newDate > maxDate) {
-      setCalendarViewMonth(new Date(maxDate));
-    } else {
-      setCalendarViewMonth(newDate);
+      adjustedDate = new Date(maxDate);
     }
-    setShowYearMonthPicker(false);
+    setCalendarViewMonth(adjustedDate);
+    // Update pendingDate to the first day of the selected month/year, preserving the day if possible
+    const currentDay = Math.min(pendingDate.getDate(), new Date(adjustedDate.getFullYear(), adjustedDate.getMonth() + 1, 0).getDate());
+    const updatedPendingDate = new Date(adjustedDate.getFullYear(), adjustedDate.getMonth(), currentDay);
+    updatedPendingDate.setHours(0, 0, 0, 0);
+    setPendingDate(updatedPendingDate);
+    // Do not close modal - wait for "Done" button
   };
   
   if (!visible) return null;
@@ -245,7 +253,7 @@ export function AppDatePicker({
               {/* Selected Date Display */}
               <View style={[styles.selectedDateContainer, { borderBottomColor: colors.border }]}>
                 <ThemedText style={[styles.selectedDate, { color: colors.text }]}>
-                  {value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {pendingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </ThemedText>
               </View>
 
@@ -404,16 +412,15 @@ export function AppDatePicker({
                     }
                   ]}
                   onPress={() => {
-                    const todayDate = new Date(today);
-                    onChange(todayDate);
+                    onChange(pendingDate);
                     onClose();
                   }}
                   {...getButtonAccessibilityProps(
-                    t('home.date_picker.today_button'),
-                    'Double tap to select today\'s date'
+                    t('home.date_picker.select_date'),
+                    'Double tap to confirm date selection'
                   )}
                 >
-                  <Text style={styles.todayButtonText}>{t('home.date_picker.today_button')}</Text>
+                  <Text style={styles.todayButtonText}>{t('home.date_picker.select_date')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -471,7 +478,7 @@ export function AppDatePicker({
                       const maxYear = maxDate ? maxDate.getFullYear() : 2100;
                       const year = maxYear - i;
                       if (year < minDate.getFullYear()) return null;
-                      const isSelected = calendarViewMonth.getFullYear() === year;
+                      const isSelected = pendingDate.getFullYear() === year;
                       return (
                         <TouchableOpacity
                           key={year}
@@ -481,7 +488,7 @@ export function AppDatePicker({
                             !isSelected && { borderColor: colors.border },
                           ]}
                           onPress={() => {
-                            const currentMonth = calendarViewMonth.getMonth();
+                            const currentMonth = pendingDate.getMonth();
                             handleYearMonthSelect(year, currentMonth);
                           }}
                           {...getButtonAccessibilityProps(
@@ -519,7 +526,7 @@ export function AppDatePicker({
                     {Array.from({ length: 12 }, (_, i) => {
                       const month = i;
                       const monthName = new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'long' });
-                      const isSelected = calendarViewMonth.getMonth() === month;
+                      const isSelected = pendingDate.getMonth() === month;
                       const testDate = new Date(calendarViewMonth.getFullYear(), i, 1);
                       const isDisabled = testDate < minDate || (maxDate !== undefined && testDate > maxDate);
                       
@@ -534,7 +541,7 @@ export function AppDatePicker({
                           ]}
                           onPress={() => {
                             if (isDisabled) return;
-                            const currentYear = calendarViewMonth.getFullYear();
+                            const currentYear = pendingDate.getFullYear();
                             handleYearMonthSelect(currentYear, month);
                           }}
                           disabled={isDisabled}

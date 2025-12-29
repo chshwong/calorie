@@ -509,9 +509,11 @@ export function useOnboardingForm() {
   };
   
   // Handle date change from AppDatePicker
+  // Note: AppDatePicker now handles closing the modal via onClose callback
+  // This handler only updates the date value
   const handleDateOfBirthChange = (date: Date) => {
     updateDateOfBirthStep2(date);
-    setShowDatePickerStep2(false);
+    // Modal closing is handled by AppDatePicker's "Select Date" button via onClose callback
   };
   
   // Calculate min/max dates for DOB (18-100 years old)

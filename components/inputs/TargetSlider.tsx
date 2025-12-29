@@ -58,6 +58,27 @@ export const TargetSlider: React.FC<TargetSliderProps> = ({
   
   // Clamp value to valid range
   const clampedValue = Math.max(min, Math.min(max, value));
+
+  // Keep latest values in refs so PanResponder callbacks don't use stale closures.
+  const clampedValueRef = useRef<number>(clampedValue);
+  const disabledRef = useRef<boolean>(disabled);
+  const onChangeRef = useRef<(v: number) => void>(onChange);
+
+  useEffect(() => {
+    clampedValueRef.current = clampedValue;
+    disabledRef.current = disabled;
+    onChangeRef.current = onChange;
+  }, [clampedValue, disabled, onChange]);
+
+  // Store the last snapped value during drag, then commit it on release.
+  const lastDragValueRef = useRef<number>(clampedValue);
+
+  useEffect(() => {
+    // When not dragging, keep the last drag value in sync with the externally-controlled value.
+    if (!isDragging) {
+      lastDragValueRef.current = clampedValue;
+    }
+  }, [clampedValue, isDragging]);
   
   // Calculate max thumb left position (ensures thumb never clips)
   const maxThumbLeft = Math.max(0, outerWidth - THUMB_SIZE);
@@ -74,8 +95,8 @@ export const TargetSlider: React.FC<TargetSliderProps> = ({
     if (maxThumbLeft === 0) return min;
     const ratio = left / maxThumbLeft;
     const rawValue = min + ratio * range;
-    // Snap to nearest step
-    const stepped = Math.round(rawValue / step) * step;
+    // Snap to nearest step (anchored to min, not 0)
+    const stepped = min + Math.round((rawValue - min) / step) * step;
     return clamp(stepped, min, max);
   };
   
@@ -97,7 +118,7 @@ export const TargetSlider: React.FC<TargetSliderProps> = ({
         }
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (disabledRef.current) return;
         
         sliderOuterRef.current?.measure((x, y, width, height, pageX, pageY) => {
           if (width === 0) return;
@@ -115,20 +136,29 @@ export const TargetSlider: React.FC<TargetSliderProps> = ({
           // Convert left position to value using current width
           const ratio = currentMaxThumbLeft > 0 ? nextLeft / currentMaxThumbLeft : 0;
           const rawValue = min + ratio * range;
-          const stepped = Math.round(rawValue / step) * step;
+          const stepped = min + Math.round((rawValue - min) / step) * step;
           const newValue = clamp(stepped, min, max);
+
+          // Track last snapped value for release commit.
+          lastDragValueRef.current = newValue;
           
           // Only update if change is significant enough to avoid jitter
-          if (Math.abs(newValue - clampedValue) >= step / 10) {
-            onChange(newValue);
-          }
+          if (newValue !== clampedValueRef.current) onChangeRef.current(newValue);
         });
       },
       onPanResponderRelease: () => {
         setIsDragging(false);
+        if (!disabledRef.current) {
+          const finalValue = lastDragValueRef.current;
+          if (finalValue !== clampedValueRef.current) onChangeRef.current(finalValue);
+        }
       },
       onPanResponderTerminate: () => {
         setIsDragging(false);
+        if (!disabledRef.current) {
+          const finalValue = lastDragValueRef.current;
+          if (finalValue !== clampedValueRef.current) onChangeRef.current(finalValue);
+        }
       },
     })
   ).current;
