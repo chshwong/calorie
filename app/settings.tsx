@@ -496,7 +496,7 @@ export default function SettingsScreen() {
             title={t('settings.my_journey.goals')}
             subtitle={t('settings.my_journey.goals_subtitle')}
             onPress={() => {
-              router.push('/my-goals');
+              router.push('/settings/my-goal');
             }}
           />
         </SettingSection>
