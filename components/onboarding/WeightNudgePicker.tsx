@@ -15,6 +15,7 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Shadow
 import { onboardingColors } from '@/theme/onboardingTheme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { roundTo1 } from '@/utils/bodyMetrics';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface WeightNudgePickerProps {
   value: number; // Display unit value
@@ -25,6 +26,7 @@ interface WeightNudgePickerProps {
   onChange: (nextDisplayValue: number) => void;
   onReset: () => void;
   disabled?: boolean;
+  colors: typeof Colors.light;
 }
 
 const TRACK_WIDTH = 280;
@@ -39,8 +41,10 @@ export const WeightNudgePicker: React.FC<WeightNudgePickerProps> = ({
   onChange,
   onReset,
   disabled = false,
+  colors,
 }) => {
   const { t } = useTranslation();
+  const isDark = useColorScheme() === 'dark';
   const trackRef = useRef<View>(null);
   const [isDragging, setIsDragging] = useState(false);
   
@@ -109,18 +113,26 @@ export const WeightNudgePicker: React.FC<WeightNudgePickerProps> = ({
     return roundTo1(val).toString();
   };
   
+  // Determine text colors based on theme
+  const valueTextColor = isDark ? colors.textValueOnDark : colors.text;
+  const hintTextColor = isDark ? colors.textSecondaryOnDark : colors.textSecondary;
+
   return (
     <View style={styles.container}>
       {/* Large centered value display */}
       <View style={styles.valueDisplay}>
-        <Text variant="h2" style={[styles.valueText, disabled && styles.valueTextDisabled]}>
+        <Text variant="h2" style={[
+          styles.valueText,
+          { color: valueTextColor, opacity: 1 },
+          disabled && styles.valueTextDisabled
+        ]}>
           {formatValue(clampedValue)} {unit}
         </Text>
       </View>
       
       {/* Instructional hint - always visible for maintain/recomp */}
       {!disabled && (
-        <ThemedText style={styles.hintText}>
+        <ThemedText style={[styles.hintText, { color: hintTextColor, opacity: 1 }]}>
           {t('onboarding.goal_weight.nudge_hint')}
         </ThemedText>
       )}
@@ -186,18 +198,18 @@ const styles = StyleSheet.create({
   valueText: {
     fontSize: FontSize['3xl'],
     fontWeight: FontWeight.bold,
-    color: Colors.light.text,
+    // Color and opacity set dynamically via inline styles
   },
   valueTextDisabled: {
     opacity: 0.5,
   },
   hintText: {
     fontSize: FontSize.sm + 1, // 12px + 1pt = 13px (within 12-13 range)
-    color: Colors.light.textSecondary,
     lineHeight: (FontSize.sm + 1) * LineHeight.normal,
     textAlign: 'center',
     marginTop: Spacing.xs,
     marginBottom: Spacing.sm,
+    // Color and opacity set dynamically via inline styles
   },
   trackContainer: {
     width: TRACK_WIDTH,

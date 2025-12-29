@@ -85,6 +85,8 @@ export const PlanStep: React.FC<PlanStepProps> = ({
         {t('onboarding.plan.subtitle_prefix')}
         <ColoredBrandName withSpaceBefore={true} />
         {t('onboarding.plan.subtitle_suffix')}
+        {'\n'}
+        {t('onboarding.plan.subtitle_do_not_pay')}
       </ThemedText>
 
       {/* Free plan */}

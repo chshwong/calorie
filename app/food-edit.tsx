@@ -55,6 +55,7 @@ export default function FoodEditScreen() {
   const { user } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const isDark = colorScheme === 'dark';
   const queryClient = useQueryClient();
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = Platform.OS === 'web' && screenWidth > 768;
@@ -111,6 +112,7 @@ export default function FoodEditScreen() {
   const servingButtonRef = useRef<View>(null);
   const quantityInputRef = useRef<TextInput>(null);
   const [servingDropdownLayout, setServingDropdownLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isQuantityFocused, setIsQuantityFocused] = useState(false);
   const entryHydratedRef = useRef(false);
   const foodHydratedRef = useRef(false);
   const isSavingRef = useRef(false); // Guard to prevent double save execution
@@ -893,9 +895,26 @@ export default function FoodEditScreen() {
               servingQuantityInput={
                 <TextInput
                   ref={quantityInputRef}
-                  style={[styles.nutritionLabelInput, styles.nutritionLabelSmallInput, { borderColor: quantityError ? '#EF4444' : '#000000' }]}
+                  style={[
+                    styles.nutritionLabelInput, 
+                    styles.nutritionLabelSmallInput,
+                    {
+                      backgroundColor: isDark ? colors.inputBgDark : 'transparent',
+                      borderBottomColor: quantityError 
+                        ? '#EF4444' 
+                        : (isDark 
+                          ? (isQuantityFocused ? colors.inputBorderFocusDark : colors.inputBorderDark)
+                          : '#000000'),
+                      color: isDark ? colors.inputTextDark : '#000000',
+                      borderBottomWidth: 1,
+                    }
+                  ]}
+                  placeholder="1"
+                  placeholderTextColor={isDark ? colors.inputPlaceholderDark : colors.inputPlaceholder}
                   value={quantity}
                   onChangeText={handleQuantityChange}
+                  onFocus={() => setIsQuantityFocused(true)}
+                  onBlur={() => setIsQuantityFocused(false)}
                   keyboardType="numeric"
                   maxLength={4}
                   returnKeyType="done"
@@ -909,7 +928,13 @@ export default function FoodEditScreen() {
               servingUnitInput={
                 <TouchableOpacity
                   ref={servingButtonRef}
-                  style={[styles.servingUnitButton, { borderColor: '#000000' }]}
+                  style={[
+                    styles.servingUnitButton,
+                    {
+                      backgroundColor: isDark ? colors.inputBgDark : 'transparent',
+                      borderColor: isDark ? colors.inputBorderDark : '#000000',
+                    }
+                  ]}
                   onPress={() => {
                     servingButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
                       setServingDropdownLayout({ x, y, width, height });
@@ -918,7 +943,10 @@ export default function FoodEditScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <ThemedText style={styles.servingUnitText}>
+                  <ThemedText style={[
+                    styles.servingUnitText,
+                    { color: isDark ? colors.inputTextDark : '#000000' }
+                  ]}>
                     {selectedServing ? selectedServing.label : unit}
                   </ThemedText>
                 </TouchableOpacity>
@@ -1152,7 +1180,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 4,
     paddingHorizontal: 0,
-    color: '#000000',
+    // backgroundColor, borderBottomColor, color set via inline styles for dark mode
     borderBottomWidth: 1,
   },
   nutritionLabelTitleInput: {
@@ -1197,9 +1225,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderWidth: 1,
     borderRadius: 4,
+    // backgroundColor and borderColor set via inline styles for dark mode
   },
   servingUnitText: {
-    color: '#000000',
+    // color set via inline style for dark mode
     fontWeight: '600',
     fontSize: 16,
   },

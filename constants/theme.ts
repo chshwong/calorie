@@ -105,12 +105,34 @@ export const Colors = {
     // Text
     text: '#11181C',
     textSecondary: StandardGrey.light,
+    textSecondaryOnDark: StandardGrey.light, // Not used in light mode, but present for type consistency
     textTertiary: '#9BA1A6',
     textMuted: '#6B7280',
+    textMutedOnDark: StandardGrey.light,
     textSubtle: '#9CA3AF',
     textInverse: '#FFFFFF',
     textOnSoft: '#0B0F10',
-    textMutedOnDark: StandardGrey.light,
+    textValueOnDark: '#11181C', // Not used in light mode, but present for type consistency
+    
+    // Light mode nutrition panel surfaces (not used in light mode, but present for type consistency)
+    surfacePanelDark: '#FFFFFF',
+    surfacePanelDividerDark: '#000000',
+    
+    // Light mode text inside panels (not used in light mode, but present for type consistency)
+    textPanelHeaderDark: '#11181C',
+    textPanelLabelDark: '#11181C',
+    textPanelValueDark: '#11181C',
+    
+    // Light mode inputs (not used in light mode, but present for type consistency)
+    inputBgDark: '#FFFFFF',
+    inputBorderDark: '#000000',
+    inputBorderFocusDark: '#000000',
+    inputTextDark: '#000000',
+    inputPlaceholderDark: '#6B7280',
+    
+    // Light mode Quick Log card (not used in light mode, but present for type consistency)
+    quickLogCardBgDark: '#FFFFFF',
+    quickLogCardBorderDark: '#E5E5E5',
     
     // Backgrounds
     background: '#FFFFFF',
@@ -167,14 +189,36 @@ export const Colors = {
   },
   dark: {
     // Text
-    text: '#FFFFFF',
+    text: '#FFFFFF', // textPrimaryOnDark - title / primary labels
     textSecondary: StandardGrey.dark,
+    textSecondaryOnDark: '#D1DEE2', // NEW: readable secondary copy (helper text)
     textTertiary: '#8E8E93',
     textMuted: '#9CA3AF',
+    textMutedOnDark: '#A9B8BD', // subtle captions only (NOT for helper on this page)
     textSubtle: '#6B7280',
     textInverse: '#11181C',
     textOnSoft: '#0B0F10',
-    textMutedOnDark: '#B8C4C8',
+    textValueOnDark: '#EAF2F4', // NEW: prominent but not pure white (large numeric values)
+    
+    // Dark mode nutrition panel surfaces
+    surfacePanelDark: '#141A1C', // darker than app background, not black
+    surfacePanelDividerDark: '#2A3438', // divider lines in dark mode panels
+    
+    // Dark mode text inside panels
+    textPanelHeaderDark: '#D6E2E6', // section headers (Calories, Fat, Carbohydrate, Protein, Sodium)
+    textPanelLabelDark: '#B7C6CB', // sub-labels (Saturated, + Trans, Fibre, Sugars)
+    textPanelValueDark: '#EAF2F4', // numeric values (g, mg, etc.)
+    
+    // Dark mode inputs (Food Entry panel)
+    inputBgDark: '#11181A', // slightly distinct from panel bg (#141A1C)
+    inputBorderDark: '#2E3A3F', // subtle outline for affordance
+    inputBorderFocusDark: '#2FA4A9', // brand teal for focus state
+    inputTextDark: '#EAF2F4', // entered text
+    inputPlaceholderDark: '#AFC0C6', // readable placeholder
+    
+    // Dark mode Quick Log card
+    quickLogCardBgDark: '#101617', // dark card surface (not pitch black)
+    quickLogCardBorderDark: '#243035', // subtle outline
     
     // Backgrounds
     background: '#121212',

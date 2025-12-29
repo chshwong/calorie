@@ -10,7 +10,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { getEntriesForDate, createEntry } from './calorieEntries';
+import { getEntriesForDate, createEntry, deleteEntries } from './calorieEntries';
 import { getMealtypeMetaByDate, upsertMealtypeMeta } from './calories-entries-mealtype-meta';
 import type { CalorieEntry } from '@/utils/types';
 
@@ -21,27 +21,30 @@ export interface CloneMealtypeResult {
   notesCopied: boolean;
 }
 
+export type TransferMode = 'copy' | 'move';
+export type NotesMode = 'exclude' | 'override';
+
+export interface TransferMealtypeParams {
+  userId: string;
+  sourceDate: string;
+  sourceMealType: string;
+  targetDate: string;
+  targetMealType: string;
+  mode: TransferMode;
+  notesMode: NotesMode; // 'exclude' means don't copy/delete notes, 'override' means copy and delete if move
+}
+
 /**
- * Clone calories entries and mealtype meta for a specific meal type from one date to another
+ * Transfer (copy or move) calories entries and mealtype meta for a specific meal type from one date to another
  * 
- * @param userId - The user's ID
- * @param sourceDate - Source date in YYYY-MM-DD format
- * @param sourceMealType - Source meal type
- * @param targetDate - Target date in YYYY-MM-DD format
- * @param targetMealType - Target meal type
- * @param includeQuickLog - Whether to copy quick log values (default: false)
- * @param includeNotes - Whether to copy notes (default: false)
- * @returns Result with counts of cloned entries and whether meta was cloned
+ * @param params - Transfer parameters
+ * @returns Result with counts of transferred entries and whether meta was transferred
  * @throws Error if sourceDate equals targetDate or if validation fails
  */
-export async function cloneCaloriesEntriesForMealtype(
-  userId: string,
-  sourceDate: string,
-  sourceMealType: string,
-  targetDate: string,
-  targetMealType: string,
-  includeNotes: boolean = false
+export async function transferMealtypeEntries(
+  params: TransferMealtypeParams
 ): Promise<CloneMealtypeResult> {
+  const { userId, sourceDate, sourceMealType, targetDate, targetMealType, mode, notesMode } = params;
   if (!userId || !sourceDate || !sourceMealType || !targetDate || !targetMealType) {
     throw new Error('Missing required parameters');
   }
@@ -56,26 +59,27 @@ export async function cloneCaloriesEntriesForMealtype(
     throw new Error('Invalid date format. Expected YYYY-MM-DD');
   }
 
-  // Prevent cloning to the same date
+  // Prevent transferring to the same date and meal type
   if (normalizedSource === normalizedTarget && sourceMealType.toLowerCase() === targetMealType.toLowerCase()) {
     throw new Error('SAME_DATE'); // Special error code for UI to handle
   }
 
   try {
-    // Use a transaction-like approach: clone entries first, then meta
-    // Note: Supabase doesn't support true transactions in the client, so we do sequential operations
-    // If entries fail, we stop. If meta fails, we still return the entries count.
-
-    // Step 1: Clone calories_entries
+    // Step 1: Get source entries
     const sourceEntries = await getEntriesForDate(userId, normalizedSource);
     
     // Filter entries by source meal type
-    const entriesToClone = sourceEntries.filter(entry => 
+    const entriesToTransfer = sourceEntries.filter(entry => 
       entry.meal_type.toLowerCase() === sourceMealType.toLowerCase()
     );
 
-    let entriesCloned = 0;
-    for (const entry of entriesToClone) {
+    // Step 2: Copy entries to target
+    let entriesTransferred = 0;
+    const sourceEntryIds: string[] = [];
+
+    for (const entry of entriesToTransfer) {
+      sourceEntryIds.push(entry.id);
+      
       // Create new entry with target date and meal type
       const newEntry: Omit<CalorieEntry, 'id' | 'created_at' | 'updated_at'> = {
         user_id: entry.user_id,
@@ -101,13 +105,15 @@ export async function cloneCaloriesEntriesForMealtype(
 
       const created = await createEntry(newEntry);
       if (created) {
-        entriesCloned++;
+        entriesTransferred++;
       } else {
-        console.error(`Failed to clone entry: ${entry.item_name}`);
+        console.error(`Failed to transfer entry: ${entry.item_name}`);
+        // If copy fails, throw error to prevent deletion
+        throw new Error(`Failed to transfer entry: ${entry.item_name}`);
       }
     }
 
-    // Step 2: Clone mealtype meta if it exists
+    // Step 3: Copy mealtype meta if notes should be included (notesMode === 'override')
     let metaCloned = false;
     let notesCopied = false;
     const sourceMetaArray = await getMealtypeMetaByDate(userId, normalizedSource);
@@ -115,7 +121,8 @@ export async function cloneCaloriesEntriesForMealtype(
       meta.meal_type.toLowerCase() === sourceMealType.toLowerCase()
     );
 
-    // Copy mealtype meta if notes should be included
+    // Copy mealtype meta if notes should be included (override mode)
+    const includeNotes = notesMode === 'override';
     if (sourceMeta && includeNotes) {
       const hasNote = sourceMeta.note != null && sourceMeta.note.trim().length > 0;
       
@@ -135,19 +142,71 @@ export async function cloneCaloriesEntriesForMealtype(
           metaCloned = true;
           notesCopied = true;
         } else {
-          console.error('Failed to clone mealtype meta');
+          console.error('Failed to copy mealtype meta');
+          // If meta copy fails, we still continue (non-critical)
+        }
+      }
+    }
+
+    // Step 4: If mode is 'move', delete source entries and optionally notes
+    if (mode === 'move') {
+      // Delete source entries (OK if this deletes 0 rows when empty)
+      const deleteSuccess = await deleteEntries(sourceEntryIds);
+      if (!deleteSuccess && sourceEntryIds.length > 0) {
+        // Only error if we expected to delete something
+        console.error('Failed to delete source entries after move');
+        throw new Error('Failed to delete source entries after move');
+      }
+
+      // MUST run even when there were 0 entries
+      if (notesMode === 'override') {
+        const { error: deleteMetaError } = await supabase
+          .from('calories_entries_mealtype_meta')
+          .delete()
+          .eq('user_id', userId)
+          .eq('entry_date', normalizedSource)
+          .eq('meal_type', sourceMealType);
+        
+        if (deleteMetaError) {
+          console.error('Failed to delete source mealtype meta after move:', deleteMetaError);
+          // Non-critical - just log the error
         }
       }
     }
 
     return {
-      entriesCloned,
+      entriesCloned: entriesTransferred,
       metaCloned,
       quickLogCopied: false, // Always false, Quick Log is deprecated
       notesCopied,
     };
   } catch (error) {
-    console.error('Exception cloning mealtype entries:', error);
+    console.error('Exception transferring mealtype entries:', error);
     throw error; // Re-throw to let caller handle
   }
+}
+
+/**
+ * Clone calories entries and mealtype meta for a specific meal type from one date to another
+ * (Legacy function maintained for backward compatibility)
+ * 
+ * @deprecated Use transferMealtypeEntries with mode='copy' instead
+ */
+export async function cloneCaloriesEntriesForMealtype(
+  userId: string,
+  sourceDate: string,
+  sourceMealType: string,
+  targetDate: string,
+  targetMealType: string,
+  includeNotes: boolean = false
+): Promise<CloneMealtypeResult> {
+  return transferMealtypeEntries({
+    userId,
+    sourceDate,
+    sourceMealType,
+    targetDate,
+    targetMealType,
+    mode: 'copy',
+    notesMode: includeNotes ? 'override' : 'exclude',
+  });
 }

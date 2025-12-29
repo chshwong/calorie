@@ -20,6 +20,8 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 
+export type TransferMode = 'copy' | 'move';
+
 type CopyMealtypeModalProps = {
   visible: boolean;
   onClose: () => void;
@@ -27,6 +29,7 @@ type CopyMealtypeModalProps = {
   sourceDate: Date;
   sourceMealType: string;
   isLoading?: boolean;
+  mode?: TransferMode; // 'copy' or 'move'
   title?: string;
   subtitle?: string;
   confirmButtonText?: string;
@@ -42,6 +45,7 @@ export function CopyMealtypeModal({
   sourceDate,
   sourceMealType,
   isLoading = false,
+  mode = 'copy',
   title,
   subtitle,
   confirmButtonText,
@@ -50,6 +54,19 @@ export function CopyMealtypeModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  
+  // Derive title and confirm button text from mode if not provided
+  const modalTitle = title || (mode === 'move' 
+    ? t('food.move.title', { defaultValue: 'Move To' })
+    : t('food.copy.title', { defaultValue: 'Copy To' }));
+  
+  const modalSubtitle = subtitle || (mode === 'move'
+    ? t('food.move.subtitle', { defaultValue: 'Choose a date and meal type to move to.' })
+    : t('food.copy.subtitle', { defaultValue: 'Choose a date and meal type to copy to.' }));
+  
+  const buttonText = confirmButtonText || (mode === 'move'
+    ? t('food.move.confirm', { defaultValue: 'Move' })
+    : t('food.copy.confirm', { defaultValue: 'Copy' }));
 
   // Default target date to tomorrow
   const getDefaultTargetDate = () => {
@@ -152,11 +169,11 @@ export function CopyMealtypeModal({
           <View style={styles.modalHeader}>
             <View style={styles.headerContent}>
               <ThemedText type="title" style={{ color: colors.text }}>
-                {title || t('food.copy.title', { defaultValue: 'Copy To' })}
+                {modalTitle}
               </ThemedText>
-              {subtitle && (
+              {modalSubtitle && (
                 <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  {subtitle}
+                  {modalSubtitle}
                 </ThemedText>
               )}
             </View>
@@ -416,13 +433,13 @@ export function CopyMealtypeModal({
               onPress={handleConfirm}
               disabled={isLoading}
               activeOpacity={0.7}
-              {...getButtonAccessibilityProps(confirmButtonText || t('food.copy.confirm', { defaultValue: 'Copy' }))}
+              {...getButtonAccessibilityProps(buttonText)}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Text style={[styles.confirmButtonText, { color: '#fff' }]}>
-                  {confirmButtonText || t('food.copy.confirm', { defaultValue: 'Copy' })}
+                  {buttonText}
                 </Text>
               )}
             </TouchableOpacity>

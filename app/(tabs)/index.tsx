@@ -1,4 +1,5 @@
 import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
+import type { TransferMode } from '@/components/copy-mealtype-modal';
 import { CopyMealtypeModal } from '@/components/copy-mealtype-modal';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
@@ -21,6 +22,7 @@ import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useSelectedDate } from '@/hooks/use-selected-date';
+import { useTransferMealtypeEntries } from '@/hooks/use-transfer-mealtype-entries';
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { userConfigQueryKey, useUserConfig } from '@/hooks/use-user-config';
 import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
@@ -216,8 +218,12 @@ export default function FoodLogHomeScreen() {
   // Note editor state
   const [noteEditor, setNoteEditor] = useState<{ visible: boolean; mealType: string | null }>({ visible: false, mealType: null });
   
-  // Copy mealtype modal state
-  const [copyMealtypeModal, setCopyMealtypeModal] = useState<{ visible: boolean; mealType: string | null }>({ visible: false, mealType: null });
+  // Transfer mealtype modal state (copy or move)
+  const [transferMealtypeModal, setTransferMealtypeModal] = useState<{ 
+    visible: boolean; 
+    mealType: string | null;
+    mode: TransferMode;
+  }>({ visible: false, mealType: null, mode: 'copy' });
 
   // SECURITY: Check if we're in password recovery mode and block access
   const { isPasswordRecovery } = useAuth();
@@ -253,8 +259,11 @@ export default function FoodLogHomeScreen() {
   // Mutation for upserting mealtype meta
   const upsertMealtypeMetaMutation = useUpsertMealtypeMeta();
   
-  // Mutation for copying mealtype entries
+  // Mutation for copying mealtype entries (legacy, kept for backward compatibility)
   const copyMealtypeMutation = useCopyMealtypeEntries();
+  
+  // Mutation for transferring mealtype entries (copy or move)
+  const transferMealtypeMutation = useTransferMealtypeEntries();
 
 
   const prefetchDateData = useCallback(
@@ -637,10 +646,15 @@ export default function FoodLogHomeScreen() {
 
   const handleCopyTo = (mealType: string) => {
     setThreeDotMealMenuVisible({ mealType: null });
-    setCopyMealtypeModal({ visible: true, mealType });
+    setTransferMealtypeModal({ visible: true, mealType, mode: 'copy' });
   };
 
-  const handleCopyConfirm = (mealType: string, targetDate: Date, targetMealType: string, includeNotes: boolean) => {
+  const handleMoveTo = (mealType: string) => {
+    setThreeDotMealMenuVisible({ mealType: null });
+    setTransferMealtypeModal({ visible: true, mealType, mode: 'move' });
+  };
+
+  const handleTransferConfirm = (mealType: string, targetDate: Date, targetMealType: string, includeNotes: boolean, mode: TransferMode) => {
     const targetDateString = getLocalDateKey(targetDate);
     
     // Helper to check if two dates are the same day
@@ -653,25 +667,32 @@ export default function FoodLogHomeScreen() {
     const sameMealType = mealType.toLowerCase() === targetMealType.toLowerCase();
     
     if (sameDay && sameMealType) {
+      const errorKey = mode === 'move' ? 'food.move.same_meal_error' : 'food.copy.same_meal_error';
       showAppToast(
-        t('food.copy.same_meal_error', {
-          defaultValue: "You can't copy into the same meal. Pick another meal or date.",
+        t(errorKey, {
+          defaultValue: mode === 'move' 
+            ? "You can't move into the same meal. Pick another meal or date."
+            : "You can't copy into the same meal. Pick another meal or date.",
         })
       );
-      return; // Don't proceed with the copy
+      return; // Don't proceed with the transfer
     }
     
-    copyMealtypeMutation.mutate(
+    // Convert includeNotes boolean to NotesMode
+    const notesMode = includeNotes ? 'override' : 'exclude';
+    
+    transferMealtypeMutation.mutate(
       {
         sourceDate: selectedDateString,
         sourceMealType: mealType,
         targetDate: targetDateString,
         targetMealType,
-        includeNotes,
+        mode,
+        notesMode,
       },
       {
         onSuccess: (result) => {
-          setCopyMealtypeModal({ visible: false, mealType: null });
+          setTransferMealtypeModal({ visible: false, mealType: null, mode: 'copy' });
           const mealTypeLabel = t(`home.meal_types.${targetMealType}`);
           const dateLabel = targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
           
@@ -681,9 +702,12 @@ export default function FoodLogHomeScreen() {
             totalCount += 1;
           }
           
+          const successKey = mode === 'move' ? 'food.move.success_toast' : 'food.copy.success_toast';
           showAppToast(
-            t('food.copy.success_toast', {
-              defaultValue: '{{count}} item(s) copied to {{mealType}} on {{date}}',
+            t(successKey, {
+              defaultValue: mode === 'move'
+                ? '{{count}} item(s) moved to {{mealType}} on {{date}}'
+                : '{{count}} item(s) copied to {{mealType}} on {{date}}',
               count: totalCount,
               mealType: mealTypeLabel,
               date: dateLabel,
@@ -691,11 +715,21 @@ export default function FoodLogHomeScreen() {
           );
         },
         onError: (error: Error) => {
-          setCopyMealtypeModal({ visible: false, mealType: null });
+          setTransferMealtypeModal({ visible: false, mealType: null, mode: 'copy' });
           if (error.message === 'SAME_DATE') {
-            showAppToast(t('food.copy.same_date_error', { defaultValue: 'Cannot copy to the same date and meal type' }));
+            const sameDateKey = mode === 'move' ? 'food.move.same_date_error' : 'food.copy.same_date_error';
+            showAppToast(t(sameDateKey, { 
+              defaultValue: mode === 'move' 
+                ? 'Cannot move to the same date and meal type' 
+                : 'Cannot copy to the same date and meal type' 
+            }));
           } else {
-            showAppToast(t('food.copy.error_message', { defaultValue: 'Unable to copy entries. Please try again.' }));
+            const errorKey = mode === 'move' ? 'food.move.error_message' : 'food.copy.error_message';
+            showAppToast(t(errorKey, { 
+              defaultValue: mode === 'move' 
+                ? 'Unable to move entries. Please try again.' 
+                : 'Unable to copy entries. Please try again.' 
+            }));
           }
         },
       }
@@ -1268,6 +1302,40 @@ export default function FoodLogHomeScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.threeDotMealMenuItem}
+                      onPress={() => {
+                        if (hasAnythingToCopy) {
+                          handleMoveTo(threeDotMealMenuVisible.mealType!);
+                        }
+                      }}
+                      activeOpacity={hasAnythingToCopy ? 0.7 : 1}
+                      disabled={!hasAnythingToCopy}
+                      {...getButtonAccessibilityProps(
+                        `Move ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`,
+                        `Move ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`
+                      )}
+                    >
+                      <View style={styles.threeDotMealMenuItemWithIcon}>
+                        <IconSymbol 
+                          name="doc.on.doc" 
+                          size={16} 
+                          color={hasAnythingToCopy ? colors.text : colors.textSecondary} 
+                        />
+                        <ThemedText 
+                          style={[
+                            styles.threeDotMealMenuItemText, 
+                            { 
+                              color: hasAnythingToCopy ? colors.text : colors.textSecondary,
+                              marginLeft: Spacing.sm,
+                              opacity: hasAnythingToCopy ? 1 : 0.5,
+                            }
+                          ]}
+                        >
+                          {t('food.menu.move_to', { defaultValue: 'Move To' })}
+                        </ThemedText>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.threeDotMealMenuItem}
                       onPress={() => handleNotes(threeDotMealMenuVisible.mealType!)}
                       activeOpacity={0.7}
                       {...getButtonAccessibilityProps(
@@ -1300,18 +1368,22 @@ export default function FoodLogHomeScreen() {
         />
       )}
 
-      {/* Copy Mealtype Modal */}
-      {copyMealtypeModal.mealType && (
+      {/* Transfer Mealtype Modal (Copy or Move) */}
+      {transferMealtypeModal.mealType && (
         <CopyMealtypeModal
-          visible={copyMealtypeModal.visible}
-          onClose={() => setCopyMealtypeModal({ visible: false, mealType: null })}
-          onConfirm={(targetDate, targetMealType, includeNotes) => handleCopyConfirm(copyMealtypeModal.mealType!, targetDate, targetMealType, includeNotes)}
+          visible={transferMealtypeModal.visible}
+          onClose={() => setTransferMealtypeModal({ visible: false, mealType: null, mode: 'copy' })}
+          onConfirm={(targetDate, targetMealType, includeNotes) => handleTransferConfirm(
+            transferMealtypeModal.mealType!, 
+            targetDate, 
+            targetMealType, 
+            includeNotes, 
+            transferMealtypeModal.mode
+          )}
           sourceDate={selectedDate}
-          sourceMealType={copyMealtypeModal.mealType}
-          isLoading={copyMealtypeMutation.isPending}
-          title={t('food.copy.title', { defaultValue: 'Copy To' })}
-          subtitle={t('food.copy.subtitle', { defaultValue: 'Choose a date and meal type to copy to.' })}
-          confirmButtonText={t('food.copy.confirm', { defaultValue: 'Copy' })}
+          sourceMealType={transferMealtypeModal.mealType}
+          isLoading={transferMealtypeMutation.isPending}
+          mode={transferMealtypeModal.mode}
         />
       )}
     </ThemedView>

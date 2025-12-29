@@ -346,23 +346,23 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
       {/* Meta block for lose/gain */}
       {currentWeightLb !== null && (goalType === 'lose' || goalType === 'gain') && (
         <View style={styles.metaBlock}>
-          <ThemedText style={[styles.metaLine, { color: colors.textSecondary }]}>
+          <ThemedText style={[styles.metaLine, { color: isDark ? colors.textSecondaryOnDark : colors.textSecondary, opacity: 1 }]}>
             {t('onboarding.goal_weight.your_current_weight')}: {roundTo1(currentWeightUnit === 'kg' ? lbToKg(currentWeightLb) : currentWeightLb)} {currentWeightUnit}
           </ThemedText>
-          <ThemedText style={[styles.metaLine, { color: colors.textSecondary }]}>
+          <ThemedText style={[styles.metaLine, { color: isDark ? colors.textSecondaryOnDark : colors.textSecondary, opacity: 1 }]}>
             {t('onboarding.goal_weight.your_goal')}: {goalType === 'lose' 
               ? t('onboarding.goal.lose_weight.label')
               : t('onboarding.goal.gain_weight.label')}
           </ThemedText>
           {goalWeightSuggestion?.ok ? (
-            <ThemedText style={[styles.metaLineLast, { color: colors.textSecondary }]}>
+            <ThemedText style={[styles.metaLineLast, { color: isDark ? colors.textSecondaryOnDark : colors.textSecondary, opacity: 1 }]}>
               {String(t('onboarding.goal_weight.suggest_prefix'))}{' '}
               <Text style={{ fontWeight: FontWeight.bold }}>
                 {roundToNearestHalf(currentWeightUnit === 'kg' ? lbToKg(goalWeightSuggestion.suggestedLb) : goalWeightSuggestion.suggestedLb)} {currentWeightUnit}
               </Text>
             </ThemedText>
           ) : goalWeightSuggestion ? (
-            <ThemedText style={[styles.metaLineLast, { color: colors.textSecondary }]}>
+            <ThemedText style={[styles.metaLineLast, { color: isDark ? colors.textSecondaryOnDark : colors.textSecondary, opacity: 1 }]}>
               {String(t(goalWeightSuggestion.messageKey, goalWeightSuggestion.messageParams || {}))}
             </ThemedText>
           ) : null}
@@ -372,10 +372,10 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
       {/* Meta block for maintain/recomp */}
       {(goalType === 'maintain' || goalType === 'recomp') && nudgeRange && currentWeightLb !== null && (
         <View style={styles.metaBlock}>
-          <ThemedText style={[styles.metaLine, { color: colors.textSecondary }]}>
+          <ThemedText style={[styles.metaLine, { color: isDark ? colors.textSecondaryOnDark : colors.textSecondary, opacity: 1 }]}>
             {t('onboarding.goal_weight.your_current_weight')}: {roundTo1(currentWeightUnit === 'kg' ? lbToKg(currentWeightLb) : currentWeightLb)} {currentWeightUnit}
           </ThemedText>
-          <ThemedText style={[styles.metaLineLast, { color: colors.textSecondary }]}>
+          <ThemedText style={[styles.metaLineLast, { color: isDark ? colors.textSecondaryOnDark : colors.textSecondary, opacity: 1 }]}>
             {t('onboarding.goal_weight.your_goal')}: {goalType === 'maintain' 
               ? t('onboarding.goal.maintain_weight.label')
               : t('onboarding.goal.recomp.label')}
@@ -448,6 +448,7 @@ export const GoalWeightStep: React.FC<GoalWeightStepProps> = ({
               onErrorClear();
             }}
             disabled={nudgeRange.disabled || loading}
+            colors={colors}
           />
         </View>
       ) : (

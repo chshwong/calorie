@@ -59,6 +59,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
   const { user } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const isDark = colorScheme === 'dark';
   const queryClient = useQueryClient();
   const itemNameInputRef = useRef<TextInput>(null);
 
@@ -635,7 +636,14 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
   }, [registerSubmit, handleFormSubmit]);
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: isDark ? colors.quickLogCardBgDark : '#FFFFFF',
+        borderWidth: isDark ? 1 : 0,
+        borderColor: isDark ? colors.quickLogCardBorderDark : 'transparent',
+      }
+    ]}>
       {/* Header with title and badge */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -1167,7 +1175,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
+    // backgroundColor set via inline style for dark mode support
     borderRadius: 12,
     padding: 16,
   },

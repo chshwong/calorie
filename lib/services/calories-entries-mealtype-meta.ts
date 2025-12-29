@@ -148,3 +148,41 @@ export async function upsertMealtypeMeta(
     return null;
   }
 }
+
+/**
+ * Delete mealtype meta for a specific date and meal type
+ * 
+ * @param userId - The user's ID
+ * @param entryDate - Date in YYYY-MM-DD format
+ * @param mealType - Meal type to delete meta for
+ * @returns true on success, false on error
+ */
+export async function deleteMealtypeMeta(
+  userId: string,
+  entryDate: string,
+  mealType: string
+): Promise<boolean> {
+  if (!userId || !entryDate || !mealType) {
+    console.error('Missing required parameters for deleteMealtypeMeta');
+    return false;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('calories_entries_mealtype_meta')
+      .delete()
+      .eq('user_id', userId)
+      .eq('entry_date', entryDate)
+      .eq('meal_type', mealType);
+
+    if (error) {
+      console.error('Error deleting mealtype meta:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Exception deleting mealtype meta:', error);
+    return false;
+  }
+}

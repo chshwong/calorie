@@ -113,6 +113,39 @@
     "admin_button": "ADMIN"
   },
 
+  "food": {
+    "menu": {
+      "copy_to": "Copy To",
+      "move_to": "Move To"
+    },
+    "copy": {
+      "title": "Copy To",
+      "subtitle": "Choose a date and meal type to copy to.",
+      "confirm": "Copy",
+      "meal_type_label": "Meal Type",
+      "date_label": "Date",
+      "exclude_notes": "Exclude Notes",
+      "override_notes": "Override Notes",
+      "same_meal_error": "You can't copy into the same meal. Pick another meal or date.",
+      "same_date_error": "Cannot copy to the same date and meal type",
+      "success_toast": "{{count}} item(s) copied to {{mealType}} on {{date}}",
+      "error_message": "Unable to copy entries. Please try again."
+    },
+    "move": {
+      "title": "Move To",
+      "subtitle": "Choose a date and meal type to move to.",
+      "confirm": "Move",
+      "meal_type_label": "Meal Type",
+      "date_label": "Date",
+      "exclude_notes": "Exclude Notes",
+      "override_notes": "Override Notes",
+      "same_meal_error": "You can't move into the same meal. Pick another meal or date.",
+      "same_date_error": "Cannot move to the same date and meal type",
+      "success_toast": "{{count}} item(s) moved to {{mealType}} on {{date}}",
+      "error_message": "Unable to move entries. Please try again."
+    }
+  },
+
   "auth": {
     "login": {
       "title": "Welcome Back",
@@ -256,33 +289,34 @@
     "plan": {
       "title": "Choose your plan",
       "subtitle_prefix": "",
-      "subtitle_suffix": "Free is the way to go! Do Not PAY!!",
+      "subtitle_suffix": "Free is the way to go!",
+      "subtitle_do_not_pay": "DO NOT PAY!!",
       "tap_to_select": "Tap to select",
       "badge_recommended": "Recommended",
       "badge_do_not_select": "Do Not Select",
       "free_name_suffix": "Free",
-      "free_value": "Everything you need to log food and stay consistent.",
-      "free_bullet_1": "Unlimited food logging",
-      "free_bullet_2": "Calorie + macro targets",
-      "free_bullet_3": "Daily insights and summaries",
-      "free_bullet_4": "Works offline-friendly (where supported)",
-      "free_bullet_5": "No upsell spam",
+      "free_value": "Everything you need.",
+      "free_bullet_1": "Log food, exercises, meds, water, and more.",
+      "free_bullet_2": "Calorie + macro targets.",
+      "free_bullet_3": "Daily insights and summaries.",
+      "free_bullet_4": "Feels premium.",
+      "free_bullet_5": "No upsell spam, makes you wonder what's the catch.",
       "free_cta": "Select Free",
       "premium_name_suffix": "Premium",
       "premium_why_title": "Why not choose Premium",
       "premium_bullet_1": "Why pay when Free already does the job?",
-      "premium_bullet_2": "AI food photo logging can be wildly wrong (lighting, portions, sauces).",
+      "premium_bullet_2": "AI food photo logging can be wildly off (and we offer a free alternative).",
       "premium_bullet_3": "You’d miss out on ads… if we had any.",
       "premium_bullet_4": "Subscriptions add sodium to your finances.",
       "premium_bullet_5": "Paying monthly won’t make broccoli taste better.",
-      "premium_bullet_6": "Supporting AvoVibe is cool, but you can do it without a subscription.",
+      "premium_bullet_6": "AvoVibe was designed to help you, not to milk you like other apps do.",
       "premium_cta": "I insist",
       "premium_cta_hint": "Opens a donation panel",
       "premium_next_nudge": "We recommended Free. If you still want to support, tap “I insist”.",
       "donation_title": "Support AvoVibe",
-      "donation_body": "No subscription today. If you want to donate, here’s the link.",
+      "donation_body": "Wow, I (the founder) truly appreciate your support.\n\nI still can’t justify locking features behind your money when there’s so much genuinely useful stuff left to build for free. Thus, there is no premium yet. If you’d like to support the app anyway, sharing AvoVibe with others means a lot. You can also choose to donate to help support its growth and long-term vision.",
       "donation_open": "Open donation link",
-      "donation_not_now": "Not now",
+      "donation_not_now": "Cheers",
       "donation_missing": "Donation link isn’t configured yet.",
       "free_accessibility_label": "AvoVibe Free plan",
       "premium_accessibility_label": "AvoVibe Premium plan"
