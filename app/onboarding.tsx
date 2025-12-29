@@ -442,7 +442,10 @@ export default function OnboardingScreen() {
                       label={loading || isSubmitting ? t('onboarding.saving') : t('onboarding.legal_agree_cta')}
                       onPress={async () => {
                         // Ensure handler is properly awaited
-                        await handleProceedToLegal();
+                        await handleCompleteOnboarding({
+                          markComplete: true,
+                          navigateTo: '/(tabs)',
+                        });
                       }}
                       disabled={shouldDisableNext() || isSubmitting}
                       loading={loading || isSubmitting}

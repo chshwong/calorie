@@ -43,6 +43,10 @@ import {
 import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 import type { DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
 import { fetchActiveLegalDocuments, acceptActiveLegalDocuments } from '@/lib/legal/legal-db';
+import { userConfigQueryKey } from '@/hooks/use-user-config';
+import { setPersistentCache } from '@/lib/persistentCache';
+import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
+import { showAppToast } from '@/components/ui/app-toast';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 type ModulePreference = 'Exercise' | 'Med' | 'Water';
@@ -1173,10 +1177,23 @@ export function useOnboardingForm() {
     const startTime = performance.now();
     clearErrors();
     
+    // Guard: prevent multiple submissions
+    if (isSubmitting) {
+      return;
+    }
+    
     // Guard: Don't start mutation if tab is not visible (web only)
     if (Platform.OS === 'web' && typeof document !== 'undefined' && document.visibilityState !== 'visible') {
       setErrorText('Please make sure the tab is visible before continuing.');
       return;
+    }
+    
+    // Validate legal checkboxes if marking complete
+    if (markComplete) {
+      if (!legalAgreeTerms || !legalAgreePrivacy || !legalAcknowledgeRisk) {
+        setErrorText(t('onboarding.legal.error_all_required'));
+        return;
+      }
     }
     
     // Validate targets are set
@@ -1190,6 +1207,10 @@ export function useOnboardingForm() {
       router.replace('/login');
       return;
     }
+    
+    // Begin submission - set both loading states
+    setIsSubmitting(true);
+    setLoading(true);
     
     // Gather required data for calculations
     if (!profile.date_of_birth) {
@@ -1221,9 +1242,27 @@ export function useOnboardingForm() {
       return;
     }
     
-    setLoading(true);
     
     try {
+      // If marking complete, accept legal documents first
+      if (markComplete) {
+        // Fetch active legal documents
+        const activeDocs = await fetchActiveLegalDocuments();
+        
+        if (!activeDocs || activeDocs.length === 0) {
+          setErrorText(t('onboarding.legal.error_no_docs'));
+          setIsSubmitting(false);
+          setLoading(false);
+          return;
+        }
+        
+        // Insert acceptances into user_legal_acceptances
+        await acceptActiveLegalDocuments({
+          userId: user.id,
+          docs: activeDocs.map(d => ({ doc_type: d.doc_type, version: d.version })),
+        });
+      }
+      
       // Calculate BMR and TDEE
       const bmr = calculateBMR(currentWeightKgValue, heightCmValue, ageNum, sex as 'male' | 'female');
       const tdee = calculateTDEE(bmr, activityLevel as ActivityLevel);
@@ -1254,6 +1293,7 @@ export function useOnboardingForm() {
         // Using 'any' here because error types from flushDraftSave can vary
         // and we need to safely handle the error without type checking
         setErrorText(t('onboarding.error_save_failed'));
+        setIsSubmitting(false);
         setLoading(false);
         return; // Keep user on final step
       }
@@ -1317,6 +1357,7 @@ export function useOnboardingForm() {
             console.warn(`[handleCompleteOnboarding] Final mutation timeout after ${mutationTime.toFixed(2)}ms`);
           }
           setErrorText(t('onboarding.error_network_waking'));
+          setIsSubmitting(false);
           setLoading(false);
           return; // Allow user to retry by clicking Next again
         }
@@ -1329,34 +1370,75 @@ export function useOnboardingForm() {
         throw new Error('Failed to save profile');
       }
       
-      // Cache updates are handled by `useUpdateProfile` onSuccess.
+      // After DB update succeeds, update caches/stores (best-effort, no awaits required)
+      const queryKey = userConfigQueryKey(user.id);
+      const cacheKey = `userConfig:${user.id}`;
       
-      // Also refresh profile in AuthContext - MUST await to prevent bounce
-      // This ensures AuthContext.onboardingComplete is updated before navigation
-      await refreshProfile();
+      // Update React Query cache (best-effort)
+      try {
+        queryClient.setQueryData(queryKey, (old: any) => {
+          if (!old) {
+            return { onboarding_complete: true };
+          }
+          return { ...old, onboarding_complete: true };
+        });
+      } catch (e) {
+        // Ignore cache update errors
+      }
+
+      // Update persistent cache (best-effort)
+      try {
+        const updatedCache = queryClient.getQueryData(queryKey);
+        if (updatedCache) {
+          setPersistentCache(cacheKey, { ...updatedCache, onboarding_complete: true });
+        } else {
+          setPersistentCache(cacheKey, { onboarding_complete: true });
+        }
+      } catch (e) {
+        // Ignore persistent cache errors
+      }
+
+      // Write to onboardingFlagStore (best-effort)
+      try {
+        if (Platform.OS === 'web') {
+          // Web can use sync write if available
+          onboardingFlagStore.write(user.id, true).catch(() => {
+            // Ignore write errors
+          });
+        } else {
+          onboardingFlagStore.write(user.id, true).catch(() => {
+            // Ignore write errors
+          });
+        }
+      } catch (e) {
+        // Ignore flag store errors
+      }
       
       // Show warning if pace was adjusted
       if (warningMessage) {
         Alert.alert('Pace Adjusted', warningMessage);
       }
       
-      // Navigate to next destination ONLY after all DB writes complete
-      // This is the final step - navigation happens here after:
-      // 1. Draft flush completes
-      // 2. Profile update with onboarding_complete=true completes
-      // 3. Cache updates complete
-      // 4. AuthContext profile refresh completes (prevents bounce)
+      // Navigate after DB save succeeded
+      // On web: force full reload to home so StartupGate re-evaluates from persisted sources (same as manual refresh)
       if (destination) {
-        router.replace(destination);
+        if (Platform.OS === 'web') {
+          window.location.assign(destination as any);
+          return;
+        }
+        
+        // On native: use router navigation
+        router.replace(destination as any);
       }
     } catch (error: any) {
       // Using 'any' here because error types can vary (Error, string, object, etc.)
       // and we need to safely extract a message for display
       const errorMessage = error.message || t('onboarding.error_complete_failed');
+      showAppToast('Failed to save. Please try again.');
       setErrorText(errorMessage);
+    } finally {
+      setIsSubmitting(false);
       setLoading(false);
-      // Note: isSubmitting is managed by handleProceedToLegal, not here
-      // This allows handleCompleteOnboarding to be called from other contexts
     }
   };
 

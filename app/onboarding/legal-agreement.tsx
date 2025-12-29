@@ -15,9 +15,14 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
+import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { userConfigQueryKey } from '@/hooks/use-user-config';
+import { setPersistentCache } from '@/lib/persistentCache';
+import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
 import {
   getActiveLegalDocuments,
   getLatestAcceptancesMap,
@@ -43,6 +48,7 @@ export default function LegalAgreementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, refreshProfile, profile } = useAuth();
+  const queryClient = useQueryClient();
 
   const [legalDocs, setLegalDocs] = useState<LegalDocument[]>([]);
   const [acceptances, setAcceptances] = useState<Record<LegalDocType, UserLegalAcceptance>>(
@@ -142,13 +148,72 @@ export default function LegalAgreementScreen() {
       await insertUserLegalAcceptances(user.id, sortedDocs);
 
       // Mark onboarding complete after logging acceptance
-      await updateProfile(user.id, { onboarding_complete: true });
-      await refreshProfile();
+      const updatedProfile = await updateProfile(user.id, {
+        onboarding_complete: true,
+      });
 
+      if (!updatedProfile) {
+        throw new Error('Failed to update profile');
+      }
+
+      // After DB update succeeds, update caches/stores (best-effort, no awaits required)
+      const queryKey = userConfigQueryKey(user.id);
+      const cacheKey = `userConfig:${user.id}`;
+      
+      // Update React Query cache (best-effort)
+      try {
+        queryClient.setQueryData(queryKey, (old: any) => {
+          if (!old) {
+            return { onboarding_complete: true };
+          }
+          return { ...old, onboarding_complete: true };
+        });
+      } catch (e) {
+        // Ignore cache update errors
+      }
+
+      // Update persistent cache (best-effort)
+      try {
+        const updatedCache = queryClient.getQueryData(queryKey);
+        if (updatedCache) {
+          setPersistentCache(cacheKey, { ...updatedCache, onboarding_complete: true });
+        } else {
+          setPersistentCache(cacheKey, { onboarding_complete: true });
+        }
+      } catch (e) {
+        // Ignore persistent cache errors
+      }
+
+      // Write to onboardingFlagStore (best-effort)
+      try {
+        if (Platform.OS === 'web') {
+          // Web can use sync write if available
+          onboardingFlagStore.write(user.id, true).catch(() => {
+            // Ignore write errors
+          });
+        } else {
+          onboardingFlagStore.write(user.id, true).catch(() => {
+            // Ignore write errors
+          });
+        }
+      } catch (e) {
+        // Ignore flag store errors
+      }
+
+      // Navigate after DB save succeeded
+      // On web: force full reload to home so StartupGate re-evaluates from persisted sources (same as manual refresh)
+      if (Platform.OS === 'web') {
+        window.location.assign('/(tabs)');
+        return;
+      }
+
+      // On native: use router navigation
       router.replace('/(tabs)');
     } catch (err: any) {
       const errorMessage = err?.message || t('legal.error_loading');
+      showAppToast('Failed to save. Please try again.');
       setLoadError(errorMessage);
+    } finally {
       setLoading(false);
     }
   };
@@ -430,4 +495,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
