@@ -531,6 +531,7 @@
       "maintain_leaner_subtitle": "Small buffer to avoid slow gain",
       "maintain_standard_title": "Maintain",
       "maintain_standard_subtitle": "Designed to maintain current weight",
+      "previously_set_target": "(Previously set target: {{calories}} cal/day)",
       "maintain_flexible_title": "Flexible",
       "maintain_flexible_subtitle": "Allows occasional overages",
       "recomp_leaner_title": "Leaner bias",

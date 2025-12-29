@@ -40,6 +40,7 @@ import {
   type OnboardingDraft,
   getLastDraftError 
 } from '@/lib/onboarding/onboarding-draft-sync';
+import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 import type { DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
 import { fetchActiveLegalDocuments, acceptActiveLegalDocuments } from '@/lib/legal/legal-db';
 
@@ -1261,23 +1262,6 @@ export function useOnboardingForm() {
       // Use calorie target from step 9 if available, otherwise fall back to calculated targetCalories
       const finalCalorieTarget = calorieTarget !== null ? calorieTarget : targetCalories;
       const finalMaintenanceCalories = maintenanceCalories !== null ? maintenanceCalories : targetCalories;
-      
-      // Map UI plan names to database values
-      const mapCaloriePlanToDb = (plan: string | null): string => {
-        if (!plan) return 'calculated';
-        switch (plan) {
-          case 'onTime':
-            return 'calculated';
-          case 'sustainable':
-            return 'recommended';
-          case 'accelerated':
-            return 'aggressive';
-          case 'custom':
-            return 'custom';
-          default:
-            return 'calculated';
-        }
-      };
       
       const finalCaloriePlan = mapCaloriePlanToDb(caloriePlan);
       

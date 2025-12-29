@@ -8,11 +8,13 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { showAppToast } from '@/components/ui/app-toast';
 import { EditSheet } from './_components/EditSheet';
+import { returnToMyGoal } from './_components/returnToMyGoal';
 import { GoalStep } from '@/components/onboarding/steps/GoalStep';
 import { GoalWeightStep } from '@/components/onboarding/steps/GoalWeightStep';
 import { ActivityStep } from '@/components/onboarding/steps/ActivityStep';
 import { DailyCalorieTargetStep } from '@/components/onboarding/steps/DailyCalorieTargetStep';
 import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
+import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 import { lbToKg, kgToLb, roundTo1 } from '@/utils/bodyMetrics';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
@@ -144,7 +146,7 @@ export default function EditGoalScreen() {
         updatePayload.maintenance_calories = maintenanceCalories;
       }
       if (caloriePlan) {
-        updatePayload.calorie_plan = caloriePlan;
+        updatePayload.calorie_plan = mapCaloriePlanToDb(caloriePlan);
         // Also set onboarding_calorie_set_at if calorie_plan is set (matching onboarding behavior)
         updatePayload.onboarding_calorie_set_at = new Date().toISOString();
       }
@@ -153,7 +155,7 @@ export default function EditGoalScreen() {
       await updateProfileMutation.mutateAsync(updatePayload);
 
       showAppToast('Goal updated');
-      router.back();
+      returnToMyGoal(router);
     } catch (error) {
       console.error('Error saving goal:', error);
       showAppToast('Failed to update goal. Please try again.');
@@ -276,6 +278,8 @@ export default function EditGoalScreen() {
           onErrorClear={() => {}}
           loading={updateProfileMutation.isPending}
           colors={colors}
+          mode="edit"
+          savedCalorieTarget={profile?.daily_calorie_target || null}
         />
       );
     }
@@ -294,9 +298,10 @@ export default function EditGoalScreen() {
   return (
     <EditSheet
       title={getStepTitle()}
-      onCancel={() => router.back()}
+      onCancel={() => returnToMyGoal(router)}
       onSave={handleSave}
       saving={updateProfileMutation.isPending}
+      scrollToTopKey={subStepIndex}
       showBack={subStepIndex > 0}
       onBack={handleBack}
       showNext={subStepIndex < 3}

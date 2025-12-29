@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
@@ -26,6 +26,8 @@ interface EditSheetProps {
   showBottomBar?: boolean;
   bottomBarCancelText?: string;
   bottomBarPrimaryText?: string;
+  // Scroll to top when this key changes (e.g. subStepIndex for multi-step flows)
+  scrollToTopKey?: string | number;
 }
 
 export function EditSheet({
@@ -43,9 +45,18 @@ export function EditSheet({
   showBottomBar = true,
   bottomBarCancelText = 'Cancel',
   bottomBarPrimaryText,
+  scrollToTopKey,
 }: EditSheetProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Scroll to top on mount and when scrollToTopKey changes
+  useEffect(() => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: false });
+    }
+  }, [scrollToTopKey]);
 
   const handleSave = async () => {
     try {
@@ -95,6 +106,7 @@ export function EditSheet({
 
       {/* Content */}
       <ScrollView
+        ref={scrollViewRef}
         style={styles.content}
         contentContainerStyle={[
           styles.scrollContentContainer,

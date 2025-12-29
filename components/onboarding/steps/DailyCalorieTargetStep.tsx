@@ -49,6 +49,8 @@ interface DailyCalorieTargetStepProps {
   onErrorClear: () => void;
   loading: boolean;
   colors: typeof Colors.light;
+  mode?: 'onboarding' | 'edit';
+  savedCalorieTarget?: number | null;
 }
 
 interface CalorieStepperProps {
@@ -145,6 +147,8 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
   onErrorClear,
   loading,
   colors,
+  mode = 'onboarding',
+  savedCalorieTarget = null,
 }) => {
   const { t } = useTranslation();
   const isDark = useColorScheme() === 'dark';
@@ -1269,6 +1273,14 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
       {/* Subtitle */}
       <ThemedText style={[styles.stepSubtitleModern, { color: colors.text }]}>
         {getSubtitleText()}
+        {mode === 'edit' && savedCalorieTarget !== null && savedCalorieTarget !== undefined && (
+          <>
+            {'\n'}
+            <ThemedText style={[styles.previouslySetLine, { color: colors.textSecondary }]}>
+              {t('onboarding.calorie_target.previously_set_target', { calories: savedCalorieTarget })}
+            </ThemedText>
+          </>
+        )}
       </ThemedText>
 
       {/* Warning Banner for EXTREME_EDGE_CASE (Weight Loss) */}
@@ -1765,5 +1777,9 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm + 2,
     fontWeight: FontWeight.semibold,
     textDecorationLine: 'underline',
+  },
+  previouslySetLine: {
+    fontSize: FontSize.sm + 4,
+    fontWeight: FontWeight.regular,
   },
 });

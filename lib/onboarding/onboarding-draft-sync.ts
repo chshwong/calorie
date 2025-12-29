@@ -9,6 +9,7 @@
 
 import { updateProfile } from '@/lib/services/profileService';
 import { QueryClient } from '@tanstack/react-query';
+import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 
 /**
  * Onboarding draft state - subset of profile fields collected during onboarding
@@ -78,27 +79,6 @@ export function toProfileUpdate(draft: OnboardingDraft): Partial<{
   if (draft.daily_calorie_target !== undefined && draft.daily_calorie_target !== null) update.daily_calorie_target = draft.daily_calorie_target;
   if (draft.maintenance_calories !== undefined && draft.maintenance_calories !== null) update.maintenance_calories = draft.maintenance_calories;
   if (draft.calorie_plan !== undefined && draft.calorie_plan !== null) {
-    // Map UI plan names to database values
-    // Database expects: 'easy', 'recommended', 'aggressive', 'custom', 'calculated'
-    // UI uses: 'onTime', 'sustainable', 'accelerated', 'custom'
-    const mapCaloriePlanToDb = (plan: string): string => {
-      switch (plan) {
-        case 'onTime':
-          return 'calculated';
-        case 'sustainable':
-          return 'recommended';
-        case 'accelerated':
-          return 'aggressive';
-        case 'custom':
-          return 'custom';
-        default:
-          // If it's already a valid DB value, pass it through
-          if (['easy', 'recommended', 'aggressive', 'custom', 'calculated'].includes(plan)) {
-            return plan;
-          }
-          return 'calculated';
-      }
-    };
     update.calorie_plan = mapCaloriePlanToDb(draft.calorie_plan);
   }
   if (draft.onboarding_calorie_set_at !== undefined && draft.onboarding_calorie_set_at !== null) update.onboarding_calorie_set_at = draft.onboarding_calorie_set_at;

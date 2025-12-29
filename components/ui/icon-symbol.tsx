@@ -82,6 +82,8 @@ const MAPPING = {
   'doc.on.doc': 'content-copy',
   'ellipsis': 'more-horiz',
   'note.text': { type: 'community', name: 'note-text' },
+  'target': 'center-focus-strong',
+  'slider.horizontal.3': 'tune',
 } as IconMapping;
 
 /**

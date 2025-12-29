@@ -20,6 +20,22 @@ export default function MyGoalScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { data: profile, isLoading } = useUserConfig();
 
+  // Safe back navigation: try router.back() if possible, fallback to /settings if no history
+  const handleBack = () => {
+    try {
+      // Check if router can go back (handles web refresh/direct entry scenarios)
+      if (router.canGoBack && router.canGoBack()) {
+        router.back();
+      } else {
+        // No history available (direct entry/refresh), go to settings
+        router.replace('/settings');
+      }
+    } catch {
+      // If router.back() throws (shouldn't happen, but safety), go to settings
+      router.replace('/settings');
+    }
+  };
+
   // Helper to format goal type
   const getGoalTypeLabel = (goalType: string | null | undefined): string => {
     if (!goalType) return 'Not set';
@@ -84,7 +100,7 @@ export default function MyGoalScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
           activeOpacity={0.7}
           {...getButtonAccessibilityProps('Back', AccessibilityHints.BACK)}
         >
@@ -96,7 +112,7 @@ export default function MyGoalScreen() {
           />
         </TouchableOpacity>
         <ThemedText type="title" style={[styles.headerTitle, { color: colors.text }]}>
-          My Goal
+          {t('my_goals.title')}
         </ThemedText>
         <View style={styles.backButton} />
       </View>
@@ -200,7 +216,7 @@ export default function MyGoalScreen() {
         >
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconContainer, { backgroundColor: colors.tint + '15' }]}>
-              <IconSymbol name="chart.pie.fill" size={24} color={colors.tint} />
+              <IconSymbol name="slider.horizontal.3" size={24} color={colors.tint} />
             </View>
             <View style={styles.cardHeaderText}>
               <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Daily Focus Targets</ThemedText>
@@ -245,6 +261,10 @@ export default function MyGoalScreen() {
             </View>
           </View>
         </TouchableOpacity>
+
+        <ThemedText style={[styles.disclaimer, { color: colors.textSecondary }]}>
+          AvoVibe offers general guidance only and is not medical advice.
+        </ThemedText>
           </View>
         </DesktopPageContainer>
       </ScrollView>
@@ -347,6 +367,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: Spacing.md,
     fontSize: FontSize.base,
+  },
+  disclaimer: {
+    marginTop: Spacing.sm,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.regular,
+    textAlign: 'center',
   },
 });
 

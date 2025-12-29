@@ -7,7 +7,9 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { showAppToast } from '@/components/ui/app-toast';
 import { EditSheet } from './_components/EditSheet';
+import { returnToMyGoal } from './_components/returnToMyGoal';
 import { DailyCalorieTargetStep } from '@/components/onboarding/steps/DailyCalorieTargetStep';
+import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 
 export default function EditCaloriesScreen() {
   const router = useRouter();
@@ -59,14 +61,14 @@ export default function EditCaloriesScreen() {
         updatePayload.maintenance_calories = maintenanceCalories;
       }
       if (caloriePlan) {
-        updatePayload.calorie_plan = caloriePlan;
+        updatePayload.calorie_plan = mapCaloriePlanToDb(caloriePlan);
         updatePayload.onboarding_calorie_set_at = new Date().toISOString();
       }
 
       await updateProfileMutation.mutateAsync(updatePayload);
 
       showAppToast('Daily calories updated');
-      router.back();
+      returnToMyGoal(router);
     } catch (error) {
       console.error('Error saving calories:', error);
       showAppToast('Failed to update calories. Please try again.');
@@ -76,7 +78,7 @@ export default function EditCaloriesScreen() {
   return (
     <EditSheet
       title="Edit Daily Calorie Target"
-      onCancel={() => router.back()}
+      onCancel={() => returnToMyGoal(router)}
       onSave={handleSave}
       saving={updateProfileMutation.isPending}
     >
@@ -101,6 +103,8 @@ export default function EditCaloriesScreen() {
           onErrorClear={() => {}}
           loading={updateProfileMutation.isPending}
           colors={colors}
+          mode="edit"
+          savedCalorieTarget={profile?.daily_calorie_target || null}
         />
       </View>
     </EditSheet>

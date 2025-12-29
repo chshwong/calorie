@@ -7,6 +7,7 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { showAppToast } from '@/components/ui/app-toast';
 import { EditSheet } from './_components/EditSheet';
+import { returnToMyGoal } from './_components/returnToMyGoal';
 import { DailyFocusTargetsStep, type DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
 
 export default function EditTargetsScreen() {
@@ -48,7 +49,7 @@ export default function EditTargetsScreen() {
       });
 
       showAppToast('Focus targets updated');
-      router.back();
+      returnToMyGoal(router);
     } catch (error) {
       console.error('Error saving targets:', error);
       showAppToast('Failed to update targets. Please try again.');
@@ -58,7 +59,7 @@ export default function EditTargetsScreen() {
   return (
     <EditSheet
       title="Edit Daily Focus Targets"
-      onCancel={() => router.back()}
+      onCancel={() => returnToMyGoal(router)}
       onSave={handleSave}
       saving={updateProfileMutation.isPending}
     >
