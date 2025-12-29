@@ -1059,12 +1059,37 @@ export function useOnboardingForm() {
     } else if (currentStep === 10) {
       // Module preferences step - save focus modules (Food is implied as #1), then proceed to legal
       if (user) {
-        const defaults: ModulePreference[] = ['Exercise', 'Med', 'Water'];
-        const picks = modulePreferences.slice(0, 2);
-        const fallbacks = defaults.filter((m) => !picks.includes(m));
+        // Default priority order (fallback list): Exercise, Med, Water
+        const fallbackOrder: ModulePreference[] = ['Exercise', 'Med', 'Water'];
+        
+        // Get user selections (ordered, max 2, excluding 'Food')
+        const selected = modulePreferences.slice(0, 2).filter((m): m is ModulePreference => 
+          m === 'Exercise' || m === 'Med' || m === 'Water'
+        );
 
-        const focus2 = picks[0] ?? fallbacks[0];
-        const focus3 = picks[1] ?? fallbacks[1];
+        let focus2: 'Exercise' | 'Med' | 'Water';
+        let focus3: 'Exercise' | 'Med' | 'Water';
+
+        if (selected.length === 2) {
+          // User selected 2 modules: use them as-is
+          focus2 = selected[0];
+          focus3 = selected[1];
+        } else if (selected.length === 1) {
+          // User selected 1 module: use it for focus2, use first fallback that is NOT equal to it for focus3
+          focus2 = selected[0];
+          focus3 = fallbackOrder.find((m) => m !== selected[0]) ?? 'Med';
+        } else {
+          // User selected 0 modules: use defaults (Exercise, Med)
+          focus2 = 'Exercise';
+          focus3 = 'Med';
+        }
+
+        // Guardrail: ensure focus_module_2 !== focus_module_3 always
+        if (focus2 === focus3) {
+          // If somehow they're equal, use the fallback order
+          focus2 = 'Exercise';
+          focus3 = 'Med';
+        }
 
         // Fire-and-forget: do not block Next
         updateProfileMutation.mutate({
