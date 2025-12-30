@@ -154,13 +154,13 @@ export const SexStep: React.FC<SexStepProps> = ({
               accessibilityState={{ selected }}
             >
               <View style={[styles.sexCardContent, { paddingRight: selected ? Spacing['4xl'] : 0 }]}>
-                <ThemedText style={[styles.sexCardTitle, { color: selected ? colors.textInverse : colors.text }]}>
+                <ThemedText style={[styles.sexCardTitle, { color: selected ? Colors.light.textInverse : colors.text }]}>
                   {t(sexOption.labelKey)}
                 </ThemedText>
               </View>
               {selected && (
                 <View style={styles.sexCardCheckmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={FontSize['2xl']} color={colors.textInverse} />
+                  <IconSymbol name="checkmark.circle.fill" size={FontSize['2xl']} color={Colors.light.textInverse} />
                 </View>
               )}
             </TouchableOpacity>

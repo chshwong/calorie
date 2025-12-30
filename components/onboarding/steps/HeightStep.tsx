@@ -225,7 +225,8 @@ export const HeightStep: React.FC<HeightStepProps> = ({
               <ThemedText
                 style={[
                   styles.unitPillText,
-                  { color: selected ? colors.textInverse : colors.textMutedOnDark },
+                  // Selected pills sit on a brand gradient; the correct contrast is always white (even in dark mode).
+                  { color: selected ? Colors.light.textInverse : colors.textMutedOnDark },
                 ]}
               >
                 {unitOption.label}

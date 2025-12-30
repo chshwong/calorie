@@ -1097,7 +1097,10 @@ export function useOnboardingForm() {
   
   const shouldDisableNext = (): boolean => {
     if (currentStep === 1) {
-      return !dateOfBirthStep2 || dateOfBirthStep2.trim().length === 0;
+      // Name & DOB step: require both fields to have input before enabling Next
+      const hasName = preferredName.trim().length > 0;
+      const hasDob = dateOfBirthStep2.trim().length > 0;
+      return !hasName || !hasDob;
     } else if (currentStep === 2) {
       return !sex || (sex !== 'male' && sex !== 'female');
     } else if (currentStep === 3) {
