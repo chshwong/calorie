@@ -19,12 +19,20 @@ import { lbToKg, kgToLb, roundTo1 } from '@/utils/bodyMetrics';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 
-export default function EditGoalScreen() {
+type EditGoalScreenProps = {
+  /**
+   * Settings-only: allow a wrapper route to provide its own header (StandardSubheader),
+   * while keeping the rest of the screen (including bottom buttons) unchanged.
+   */
+  hideHeader?: boolean;
+};
+
+export default function EditGoalScreen({ hideHeader = false }: EditGoalScreenProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ start?: string }>();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme ?? 'light'] as typeof Colors.light;
   const { data: profile } = useUserConfig();
   const updateProfileMutation = useUpdateProfile();
 
@@ -313,6 +321,7 @@ export default function EditGoalScreen() {
       onCancel={() => returnToMyGoal(router)}
       onSave={handleSave}
       saving={updateProfileMutation.isPending}
+      hideHeader={hideHeader}
       scrollToTopKey={subStepIndex}
       showBack={subStepIndex > 0}
       onBack={handleBack}

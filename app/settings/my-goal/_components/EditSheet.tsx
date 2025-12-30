@@ -13,6 +13,7 @@ import { getButtonAccessibilityProps, AccessibilityHints, getIconAccessibilityPr
 interface EditSheetProps {
   title: string;
   children: React.ReactNode;
+  hideHeader?: boolean;
   onCancel: () => void;
   onSave: () => Promise<void>;
   saving: boolean;
@@ -33,6 +34,7 @@ interface EditSheetProps {
 function EditSheet({
   title,
   children,
+  hideHeader = false,
   onCancel,
   onSave,
   saving,
@@ -70,39 +72,40 @@ function EditSheet({
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        {/* Left: X icon */}
-        <TouchableOpacity
-          style={styles.headerLeft}
-          onPress={onCancel}
-          disabled={saving}
-          activeOpacity={0.7}
-          {...getButtonAccessibilityProps('Close', AccessibilityHints.CLOSE, saving)}
-        >
-          <IconSymbol 
-            name="xmark" 
-            size={24} 
-            color={colors.text}
-            {...getIconAccessibilityProps('Close', false)}
-          />
-        </TouchableOpacity>
-        
-        {/* Center: Title (truncates) */}
-        <View style={styles.headerCenter}>
-          <ThemedText 
-            type="title" 
-            style={[styles.headerTitle, { color: colors.text }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
+      {!hideHeader && (
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          {/* Left: X icon */}
+          <TouchableOpacity
+            style={styles.headerLeft}
+            onPress={onCancel}
+            disabled={saving}
+            activeOpacity={0.7}
+            {...getButtonAccessibilityProps('Close', AccessibilityHints.CLOSE, saving)}
           >
-            {title}
-          </ThemedText>
+            <IconSymbol 
+              name="xmark" 
+              size={24} 
+              color={colors.text}
+              {...getIconAccessibilityProps('Close', false)}
+            />
+          </TouchableOpacity>
+          
+          {/* Center: Title (truncates) */}
+          <View style={styles.headerCenter}>
+            <ThemedText 
+              type="title" 
+              style={[styles.headerTitle, { color: colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {title}
+            </ThemedText>
+          </View>
+          
+          {/* Right: Spacer for balance */}
+          <View style={styles.headerRight} />
         </View>
-        
-        {/* Right: Spacer for balance */}
-        <View style={styles.headerRight} />
-      </View>
+      )}
 
       {/* Content */}
       <ScrollView
