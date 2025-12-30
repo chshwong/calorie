@@ -13,23 +13,20 @@
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
-import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { type LegalDocType } from '@/legal/legal-documents';
 
 const DOC_TYPE_MAP: Record<string, LegalDocType> = {
@@ -40,7 +37,6 @@ const DOC_TYPE_MAP: Record<string, LegalDocType> = {
 
 export default function LegalDocumentViewer() {
   const { t } = useTranslation();
-  const router = useRouter();
   const params = useLocalSearchParams<{ docType: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -58,60 +54,33 @@ export default function LegalDocumentViewer() {
     return documents.find((d) => d.doc_type === docType) ?? null;
   }, [documents, docType]);
 
-  // Get title for header
-  const title = useMemo(() => {
-    if (!docType) return t('legal.title');
+  // Title for StandardSubheader (explicit per Settings → Legal requirements)
+  const headerTitle = useMemo(() => {
     switch (docType) {
       case 'terms':
-        return t('onboarding.legal.terms_title');
+        return 'Terms of Service';
       case 'privacy':
-        return t('onboarding.legal.privacy_title');
+        return 'Privacy Policy';
       case 'health_disclaimer':
-        return t('onboarding.legal.health_disclaimer_title');
+        return 'Health Disclaimer';
       default:
         return t('legal.title');
     }
   }, [docType, t]);
 
-  if (!docType) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-              {...getButtonAccessibilityProps(t('common.back'), t('common.back'))}
-              {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-            >
-              <IconSymbol name="chevron.left" size={22} color={colors.text} />
-            </TouchableOpacity>
-            <ThemedText type="title" style={[styles.headerTitle, { color: colors.text }]}>
-              {t('legal.title')}
-            </ThemedText>
-            <View style={styles.headerRight} />
-          </View>
-          <View style={styles.errorContainer}>
-            <Text style={[styles.errorText, { color: colors.text }]}>
-              {t('legal.error_loading')}
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <>
       <Stack.Screen
         options={{
-          title,
-          headerBackTitleVisible: false,
-          headerTitleAlign: 'center',
+          headerShown: false,
         }}
       />
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        edges={['left', 'right', 'bottom']}
+        style={[styles.safeArea, { backgroundColor: colors.background }]}
+      >
         <View style={styles.container}>
+          <StandardSubheader title={headerTitle} />
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator color={colors.tint} size="large" />
@@ -135,6 +104,7 @@ export default function LegalDocumentViewer() {
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
+              contentInsetAdjustmentBehavior="never"
               showsVerticalScrollIndicator={true}
             >
               {document.version && (
@@ -164,28 +134,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Platform.select({ web: 20, default: 10 }),
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'transparent', // Handled by Stack header
-  },
-  backButton: {
-    padding: Spacing.xs,
-  },
-  headerTitle: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerRight: {
-    width: 40,
   },
   loadingContainer: {
     flex: 1,
