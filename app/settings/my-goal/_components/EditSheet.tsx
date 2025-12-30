@@ -4,16 +4,23 @@ import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showAppToast } from '@/components/ui/app-toast';
-import { getButtonAccessibilityProps, AccessibilityHints, getIconAccessibilityProps } from '@/utils/accessibility';
+import {
+  getButtonAccessibilityProps,
+  AccessibilityHints,
+  getIconAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle,
+} from '@/utils/accessibility';
 
 interface EditSheetProps {
   title: string;
   children: React.ReactNode;
-  hideHeader?: boolean;
+  headerVariant?: 'default' | 'standardSubheaderCloseRight';
   onCancel: () => void;
   onSave: () => Promise<void>;
   saving: boolean;
@@ -34,7 +41,7 @@ interface EditSheetProps {
 function EditSheet({
   title,
   children,
-  hideHeader = false,
+  headerVariant = 'default',
   onCancel,
   onSave,
   saving,
@@ -72,7 +79,27 @@ function EditSheet({
 
   return (
     <ThemedView style={styles.container}>
-      {!hideHeader && (
+      {headerVariant === 'standardSubheaderCloseRight' ? (
+        <StandardSubheader
+          title={title}
+          showBack={false}
+          right={
+            <TouchableOpacity
+              style={[
+                styles.closeButton,
+                getMinTouchTargetStyle(),
+                { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+              ]}
+              onPress={onCancel}
+              disabled={saving}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps('Close', AccessibilityHints.CLOSE, saving)}
+            >
+              <IconSymbol name="xmark" size={20} color={colors.tint} decorative={true} />
+            </TouchableOpacity>
+          }
+        />
+      ) : (
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           {/* Left: X icon */}
           <TouchableOpacity
@@ -229,6 +256,10 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 44, // Fixed width to balance left icon
+  },
+  closeButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   content: {
     flex: 1,

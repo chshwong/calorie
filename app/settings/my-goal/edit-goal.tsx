@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -19,17 +19,10 @@ import { lbToKg, kgToLb, roundTo1 } from '@/utils/bodyMetrics';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 
-type EditGoalScreenProps = {
-  /**
-   * Settings-only: allow a wrapper route to provide its own header (StandardSubheader),
-   * while keeping the rest of the screen (including bottom buttons) unchanged.
-   */
-  hideHeader?: boolean;
-};
-
-export default function EditGoalScreen({ hideHeader = false }: EditGoalScreenProps) {
+export default function EditGoalScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ start?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'] as typeof Colors.light;
@@ -315,13 +308,23 @@ export default function EditGoalScreen({ hideHeader = false }: EditGoalScreenPro
     return 'Edit Goal';
   };
 
+  const isSettingsAdjustActivityEntry = params?.start === 'activity';
+  const isActivityLevelScreen = isSettingsAdjustActivityEntry && subStepIndex === 2;
+
+  const handleClose = () => {
+    if (router.canGoBack?.()) return router.back();
+    // @ts-ignore - navigation types can vary
+    if ((navigation as any)?.canGoBack?.()) return router.back();
+    router.replace('/settings/my-goal');
+  };
+
   return (
     <EditSheet
       title={getStepTitle()}
-      onCancel={() => returnToMyGoal(router)}
+      onCancel={isSettingsAdjustActivityEntry ? handleClose : () => returnToMyGoal(router)}
       onSave={handleSave}
       saving={updateProfileMutation.isPending}
-      hideHeader={hideHeader}
+      headerVariant={isActivityLevelScreen ? 'standardSubheaderCloseRight' : 'default'}
       scrollToTopKey={subStepIndex}
       showBack={subStepIndex > 0}
       onBack={handleBack}
