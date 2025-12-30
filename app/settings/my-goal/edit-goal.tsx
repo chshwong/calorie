@@ -310,6 +310,7 @@ export default function EditGoalScreen() {
 
   const isSettingsAdjustActivityEntry = params?.start === 'activity';
   const isActivityLevelScreen = isSettingsAdjustActivityEntry && subStepIndex === 2;
+  const shouldShowBackButton = subStepIndex > 0 && !isActivityLevelScreen;
 
   const handleClose = () => {
     if (router.canGoBack?.()) return router.back();
@@ -326,7 +327,7 @@ export default function EditGoalScreen() {
       saving={updateProfileMutation.isPending}
       headerVariant={isActivityLevelScreen ? 'standardSubheaderCloseRight' : 'default'}
       scrollToTopKey={subStepIndex}
-      showBack={subStepIndex > 0}
+      showBack={shouldShowBackButton}
       onBack={handleBack}
       showNext={subStepIndex < 3}
       onNext={handleNext}
