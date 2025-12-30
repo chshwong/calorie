@@ -11,12 +11,13 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight } from '@/constants/theme';
@@ -41,6 +42,7 @@ type WeightUnit = 'kg' | 'lbs';
 
 export default function WeightEntryScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { data: userConfig } = useUserConfig();
@@ -100,6 +102,21 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
   const handleClose = () => {
     router.replace('/weight' as any);
   };
+
+  const handleHeaderBack = useCallback(() => {
+    // Match StandardSubheader's default behavior, but prefer /weight as the deep-link fallback.
+    // @ts-ignore - canGoBack exists on navigation but types can vary
+    const canGoBack = typeof (navigation as any)?.canGoBack === 'function'
+      ? (navigation as any).canGoBack()
+      : false;
+
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+
+    router.replace('/weight' as any);
+  }, [navigation, router]);
 
   // Prefill / sync with params (edit mode only)
   useEffect(() => {
@@ -300,23 +317,16 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StandardSubheader
+        title={isEditMode ? 'Edit Weight' : 'Add Weight'}
+        onBack={handleHeaderBack}
+      />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Layout.screenPadding * 2 }]}
         keyboardShouldPersistTaps="handled"
       >
         <DesktopPageContainer>
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={[styles.backButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={handleClose}
-              {...getButtonAccessibilityProps('Go back')}
-            >
-              <IconSymbol name="chevron.left" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <ThemedText type="title" style={{ color: colors.text }}>
-              {isEditMode ? 'Edit Weight' : 'Add Weight'}
-            </ThemedText>
-          </View>
+          <View style={{ height: Spacing.lg }} />
 
           <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.dateRow}>

@@ -4,21 +4,21 @@ import { SexStep } from '@/components/onboarding/steps/SexStep';
 import { NameDobForm } from '@/components/profile/NameDobForm';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { POLICY } from '@/constants/constraints';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useUserConfig } from '@/hooks/use-user-config';
-import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
 import { cmToFtIn, convertHeightToCm, roundTo1 } from '@/utils/bodyMetrics';
 import { normalizeSpaces } from '@/utils/inputFilters';
 import { validateDateOfBirth, validateHeightCm, validatePreferredName, validateSex } from '@/utils/validation';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 /**
  * Edit Profile Screen
@@ -259,31 +259,9 @@ export default function EditProfileScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.header, { borderBottomColor: colors.separator }]}>
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            getMinTouchTargetStyle(),
-            { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-          ]}
-          onPress={handleBack}
-          activeOpacity={0.7}
-          {...getButtonAccessibilityProps(
-            t('common.back'),
-            'Double tap to go back'
-          )}
-        >
-          <IconSymbol name="chevron.left" size={24} color={colors.text} decorative={true} />
-        </TouchableOpacity>
-        <ThemedText 
-          type="title" 
-          style={[styles.headerTitle, { color: colors.text }]}
-          accessibilityRole="header"
-        >
-          {t('settings.account.edit_profile')}
-        </ThemedText>
-        <View style={styles.headerRight} />
-      </View>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <StandardSubheader title="Edit Profile" onBack={handleBack} />
 
       <ScrollView 
         style={styles.scrollView}
@@ -385,27 +363,6 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.select({ web: 20, default: 50 }),
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerRight: {
-    width: 32,
   },
   scrollView: {
     flex: 1,

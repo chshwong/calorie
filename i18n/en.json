@@ -671,7 +671,7 @@
     "account": {
       "title": "Account",
       "edit_profile": "Edit Profile",
-      "edit_profile_subtitle": "Update your personal information",
+      "edit_profile_subtitle": "Update your personal info, gender, height",
       "change_password": "Change Password",
       "email_settings": "Email Settings"
     },

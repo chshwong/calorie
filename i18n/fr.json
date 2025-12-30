@@ -503,7 +503,7 @@
     "account": {
       "title": "Compte",
       "edit_profile": "Modifier le profil",
-      "edit_profile_subtitle": "Mettre à jour vos informations personnelles",
+      "edit_profile_subtitle": "Mettre à jour vos infos personnelles, genre, taille",
       "change_password": "Changer le mot de passe",
       "email_settings": "Paramètres de courriel"
     },
