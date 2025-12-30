@@ -21,6 +21,7 @@ interface EditSheetProps {
   title: string;
   children: React.ReactNode;
   headerVariant?: 'default' | 'standardSubheaderCloseRight';
+  hideHeader?: boolean;
   onCancel: () => void;
   onSave: () => Promise<void>;
   saving: boolean;
@@ -42,6 +43,7 @@ function EditSheet({
   title,
   children,
   headerVariant = 'default',
+  hideHeader = false,
   onCancel,
   onSave,
   saving,
@@ -79,60 +81,62 @@ function EditSheet({
 
   return (
     <ThemedView style={styles.container}>
-      {headerVariant === 'standardSubheaderCloseRight' ? (
-        <StandardSubheader
-          title={title}
-          onBack={onCancel}
-          right={
+      {!hideHeader ? (
+        headerVariant === 'standardSubheaderCloseRight' ? (
+          <StandardSubheader
+            title={title}
+            onBack={onCancel}
+            right={
+              <TouchableOpacity
+                style={[
+                  styles.closeButton,
+                  getMinTouchTargetStyle(),
+                  { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                ]}
+                onPress={onCancel}
+                disabled={saving}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps('Close', AccessibilityHints.CLOSE, saving)}
+              >
+                <IconSymbol name="xmark" size={20} color={colors.tint} decorative={true} />
+              </TouchableOpacity>
+            }
+          />
+        ) : (
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+            {/* Left: X icon */}
             <TouchableOpacity
-              style={[
-                styles.closeButton,
-                getMinTouchTargetStyle(),
-                { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-              ]}
+              style={styles.headerLeft}
               onPress={onCancel}
               disabled={saving}
               activeOpacity={0.7}
               {...getButtonAccessibilityProps('Close', AccessibilityHints.CLOSE, saving)}
             >
-              <IconSymbol name="xmark" size={20} color={colors.tint} decorative={true} />
+              <IconSymbol
+                name="xmark"
+                size={24}
+                color={colors.text}
+                {...getIconAccessibilityProps('Close', false)}
+              />
             </TouchableOpacity>
-          }
-        />
-      ) : (
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          {/* Left: X icon */}
-          <TouchableOpacity
-            style={styles.headerLeft}
-            onPress={onCancel}
-            disabled={saving}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps('Close', AccessibilityHints.CLOSE, saving)}
-          >
-            <IconSymbol 
-              name="xmark" 
-              size={24} 
-              color={colors.text}
-              {...getIconAccessibilityProps('Close', false)}
-            />
-          </TouchableOpacity>
-          
-          {/* Center: Title (truncates) */}
-          <View style={styles.headerCenter}>
-            <ThemedText 
-              type="title" 
-              style={[styles.headerTitle, { color: colors.text }]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {title}
-            </ThemedText>
+
+            {/* Center: Title (truncates) */}
+            <View style={styles.headerCenter}>
+              <ThemedText
+                type="title"
+                style={[styles.headerTitle, { color: colors.text }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {title}
+              </ThemedText>
+            </View>
+
+            {/* Right: Spacer for balance */}
+            <View style={styles.headerRight} />
           </View>
-          
-          {/* Right: Spacer for balance */}
-          <View style={styles.headerRight} />
-        </View>
-      )}
+        )
+      ) : null}
 
       {/* Content */}
       <ScrollView

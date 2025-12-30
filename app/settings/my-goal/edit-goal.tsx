@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { ThemedView } from '@/components/themed-view';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
@@ -320,23 +322,28 @@ export default function EditGoalScreen() {
   };
 
   return (
-    <EditSheet
-      title={getStepTitle()}
-      onCancel={isSettingsAdjustActivityEntry ? handleClose : () => returnToMyGoal(router)}
-      onSave={handleSave}
-      saving={updateProfileMutation.isPending}
-      headerVariant={isActivityLevelScreen ? 'standardSubheaderCloseRight' : 'default'}
-      scrollToTopKey={subStepIndex}
-      showBack={shouldShowBackButton}
-      onBack={handleBack}
-      showNext={subStepIndex < 3}
-      onNext={handleNext}
-      canSave={canGoNext()}
-    >
-      <View style={styles.stepContainer}>
-        {renderStep()}
-      </View>
-    </EditSheet>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ThemedView style={{ flex: 1 }}>
+        <StandardSubheader title="Goal" />
+        <EditSheet
+          title={getStepTitle()}
+          hideHeader={true}
+          onCancel={isSettingsAdjustActivityEntry ? handleClose : () => returnToMyGoal(router)}
+          onSave={handleSave}
+          saving={updateProfileMutation.isPending}
+          headerVariant={isActivityLevelScreen ? 'standardSubheaderCloseRight' : 'default'}
+          scrollToTopKey={subStepIndex}
+          showBack={shouldShowBackButton}
+          onBack={handleBack}
+          showNext={subStepIndex < 3}
+          onNext={handleNext}
+          canSave={canGoNext()}
+        >
+          <View style={styles.stepContainer}>{renderStep()}</View>
+        </EditSheet>
+      </ThemedView>
+    </>
   );
 }
 

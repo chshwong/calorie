@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Platform, ActivityIndicator } from 'react-native';
-import { router, usePathname, useRouter, useNavigation } from 'expo-router';
+import { router as appRouter, usePathname } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -39,63 +39,34 @@ export default function SettingsScreen() {
   const { t, i18n: i18nInstance } = useTranslation();
   const { signOut, user } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
-  const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const pathnameRef = useRef(pathname);
-  const mountedRef = useRef(true);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  useEffect(() => {
-    pathnameRef.current = pathname;
-  }, [pathname]);
+  const HANDLE_CLOSE_FALLBACK = '/'; // change if your home route differs
 
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  
-  // Safe close handler to prevent "GO_BACK" error on web refresh/direct entry
   const handleClose = () => {
-    // Prefer modal dismiss when available, then fall back to router.back().
-    // Only fall back to /(tabs) for rare direct-entry/deeplink cases.
-    try {
-      if (typeof (router as any)?.dismiss === 'function') {
-        (router as any).dismiss();
+    // 1) Prefer router's canGoBack if available
+    const canGoBack =
+      typeof (appRouter as any).canGoBack === 'function' && (appRouter as any).canGoBack();
+
+    if (canGoBack) {
+      appRouter.back();
+      return;
+    }
+
+    // 2) Web-only: if browser history exists, go back (covers some cases where canGoBack is false)
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // If you refreshed / landed directly on /settings, history length is often 1
+      if (window.history.length > 1) {
+        window.history.back();
         return;
       }
-    } catch {
-      // ignore and try router.back below
     }
 
-    try {
-      router.back();
-      return;
-    } catch {
-      // ignore and try navigation.canGoBack below
-    }
-
-    // @ts-ignore - canGoBack exists on navigation but types can vary
-    const canGoBackViaNav =
-      typeof (navigation as any)?.canGoBack === 'function' ? (navigation as any).canGoBack() : false;
-
-    if (canGoBackViaNav) {
-      router.back();
-      // fall through to fallback check in case the pop isn't handled (web / edge-case navigators)
-    }
-
-    // Fallback when no history (web refresh / direct URL)
-    // Note: router.back()/dismiss can fail without throwing (e.g., POP not handled).
-    // If we're still on /settings on the next frame, force a safe fallback.
-    requestAnimationFrame(() => {
-      if (!mountedRef.current) return;
-      if (pathnameRef.current === '/settings') {
-        router.replace('/(tabs)');
-      }
-    });
+    // 3) Final fallback
+    appRouter.replace(HANDLE_CLOSE_FALLBACK);
   };
   
   // Use React Query hooks for user config data (shared cache with Home screen)
@@ -214,7 +185,7 @@ export default function SettingsScreen() {
     try {
       await deleteUserAccountData({ userId: user.id });
       await signOut();
-      router.replace('/login');
+      appRouter.replace('/login');
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('Error deleting account data:', error);
@@ -359,7 +330,7 @@ export default function SettingsScreen() {
             title={t('settings.my_journey.goals')}
             subtitle={t('settings.my_journey.goals_subtitle')}
             onPress={() => {
-              router.push('/settings/my-goal');
+              appRouter.push('/settings/my-goal');
             }}
           />
           <SettingItem
@@ -367,7 +338,7 @@ export default function SettingsScreen() {
             title={t('settings.my_journey.adjust_activity_level')}
             subtitle={t('settings.my_journey.adjust_activity_level_subtitle')}
             onPress={() => {
-              openMyGoalEdit(router, 'activity');
+              openMyGoalEdit(appRouter, 'activity');
             }}
           />
           <SettingItem
@@ -375,7 +346,7 @@ export default function SettingsScreen() {
             title={t('settings.my_journey.my_weight')}
             subtitle={t('settings.my_journey.my_weight_subtitle')}
             onPress={() => {
-              openWeightEntryForToday(router);
+              openWeightEntryForToday(appRouter);
             }}
           />
         </SettingSection>
@@ -387,7 +358,7 @@ export default function SettingsScreen() {
             title={t('settings.account.edit_profile')}
             subtitle={t('settings.account.edit_profile_subtitle')}
             onPress={() => {
-              router.push('/edit-profile');
+              appRouter.push('/edit-profile');
             }}
           />
           <SettingItem
@@ -459,7 +430,7 @@ export default function SettingsScreen() {
             title={t('onboarding.legal.terms_title')}
             subtitle={getDocVersion('terms') ? t('legal.updated_version', { version: getDocVersion('terms') }) : undefined}
             onPress={() => {
-              router.push({ pathname: '/legal/[docType]', params: { docType: 'terms' } });
+              appRouter.push({ pathname: '/legal/[docType]', params: { docType: 'terms' } });
             }}
           />
           <SettingItem
@@ -467,7 +438,7 @@ export default function SettingsScreen() {
             title={t('onboarding.legal.privacy_title')}
             subtitle={getDocVersion('privacy') ? t('legal.updated_version', { version: getDocVersion('privacy') }) : undefined}
             onPress={() => {
-              router.push({ pathname: '/legal/[docType]', params: { docType: 'privacy' } });
+              appRouter.push({ pathname: '/legal/[docType]', params: { docType: 'privacy' } });
             }}
           />
           <SettingItem
@@ -475,7 +446,7 @@ export default function SettingsScreen() {
             title={t('onboarding.legal.health_disclaimer_title')}
             subtitle={getDocVersion('health_disclaimer') ? t('legal.updated_version', { version: getDocVersion('health_disclaimer') }) : undefined}
             onPress={() => {
-              router.push({ pathname: '/legal/[docType]', params: { docType: 'health' } });
+              appRouter.push({ pathname: '/legal/[docType]', params: { docType: 'health' } });
             }}
           />
         </SettingSection>
@@ -593,7 +564,7 @@ export default function SettingsScreen() {
           setShowLogoutConfirm(false);
           try {
             await signOut();
-            router.replace('/login');
+            appRouter.replace('/login');
           } catch (error) {
             if (process.env.NODE_ENV !== 'production') {
               console.error('Error logging out:', error);

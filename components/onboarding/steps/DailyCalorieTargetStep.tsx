@@ -1276,7 +1276,12 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
         {mode === 'edit' && savedCalorieTarget !== null && savedCalorieTarget !== undefined && (
           <>
             {'\n'}
-            <ThemedText style={[styles.previouslySetLine, { color: colors.textSecondary }]}>
+            <ThemedText
+              style={[
+                styles.previouslySetLine,
+                { color: colors.tint, fontWeight: FontWeight.bold },
+              ]}
+            >
               {t('onboarding.calorie_target.previously_set_target', { calories: savedCalorieTarget })}
             </ThemedText>
           </>
