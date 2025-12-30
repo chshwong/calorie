@@ -334,7 +334,7 @@
       "error_dob_required": "La date de naissance est requise",
       "error_dob_format": "Veuillez entrer une date de naissance valide",
       "error_dob_future": "La date de naissance ne peut pas être dans le futur",
-      "error_age_minimum": "Vous devez avoir au moins 18 ans",
+      "error_age_minimum": "Vous devez avoir au moins 13 ans",
       "error_age_maximum": "Veuillez entrer une date de naissance valide",
       "error_name_required": "Le nom préféré est requis",
       "error_name_too_long": "Le nom préféré ne doit pas dépasser 40 caractères"

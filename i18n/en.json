@@ -377,7 +377,7 @@
       "error_dob_required": "Date of birth is required",
       "error_dob_format": "Please enter a valid date of birth",
       "error_dob_future": "Date of birth cannot be in the future",
-      "error_age_minimum": "You must be at least 18 years old",
+      "error_age_minimum": "You must be at least 13 years old",
       "error_age_maximum": "Please enter a valid date of birth",
       "error_name_required": "Preferred Name is required",
       "error_name_too_long": "Preferred name must be 40 characters or less"

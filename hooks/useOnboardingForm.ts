@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ageFromDob, ActivityLevel, calculateBMR, calculateTDEE, calculateRequiredDailyCalorieDiff, calculateSafeCalorieTarget } from '@/utils/calculations';
 import { 
   validatePreferredName, 
+  validateDateOfBirth,
   validateHeightCm as validateHeightCmUtil, 
   validateActivityLevel as validateActivityLevelUtil, 
   validateWeightKg as validateWeightKgUtil, 
@@ -32,7 +33,7 @@ import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { uploadUserAvatar, setProfileAvatarUrl } from '@/lib/avatar/avatar-service';
 import { checkProfanity } from '@/utils/profanity';
 import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
-import { PROFILES, DERIVED } from '@/constants/constraints';
+import { PROFILES, DERIVED, POLICY } from '@/constants/constraints';
 import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
 import { 
   scheduleDraftSave, 
@@ -456,32 +457,10 @@ export function useOnboardingForm() {
       return nameValidation.error || t('onboarding.name_age.error_name_invalid');
     }
     
-    // Date of Birth is required
-    if (!dateOfBirthStep2 || dateOfBirthStep2.trim().length === 0) {
-      return t('onboarding.name_age.error_dob_required');
-    }
-    
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(dateOfBirthStep2)) {
-      return t('onboarding.name_age.error_dob_format');
-    }
-    
-    const dobDate = new Date(dateOfBirthStep2 + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (dobDate > today) {
-      return t('onboarding.name_age.error_dob_future');
-    }
-    
-    const actualAge = ageFromDob(dateOfBirthStep2);
-    
-    if (actualAge < 18) {
-      return t('onboarding.name_age.error_age_minimum');
-    }
-    
-    if (actualAge > 100) {
-      return t('onboarding.name_age.error_age_maximum');
+    // Date of Birth validation (uses shared policy defaults from constants/constraints.ts)
+    const dobErrorKey = validateDateOfBirth(dateOfBirthStep2);
+    if (dobErrorKey) {
+      return t(dobErrorKey);
     }
     
     return null;
@@ -516,16 +495,16 @@ export function useOnboardingForm() {
     // Modal closing is handled by AppDatePicker's "Select Date" button via onClose callback
   };
   
-  // Calculate min/max dates for DOB (18-100 years old)
+  // Calculate min/max dates for DOB using policy constraints
   const getDOBMinDate = () => {
     const date = new Date();
-    date.setFullYear(date.getFullYear() - 100);
+    date.setFullYear(date.getFullYear() - POLICY.DOB.MAX_AGE_YEARS);
     return date;
   };
   
   const getDOBMaxDate = () => {
     const date = new Date();
-    date.setFullYear(date.getFullYear() - 18);
+    date.setFullYear(date.getFullYear() - POLICY.DOB.MIN_AGE_YEARS);
     return date;
   };
   
