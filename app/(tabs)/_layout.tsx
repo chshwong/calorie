@@ -406,7 +406,7 @@ function TabLayoutContent() {
           }}
         />
         <Tabs.Screen
-          name="settings"
+          name="more"
           options={{
             title: t('tabs.more'),
             tabBarButton: (props) => <MoreButtonTab {...props} onPressCustom={() => setMoreMenuVisible(true)} />,

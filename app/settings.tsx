@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Platform, ActivityIndicator } from 'react-native';
-import { router, useRouter, useNavigation } from 'expo-router';
+import { router, usePathname, useRouter, useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setLanguage, languageNames, SupportedLanguage } from '../i18n';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -40,23 +41,61 @@ export default function SettingsScreen() {
   const { themeMode, setThemeMode } = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  const mountedRef = useRef(true);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  
-  // Safe back handler to prevent "GO_BACK" error on web refresh/direct entry
-  const handleBack = () => {
-    // @ts-ignore - canGoBack exists on navigation but types can vary
-    const canGoBack = typeof (navigation as any)?.canGoBack === 'function'
-      ? (navigation as any).canGoBack()
-      : false;
 
-    if (canGoBack) {
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  
+  // Safe close handler to prevent "GO_BACK" error on web refresh/direct entry
+  const handleClose = () => {
+    // Prefer modal dismiss when available, then fall back to router.back().
+    // Only fall back to /(tabs) for rare direct-entry/deeplink cases.
+    try {
+      if (typeof (router as any)?.dismiss === 'function') {
+        (router as any).dismiss();
+        return;
+      }
+    } catch {
+      // ignore and try router.back below
+    }
+
+    try {
       router.back();
       return;
+    } catch {
+      // ignore and try navigation.canGoBack below
+    }
+
+    // @ts-ignore - canGoBack exists on navigation but types can vary
+    const canGoBackViaNav =
+      typeof (navigation as any)?.canGoBack === 'function' ? (navigation as any).canGoBack() : false;
+
+    if (canGoBackViaNav) {
+      router.back();
+      // fall through to fallback check in case the pop isn't handled (web / edge-case navigators)
     }
 
     // Fallback when no history (web refresh / direct URL)
-    router.replace('/(tabs)');
+    // Note: router.back()/dismiss can fail without throwing (e.g., POP not handled).
+    // If we're still on /settings on the next frame, force a safe fallback.
+    requestAnimationFrame(() => {
+      if (!mountedRef.current) return;
+      if (pathnameRef.current === '/settings') {
+        router.replace('/(tabs)');
+      }
+    });
   };
   
   // Use React Query hooks for user config data (shared cache with Home screen)
@@ -253,32 +292,6 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.header, { borderBottomColor: colors.separator }]}>
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            getMinTouchTargetStyle(),
-            { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-          ]}
-          onPress={handleBack}
-          activeOpacity={0.7}
-          {...getButtonAccessibilityProps(
-            t('common.back'),
-            AccessibilityHints.BACK
-          )}
-        >
-          <IconSymbol name="chevron.left" size={24} color={colors.text} decorative={true} />
-        </TouchableOpacity>
-        <ThemedText 
-          type="title" 
-          style={[styles.headerTitle, { color: colors.text }]}
-          accessibilityRole="header"
-        >
-          {t('settings.title')}
-        </ThemedText>
-        <View style={styles.headerRight} />
-      </View>
-
       <ScrollView 
         ref={scrollRef}
         style={styles.scrollView}
@@ -286,15 +299,42 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.scrollContent}>
+          <View style={[styles.topRowContainer, { paddingTop: insets.top }]}>
+            <View style={styles.topRow}>
+              {/* left placeholder to keep centered title */}
+              <View style={styles.topRowSide} />
+
+              <ThemedText
+                style={[styles.topRowTitle, { color: colors.text }]}
+                accessibilityRole="header"
+                numberOfLines={1}
+              >
+                {t('settings.greeting', { name: firstName })}
+              </ThemedText>
+
+              <View style={styles.topRowSide}>
+                <TouchableOpacity
+                  style={[
+                    styles.topRowCloseButton,
+                    getMinTouchTargetStyle(),
+                    { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                  ]}
+                  onPress={handleClose}
+                  activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(t('common.close'), AccessibilityHints.CLOSE)}
+                >
+                  <IconSymbol name="xmark" size={24} color={colors.text} decorative={true} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
           {/* New profile header (replaces logo + old profile card) */}
           <View style={styles.profileHeader}>
             {userConfigLoading && !userConfig ? (
               <ActivityIndicator size="small" color={colors.tint} />
             ) : (
               <>
-                <ThemedText type="title" style={[styles.helloTitle, { color: colors.text }]}>
-                  {t('settings.greeting', { name: firstName })}
-                </ThemedText>
                 <ProfileAvatarPicker
                   avatarUrl={avatarUrl}
                   onAvatarUpdated={setAvatarUrl}
@@ -419,7 +459,7 @@ export default function SettingsScreen() {
             title={t('onboarding.legal.terms_title')}
             subtitle={getDocVersion('terms') ? t('legal.updated_version', { version: getDocVersion('terms') }) : undefined}
             onPress={() => {
-              router.push('/legal/terms');
+              router.push({ pathname: '/legal/[docType]', params: { docType: 'terms' } });
             }}
           />
           <SettingItem
@@ -427,7 +467,7 @@ export default function SettingsScreen() {
             title={t('onboarding.legal.privacy_title')}
             subtitle={getDocVersion('privacy') ? t('legal.updated_version', { version: getDocVersion('privacy') }) : undefined}
             onPress={() => {
-              router.push('/legal/privacy');
+              router.push({ pathname: '/legal/[docType]', params: { docType: 'privacy' } });
             }}
           />
           <SettingItem
@@ -435,7 +475,7 @@ export default function SettingsScreen() {
             title={t('onboarding.legal.health_disclaimer_title')}
             subtitle={getDocVersion('health_disclaimer') ? t('legal.updated_version', { version: getDocVersion('health_disclaimer') }) : undefined}
             onPress={() => {
-              router.push('/legal/health');
+              router.push({ pathname: '/legal/[docType]', params: { docType: 'health' } });
             }}
           />
         </SettingSection>
@@ -575,26 +615,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  topRowContainer: {
+    width: '100%',
+  },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    height: 48,
     paddingHorizontal: 16,
-    paddingTop: Platform.select({ web: 20, default: 50 }),
-    paddingBottom: 16,
-    borderBottomWidth: 1,
   },
-  backButton: {
+  topRowSide: {
+    width: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  topRowCloseButton: {
     padding: 4,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  topRowTitle: {
     flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: -0.2,
     textAlign: 'center',
-  },
-  headerRight: {
-    width: 32,
   },
   scrollView: {
     flex: 1,
@@ -609,11 +653,12 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         padding: 16,
-        paddingTop: 30,
+        paddingTop: 0,
         paddingBottom: 16,
       },
       default: {
         padding: 16,
+        paddingTop: 0,
         paddingBottom: 32,
       },
     }),
@@ -621,15 +666,9 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 18,
+    paddingTop: 6,
     paddingBottom: 10,
     marginBottom: 18,
-  },
-  helloTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
   },
   emailText: {
     fontSize: 14,

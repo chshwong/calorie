@@ -1,16 +1,14 @@
 import React, { RefObject } from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import {
-  getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
-} from '@/utils/accessibility';
+import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
 import type { Colors } from '@/constants/theme';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 
 type MealTypeLogHeaderProps = {
   mealTypeLabel: string;
   formattedDate: string;
-  onBack: () => void;
+  onBack?: () => void;
   onMealTypePress: () => void;
   onDatePress: () => void;
   mealTypeButtonRef: RefObject<View | null>;
@@ -34,29 +32,8 @@ export function MealTypeLogHeader({
 }: MealTypeLogHeaderProps) {
   return (
     <View style={styles.headerContainer}>
-      {/* First Line: Back Arrow, Diary Title, Empty Right */}
-      <View style={styles.headerTop}>
-        <TouchableOpacity
-          style={[
-            styles.backArrowButton,
-            getMinTouchTargetStyle(),
-          ]}
-          onPress={onBack}
-          activeOpacity={0.7}
-          {...getButtonAccessibilityProps(
-            'Go back',
-            'Double tap to go back'
-          )}
-        >
-          <ThemedText style={[styles.backArrow, { color: colors.tint }]}>←</ThemedText>
-        </TouchableOpacity>
-        <View style={styles.titleCenter}>
-          <ThemedText style={[styles.mainTitle, { color: colors.text }]}>🍴 {t('mealtype_log.title')}</ThemedText>
-        </View>
-        <View style={styles.headerRight}>
-          <View style={styles.placeholder} />
-        </View>
-      </View>
+      {/* First Line: Back, Title, Optional Right */}
+      <StandardSubheader title={`🍴 ${t('mealtype_log.title')}`} onBack={onBack} />
       
       {/* Second Line: Meal Type and Date - Centered */}
       <View style={styles.headerBottom}>

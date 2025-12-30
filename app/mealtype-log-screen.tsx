@@ -1830,13 +1830,13 @@ export default function LogFoodScreen() {
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
       >
         <DesktopPageContainer>
           {/* Header */}
           <MealTypeLogHeader
             mealTypeLabel={mealTypeLabel}
             formattedDate={formattedDate}
-            onBack={() => router.back()}
             onMealTypePress={() => {
               setShowMealTypeDropdown(!showMealTypeDropdown);
             }}

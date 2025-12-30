@@ -5,13 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { lbToKg } from '@/lib/domain/weight-constants';
 import { roundTo1 } from '@/utils/bodyMetrics';
-import { getButtonAccessibilityProps, AccessibilityHints, getLinkAccessibilityProps, getIconAccessibilityProps } from '@/utils/accessibility';
+import { AccessibilityHints, getLinkAccessibilityProps, getIconAccessibilityProps } from '@/utils/accessibility';
 import { openMyGoalEdit } from '@/lib/navigation/my-goal';
 
 export default function MyGoalScreen() {
@@ -20,22 +21,6 @@ export default function MyGoalScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { data: profile, isLoading } = useUserConfig();
-
-  // Safe back navigation: try router.back() if possible, fallback to /settings if no history
-  const handleBack = () => {
-    try {
-      // Check if router can go back (handles web refresh/direct entry scenarios)
-      if (router.canGoBack && router.canGoBack()) {
-        router.back();
-      } else {
-        // No history available (direct entry/refresh), go to settings
-        router.replace('/settings');
-      }
-    } catch {
-      // If router.back() throws (shouldn't happen, but safety), go to settings
-      router.replace('/settings');
-    }
-  };
 
   // Helper to format goal type
   const getGoalTypeLabel = (goalType: string | null | undefined): string => {
@@ -97,26 +82,7 @@ export default function MyGoalScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBack}
-          activeOpacity={0.7}
-          {...getButtonAccessibilityProps('Back', AccessibilityHints.BACK)}
-        >
-          <IconSymbol 
-            name="chevron.left" 
-            size={24} 
-            color={colors.text}
-            {...getIconAccessibilityProps('Back', false)}
-          />
-        </TouchableOpacity>
-        <ThemedText type="title" style={[styles.headerTitle, { color: colors.text }]}>
-          {t('my_goals.title')}
-        </ThemedText>
-        <View style={styles.backButton} />
-      </View>
+      <StandardSubheader title={t('settings.my_journey.goals')} />
 
       {/* Content */}
       <ScrollView
@@ -280,27 +246,6 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.select({ web: 20, default: 50 }),
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    flex: 1,
-    textAlign: 'center',
   },
   content: {
     flex: 1,
