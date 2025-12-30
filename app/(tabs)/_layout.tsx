@@ -17,6 +17,7 @@ import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
 import type { FocusModule } from '@/utils/types';
 import { getLocalDateString } from '@/utils/calculations';
 import { useAuth } from '@/contexts/AuthContext';
+import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/navigation/weight';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
@@ -233,11 +234,7 @@ function TabLayoutContent() {
   };
 
   const openWeightEntryForToday = () => {
-    const todayString = getLocalDateString();
-    router.replace({
-      pathname: '/weight/entry',
-      params: { date: todayString },
-    });
+    openWeightEntryForTodayNav(router);
   };
 
   const renderQuickAddModuleCard = (config: typeof module1Config) => {

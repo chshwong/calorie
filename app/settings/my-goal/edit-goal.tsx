@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { showAppToast } from '@/components/ui/app-toast';
-import { EditSheet } from './_components/EditSheet';
+import EditSheet from './_components/EditSheet';
 import { returnToMyGoal } from './_components/returnToMyGoal';
 import { GoalStep } from '@/components/onboarding/steps/GoalStep';
 import { GoalWeightStep } from '@/components/onboarding/steps/GoalWeightStep';
@@ -22,6 +22,7 @@ type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 export default function EditGoalScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const params = useLocalSearchParams<{ start?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { data: profile } = useUserConfig();
@@ -29,6 +30,17 @@ export default function EditGoalScreen() {
 
   // Step index: 0 = Goal, 1 = GoalWeight, 2 = Activity, 3 = DailyCalorieTarget
   const [subStepIndex, setSubStepIndex] = useState(0);
+  const didInitFromParams = useRef(false);
+
+  // Optional deep-link start (used by Settings "Adjust Activity Level" row)
+  useEffect(() => {
+    if (didInitFromParams.current) return;
+    didInitFromParams.current = true;
+
+    if (params?.start === 'activity') {
+      setSubStepIndex(2);
+    }
+  }, [params?.start]);
 
   // Initialize state from profile
   const [goal, setGoal] = useState<GoalType | ''>((profile?.goal_type as GoalType) || '');

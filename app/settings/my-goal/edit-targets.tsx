@@ -6,7 +6,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { showAppToast } from '@/components/ui/app-toast';
-import { EditSheet } from './_components/EditSheet';
+import EditSheet from './_components/EditSheet';
 import { returnToMyGoal } from './_components/returnToMyGoal';
 import { DailyFocusTargetsStep, type DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
 

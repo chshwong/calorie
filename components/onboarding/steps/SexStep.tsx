@@ -14,6 +14,12 @@ interface SexStepProps {
   onErrorClear: () => void;
   loading: boolean;
   colors: typeof Colors.light;
+  // Edit mode props (optional, non-breaking)
+  mode?: 'onboarding' | 'edit';
+  initialValue?: 'male' | 'female' | '';
+  onNext?: (value: 'male' | 'female') => void | Promise<void>;
+  onBack?: () => void;
+  ctaLabel?: string;
 }
 
 const GenderIllustration = ({ colors, isDark }: { colors: typeof Colors.light; isDark: boolean }) => {
@@ -119,7 +125,13 @@ export const SexStep: React.FC<SexStepProps> = ({
                 },
                 !selected && {
                   ...(Platform.OS === 'web' 
-                    ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)', transition: 'all 0.2s ease' } // Shadows.sm web value
+                    ? { 
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                        // Use transitionDuration instead of transition to avoid conflicts
+                        transitionProperty: 'all',
+                        transitionDuration: '0.2s',
+                        transitionTimingFunction: 'ease',
+                      }
                     : Shadows.sm
                   ),
                 },
@@ -128,7 +140,10 @@ export const SexStep: React.FC<SexStepProps> = ({
                     ? {
                         background: `linear-gradient(180deg, ${onboardingColors.primary}, ${onboardingColors.primaryDark})`,
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)', // Shadows.lg web value
-                        transition: 'all 0.2s ease',
+                        // Use transitionDuration instead of transition to avoid conflicts
+                        transitionProperty: 'all',
+                        transitionDuration: '0.2s',
+                        transitionTimingFunction: 'ease',
                       }
                     : {
                         backgroundColor: onboardingColors.primary,
@@ -219,7 +234,10 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         cursor: 'pointer',
-        transition: 'all 0.2s ease',
+        // Use transitionDuration instead of transition to avoid conflicts
+        transitionProperty: 'all',
+        transitionDuration: '0.2s',
+        transitionTimingFunction: 'ease',
       },
       default: {},
     }),

@@ -44,35 +44,59 @@ export const AccessibilityHints = {
 
 /**
  * Get accessibility props for a button
+ * On web, accessibilityHint is not converted to aria-hint (which is invalid)
+ * Instead, we use aria-describedby for web compatibility
  */
 export function getButtonAccessibilityProps(
   label: string,
   hint?: string,
   disabled?: boolean
 ) {
-  return {
+  const baseProps = {
     accessibilityRole: AccessibilityRoles.BUTTON as const,
     accessibilityLabel: label,
-    accessibilityHint: hint || AccessibilityHints.BUTTON,
     accessibilityState: {
       disabled: disabled || false,
     },
+  };
+
+  // On web, don't use accessibilityHint (it becomes invalid aria-hint)
+  // On native, use accessibilityHint for screen readers
+  if (Platform.OS === 'web') {
+    return baseProps;
+  }
+
+  return {
+    ...baseProps,
+    accessibilityHint: hint || AccessibilityHints.BUTTON,
   };
 }
 
 /**
  * Get accessibility props for a link
+ * On web, accessibilityHint is not converted to aria-hint (which is invalid)
  */
 export function getLinkAccessibilityProps(label: string, hint?: string) {
-  return {
+  const baseProps = {
     accessibilityRole: AccessibilityRoles.LINK as const,
     accessibilityLabel: label,
+  };
+
+  // On web, don't use accessibilityHint (it becomes invalid aria-hint)
+  // On native, use accessibilityHint for screen readers
+  if (Platform.OS === 'web') {
+    return baseProps;
+  }
+
+  return {
+    ...baseProps,
     accessibilityHint: hint || AccessibilityHints.LINK,
   };
 }
 
 /**
  * Get accessibility props for a text input
+ * On web, accessibilityHint is not converted to aria-hint (which is invalid)
  */
 export function getInputAccessibilityProps(
   label: string,
@@ -80,11 +104,21 @@ export function getInputAccessibilityProps(
   error?: string,
   required?: boolean
 ) {
-  return {
+  const baseProps = {
     accessibilityLabel: label,
-    accessibilityHint: hint,
     accessibilityRequired: required,
     accessibilityLiveRegion: (error ? 'polite' : undefined) as 'polite' | undefined,
+  };
+
+  // On web, don't use accessibilityHint (it becomes invalid aria-hint)
+  // On native, use accessibilityHint for screen readers
+  if (Platform.OS === 'web') {
+    return baseProps;
+  }
+
+  return {
+    ...baseProps,
+    accessibilityHint: hint,
   };
 }
 

@@ -12,6 +12,7 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { lbToKg } from '@/lib/domain/weight-constants';
 import { roundTo1 } from '@/utils/bodyMetrics';
 import { getButtonAccessibilityProps, AccessibilityHints, getLinkAccessibilityProps, getIconAccessibilityProps } from '@/utils/accessibility';
+import { openMyGoalEdit } from '@/lib/navigation/my-goal';
 
 export default function MyGoalScreen() {
   const { t } = useTranslation();
@@ -128,7 +129,7 @@ export default function MyGoalScreen() {
             {/* Card A - Goal */}
             <TouchableOpacity
           style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-          onPress={() => router.push('/settings/my-goal/edit-goal')}
+          onPress={() => openMyGoalEdit(router, 'goal')}
           activeOpacity={0.7}
           {...getLinkAccessibilityProps('Edit Goal', AccessibilityHints.EDIT)}
         >

@@ -30,7 +30,7 @@ interface EditSheetProps {
   scrollToTopKey?: string | number;
 }
 
-export function EditSheet({
+function EditSheet({
   title,
   children,
   onCancel,
@@ -312,3 +312,4 @@ const styles = StyleSheet.create({
   },
 });
 
+export default EditSheet;

@@ -1,10 +1,11 @@
 import React, { useMemo, useRef } from 'react';
-import { Animated, ScrollView, StyleSheet, View, Text, Image, RefreshControl, TouchableOpacity, Platform } from 'react-native';
+import { Animated, ScrollView, StyleSheet, View, Text, Image, RefreshControl, TouchableOpacity, Platform, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, ModuleThemes, Spacing, FontSize, BorderRadius, type ModuleType } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTranslation } from 'react-i18next';
 import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
+import { useRouter } from 'expo-router';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -49,6 +50,7 @@ export function CollapsibleModuleHeader({
   isToday = false,
   module,
 }: Props) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -127,11 +129,25 @@ export function CollapsibleModuleHeader({
                   {preferredName}
                 </Text>
               )}
-              {rightAvatarUri ? (
-                <Image source={{ uri: rightAvatarUri }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.backgroundSecondary }]} />
-              )}
+              <Pressable
+                onPress={() => router.push('/settings')}
+                style={[
+                  getMinTouchTargetStyle(),
+                  Platform.OS === 'web' ? getFocusStyle(moduleAccent) : {},
+                ]}
+                {...getButtonAccessibilityProps('Open settings', 'Open settings')}
+              >
+                {rightAvatarUri ? (
+                  <Image source={{ uri: rightAvatarUri }} style={styles.avatar} />
+                ) : (
+                  <View
+                    style={[
+                      styles.avatarPlaceholder,
+                      { backgroundColor: colors.backgroundSecondary },
+                    ]}
+                  />
+                )}
+              </Pressable>
             </View>
           </View>
         </Animated.View>

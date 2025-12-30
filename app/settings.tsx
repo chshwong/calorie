@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Platform, ActivityIndicator } from 'react-native';
 import { router, useRouter, useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { setLanguage, languageNames, SupportedLanguage } from '../i18n';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +16,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { useLegalDocuments } from '@/hooks/use-legal-documents';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import {
@@ -22,9 +26,10 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
+import { openWeightEntryForToday } from '@/lib/navigation/weight';
+import { openMyGoalEdit } from '@/lib/navigation/my-goal';
 
 type SettingsPreferences = {
-  units: 'metric' | 'imperial';
   notifications: boolean;
 };
 
@@ -59,6 +64,15 @@ export default function SettingsScreen() {
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility in this file
   const updateProfileMutation = useUpdateProfile();
+  
+  // Fetch legal documents for version display
+  const { data: legalDocuments = [] } = useLegalDocuments();
+  
+  // Get version for each document type
+  const getDocVersion = (docType: 'terms' | 'privacy' | 'health_disclaimer'): string | null => {
+    const doc = legalDocuments.find((d) => d.doc_type === docType);
+    return doc?.version ?? null;
+  };
 
   const firstName = (profile?.first_name ?? '').trim() || 'there';
   const email = profile?.email || user?.email || '';
@@ -71,13 +85,23 @@ export default function SettingsScreen() {
   const currentLanguage = (i18nInstance.language as SupportedLanguage) || 'en';
   
   const [settings, setSettings] = useState<SettingsPreferences>({
-    units: 'imperial',
     notifications: true,
   });
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteSecondConfirm, setShowDeleteSecondConfirm] = useState(false);
   const [showDeleteThirdConfirm, setShowDeleteThirdConfirm] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Always reset scroll position when returning to Settings
+  useFocusEffect(
+    useCallback(() => {
+      const rafId = requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      });
+      return () => cancelAnimationFrame(rafId);
+    }, [])
+  );
 
   // Load settings from storage
   useEffect(() => {
@@ -91,7 +115,6 @@ export default function SettingsScreen() {
         if (stored) {
           const parsed = JSON.parse(stored);
           setSettings({
-            units: parsed.units || 'imperial',
             notifications: parsed.notifications !== undefined ? parsed.notifications : true,
           });
         }
@@ -100,7 +123,6 @@ export default function SettingsScreen() {
         if (stored) {
           const parsed = JSON.parse(stored);
           setSettings({
-            units: parsed.units || 'imperial',
             notifications: parsed.notifications !== undefined ? parsed.notifications : true,
           });
         }
@@ -384,7 +406,7 @@ export default function SettingsScreen() {
     rightComponent,
     showChevron = true 
   }: {
-    icon: string;
+    icon: string | React.ReactNode;
     title: string;
     subtitle?: string;
     onPress?: () => void;
@@ -414,7 +436,11 @@ export default function SettingsScreen() {
         accessibilityElementsHidden={true}
         importantForAccessibility="no-hide-descendants"
       >
-        <IconSymbol name={icon as any} size={20} color={colors.tint} decorative={true} />
+        {typeof icon === 'string' ? (
+          <IconSymbol name={icon as any} size={20} color={colors.tint} decorative={true} />
+        ) : (
+          icon
+        )}
       </View>
       <View style={styles.settingContent}>
         <ThemedText style={[styles.settingTitle, { color: colors.text }]}>{title}</ThemedText>
@@ -466,6 +492,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView 
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
@@ -507,6 +534,22 @@ export default function SettingsScreen() {
               router.push('/settings/my-goal');
             }}
           />
+          <SettingItem
+            icon={<Ionicons name="walk-outline" size={20} color={colors.tint} />}
+            title="Adjust Activity Level"
+            subtitle="Update your daily activity setting"
+            onPress={() => {
+              openMyGoalEdit(router, 'activity');
+            }}
+          />
+          <SettingItem
+            icon={<MaterialCommunityIcons name="scale-bathroom" size={20} color={colors.tint} />}
+            title="My Weight"
+            subtitle="Log or review your weight entries"
+            onPress={() => {
+              openWeightEntryForToday(router);
+            }}
+          />
         </SettingSection>
 
         {/* Account Management */}
@@ -517,14 +560,6 @@ export default function SettingsScreen() {
             subtitle={t('settings.account.edit_profile_subtitle')}
             onPress={() => {
               router.push('/edit-profile');
-            }}
-          />
-          <SettingItem
-            icon="lock.fill"
-            title={t('settings.account.change_password')}
-            onPress={() => {
-              // TODO: Navigate to change password screen
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.account.change_password') }));
             }}
           />
           <SettingItem
@@ -548,48 +583,6 @@ export default function SettingsScreen() {
               <View style={styles.switchContainer}>
                 <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
                   {languageNames[currentLanguage]}
-                </Text>
-                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
-              </View>
-            }
-          />
-          <SettingItem
-            icon="ruler.fill"
-            title={t('settings.preferences.units')}
-            subtitle={settings.units === 'metric' ? t('settings.preferences.units_metric') : t('settings.preferences.units_imperial')}
-            onPress={() => {
-              const newUnits = settings.units === 'metric' ? 'imperial' : 'metric';
-              saveSettings({ ...settings, units: newUnits });
-            }}
-            rightComponent={
-              <View style={styles.switchContainer}>
-                <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
-                  {settings.units === 'metric' ? 'Metric' : 'Imperial'}
-                </Text>
-                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
-              </View>
-            }
-          />
-          <SettingItem
-            icon="drop.fill"
-            title={t('settings.preferences.water_units')}
-            subtitle={profile?.water_unit_preference === 'imperial' ? t('settings.preferences.water_units_imperial') : t('settings.preferences.water_units_metric')}
-            onPress={async () => {
-              if (!user?.id || !profile) return;
-              const newPreference = profile.water_unit_preference === 'imperial' ? 'metric' : 'imperial';
-              try {
-                await updateProfileMutation.mutateAsync({
-                  water_unit_preference: newPreference,
-                });
-              } catch (err) {
-                console.error('Error saving water unit preference:', err);
-                Alert.alert(t('alerts.error_title'), t('settings.errors.save_preference_failed'));
-              }
-            }}
-            rightComponent={
-              <View style={styles.switchContainer}>
-                <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
-                  {profile?.water_unit_preference === 'imperial' ? 'fl oz' : 'ml'}
                 </Text>
                 <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
               </View>
@@ -631,23 +624,30 @@ export default function SettingsScreen() {
           />
         </SettingSection>
 
-        {/* Privacy & Security */}
-        <SettingSection title={t('settings.privacy.title')}>
+        {/* Legal */}
+        <SettingSection title="LEGAL">
           <SettingItem
-            icon="arrow.down.doc.fill"
-            title={t('settings.privacy.export_data')}
-            subtitle={t('settings.privacy.export_data_subtitle')}
+            icon="doc.text.fill"
+            title={t('onboarding.legal.terms_title')}
+            subtitle={getDocVersion('terms') ? `Version: ${getDocVersion('terms')}` : undefined}
             onPress={() => {
-              // TODO: Implement data export
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.privacy.export_data') }));
+              router.push('/legal/terms');
             }}
           />
           <SettingItem
             icon="hand.raised.fill"
-            title={t('settings.privacy.privacy_policy')}
+            title={t('onboarding.legal.privacy_title')}
+            subtitle={getDocVersion('privacy') ? `Version: ${getDocVersion('privacy')}` : undefined}
             onPress={() => {
-              // TODO: Navigate to privacy policy
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.privacy.privacy_policy') }));
+              router.push('/legal/privacy');
+            }}
+          />
+          <SettingItem
+            icon={<MaterialCommunityIcons name="heart-pulse" size={20} color={colors.tint} />}
+            title={t('onboarding.legal.health_disclaimer_title')}
+            subtitle={getDocVersion('health_disclaimer') ? `Version: ${getDocVersion('health_disclaimer')}` : undefined}
+            onPress={() => {
+              router.push('/legal/health');
             }}
           />
         </SettingSection>
@@ -660,14 +660,6 @@ export default function SettingsScreen() {
             subtitle="1.0.0"
             onPress={undefined}
             showChevron={false}
-          />
-          <SettingItem
-            icon="doc.text.fill"
-            title={t('settings.about.terms_of_service')}
-            onPress={() => {
-              // TODO: Navigate to terms
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.about.terms_of_service') }));
-            }}
           />
           <SettingItem
             icon="questionmark.circle.fill"

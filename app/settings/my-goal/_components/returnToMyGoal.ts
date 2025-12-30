@@ -18,3 +18,7 @@ export function returnToMyGoal(router: Router): void {
   router.replace('/settings/my-goal');
 }
 
+// Default export for Expo Router (this file is a utility, not a route component)
+export default function ReturnToMyGoalRoute() {
+  return null;
+}

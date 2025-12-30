@@ -23,6 +23,12 @@ interface HeightStepProps {
   error: string | null;
   loading: boolean;
   colors: typeof Colors.light;
+  // Edit mode props (optional, non-breaking)
+  mode?: 'onboarding' | 'edit';
+  initialValue?: number | null; // height in cm
+  onNext?: (heightCm: number) => void | Promise<void>;
+  onBack?: () => void;
+  ctaLabel?: string;
 }
 
 const HeightIllustration = () => {
@@ -209,7 +215,16 @@ export const HeightStep: React.FC<HeightStepProps> = ({
                 !selected && {
                   backgroundColor: colors.surfaceInteractive,
                   borderWidth: 0,
-                  ...(Platform.OS === 'web' ? { boxShadow: 'none' as any, transition: 'all 0.2s ease' as any } : {}),
+                  ...(Platform.OS === 'web' 
+                    ? { 
+                        boxShadow: 'none' as any,
+                        // Use transitionDuration instead of transition to avoid conflicts
+                        transitionProperty: 'all',
+                        transitionDuration: '0.2s',
+                        transitionTimingFunction: 'ease',
+                      } 
+                    : {}
+                  ),
                 },
               ]}
               onPress={() => handleUnitChange(unitOption.value as 'cm' | 'ft/in')}
