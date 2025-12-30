@@ -82,7 +82,7 @@ function EditSheet({
       {headerVariant === 'standardSubheaderCloseRight' ? (
         <StandardSubheader
           title={title}
-          showBack={false}
+          onBack={onCancel}
           right={
             <TouchableOpacity
               style={[
