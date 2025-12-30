@@ -560,6 +560,110 @@ export const Layout = {
 };
 
 // ============================================================================
+// COMPONENT TOKENS
+// ============================================================================
+
+/**
+ * More bottom sheet (tab menu) tokens.
+ *
+ * Engineering guideline #11: components should not hardcode colors/sizes.
+ * Design spec requires several non-scale values (e.g. 15px label text, 5px handle height),
+ * so those live here as explicit tokens.
+ */
+export const MoreSheetTokens = {
+  container: {
+    paddingHorizontal: Spacing.lg, // 16
+    paddingTop: Layout.cardInnerPaddingCompact, // 10 (spec-driven)
+    paddingBottomBase: Layout.cardInnerPaddingCompact, // 10 (spec-driven; safe-area added at runtime)
+    borderTopRadius: BorderRadius['3xl'], // 24
+  },
+  handle: {
+    width: Layout.minTouchTarget, // 44
+    height: 5, // spec-driven
+    borderRadius: 3, // spec-driven
+    marginBottom: Layout.cardInnerPaddingCompact, // 10
+    color: {
+      light: 'rgba(0,0,0,0.18)',
+      dark: 'rgba(255,255,255,0.18)',
+    },
+  },
+  header: {
+    title: {
+      fontSize: FontSize.lg, // 18
+      fontWeight: FontWeight.bold,
+      color: {
+        light: '#0B0C0E',
+        dark: '#F2F4F7',
+      },
+    },
+    closeButton: {
+      size: 34, // spec-driven
+      borderRadius: 17, // spec-driven
+      iconSize: FontSize.lg, // 18
+      iconColor: {
+        light: 'rgba(0,0,0,0.38)',
+        dark: 'rgba(255,255,255,0.45)',
+      },
+      backgroundColor: {
+        light: 'rgba(0,0,0,0.04)',
+        dark: 'rgba(255,255,255,0.06)',
+      },
+    },
+    marginBottom: Spacing.md, // 12
+  },
+  row: {
+    height: Spacing['5xl'] + Spacing.sm, // 56
+    paddingHorizontal: Spacing.md + Spacing.xxs, // 14
+    borderRadius: BorderRadius.xl, // 16
+    borderWidth: 1,
+    gap: Layout.cardInnerPaddingCompact, // 10
+    backgroundColor: {
+      light: 'rgba(0,0,0,0.02)',
+      dark: 'rgba(255,255,255,0.04)',
+    },
+    borderColor: {
+      light: 'rgba(0,0,0,0.06)',
+      dark: 'rgba(255,255,255,0.08)',
+    },
+    label: {
+      fontSize: 15, // spec-driven
+      fontWeight: FontWeight.semibold,
+      color: {
+        light: '#0B0C0E',
+        dark: '#F2F4F7',
+      },
+    },
+    chevron: {
+      size: FontSize.lg, // 18
+      color: {
+        light: 'rgba(0,0,0,0.38)',
+        dark: 'rgba(255,255,255,0.45)',
+      },
+    },
+  },
+  iconChip: {
+    size: 34, // spec-driven
+    borderRadius: BorderRadius.lg, // 12
+    backgroundColor: {
+      light: 'rgba(0,0,0,0.06)',
+      dark: 'rgba(255,255,255,0.08)',
+    },
+    iconSize: FontSize.lg, // 18
+    iconColor: {
+      light: '#0B0C0E',
+      dark: '#F2F4F7',
+    },
+    marginRight: Spacing.md, // 12
+  },
+  sheet: {
+    backgroundColor: {
+      light: '#FFFFFF',
+      dark: '#14161A',
+    },
+  },
+} as const;
+
+// ============================================================================
 // FONTS (Legacy - kept for backwards compatibility)
 // ============================================================================
 

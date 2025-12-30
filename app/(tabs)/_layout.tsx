@@ -8,7 +8,8 @@ import { HapticTab } from '@/components/haptic-tab';
 import { PlusButtonTab } from '@/components/plus-button-tab';
 import { MoreButtonTab } from '@/components/more-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, FontSize } from '@/constants/theme';
+import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
+import { Colors, FontSize, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
@@ -23,6 +24,7 @@ function TabLayoutContent() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
   const colors = Colors[colorScheme ?? 'light'];
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const segments = useSegments();
   const { user, profile: authProfile, loading: authLoading } = useAuth();
@@ -143,6 +145,39 @@ function TabLayoutContent() {
     setMoreMenuVisible(false);
     router.push('/(tabs)/water');
   };
+
+  const moreSheetItems = [
+    {
+      key: 'settings',
+      label: t('settings.title'),
+      icon: 'settings-outline' as const,
+      onPress: handleMoreSettings,
+    },
+    {
+      key: 'exercise',
+      label: t('tabs.exercise'),
+      icon: 'barbell-outline' as const,
+      onPress: handleMoreExercise,
+    },
+    {
+      key: 'weight',
+      label: t('tabs.weight'),
+      icon: 'scale-outline' as const,
+      onPress: handleMoreWeight,
+    },
+    {
+      key: 'meds',
+      label: t('tabs.meds'),
+      icon: 'nutrition-outline' as const,
+      onPress: handleMoreMeds,
+    },
+    {
+      key: 'water',
+      label: t('tabs.water'),
+      icon: 'water-outline' as const,
+      onPress: handleMoreWater,
+    },
+  ];
 
   // Get module configs
   const module1Config = MODULE_CONFIGS[focusModule1];
@@ -488,29 +523,17 @@ function TabLayoutContent() {
             ]}
             onPress={() => setMoreMenuVisible(false)}
           >
-            <View style={styles.moreMenuSheet}>
-              <View style={styles.moreMenuHandle} />
-
-              <Pressable style={styles.moreMenuItem} onPress={handleMoreSettings}>
-                <Text style={styles.moreMenuItemText}>{t('settings.title')}</Text>
-              </Pressable>
-
-              <Pressable style={styles.moreMenuItem} onPress={handleMoreExercise}>
-                <Text style={styles.moreMenuItemText}>{t('tabs.exercise')}</Text>
-              </Pressable>
-
-              <Pressable style={styles.moreMenuItem} onPress={handleMoreWeight}>
-                <Text style={styles.moreMenuItemText}>{t('tabs.weight')}</Text>
-              </Pressable>
-
-              <Pressable style={styles.moreMenuItem} onPress={handleMoreMeds}>
-                <Text style={styles.moreMenuItemText}>{t('tabs.meds')}</Text>
-              </Pressable>
-
-              <Pressable style={styles.moreMenuItem} onPress={handleMoreWater}>
-                <Text style={styles.moreMenuItemText}>{t('tabs.water')}</Text>
-              </Pressable>
-            </View>
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <View style={styles.moreMenuSheetContainer}>
+                <MoreSheetContent
+                  isDark={isDark}
+                  title={t('tabs.more')}
+                  closeLabel={t('common.close', { defaultValue: 'Close' })}
+                  items={moreSheetItems}
+                  onClose={() => setMoreMenuVisible(false)}
+                />
+              </View>
+            </Pressable>
           </Pressable>
         </Modal>
       </View>
@@ -603,27 +626,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
-  moreMenuSheet: {
+  moreMenuSheetContainer: {
     width: '100%',
-    backgroundColor: '#ffffff',
-    paddingBottom: 12,
-    paddingTop: 8,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  moreMenuHandle: {
+    maxWidth: Layout.desktopMaxWidth, // Match DesktopPageContainer max-width (same as main content)
     alignSelf: 'center',
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#ccc',
-    marginBottom: 8,
-  },
-  moreMenuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  moreMenuItemText: {
-    fontSize: 15,
+    alignItems: 'center',
   },
 });
