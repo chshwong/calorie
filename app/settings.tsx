@@ -17,23 +17,22 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
-import { supabase } from '@/lib/supabase';
-import * as SecureStore from 'expo-secure-store';
 import {
   getButtonAccessibilityProps,
   getLinkAccessibilityProps,
+  AccessibilityHints,
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
 import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
 import { openWeightEntryForToday } from '@/lib/navigation/weight';
 import { openMyGoalEdit } from '@/lib/navigation/my-goal';
-
-type SettingsPreferences = {
-  notifications: boolean;
-};
-
-const SETTINGS_STORAGE_KEY = 'app_settings';
+import { deleteUserAccountData } from '@/lib/services/accountDeletion';
+import {
+  loadSettingsPreferences,
+  saveSettingsPreferences,
+  type SettingsPreferences,
+} from '@/lib/services/settingsPreferences';
 
 export default function SettingsScreen() {
   const { t, i18n: i18nInstance } = useTranslation();
@@ -74,7 +73,8 @@ export default function SettingsScreen() {
     return doc?.version ?? null;
   };
 
-  const firstName = (profile?.first_name ?? '').trim() || 'there';
+  const firstName =
+    (profile?.first_name ?? '').trim() || t('settings.profile_section.user_fallback');
   const email = profile?.email || user?.email || '';
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
   useEffect(() => {
@@ -91,6 +91,7 @@ export default function SettingsScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteSecondConfirm, setShowDeleteSecondConfirm] = useState(false);
   const [showDeleteThirdConfirm, setShowDeleteThirdConfirm] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   // Always reset scroll position when returning to Settings
@@ -109,39 +110,18 @@ export default function SettingsScreen() {
   }, []);
 
   const loadSettings = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setSettings({
-            notifications: parsed.notifications !== undefined ? parsed.notifications : true,
-          });
-        }
-      } else {
-        const stored = await SecureStore.getItemAsync(SETTINGS_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setSettings({
-            notifications: parsed.notifications !== undefined ? parsed.notifications : true,
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
+    // NOTE: This is local-only UI preference data (not Supabase).
+    // Platform storage access is centralized in a service per engineering guidelines.
+    const prefs = await loadSettingsPreferences();
+    setSettings(prefs);
   };
 
   const saveSettings = async (newSettings: SettingsPreferences) => {
+    setSettings(newSettings);
     try {
-      setSettings(newSettings);
-      if (Platform.OS === 'web') {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
-      } else {
-        await SecureStore.setItemAsync(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
-      }
-    } catch (error) {
-      console.error('Error saving settings:', error);
+      await saveSettingsPreferences(newSettings);
+    } catch {
+      Alert.alert(t('alerts.error_title'), t('settings.errors.save_preference_failed'));
     }
   };
 
@@ -164,34 +144,8 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        const confirmed = window.confirm(t('settings.logout.confirm_message'));
-        if (!confirmed) {
-          return;
-        }
-        await signOut();
-        router.replace('/login');
-      } else {
-        Alert.alert(
-          t('settings.logout.confirm_title'),
-          t('settings.logout.confirm_message'),
-          [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-              text: t('settings.logout.button'),
-              style: 'destructive',
-              onPress: async () => {
-                await signOut();
-                router.replace('/login');
-              },
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
+    // Cross-platform confirm (no window.confirm per engineering guidelines)
+    setShowLogoutConfirm(true);
   };
 
   const handleDeleteAccount = () => {
@@ -219,181 +173,15 @@ export default function SettingsScreen() {
     setShowDeleteThirdConfirm(false);
 
     try {
-      // Step 1: Delete calorie entries
-      const { error: calorieEntriesError } = await supabase
-        .from('calorie_entries')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (calorieEntriesError) {
-        console.error('Error deleting calorie entries:', calorieEntriesError);
-        Alert.alert(
-          'Error',
-          'Failed to delete some account data. Please try again or contact support if the problem persists.',
-          [{ text: 'OK' }]
-        );
-        setLoading(false);
-        return;
-      }
-
-      // Step 2: Get all bundle IDs for this user (needed to delete bundle_items)
-      const { data: userBundles, error: bundlesFetchError } = await supabase
-        .from('bundles')
-        .select('id')
-        .eq('user_id', user.id);
-
-      if (bundlesFetchError) {
-        console.error('Error fetching bundles:', bundlesFetchError);
-      }
-
-      const bundleIds = userBundles?.map(b => b.id) || [];
-
-      // Step 3: Delete bundle_items for user's bundles
-      if (bundleIds.length > 0) {
-        const { error: bundleItemsError } = await supabase
-          .from('bundle_items')
-          .delete()
-          .in('bundle_id', bundleIds);
-
-        if (bundleItemsError) {
-          console.error('Error deleting bundle_items:', bundleItemsError);
-          // Continue even if this fails - CASCADE might handle it
-        }
-      }
-
-      // Step 4: Delete bundles
-      const { error: bundlesError } = await supabase
-        .from('bundles')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (bundlesError) {
-        console.error('Error deleting bundles:', bundlesError);
-        Alert.alert(
-          'Error',
-          'Failed to delete some account data. Please try again or contact support if the problem persists.',
-          [{ text: 'OK' }]
-        );
-        setLoading(false);
-        return;
-      }
-
-      // Step 5: Get all custom food_master IDs for this user (needed to delete food_servings)
-      const { data: customFoods, error: foodsFetchError } = await supabase
-        .from('food_master')
-        .select('id')
-        .eq('owner_user_id', user.id)
-        .eq('is_custom', true);
-
-      if (foodsFetchError) {
-        console.error('Error fetching custom foods:', foodsFetchError);
-      }
-
-      const foodIds = customFoods?.map(f => f.id) || [];
-
-      // Step 6: Delete food_servings for user's custom foods
-      if (foodIds.length > 0) {
-        const { error: servingsError } = await supabase
-          .from('food_servings')
-          .delete()
-          .in('food_id', foodIds);
-
-        if (servingsError) {
-          console.error('Error deleting food_servings:', servingsError);
-          Alert.alert(
-            'Error',
-            'Failed to delete some account data. Please try again or contact support if the problem persists.',
-            [{ text: 'OK' }]
-          );
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Step 7: Delete custom food_master entries
-      const { error: foodMasterError } = await supabase
-        .from('food_master')
-        .delete()
-        .eq('owner_user_id', user.id)
-        .eq('is_custom', true);
-
-      if (foodMasterError) {
-        console.error('Error deleting food_master:', foodMasterError);
-        Alert.alert(
-          'Error',
-          'Failed to delete some account data. Please try again or contact support if the problem persists.',
-          [{ text: 'OK' }]
-        );
-        setLoading(false);
-        return;
-      }
-
-      // Step 8: Delete the profile
-      const { error: profileDeleteError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (profileDeleteError) {
-        console.error('Error deleting profile:', profileDeleteError);
-        Alert.alert(
-          'Error',
-          'Failed to delete profile. Please try again or contact support if the problem persists.',
-          [{ text: 'OK' }]
-        );
-        setLoading(false);
-        return;
-      }
-
-      // Step 9: Delete the auth user using Edge Function
-      // This calls the Supabase Edge Function which uses the Admin API
-      try {
-        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-        if (!supabaseUrl) {
-          throw new Error('Supabase URL not configured');
-        }
-
-        // Get the current session token
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          throw new Error('No session token available');
-        }
-
-        // Call the Edge Function to delete the auth user
-        const response = await fetch(`${supabaseUrl}/functions/v1/delete-auth-user`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to delete auth user: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to delete auth user');
-        }
-      } catch (error: any) {
-        // Log error but don't fail the entire process
-        // The profile and all data are already deleted
-        console.error('Error deleting auth user (profile and data already deleted):', error.message);
-        // Continue - the profile and all data are deleted, auth user deletion is optional
-      }
-
-      // Successfully deleted all data and profile, now sign out
+      await deleteUserAccountData({ userId: user.id });
       await signOut();
       router.replace('/login');
     } catch (error) {
-      console.error('Error deleting account data:', error);
-      Alert.alert(
-        'Error',
-        'An unexpected error occurred while deleting your account data. Please contact support.',
-        [{ text: 'OK' }]
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error deleting account data:', error);
+      }
+      Alert.alert(t('alerts.error_title'), t('settings.errors.delete_account_failed'));
+    } finally {
       setLoading(false);
     }
   };
@@ -428,7 +216,7 @@ export default function SettingsScreen() {
       activeOpacity={0.7}
       {...(onPress ? getButtonAccessibilityProps(
         subtitle ? `${title}, ${subtitle}` : title,
-        `Double tap to ${title.toLowerCase()}`
+        AccessibilityHints.NAVIGATE
       ) : {})}
     >
       <View 
@@ -475,8 +263,8 @@ export default function SettingsScreen() {
           onPress={handleBack}
           activeOpacity={0.7}
           {...getButtonAccessibilityProps(
-            'Back',
-            'Double tap to go back'
+            t('common.back'),
+            AccessibilityHints.BACK
           )}
         >
           <IconSymbol name="chevron.left" size={24} color={colors.text} decorative={true} />
@@ -505,7 +293,7 @@ export default function SettingsScreen() {
             ) : (
               <>
                 <ThemedText type="title" style={[styles.helloTitle, { color: colors.text }]}>
-                  {`Hello ${firstName}!`}
+                  {t('settings.greeting', { name: firstName })}
                 </ThemedText>
                 <ProfileAvatarPicker
                   avatarUrl={avatarUrl}
@@ -513,7 +301,7 @@ export default function SettingsScreen() {
                   size={130}
                   editable={!loading && !userConfigLoading}
                   persistToProfile={true}
-                  successToastMessage="Profile photo updated."
+                  successToastMessage={t('settings.profile_photo_updated')}
                 />
                 {!!email && (
                   <ThemedText style={[styles.emailText, { color: colors.textSecondary }]}>
@@ -536,16 +324,16 @@ export default function SettingsScreen() {
           />
           <SettingItem
             icon={<Ionicons name="walk-outline" size={20} color={colors.tint} />}
-            title="Adjust Activity Level"
-            subtitle="Update your daily activity setting"
+            title={t('settings.my_journey.adjust_activity_level')}
+            subtitle={t('settings.my_journey.adjust_activity_level_subtitle')}
             onPress={() => {
               openMyGoalEdit(router, 'activity');
             }}
           />
           <SettingItem
             icon={<MaterialCommunityIcons name="scale-bathroom" size={20} color={colors.tint} />}
-            title="My Weight"
-            subtitle="Log or review your weight entries"
+            title={t('settings.my_journey.my_weight')}
+            subtitle={t('settings.my_journey.my_weight_subtitle')}
             onPress={() => {
               openWeightEntryForToday(router);
             }}
@@ -625,11 +413,11 @@ export default function SettingsScreen() {
         </SettingSection>
 
         {/* Legal */}
-        <SettingSection title="LEGAL">
+        <SettingSection title={t('settings.legal.title')}>
           <SettingItem
             icon="doc.text.fill"
             title={t('onboarding.legal.terms_title')}
-            subtitle={getDocVersion('terms') ? `Version: ${getDocVersion('terms')}` : undefined}
+            subtitle={getDocVersion('terms') ? t('legal.updated_version', { version: getDocVersion('terms') }) : undefined}
             onPress={() => {
               router.push('/legal/terms');
             }}
@@ -637,7 +425,7 @@ export default function SettingsScreen() {
           <SettingItem
             icon="hand.raised.fill"
             title={t('onboarding.legal.privacy_title')}
-            subtitle={getDocVersion('privacy') ? `Version: ${getDocVersion('privacy')}` : undefined}
+            subtitle={getDocVersion('privacy') ? t('legal.updated_version', { version: getDocVersion('privacy') }) : undefined}
             onPress={() => {
               router.push('/legal/privacy');
             }}
@@ -645,7 +433,7 @@ export default function SettingsScreen() {
           <SettingItem
             icon={<MaterialCommunityIcons name="heart-pulse" size={20} color={colors.tint} />}
             title={t('onboarding.legal.health_disclaimer_title')}
-            subtitle={getDocVersion('health_disclaimer') ? `Version: ${getDocVersion('health_disclaimer')}` : undefined}
+            subtitle={getDocVersion('health_disclaimer') ? t('legal.updated_version', { version: getDocVersion('health_disclaimer') }) : undefined}
             onPress={() => {
               router.push('/legal/health');
             }}
@@ -752,6 +540,31 @@ export default function SettingsScreen() {
         confirmButtonStyle={{ backgroundColor: '#6B7280', flex: 0.5 }}
         cancelButtonStyle={{ backgroundColor: '#22C55E', flex: 1 }}
         confirmDisabled={loading}
+        animationType="fade"
+      />
+
+      <ConfirmModal
+        visible={showLogoutConfirm}
+        title={t('settings.logout.confirm_title')}
+        message={t('settings.logout.confirm_message')}
+        confirmText={t('settings.logout.button')}
+        cancelText={t('common.cancel')}
+        onConfirm={async () => {
+          setShowLogoutConfirm(false);
+          try {
+            await signOut();
+            router.replace('/login');
+          } catch (error) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('Error logging out:', error);
+            }
+            Alert.alert(t('alerts.error_title'), t('settings.errors.logout_failed'));
+          }
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+        confirmButtonStyle={{ backgroundColor: colors.tint }}
+        cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
+        confirmDisabled={false}
         animationType="fade"
       />
     </ThemedView>

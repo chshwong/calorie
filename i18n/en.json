@@ -654,13 +654,19 @@
 
   "settings": {
     "title": "Settings",
+    "greeting": "Hello {{name}}!",
+    "profile_photo_updated": "Profile photo updated.",
     "profile_section": {
       "user_fallback": "User"
     },
     "my_journey": {
       "title": "My Journey",
       "goals": "My Goals",
-      "goals_subtitle": "Set and track your fitness goals"
+      "goals_subtitle": "Set and track your fitness goals",
+      "adjust_activity_level": "Adjust Activity Level",
+      "adjust_activity_level_subtitle": "Update your daily activity setting",
+      "my_weight": "My Weight",
+      "my_weight_subtitle": "Log or review your weight entries"
     },
     "account": {
       "title": "Account",
@@ -688,7 +694,10 @@
       "notifications_subtitle": "Enable push notifications"
     },
     "errors": {
-      "save_preference_failed": "Failed to save preference. Please try again."
+      "save_preference_failed": "Failed to save preference. Please try again.",
+      "save_language_failed": "Failed to save language preference. Please try again.",
+      "delete_account_failed": "An unexpected error occurred while deleting your account data. Please contact support.",
+      "logout_failed": "Failed to logout. Please try again."
     },
     "privacy": {
       "title": "Privacy & Security",
@@ -703,6 +712,9 @@
       "legal_subtitle": "Terms, Privacy, and Disclaimer",
       "terms_of_service": "Terms of Service",
       "help_support": "Help & Support"
+    },
+    "legal": {
+      "title": "Legal"
     },
     "admin": {
       "title": "Admin",
@@ -1890,9 +1902,15 @@
     "log": "Log",
     "exercise": "Exercise",
     "meds": "Supps",
+    "weight": "Weight",
     "water": "Water",
     "dashboard": "Dashboard",
     "more": "More"
+  },
+
+  "quick_add": {
+    "enter_weight": "Enter Weight",
+    "scan_barcode": "Scan Barcode"
   },
 
   "water": {

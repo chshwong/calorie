@@ -275,35 +275,25 @@ function TabLayoutContent() {
     );
   };
 
-  const renderQuickAddCard = (label: string) => {
-    const iconMap: Record<string, string> = {
-      'Enter Weight': '⚖️',
-      'Scan Barcode': '📷',
-    };
-
+  const renderQuickAddCard = (params: { key: 'enter_weight' | 'scan_barcode'; label: string; emoji: string; onPress: () => void }) => {
     return (
       <Pressable
-        key={label}
+        key={params.key}
         style={({ pressed }) => [
           styles.quickAddCard,
           pressed && styles.quickAddCardPressed,
         ]}
         onPress={() => {
           setQuickAddVisible(false);
-          // Handle Scan Barcode card - navigate to mealtype-log with auto-scan
-          if (label === 'Scan Barcode') {
-            openMealTypeLogForNow(true);
-          } else if (label === 'Enter Weight') {
-            openWeightEntryForToday();
-          }
+          params.onPress();
         }}
       >
         <View style={styles.quickAddCardIconCircle}>
           <Text style={styles.quickAddCardIconEmoji}>
-            {iconMap[label] || '•'}
+            {params.emoji}
           </Text>
         </View>
-        <Text style={styles.quickAddCardLabel}>{label}</Text>
+        <Text style={styles.quickAddCardLabel}>{params.label}</Text>
       </Pressable>
     );
   };
@@ -465,8 +455,18 @@ function TabLayoutContent() {
                   <View style={styles.quickAddGrid}>
                     {renderQuickAddModuleCard(module1Config)}
                     {renderQuickAddModuleCard(module2Config)}
-                    {renderQuickAddCard('Enter Weight')}
-                    {renderQuickAddCard('Scan Barcode')}
+                    {renderQuickAddCard({
+                      key: 'enter_weight',
+                      label: t('quick_add.enter_weight'),
+                      emoji: '⚖️',
+                      onPress: openWeightEntryForToday,
+                    })}
+                    {renderQuickAddCard({
+                      key: 'scan_barcode',
+                      label: t('quick_add.scan_barcode'),
+                      emoji: '📷',
+                      onPress: () => openMealTypeLogForNow(true),
+                    })}
                     {renderQuickAddModuleCard(module3Config)}
                     {remainingModuleConfig && renderQuickAddModuleCard(remainingModuleConfig)}
                   </View>
@@ -492,23 +492,23 @@ function TabLayoutContent() {
               <View style={styles.moreMenuHandle} />
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreSettings}>
-                <Text style={styles.moreMenuItemText}>Settings</Text>
+                <Text style={styles.moreMenuItemText}>{t('settings.title')}</Text>
               </Pressable>
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreExercise}>
-                <Text style={styles.moreMenuItemText}>Exercise</Text>
+                <Text style={styles.moreMenuItemText}>{t('tabs.exercise')}</Text>
               </Pressable>
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreWeight}>
-                <Text style={styles.moreMenuItemText}>Weight</Text>
+                <Text style={styles.moreMenuItemText}>{t('tabs.weight')}</Text>
               </Pressable>
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreMeds}>
-                <Text style={styles.moreMenuItemText}>Meds</Text>
+                <Text style={styles.moreMenuItemText}>{t('tabs.meds')}</Text>
               </Pressable>
 
               <Pressable style={styles.moreMenuItem} onPress={handleMoreWater}>
-                <Text style={styles.moreMenuItemText}>Water</Text>
+                <Text style={styles.moreMenuItemText}>{t('tabs.water')}</Text>
               </Pressable>
             </View>
           </Pressable>

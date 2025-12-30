@@ -135,7 +135,7 @@ export function CollapsibleModuleHeader({
                   getMinTouchTargetStyle(),
                   Platform.OS === 'web' ? getFocusStyle(moduleAccent) : {},
                 ]}
-                {...getButtonAccessibilityProps('Open settings', 'Open settings')}
+                {...getButtonAccessibilityProps(t('settings.title'), t('settings.title'))}
               >
                 {rightAvatarUri ? (
                   <Image source={{ uri: rightAvatarUri }} style={styles.avatar} />
@@ -179,7 +179,7 @@ export function CollapsibleModuleHeader({
             ]}
             {...getButtonAccessibilityProps(
               t('home.date_picker.previous_day'),
-              'Double tap to go to the previous day'
+              t('accessibility.previous_day')
             )}
           >
             <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
@@ -217,7 +217,7 @@ export function CollapsibleModuleHeader({
               ]}
               {...getButtonAccessibilityProps(
                 t('home.date_picker.next_day'),
-                'Double tap to go to the next day'
+                t('accessibility.next_day')
               )}
             >
               <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>

@@ -486,13 +486,19 @@
 
   "settings": {
     "title": "Paramètres",
+    "greeting": "Bonjour {{name}} !",
+    "profile_photo_updated": "Photo de profil mise à jour.",
     "profile_section": {
       "user_fallback": "Utilisateur"
     },
     "my_journey": {
       "title": "Mon parcours",
       "goals": "Mes objectifs",
-      "goals_subtitle": "Définir et suivre vos objectifs"
+      "goals_subtitle": "Définir et suivre vos objectifs",
+      "adjust_activity_level": "Ajuster le niveau d'activité",
+      "adjust_activity_level_subtitle": "Mettre à jour votre activité quotidienne",
+      "my_weight": "Mon poids",
+      "my_weight_subtitle": "Enregistrer ou consulter vos entrées de poids"
     },
     "account": {
       "title": "Compte",
@@ -516,6 +522,12 @@
       "notifications": "Notifications",
       "notifications_subtitle": "Activer les notifications push"
     },
+    "errors": {
+      "save_preference_failed": "Échec de l'enregistrement de la préférence. Veuillez réessayer.",
+      "save_language_failed": "Échec de l'enregistrement de la langue. Veuillez réessayer.",
+      "delete_account_failed": "Une erreur inattendue est survenue lors de la suppression de vos données. Veuillez contacter le support.",
+      "logout_failed": "Échec de la déconnexion. Veuillez réessayer."
+    },
     "privacy": {
       "title": "Confidentialité et sécurité",
       "export_data": "Exporter les données",
@@ -527,6 +539,9 @@
       "app_version": "Version de l'application",
       "terms_of_service": "Conditions d'utilisation",
       "help_support": "Aide et support"
+    },
+    "legal": {
+      "title": "Juridique"
     },
     "admin": {
       "title": "Admin",
@@ -1580,8 +1595,14 @@
     "log": "Journal",
     "exercise": "Exercice",
     "meds": "Médicaments",
+    "weight": "Poids",
     "dashboard": "Tableau de bord",
     "more": "Plus"
+  },
+
+  "quick_add": {
+    "enter_weight": "Entrer le poids",
+    "scan_barcode": "Scanner un code-barres"
   }
 }
 
