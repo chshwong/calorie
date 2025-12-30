@@ -1181,8 +1181,8 @@ export function useOnboardingForm() {
       // Module Preferences step - user can proceed with 0 selections
       return false;
     } else if (currentStep === 11) {
-      // Plan step - always allow Next
-      return false;
+      // Plan step - only allow Next when Free is selected
+      return selectedPlan !== 'free';
     } else if (currentStep === 12) {
       // Legal Agreement step - all three checkboxes must be checked
       return !legalAgreeTerms || !legalAgreePrivacy || !legalAcknowledgeRisk;
