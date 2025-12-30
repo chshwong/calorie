@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
-import { AvatarUploader } from '@/components/AvatarUploader';
+import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppearanceCycleRow } from '@/components/onboarding/AppearanceCycleRow';
@@ -69,11 +69,11 @@ export const NameStep: React.FC<NameStepProps> = ({
       </ThemedText>
       
       <View style={styles.avatarContainer}>
-        <AvatarUploader
-          value={avatarUri}
-          onChange={onAvatarChange}
+        <ProfileAvatarPicker
+          avatarUrl={avatarUri}
+          onAvatarUpdated={onAvatarChange}
           size={110} // Avatar size - standard profile picture size, not a theme token
-          disabled={loading}
+          editable={!loading}
         />
       </View>
       

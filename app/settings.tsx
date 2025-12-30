@@ -21,8 +21,7 @@ import {
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
-import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
-import BrandLogoNoTag from '@/components/brand/BrandLogoNoTag';
+import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
 
 type SettingsPreferences = {
   units: 'metric' | 'imperial';
@@ -60,6 +59,13 @@ export default function SettingsScreen() {
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility in this file
   const updateProfileMutation = useUpdateProfile();
+
+  const firstName = (profile?.first_name ?? '').trim() || 'there';
+  const email = profile?.email || user?.email || '';
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
+  useEffect(() => {
+    setAvatarUrl(profile?.avatar_url ?? null);
+  }, [profile?.avatar_url]);
   
   // Use i18n's current language as the source of truth
   const currentLanguage = (i18nInstance.language as SupportedLanguage) || 'en';
@@ -465,29 +471,31 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.scrollContent}>
-        <View style={styles.logoBlock}>
-          <BrandLogoNoTag width={220} accessibilityLabel="AvoVibe logo" />
-        </View>
-        {/* Profile Section */}
-        <View style={[styles.profileSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.profileIconContainer, { backgroundColor: colors.tint + '20' }]}>
-            <IconSymbol name="person.fill" size={32} color={colors.tint} />
-          </View>
-          <View style={styles.profileInfo}>
+          {/* New profile header (replaces logo + old profile card) */}
+          <View style={styles.profileHeader}>
             {userConfigLoading && !userConfig ? (
               <ActivityIndicator size="small" color={colors.tint} />
             ) : (
               <>
-                <ThemedText type="title" style={[styles.profileName, { color: colors.text }]}>
-                  {userConfig?.first_name || t('settings.profile_section.user_fallback')}
+                <ThemedText type="title" style={[styles.helloTitle, { color: colors.text }]}>
+                  {`Hello ${firstName}!`}
                 </ThemedText>
-                <ThemedText style={[styles.profileEmail, { color: colors.textSecondary }]}>
-                  {userConfig?.email || user?.email || ''}
-                </ThemedText>
+                <ProfileAvatarPicker
+                  avatarUrl={avatarUrl}
+                  onAvatarUpdated={setAvatarUrl}
+                  size={130}
+                  editable={!loading && !userConfigLoading}
+                  persistToProfile={true}
+                  successToastMessage="Profile photo updated."
+                />
+                {!!email && (
+                  <ThemedText style={[styles.emailText, { color: colors.textSecondary }]}>
+                    {email}
+                  </ThemedText>
+                )}
               </>
             )}
           </View>
-        </View>
 
         {/* My Journey */}
         <SettingSection title={t('settings.my_journey.title')}>
@@ -646,9 +654,6 @@ export default function SettingsScreen() {
 
         {/* About */}
         <SettingSection title={t('settings.about.title')}>
-          <View style={styles.mascotContainer}>
-            <BrandLogoMascotOnly width={80} />
-          </View>
           <SettingItem
             icon="info.circle.fill"
             title={t('settings.about.app_version')}
@@ -765,12 +770,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  logoBlock: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    marginBottom: 14,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -814,33 +813,24 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  profileIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  profileHeader: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    paddingTop: 18,
+    paddingBottom: 10,
+    marginBottom: 18,
   },
-  profileInfo: {
-    flex: 1,
+  helloTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  profileEmail: {
+  emailText: {
     fontSize: 14,
-    opacity: 0.7,
+    opacity: 0.8,
+    textAlign: 'center',
+    marginTop: -8,
   },
   section: {
     marginBottom: 24,
@@ -908,12 +898,6 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
-  },
-  mascotContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    marginBottom: 8,
   },
 });
 

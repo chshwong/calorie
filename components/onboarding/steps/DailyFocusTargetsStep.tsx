@@ -50,6 +50,8 @@ type ConstraintType = 'min' | 'max' | 'target';
 // Per engineering guidelines: design-specific constants are acceptable with comments
 const WIDE_SCREEN_BREAKPOINT = 480; // Breakpoint for 2-column layout
 const DESKTOP_BREAKPOINT = 768; // Breakpoint for desktop layout
+const CONTENT_MAX_WIDTH = 520; // must match styles.content.maxWidth
+const CARD_MIN_WIDTH_WIDE = 280; // must match styles.nutrientCardWide.minWidth
 
 interface TargetStepperProps {
   label: string;
@@ -148,9 +150,19 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
 
   const constraintBadgeLabel = getConstraintBadgeLabel();
 
-  // Determine if we should use 2-column layout (screen width > 480px)
   const screenWidth = Dimensions.get('window').width;
-  const isWideScreen = screenWidth > WIDE_SCREEN_BREAKPOINT;
+
+  // content is clamped to CONTENT_MAX_WIDTH and also has horizontal padding
+  const effectiveContentWidth = Math.min(
+    CONTENT_MAX_WIDTH,
+    screenWidth - (Spacing.sm * 2) // scrollContent paddingHorizontal
+  );
+
+  // only enable 2-column layout when 2 cards can actually fit
+  const canFitTwoColumns =
+    effectiveContentWidth >= (CARD_MIN_WIDTH_WIDE * 2 + Spacing.md);
+
+  const isWideScreen = screenWidth > WIDE_SCREEN_BREAKPOINT && canFitTwoColumns;
 
   return (
     <>
@@ -393,9 +405,19 @@ const NutrientTargetSliderCard: React.FC<NutrientTargetSliderCardProps> = ({
 
   const constraintBadgeLabel = getConstraintBadgeLabel();
 
-  // Determine if we should use 2-column layout (screen width > 480px)
   const screenWidth = Dimensions.get('window').width;
-  const isWideScreen = screenWidth > WIDE_SCREEN_BREAKPOINT;
+
+  // content is clamped to CONTENT_MAX_WIDTH and also has horizontal padding
+  const effectiveContentWidth = Math.min(
+    CONTENT_MAX_WIDTH,
+    screenWidth - (Spacing.sm * 2) // scrollContent paddingHorizontal
+  );
+
+  // only enable 2-column layout when 2 cards can actually fit
+  const canFitTwoColumns =
+    effectiveContentWidth >= (CARD_MIN_WIDTH_WIDE * 2 + Spacing.md);
+
+  const isWideScreen = screenWidth > WIDE_SCREEN_BREAKPOINT && canFitTwoColumns;
 
   return (
     <View style={[
@@ -493,6 +515,13 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
   const layoutKey = useMemo(() => (width < DESKTOP_BREAKPOINT ? 'narrow' : 'wide'), [width]);
   
   const screenWidth = width;
+  const effectiveContentWidth = Math.min(
+    CONTENT_MAX_WIDTH,
+    screenWidth - (Spacing.sm * 2)
+  );
+  const canFitTwoColumns =
+    effectiveContentWidth >= (CARD_MIN_WIDTH_WIDE * 2 + Spacing.md);
+  const isWideScreen = screenWidth > WIDE_SCREEN_BREAKPOINT && canFitTwoColumns;
 
   // Compute suggested targets
   const suggested = useMemo(
@@ -793,7 +822,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
               <ThemedText type="subtitle" style={[styles.sectionHeader, { color: colors.text }]}>
                 {t('onboarding.daily_targets.primary_focus')}
               </ThemedText>
-              <View style={[styles.targetsList, screenWidth > WIDE_SCREEN_BREAKPOINT && styles.targetsListWide]}>
+              <View style={[styles.targetsList, isWideScreen && styles.targetsListWide]}>
                 {primaryNutrients
                   .filter((nutrient) => !nutrient.showCondition || nutrient.showCondition(isWeightLoss))
                   .map((nutrient) => {
@@ -861,7 +890,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                 />
               </TouchableOpacity>
               {expandedSecondary && (
-                <View style={[styles.targetsList, screenWidth > WIDE_SCREEN_BREAKPOINT && styles.targetsListWide]}>
+                <View style={[styles.targetsList, isWideScreen && styles.targetsListWide]}>
                   {secondaryNutrients
                     .filter((nutrient) => !nutrient.showCondition || nutrient.showCondition(isWeightLoss))
                     .map((nutrient) => {
