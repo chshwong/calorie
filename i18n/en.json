@@ -5,6 +5,7 @@
     "done": "Done",
     "save": "Save",
     "cancel": "Cancel",
+    "edit": "Edit",
     "close": "Close",
     "loading": "Loading",
     "error": "Error",
@@ -123,7 +124,7 @@
     "fields": {
       "bmr": "Basal Metabolic Rate (BMR)",
       "active": "Activity",
-      "tdee": "Total Daily Energy Expenditure (TDEE)",
+      "tdee": "Total Daily Energy Expenditure",
       "placeholder": "0"
     },
     "actions": {

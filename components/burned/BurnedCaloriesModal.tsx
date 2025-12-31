@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
+import { RANGES } from '@/constants/constraints';
 import { getMinTouchTargetStyle, getFocusStyle, getButtonAccessibilityProps } from '@/utils/accessibility';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import { useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
@@ -77,9 +79,11 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
       return false;
     }
 
-    if ((touched.bmr && (!Number.isFinite(parsed.bmr) || parsed.bmr < 0)) ||
-        (touched.active && (!Number.isFinite(parsed.active) || parsed.active < 0)) ||
-        (touched.tdee && (!Number.isFinite(parsed.tdee) || parsed.tdee < 0))) {
+    if (
+      (touched.bmr && (!Number.isFinite(parsed.bmr) || parsed.bmr < RANGES.CALORIES_KCAL.MIN)) ||
+      (touched.active && (!Number.isFinite(parsed.active) || parsed.active < RANGES.CALORIES_KCAL.MIN)) ||
+      (touched.tdee && (!Number.isFinite(parsed.tdee) || parsed.tdee < RANGES.CALORIES_KCAL.MIN))
+    ) {
       setValidationError(t('burned.errors.invalid_number'));
       return false;
     }
@@ -214,39 +218,107 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
             </View>
           ) : (
             <View style={styles.body}>
-              <FieldRow
-                label={t('burned.fields.bmr')}
-                value={bmrText}
-                onChangeText={(v) => {
-                  markTouched('bmr');
-                  setBmrText(v.replace(/[^\d]/g, ''));
-                }}
-                placeholder={t('burned.fields.placeholder')}
-                unitSuffix={t('home.food_log.kcal')}
-                colors={colors}
-              />
-              <FieldRow
-                label={t('burned.fields.active')}
-                value={activeText}
-                onChangeText={(v) => {
-                  markTouched('active');
-                  setActiveText(v.replace(/[^\d]/g, ''));
-                }}
-                placeholder={t('burned.fields.placeholder')}
-                unitSuffix={t('home.food_log.kcal')}
-                colors={colors}
-              />
-              <FieldRow
-                label={t('burned.fields.tdee')}
-                value={tdeeText}
-                onChangeText={(v) => {
-                  markTouched('tdee');
-                  setTdeeText(v.replace(/[^\d]/g, ''));
-                }}
-                placeholder={t('burned.fields.placeholder')}
-                unitSuffix={t('home.food_log.kcal')}
-                colors={colors}
-              />
+              <View style={styles.row}>
+                <View style={styles.labelWrap}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.bmr')}</ThemedText>
+                </View>
+                <View style={styles.chipWrap}>
+                  <InlineEditableNumberChip
+                    value={Number.isFinite(parsed.bmr) ? parsed.bmr : null}
+                    onCommit={(next) => {
+                      const nextBmr = next ?? 0;
+                      markTouched('bmr');
+                      setBmrText(String(nextBmr));
+                      if (!touched.tdee) {
+                        const active = Number.isFinite(parsed.active) ? parsed.active : 0;
+                        setTdeeText(String(nextBmr + active));
+                      }
+                    }}
+                    placeholder={t('burned.fields.placeholder')}
+                    unitSuffix={t('home.food_log.kcal')}
+                    min={RANGES.CALORIES_KCAL.MIN}
+                    allowNull={false}
+                    colors={colors}
+                    badgeBackgroundColor={colors.backgroundSecondary}
+                    badgeBorderColor={colors.border}
+                    badgeTextColor={colors.text}
+                    badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
+                    inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                    accessibilityLabel={t('burned.fields.bmr')}
+                    inputWidth={64}
+                    commitOnBlur
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.labelWrap}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.active')}</ThemedText>
+                </View>
+                <View style={styles.chipWrap}>
+                  <InlineEditableNumberChip
+                    value={Number.isFinite(parsed.active) ? parsed.active : null}
+                    onCommit={(next) => {
+                      const nextActive = next ?? 0;
+                      markTouched('active');
+                      setActiveText(String(nextActive));
+                      if (!touched.tdee) {
+                        const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
+                        setTdeeText(String(bmr + nextActive));
+                      }
+                    }}
+                    placeholder={t('burned.fields.placeholder')}
+                    unitSuffix={t('home.food_log.kcal')}
+                    min={RANGES.CALORIES_KCAL.MIN}
+                    allowNull={false}
+                    colors={colors}
+                    badgeBackgroundColor={colors.backgroundSecondary}
+                    badgeBorderColor={colors.border}
+                    badgeTextColor={colors.text}
+                    badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
+                    inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                    accessibilityLabel={t('burned.fields.active')}
+                    inputWidth={64}
+                    commitOnBlur
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.labelWrap}>
+                  <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.tdee')}</ThemedText>
+                </View>
+                <View style={styles.chipWrap}>
+                  <InlineEditableNumberChip
+                    value={Number.isFinite(parsed.tdee) ? parsed.tdee : null}
+                    onCommit={(next) => {
+                      const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
+                      const requestedTdee = next ?? 0;
+                      const nextTdee = Math.max(bmr, requestedTdee);
+                      const nextActive = nextTdee - bmr;
+
+                      // Treat "edit TDEE" as "solve for Activity" so that TDEE always equals BMR + Activity.
+                      // This also ensures save uses the BMR/Active branch where TDEE is derived.
+                      markTouched('active');
+                      setActiveText(String(nextActive));
+                      setTdeeText(String(nextTdee));
+                    }}
+                    placeholder={t('burned.fields.placeholder')}
+                    unitSuffix={t('home.food_log.kcal')}
+                    min={RANGES.CALORIES_KCAL.MIN}
+                    allowNull={false}
+                    colors={colors}
+                    badgeBackgroundColor={colors.backgroundSecondary}
+                    badgeBorderColor={colors.border}
+                    badgeTextColor={colors.text}
+                    badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
+                    inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                    accessibilityLabel={t('burned.fields.tdee')}
+                    inputWidth={64}
+                    commitOnBlur
+                  />
+                </View>
+              </View>
 
               {validationError && (
                 <ThemedText style={[styles.errorText, { color: colors.chartRed }]}>{validationError}</ThemedText>
@@ -288,41 +360,6 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
         </View>
       </View>
     </Modal>
-  );
-}
-
-function FieldRow(props: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  unitSuffix: string;
-  colors: typeof Colors.light | typeof Colors.dark;
-}) {
-  const { label, value, onChangeText, placeholder, unitSuffix, colors } = props;
-  return (
-    <View style={styles.row}>
-      <View style={styles.labelWrap}>
-        <ThemedText style={[styles.label, { color: colors.text }]}>{label}</ThemedText>
-      </View>
-      <View style={styles.inputWrap}>
-        <View style={[styles.inputGroup, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
-          <TextInput
-            value={value}
-            onChangeText={onChangeText}
-            keyboardType={Platform.OS === 'web' ? 'text' : 'number-pad'}
-            style={[
-              styles.input,
-              { color: colors.text },
-              Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
-            ]}
-            placeholder={placeholder}
-            placeholderTextColor={colors.textSecondary}
-          />
-          <ThemedText style={[styles.inputSuffix, { color: colors.textSecondary }]}>{unitSuffix}</ThemedText>
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -393,31 +430,10 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     fontWeight: '400',
   },
-  inputWrap: {
-    // Previously 30% — shrink another 30% → ~21% and keep all rows identical.
-    width: '21%',
-    minWidth: 72,
-  },
-  inputGroup: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    paddingRight: Spacing.xs,
-  },
-  input: {
-    width: '100%',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Platform.select({ web: Spacing.sm, default: Spacing.sm }),
-    fontSize: FontSize.md,
-    textAlign: 'right',
-    backgroundColor: 'transparent',
-  },
-  inputSuffix: {
-    fontSize: FontSize.sm,
-    fontWeight: '600',
-    marginLeft: 2,
+  chipWrap: {
+    width: '30%',
+    minWidth: 110,
+    alignItems: 'flex-end',
   },
   errorText: {
     fontSize: FontSize.sm,

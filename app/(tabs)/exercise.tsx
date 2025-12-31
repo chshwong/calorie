@@ -44,6 +44,7 @@ import {
   getMinTouchTargetStyle,
   getFocusStyle,
 } from '@/utils/accessibility';
+import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 
 // Static default exercises with icons and i18n keys
 const DEFAULT_EXERCISES: Array<{ i18nKey: string; icon: string }> = [
@@ -80,116 +81,6 @@ type ExerciseRowProps = {
 
 function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, animationValue, disabled = false }: ExerciseRowProps) {
   const [deleteHovered, setDeleteHovered] = useState(false);
-  const [isEditingMinutes, setIsEditingMinutes] = useState(false);
-  const [minutesInput, setMinutesInput] = useState(log.minutes?.toString() || '');
-  const [minutesInputError, setMinutesInputError] = useState(false);
-  const minutesInputRef = useRef<TextInput>(null);
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  // Handle minutes input change - only allow integers within configured range
-  const handleMinutesInputChange = (text: string) => {
-    const numericOnly = text.replace(/[^0-9]/g, '');
-    
-    if (numericOnly === '') {
-      setMinutesInput('');
-      setMinutesInputError(false);
-      return;
-    }
-    
-    const numValue = parseInt(numericOnly, 10);
-    
-    if (!isNaN(numValue) && numValue >= RANGES.EXERCISE_MINUTES.MIN && numValue <= RANGES.EXERCISE_MINUTES.MAX) {
-      setMinutesInput(numericOnly);
-      setMinutesInputError(false);
-    } else if (!isNaN(numValue) && numValue > RANGES.EXERCISE_MINUTES.MAX) {
-      setMinutesInput(RANGES.EXERCISE_MINUTES.MAX.toString());
-      setMinutesInputError(false);
-    }
-  };
-
-  // Start inline editing for minutes
-  const startEditingMinutes = () => {
-    setIsEditingMinutes(true);
-    setMinutesInput(log.minutes?.toString() || '');
-    setMinutesInputError(false);
-    
-    // Animate in
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        damping: 15,
-        stiffness: 300,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Focus input after animation
-    setTimeout(() => {
-      minutesInputRef.current?.focus();
-    }, 100);
-  };
-
-  // Save minutes inline
-  const saveMinutes = () => {
-    const minutesValue = minutesInput.trim();
-    const minutes = minutesValue ? parseInt(minutesValue, 10) : null;
-
-    // Validate
-    if (minutesValue && (isNaN(minutes!) || minutes! < 0 || minutes! > 999)) {
-      setMinutesInputError(true);
-      return;
-    }
-
-    // Animate out
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 15,
-        stiffness: 300,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setIsEditingMinutes(false);
-    });
-
-    // Update if changed
-    if (minutes !== log.minutes) {
-      onMinutesUpdate(log.id, minutes);
-    }
-  };
-
-  // Cancel inline editing
-  const cancelMinutesEdit = () => {
-    setMinutesInput(log.minutes?.toString() || '');
-    setMinutesInputError(false);
-    
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 15,
-        stiffness: 300,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setIsEditingMinutes(false);
-    });
-  };
   
   const rowStyle = animationValue
     ? {
@@ -237,62 +128,22 @@ function ExerciseRow({ log, colors, onEdit, onDelete, onMinutesUpdate, isLast, a
 
         {/* Right side: Minutes badge and Delete button */}
         <View style={styles.exerciseRowRight}>
-          {/* Minutes badge or inline editor */}
-          {isEditingMinutes ? (
-            <Animated.View
-              style={[
-                styles.minutesEditorContainer,
-                {
-                  opacity: opacityAnim,
-                  transform: [{ scale: scaleAnim }],
-                },
-              ]}
-            >
-              <TextInput
-                ref={minutesInputRef}
-                style={[
-                  styles.minutesEditorInput,
-                  {
-                    backgroundColor: colors.card,
-                    color: colors.text,
-                    borderColor: minutesInputError ? colors.error : colors.border,
-                  },
-                ]}
-                value={minutesInput}
-                onChangeText={handleMinutesInputChange}
-                onBlur={saveMinutes}
-                onSubmitEditing={saveMinutes}
-                keyboardType="number-pad"
-                maxLength={RANGES.EXERCISE_MINUTES.MAX.toString().length}
-                selectTextOnFocus
-              />
-              <TouchableOpacity
-                onPress={saveMinutes}
-                style={[styles.minutesEditorButton, { backgroundColor: colors.tint, marginLeft: Spacing.xs }]}
-                {...getButtonAccessibilityProps('Save minutes')}
-              >
-                <IconSymbol name="checkmark" size={14} color={colors.textInverse} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={cancelMinutesEdit}
-                style={[styles.minutesEditorButton, { backgroundColor: colors.backgroundSecondary, marginLeft: Spacing.xs }]}
-                {...getButtonAccessibilityProps('Cancel')}
-              >
-                <IconSymbol name="xmark" size={14} color={colors.text} />
-              </TouchableOpacity>
-            </Animated.View>
-          ) : (
-            <TouchableOpacity
-              onPress={startEditingMinutes}
-              style={[styles.minutesBadge, { backgroundColor: colors.infoLight, borderColor: colors.info }]}
-              activeOpacity={0.7}
-              {...getButtonAccessibilityProps('Edit minutes')}
-            >
-              <ThemedText style={[styles.minutesBadgeText, { color: colors.info }]}>
-                {log.minutes !== null ? `${log.minutes} min` : 'Add min'}
-              </ThemedText>
-            </TouchableOpacity>
-          )}
+          <InlineEditableNumberChip
+            value={log.minutes}
+            onCommit={(next) => onMinutesUpdate(log.id, next)}
+            unitSuffix="min"
+            placeholder="Add min"
+            min={RANGES.EXERCISE_MINUTES.MIN}
+            max={RANGES.EXERCISE_MINUTES.MAX}
+            allowNull
+            disabled={disabled}
+            colors={colors}
+            badgeBackgroundColor={colors.infoLight}
+            badgeBorderColor={colors.info}
+            badgeTextColor={colors.info}
+            accessibilityLabel="Edit minutes"
+            commitOnBlur
+          />
 
           {/* Delete button */}
           <TouchableOpacity
@@ -1662,29 +1513,6 @@ const styles = StyleSheet.create({
   minutesBadgeText: {
     fontSize: FontSize.sm,
     fontWeight: '600',
-  },
-  // Inline minutes editor styles
-  minutesEditorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  minutesEditorInput: {
-    width: 50,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  minutesEditorButton: {
-    width: 24,
-    height: 24,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...getMinTouchTargetStyle(),
   },
   deleteButtonGhost: {
     width: 32,

@@ -11,7 +11,9 @@ import { NUTRIENT_TARGETS } from '@/constants/constraints';
 
 // Global constants - DO NOT hardcode these values elsewhere
 export const CALORIES_PER_LB = 3600;
-export const CALORIE_LOSS_CONTINGENCY = 0.10;
+//export const CALORIE_LOSS_CONTINGENCY = 0.10;
+export const CALORIE_BMR_CONTINGENCY = 0.05 ;
+export const CALORIE_LOSS_ACTIVITY_CONTINGENCY = 0.2;
 
 // Hard/soft floor constants - DO NOT hardcode these values elsewhere
 export const HARD_HARD_STOP = 700; // absolute minimum, nothing selectable below this
@@ -152,7 +154,7 @@ export function computeBmr(params: {
     usedBodyFat = false;
   }
 
-  const lowerBmr = floorToNearest10(rawBmr * (1 - CALORIE_LOSS_CONTINGENCY));
+  const lowerBmr = floorToNearest10(rawBmr * (1 - CALORIE_BMR_CONTINGENCY));
   const upperBmr = floorToNearest10(rawBmr);
 
   return {
@@ -194,7 +196,7 @@ export function computeMaintenanceRange(params: {
   const rawActivityCalories = bmrResult.rawBmr * (multiplier - 1);
 
   // Apply contingency to activity calories
-  const lowerActivityCalories = floorToNearest10(rawActivityCalories * (1 - CALORIE_LOSS_CONTINGENCY));
+  const lowerActivityCalories = floorToNearest10(rawActivityCalories * (1 - CALORIE_LOSS_ACTIVITY_CONTINGENCY));
   const upperActivityCalories = floorToNearest10(rawActivityCalories);
 
   // Maintenance range
