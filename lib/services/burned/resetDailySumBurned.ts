@@ -1,0 +1,37 @@
+import { toDateKey } from '@/utils/dateKey';
+import type { DailySumBurned } from '@/utils/types';
+import { getOrCreateDailySumBurned } from '@/lib/services/burned/getOrCreateDailySumBurned';
+import { updateDailySumBurnedById } from '@/lib/services/burned/dailySumBurned';
+
+/**
+ * Reset burned values back to system defaults (spec).
+ */
+export async function resetDailySumBurned(
+  userId: string,
+  dateInput: Date | string | number | null | undefined
+): Promise<DailySumBurned | null> {
+  if (!userId) return null;
+
+  const entryDate = toDateKey(dateInput ?? undefined);
+  const row = await getOrCreateDailySumBurned(userId, entryDate);
+  if (!row) return null;
+
+  return updateDailySumBurnedById({
+    userId,
+    id: row.id,
+    updates: {
+      bmr_cal: row.system_bmr_cal,
+      active_cal: row.system_active_cal,
+      tdee_cal: row.system_tdee_cal,
+
+      bmr_overridden: false,
+      active_overridden: false,
+      tdee_overridden: false,
+      is_overridden: false,
+
+      source: 'system',
+    },
+  });
+}
+
+

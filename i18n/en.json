@@ -112,6 +112,57 @@
     "admin_button": "ADMIN"
   },
 
+  "burned": {
+    "modal": {
+      "title": "Estimated Day Burn",
+      "estimated_banner": "Estimated (no food logged for this day)"
+    },
+    "day": {
+      "net": "Net"
+    },
+    "fields": {
+      "bmr": "Basal Metabolic Rate (BMR)",
+      "active": "Activity",
+      "tdee": "Total Daily Energy Expenditure (TDEE)",
+      "placeholder": "0"
+    },
+    "actions": {
+      "reset": "Reset"
+    },
+    "errors": {
+      "load_failed": "Could not load burned calories.",
+      "no_changes": "Make a change before saving.",
+      "invalid_number": "Please enter a valid non-negative number.",
+      "tdee_below_bmr": "TDEE cannot be below your system BMR.",
+      "save_failed": "Could not save burned calories.",
+      "reset_failed": "Could not reset burned calories."
+    },
+    "toast": {
+      "saved": "Burned calories saved.",
+      "reset": "Burned calories reset."
+    },
+    "week": {
+      "title": "Week",
+      "missed": "Missed",
+      "placeholder": "--"
+    },
+    "energy_balance": {
+      "labels": {
+        "burned": "🔥 Burned",
+        "eaten": "🍴 Eaten",
+        "deficit": "✅ Deficit",
+        "surplus": "✅ Surplus"
+      },
+      "words": {
+        "eaten": "Eaten"
+      },
+      "accessibility": {
+        "open_burned_modal": "Open Burned Calories",
+        "edit_burned": "Edit burned calories"
+      }
+    }
+  },
+
   "food": {
     "menu": {
       "copy_to": "Copy To",
@@ -485,7 +536,6 @@
       "subtitle": "We'll use this to estimate a safe and realistic pace.",
       "summary_label": "Trajectory",
       "trajectory_title": "Trajectory",
-      "no_deadline": "No deadline",
       "three_months": "3 months",
       "six_months": "6 months",
       "twelve_months": "12 months",
@@ -1493,12 +1543,6 @@
     "scanned_code": "Scanned Code",
     "create_custom": "Create Custom Food",
     "try_again": "Try Again",
-    "found_on": "Found on",
-    "save_and_log": "Save as Custom and Log Food",
-    "save_and_log_hint": "Save this food and log it in your meal",
-    "log_existing_custom": "Log my existing Custom food",
-    "log_existing_custom_hint": "Log your existing custom food",
-    "already_saved_as_custom": "You previously saved it as Custom already!",
     "use_this_food": "Use This Food",
     "use_this_food_hint": "Add this food to your meal",
     "log_it": "Log it",
@@ -1956,14 +2000,6 @@
       "error": "Failed to update total"
     },
     "custom_button": "+ Custom",
-    "set_goal": {
-      "title": "Set Water Goal",
-      "button": "Set Goal",
-      "message": "Daily Goal ({{unit}})",
-      "invalid": "Please enter a valid goal between 480 and 5000 ml",
-      "error": "Failed to set goal"
-    },
-    "edit_goal": "Edit Goal",
     "goal_limit_error": "Goal must be between {{min}} ml and {{max}} ml",
     "quick_add_title": "Quick Add",
     "quick_presets": {

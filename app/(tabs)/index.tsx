@@ -8,6 +8,7 @@ import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { MacroGauge } from '@/components/MacroGauge';
 import { NoteEditor } from '@/components/note-editor';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -20,6 +21,7 @@ import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-fro
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useTransferMealtypeEntries } from '@/hooks/use-transfer-mealtype-entries';
@@ -44,11 +46,12 @@ import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotal
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
+import { calculateNetCalories, canComputeNetCalories } from '@/lib/domain/burned/netCalories';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -201,6 +204,146 @@ function formatMealEntryLabel(entry: CalorieEntry): string {
   return `${quantity} x ${entry.unit} ${entry.item_name}`;
 }
 
+function formatWholeNumber(n: number): string {
+  // Match existing Day Summary style: whole numbers, commas, no decimals.
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function EnergyBalanceBlock(props: {
+  burnedCal: number | null;
+  eatenCal: number;
+  goalType: 'lose' | 'maintain' | 'recomp' | 'gain';
+  colors: typeof Colors.light | typeof Colors.dark;
+  t: (key: string, options?: any) => string;
+  onEditBurned?: () => void;
+}) {
+  const { burnedCal, eatenCal, goalType, colors, t, onEditBurned } = props;
+  const [isBurnedHover, setIsBurnedHover] = useState(false);
+
+  const net = burnedCal == null ? null : burnedCal - eatenCal;
+  const netAbs = net == null ? null : Math.abs(net);
+  const isDeficit = net == null ? true : net >= 0;
+
+  const netColor = (() => {
+    if (net == null) return colors.text;
+    if (goalType !== 'lose') return colors.text;
+
+    if (net >= 200) return colors.chartGreen;
+    if (net >= 0) return colors.chartOrange;
+    if (net > -500) return colors.chartPink;
+    return colors.chartRed;
+  })();
+
+  const netLabel = isDeficit ? t('burned.energy_balance.labels.deficit') : t('burned.energy_balance.labels.surplus');
+
+  const burnedPressableProps = onEditBurned
+    ? {
+        onPress: onEditBurned,
+        activeOpacity: 0.8,
+        hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
+        accessibilityRole: 'button' as const,
+        ...getButtonAccessibilityProps(t('burned.energy_balance.accessibility.edit_burned')),
+        onHoverIn: () => setIsBurnedHover(true),
+        onHoverOut: () => setIsBurnedHover(false),
+      }
+    : {};
+
+  return (
+    <View style={[styles.energyBalanceWrap, { borderTopColor: colors.separator, borderBottomColor: colors.separator }]}>
+      {/* Row 1: Equation */}
+      <View style={styles.energyBalanceRowNumbers}>
+        <View style={styles.energyBalanceCol}>
+          <TouchableOpacity
+            style={[
+              styles.energyBalanceBurnedTapTarget,
+              Platform.OS === 'web' && onEditBurned ? ({ cursor: 'pointer' } as any) : null,
+              Platform.OS === 'web' && onEditBurned ? getFocusStyle(colors.tint) : null,
+            ]}
+            {...burnedPressableProps}
+          >
+            <View style={styles.energyBalanceBurnedNumberRow}>
+              <ThemedText
+                style={[
+                  styles.energyBalanceNumber,
+                  { color: colors.text },
+                  Platform.OS === 'web' && isBurnedHover ? styles.energyBalanceUnderline : null,
+                ]}
+                numberOfLines={1}
+              >
+                {burnedCal == null ? t('burned.week.placeholder') : formatWholeNumber(burnedCal)}
+              </ThemedText>
+              <Text style={styles.energyBalanceEmoji} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">
+                ✏️
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
+          –
+        </ThemedText>
+
+        <View style={styles.energyBalanceCol}>
+          <ThemedText style={[styles.energyBalanceNumber, { color: colors.text }]} numberOfLines={1}>
+            {formatWholeNumber(eatenCal)}
+          </ThemedText>
+        </View>
+
+        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
+          =
+        </ThemedText>
+
+        <View style={styles.energyBalanceCol}>
+          <ThemedText style={[styles.energyBalanceNumber, { color: netColor }]} numberOfLines={1}>
+            {netAbs == null ? t('burned.week.placeholder') : formatWholeNumber(netAbs)}
+          </ThemedText>
+        </View>
+      </View>
+
+      {/* Row 2: Labels */}
+      <View style={styles.energyBalanceRowLabels}>
+        <View style={styles.energyBalanceCol}>
+          <TouchableOpacity
+            style={[
+              styles.energyBalanceBurnedTapTarget,
+              Platform.OS === 'web' && onEditBurned ? ({ cursor: 'pointer' } as any) : null,
+              Platform.OS === 'web' && onEditBurned ? getFocusStyle(colors.tint) : null,
+            ]}
+            {...burnedPressableProps}
+          >
+            <ThemedText style={[styles.energyBalanceLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+              {t('burned.energy_balance.labels.burned')}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
+          {' '}
+        </ThemedText>
+
+        <View style={styles.energyBalanceCol}>
+          <ThemedText style={[styles.energyBalanceLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+            <Text style={styles.energyBalanceEmojiInline} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">
+              🍴
+            </Text>{' '}
+            {t('burned.energy_balance.words.eaten')}
+          </ThemedText>
+        </View>
+
+        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
+          {' '}
+        </ThemedText>
+
+        <View style={styles.energyBalanceCol}>
+          <ThemedText style={[styles.energyBalanceLabel, { color: netColor }]} numberOfLines={1}>
+            {netLabel}
+          </ThemedText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function FoodLogHomeScreen() {
   const { t } = useTranslation();
   const { signOut, loading, retrying, user, profile: authProfile } = useAuth();
@@ -224,6 +367,8 @@ export default function FoodLogHomeScreen() {
     mealType: string | null;
     mode: TransferMode;
   }>({ visible: false, mealType: null, mode: 'copy' });
+
+  const [burnedModalVisible, setBurnedModalVisible] = useState(false);
 
   // SECURITY: Check if we're in password recovery mode and block access
   const { isPasswordRecovery } = useAuth();
@@ -324,6 +469,7 @@ export default function FoodLogHomeScreen() {
   }, [user?.id, selectedDateString]);
   
   const entries = calorieEntries ?? persistentEntries ?? [];
+  const hasFoodEntries = entries.length > 0;
   
   // Only show loading spinner if we're doing initial load AND have no data at all (including persistent cache)
   // placeholderData should provide cached data immediately, so if we have no data from any source,
@@ -341,6 +487,9 @@ export default function FoodLogHomeScreen() {
   
   // Get effective profile (from useUserConfig hook or AuthContext fallback)
   const effectiveProfile = cachedUserConfig ?? authProfile;
+
+  // Burned daily cache (lazy create on day view open per spec).
+  const { data: dailyBurned } = useDailySumBurned(selectedDateString, { enabled: !!user?.id });
 
   // Prefetch adjacent dates for instant navigation
   useEffect(() => {
@@ -552,6 +701,14 @@ export default function FoodLogHomeScreen() {
   const calorieConsumed = Number(dailyTotals?.calories ?? 0);
   const calorieTarget = Number(profileGoals?.daily_calorie_target ?? 0);
   const goalType = (profileGoals?.goal_type ?? 'maintain') as 'lose' | 'maintain' | 'recomp' | 'gain';
+
+  // Net calories remain available for other modules (e.g. week overview); UI formatting lives in EnergyBalanceBlock.
+  const netCalories = useMemo(() => {
+    if (dailyBurned?.tdee_cal == null) return null;
+    return calculateNetCalories({ burnedTdeeCal: dailyBurned.tdee_cal, eatenCalories: calorieConsumed });
+  }, [dailyBurned?.tdee_cal, calorieConsumed]);
+
+  // Week section removed per spec (v1 only needed in earlier iteration).
 
   // NOTE: profile/dailyTotals typing is behind current DB schema; remove these narrow casts once types are regenerated.
   const sodiumConsumedMg = Number(
@@ -827,6 +984,15 @@ export default function FoodLogHomeScreen() {
             
             {(entries.length > 0 || !showLoadingSpinner) && (
               <View style={styles.dailyTotalsContent}>
+                <EnergyBalanceBlock
+                  burnedCal={dailyBurned?.tdee_cal ?? null}
+                  eatenCal={calorieConsumed}
+                  goalType={goalType}
+                  colors={colors}
+                  t={t}
+                  onEditBurned={() => setBurnedModalVisible(true)}
+                />
+
                 {/* Macro Gauges Row */}
                 <View style={styles.macroGaugeRowWrap}>
                   <View
@@ -1386,6 +1552,13 @@ export default function FoodLogHomeScreen() {
           mode={transferMealtypeModal.mode}
         />
       )}
+
+      <BurnedCaloriesModal
+        visible={burnedModalVisible}
+        onClose={() => setBurnedModalVisible(false)}
+        entryDate={selectedDateString}
+        hasFoodEntries={hasFoodEntries}
+      />
     </ThemedView>
   );
 }
@@ -1634,6 +1807,75 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
     }),
+  },
+  energyBalanceWrap: {
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  energyBalanceRowNumbers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  energyBalanceRowLabels: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  energyBalanceCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 0,
+  },
+  energyBalanceOp: {
+    width: 16,
+    textAlign: 'center',
+    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
+    fontWeight: '600',
+  },
+  energyBalanceNumber: {
+    fontSize: Platform.select({ web: FontSize.lg, default: FontSize.md }),
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  energyBalanceUnderline: {
+    textDecorationLine: 'underline',
+  },
+  energyBalanceBurnedTapTarget: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  energyBalanceBurnedNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  energyBalanceEmoji: {
+    marginLeft: 5,
+    fontSize: 13,
+    ...Platform.select({
+      // Ensure colored emoji rendering on web/Windows (app default font is Inter).
+      web: {
+        fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji',
+      },
+      default: {},
+    }),
+  },
+  energyBalanceEmojiInline: {
+    fontSize: 12,
+    ...Platform.select({
+      web: {
+        fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji',
+      },
+      default: {},
+    }),
+  },
+  energyBalanceLabel: {
+    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
+    fontWeight: '500',
   },
   miniGaugeSection: {
     paddingTop: 0,

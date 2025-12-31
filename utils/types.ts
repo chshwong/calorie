@@ -121,6 +121,47 @@ export interface DateDisplayInfo {
 }
 
 // ============================================================================
+// BURNED CALORIES TYPES
+// ============================================================================
+
+/**
+ * Daily burned calories cache (lazy materialized).
+ * Maps to the 'daily_sum_burned' table.
+ *
+ * entry_date is a local calendar day key aligned with food logs (YYYY-MM-DD).
+ */
+export interface DailySumBurned {
+  id: string;
+  user_id: string;
+  entry_date: string;
+  updated_at: string;
+
+  // Authoritative values used by UI
+  bmr_cal: number;
+  active_cal: number;
+  tdee_cal: number;
+
+  // System-calculated defaults (for reset and reproducibility)
+  system_bmr_cal: number;
+  system_active_cal: number;
+  system_tdee_cal: number;
+
+  // Override tracking
+  bmr_overridden: boolean;
+  active_overridden: boolean;
+  tdee_overridden: boolean;
+  is_overridden: boolean;
+
+  // Provenance
+  source: string;
+
+  // Optional future-proofing fields
+  vendor_external_id: string | null;
+  vendor_payload_hash: string | null;
+  synced_at: string | null;
+}
+
+// ============================================================================
 // USER PROFILE TYPES
 // ============================================================================
 
