@@ -4,6 +4,8 @@ import { router as appRouter, usePathname } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setLanguage, languageNames, SupportedLanguage } from '../i18n';
@@ -37,10 +39,22 @@ import {
 
 export default function SettingsScreen() {
   const APP_VERSION =
-  process.env.EXPO_PUBLIC_APP_VERSION ??
-  process.env.NODE_ENV === 'development'
-    ? 'dev'
-    : 'unknown';
+    Application.nativeApplicationVersion ??
+    Constants.expoConfig?.version ??
+    // Legacy fallback for older Expo paths / environments
+    (Constants as any).manifest?.version ??
+    process.env.EXPO_PUBLIC_APP_VERSION ??
+    (process.env.NODE_ENV === 'development' ? 'dev' : 'unknown');
+
+  const APP_BUILD =
+    Application.nativeBuildVersion ??
+    (Platform.OS === 'ios'
+      ? Constants.expoConfig?.ios?.buildNumber
+      : Constants.expoConfig?.android?.versionCode != null
+        ? String(Constants.expoConfig?.android?.versionCode)
+        : null);
+
+  const APP_VERSION_LABEL = APP_BUILD ? `${APP_VERSION} (${APP_BUILD})` : APP_VERSION;
   const { t, i18n: i18nInstance } = useTranslation();
   const { signOut, user } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
@@ -461,7 +475,7 @@ export default function SettingsScreen() {
           <SettingItem
             icon="info.circle.fill"
             title={t('settings.about.app_version')}
-            subtitle={APP_VERSION}
+            subtitle={APP_VERSION_LABEL}
             onPress={undefined}
             showChevron={false}
           />

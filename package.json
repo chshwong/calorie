@@ -28,6 +28,7 @@
     "@tanstack/react-query-persist-client": "^5.90.13",
     "bad-words": "^4.0.0",
     "expo": "~54.0.23",
+    "expo-application": "~7.0.8",
     "expo-camera": "^17.0.9",
     "expo-constants": "~18.0.10",
     "expo-file-system": "~18.0.10",
