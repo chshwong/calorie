@@ -96,11 +96,11 @@ export function createEmptyGroupedEntries(): GroupedEntries {
 
 /**
  * Normalize a meal type string to a valid MealType
- * Unknown meal types are mapped to 'late_night'
+ * Unknown meal types are mapped to 'dinner'
  */
 export function normalizeMealType(mealType: string | null | undefined): MealType {
   if (!mealType) {
-    return 'late_night';
+    return 'dinner';
   }
   
   const normalized = mealType.toLowerCase() as MealType;
@@ -109,7 +109,7 @@ export function normalizeMealType(mealType: string | null | undefined): MealType
     return normalized;
   }
   
-  return 'late_night';
+  return 'dinner';
 }
 
 /**

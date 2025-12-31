@@ -13,7 +13,7 @@ import type { FocusModule } from '@/utils/types';
 export interface ModuleConfig {
   key: FocusModule;
   label: string;
-  routeName: string;
+  routeName: 'index' | 'exercise' | 'meds' | 'water';
   icon: (props: { color: string; size?: number }) => React.ReactElement;
 }
 

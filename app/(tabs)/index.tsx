@@ -398,8 +398,8 @@ export default function FoodLogHomeScreen() {
   }, [user?.id, selectedDateString, isToday, queryClient]);
 
   // Background prefetch for mealtype-log tab data (after Home data is ready)
-  // Use default meal type 'late_night' (same as mealtype-log default)
-  const defaultMealType = 'late_night';
+  // Use a stable default meal type for background prefetching
+  const defaultMealType = 'dinner';
   useEffect(() => {
     // Only wait for initial load if there's no cached data
     // If entries exist in cache, we can proceed with prefetching
@@ -1009,8 +1009,8 @@ export default function FoodLogHomeScreen() {
                               </View>
                             </View>
                           </TouchableOpacity>
-                          {/* Show "← Log Food" immediately after meal type badge when no entries (except for Late Night) */}
-                          {group.entries.length === 0 && mealType !== 'late_night' && (
+                          {/* Show "← Log Food" immediately after meal type badge when no entries */}
+                          {group.entries.length === 0 && (
                             <TouchableOpacity
                               style={[
                                 styles.addFoodPrompt,

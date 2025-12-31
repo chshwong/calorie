@@ -137,7 +137,7 @@ export default function LogFoodScreen() {
   const mealTypeParam = params.mealType;
   const mealType = Array.isArray(mealTypeParam) 
     ? mealTypeParam[0] 
-    : (mealTypeParam as string) || 'late_night';
+    : (mealTypeParam as string) || 'dinner';
   
   // Get entry date from params (in user's local timezone)
   const entryDateParam = params.entryDate;

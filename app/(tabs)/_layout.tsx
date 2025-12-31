@@ -3,6 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -10,7 +11,7 @@ import { PlusButtonTab } from '@/components/plus-button-tab';
 import { MoreButtonTab } from '@/components/more-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
-import { BigCircleMenuTokens, Colors, FontSize, FontWeight, Layout } from '@/constants/theme';
+import { BigCircleMenuTokens, Colors, FontSize, FontWeight, Layout, MoreSheetTokens } from '@/constants/theme';
 import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
@@ -206,11 +207,6 @@ function TabLayoutContent() {
     dragY
   );
 
-  const backdropOpacity = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.55],
-  });
-
   const moreSheetTranslateY = Animated.add(
     moreSlideAnim.interpolate({
       inputRange: [0, 1],
@@ -218,11 +214,6 @@ function TabLayoutContent() {
     }),
     moreDragY
   );
-
-  const moreBackdropOpacity = moreSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.35],
-  });
 
   const morePanResponder = useRef(
     PanResponder.create({
@@ -323,6 +314,13 @@ function TabLayoutContent() {
   const module3Config = MODULE_CONFIGS[focusModule3];
   const remainingModuleConfig = remainingModule ? MODULE_CONFIGS[remainingModule] : null;
 
+  const moduleRouteHref = {
+    index: '/(tabs)',
+    exercise: '/(tabs)/exercise',
+    meds: '/(tabs)/meds',
+    water: '/(tabs)/water',
+  } as const;
+
   // Helper function to open mealtype-log for current time
   // Reuses the same route and params structure as the old FAB behavior
   // autoScan: if true, automatically opens the barcode scanner when the screen loads
@@ -333,13 +331,13 @@ function TabLayoutContent() {
     const minutes = now.getHours() * 60 + now.getMinutes();
     let mealType: string;
     
-    // 22:00–04:00 -> Late Night
+    // 22:00–04:00 -> Snack
     // 04:00–11:30 -> Breakfast
     // 11:30–14:00 -> Lunch
     // 14:00–17:00 -> Snack
     // 17:00–22:00 -> Dinner
     if (minutes >= 22 * 60 || minutes < 4 * 60) {
-      mealType = 'late_night';
+      mealType = 'afternoon_snack';
     } else if (minutes >= 4 * 60 && minutes < (11 * 60 + 30)) {
       mealType = 'breakfast';
     } else if (minutes >= (11 * 60 + 30) && minutes < 14 * 60) {
@@ -530,7 +528,9 @@ function TabLayoutContent() {
     const iconVisualSize = BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey];
     // Emojis typically render with extra line-height/vertical padding compared to vector icons.
     // Give icon-based tiles a consistent "icon box" height so the label aligns with emoji-based tiles.
-    const iconBoxHeight = Math.round(iconVisualSize * 1.4);
+    const iconBoxHeight = Math.round(
+      iconVisualSize * BigCircleMenuTokens.tile.iconChip.iconBoxHeightMultiplier[themeKey]
+    );
 
     return (
       <Pressable
@@ -634,7 +634,7 @@ function TabLayoutContent() {
   return (
     <View style={styles.container}>
         <Tabs
-          tabBar={(props: any) => <ConstrainedTabBar {...props} />}
+          tabBar={(props: BottomTabBarProps) => <ConstrainedTabBar {...props} />}
           screenOptions={{
             tabBarActiveTintColor: colors.tint,
             headerShown: false,
@@ -669,11 +669,11 @@ function TabLayoutContent() {
         <Tabs.Screen
           name="index"
           listeners={{
-            tabPress: (e: any) => {
+            tabPress: (e: { preventDefault: () => void }) => {
               // If focusModule1 is not 'Food', redirect to the correct route
               if (focusModule1 !== 'Food' && module1Config.routeName !== 'index') {
                 e.preventDefault();
-                router.push(`/(tabs)/${module1Config.routeName}` as any);
+                router.push(moduleRouteHref[module1Config.routeName]);
               }
             },
           }}
@@ -725,11 +725,11 @@ function TabLayoutContent() {
         <Tabs.Screen
           name="exercise"
           listeners={{
-            tabPress: (e: any) => {
+            tabPress: (e: { preventDefault: () => void }) => {
               // If focusModule2 is not 'Exercise', redirect to the correct route
               if (focusModule2 !== 'Exercise' && module2Config.routeName !== 'exercise') {
                 e.preventDefault();
-                router.push(`/(tabs)/${module2Config.routeName}` as any);
+                router.push(moduleRouteHref[module2Config.routeName]);
               }
             },
           }}
@@ -771,7 +771,10 @@ function TabLayoutContent() {
           >
             <Animated.View
               pointerEvents="none"
-              style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdropOpacity }]}
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: BigCircleMenuTokens.backdrop.color[themeKey], opacity: slideAnim },
+              ]}
             />
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.quickAddSheet}>
@@ -877,7 +880,10 @@ function TabLayoutContent() {
           >
             <Animated.View
               pointerEvents="none"
-              style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: moreBackdropOpacity }]}
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: MoreSheetTokens.backdrop.color[themeKey], opacity: moreSlideAnim },
+              ]}
             />
 
             {/* Backdrop tap target */}
@@ -885,33 +891,44 @@ function TabLayoutContent() {
 
             {/* Sheet container (not pressable) */}
             <View style={styles.moreMenuSheetContainer} pointerEvents="box-none">
-              <Animated.View
-                style={{ width: '100%', transform: [{ translateY: moreSheetTranslateY }] }}
-                onLayout={(e) => {
-                  moreSheetHeightRef.current = e.nativeEvent.layout.height;
-                }}
-              >
+            <Animated.View
+              {...morePanResponder.panHandlers}
+              style={{ width: '100%', transform: [{ translateY: moreSheetTranslateY }] }}
+              onLayout={(e) => {
+                moreSheetHeightRef.current = e.nativeEvent.layout.height;
+              }}
+            >
                 <MoreSheetContent
                   isDark={isDark}
                   title={t('tabs.more')}
-                  titleNode={<BrandLogoMascotOnly width={104} accessibilityLabel={t('tabs.more')} />}
+                  titleNode={
+                    <BrandLogoMascotOnly
+                      width={MoreSheetTokens.header.logoWidth}
+                      accessibilityLabel={t('tabs.more')}
+                    />
+                  }
                   items={moreSheetItems}
                   iconColor={colors.tint}
                   topAccessory={
                     <View
-                      {...morePanResponder.panHandlers}
-                      style={{ paddingTop: 10, paddingBottom: 8, width: '100%', alignItems: 'center' }}
+                      style={{
+                        paddingTop: MoreSheetTokens.handle.paddingTop,
+                        paddingBottom: MoreSheetTokens.handle.paddingBottom,
+                        width: '100%',
+                        alignItems: 'center',
+                      }}
                     >
                       <View
                         style={{
-                          width: 44,
-                          height: 5,
-                          borderRadius: 3,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)',
+                          width: MoreSheetTokens.handle.width,
+                          height: MoreSheetTokens.handle.height,
+                          borderRadius: MoreSheetTokens.handle.borderRadius,
+                          backgroundColor: MoreSheetTokens.handle.color[themeKey],
                         }}
                       />
                     </View>
                   }
+                  
                 />
               </Animated.View>
             </View>
@@ -940,8 +957,6 @@ const styles = StyleSheet.create({
   quickAddSheet: {
     width: '100%',
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 0,
   },
   quickAddSheetInner: {
     width: '100%',
@@ -956,7 +971,7 @@ const styles = StyleSheet.create({
     marginBottom: Layout.cardInnerPaddingCompact,
   },
   quickAddTitleText: {
-    marginRight: 6,
+    marginRight: Layout.titleGapCompact,
   },
   quickAddGrid: {
     flexDirection: 'row',

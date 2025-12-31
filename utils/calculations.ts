@@ -202,7 +202,7 @@ export const getDateString = (date: Date): string => {
  * - 11:31 AM to 2:00 PM: Lunch
  * - 2:00 PM to 5:00 PM: Snack
  * - 5:01 PM to 9:30 PM: Dinner
- * - Anywhere else: Late Night
+ * - Anywhere else: Snack
  */
 export const getMealTypeFromCurrentTime = (): string => {
   const now = new Date();
@@ -232,7 +232,7 @@ export const getMealTypeFromCurrentTime = (): string => {
     return 'dinner';
   } else {
     // Before 4:00 AM or after 9:30 PM
-    return 'late_night';
+    return 'afternoon_snack';
   }
 };
 

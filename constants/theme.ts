@@ -571,6 +571,13 @@ export const Layout = {
  * so those live here as explicit tokens.
  */
 export const MoreSheetTokens = {
+  backdrop: {
+    color: {
+      // Matches prior overlay appearance in tabs layout (now animated via opacity).
+      light: 'rgba(0,0,0,0.35)',
+      dark: 'rgba(0,0,0,0.35)',
+    },
+  },
   container: {
     paddingHorizontal: Spacing.lg, // 16
     paddingTop: Layout.cardInnerPaddingCompact, // 10 (spec-driven)
@@ -582,31 +589,21 @@ export const MoreSheetTokens = {
     height: 5, // spec-driven
     borderRadius: 3, // spec-driven
     marginBottom: Layout.cardInnerPaddingCompact, // 10
+    paddingTop: Layout.cardInnerPaddingCompact, // 10 (spec-driven)
+    paddingBottom: Layout.cardInnerPaddingY, // 8 (spec-driven)
     color: {
       light: 'rgba(0,0,0,0.18)',
       dark: 'rgba(255,255,255,0.18)',
     },
   },
   header: {
+    logoWidth: 104, // spec: ~10–20% of original mascot asset
     title: {
       fontSize: FontSize.lg, // 18
       fontWeight: FontWeight.bold,
       color: {
         light: '#0B0C0E',
         dark: '#F2F4F7',
-      },
-    },
-    closeButton: {
-      size: 34, // spec-driven
-      borderRadius: 17, // spec-driven
-      iconSize: FontSize.lg, // 18
-      iconColor: {
-        light: 'rgba(0,0,0,0.38)',
-        dark: 'rgba(255,255,255,0.45)',
-      },
-      backgroundColor: {
-        light: 'rgba(0,0,0,0.04)',
-        dark: 'rgba(255,255,255,0.06)',
       },
     },
     marginBottom: Spacing.md, // 12
@@ -771,6 +768,11 @@ export const BigCircleMenuTokens = {
         light: 32, // keep existing light mode
         // No chip in dark mode (matches light mode layout), so keep emoji larger like light mode.
         dark: 32,
+      },
+      iconBoxHeightMultiplier: {
+        // Vector icons have less inherent line-height than emojis; multiplier keeps label baselines aligned.
+        light: 1.4,
+        dark: 1.4,
       },
       marginBottom: {
         light: Spacing.md, // 12 (existing is 10, but this is not applied directly; component controls exact)

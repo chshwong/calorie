@@ -78,8 +78,7 @@
       "breakfast": "Petit-déjeuner",
       "lunch": "Déjeuner",
       "dinner": "Dîner",
-      "afternoon_snack": "Collation",
-      "late_night": "Collation tardive"
+      "afternoon_snack": "Collation"
     },
     "food_log": {
       "log_food_prompt": "← Ajouter aliment",
@@ -1067,8 +1066,7 @@
       "breakfast": "Petit-déjeuner",
       "lunch": "Déjeuner",
       "dinner": "Dîner",
-      "snack": "Collation",
-      "late_night": "Souper tardif"
+      "snack": "Collation"
     },
     
     "multi_select": {

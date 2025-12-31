@@ -290,7 +290,6 @@ export default function FoodEditScreen() {
       lunch: t('mealtype_log.meal_types.lunch'),
       dinner: t('mealtype_log.meal_types.dinner'),
       afternoon_snack: t('mealtype_log.meal_types.snack'),
-      late_night: t('mealtype_log.meal_types.late_night'),
     };
     return labels[(mealType || '').toLowerCase()] || mealType || '';
   }, [mealType, t]);

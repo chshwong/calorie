@@ -15,17 +15,17 @@ UPDATE calorie_entries
 SET meal_type = 'afternoon_snack'
 WHERE meal_type = 'snack';
 
--- Step 4: Update existing data from 'other' to 'late_night'
+-- Step 4: Update existing data from 'other' to 'dinner'
 -- Do this BEFORE adding the new constraint
 UPDATE calorie_entries
-SET meal_type = 'late_night'
+SET meal_type = 'dinner'
 WHERE meal_type = 'other';
 
 -- Step 5: Now create the new check constraint with updated meal types
 -- This is safe now because all data has been updated
 ALTER TABLE calorie_entries 
 ADD CONSTRAINT calorie_entries_meal_type_check 
-CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'afternoon_snack', 'late_night'));
+CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'afternoon_snack'));
 
 -- Step 6: Verify the updates
 -- SELECT meal_type, COUNT(*) 

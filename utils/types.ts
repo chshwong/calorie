@@ -59,7 +59,7 @@ export interface DailyTotals {
 /**
  * Meal type identifiers used throughout the app
  */
-export type MealType = 'breakfast' | 'lunch' | 'afternoon_snack' | 'dinner' | 'late_night';
+export type MealType = 'breakfast' | 'lunch' | 'afternoon_snack' | 'dinner';
 
 /**
  * Ordered list of meal types for display consistency
@@ -69,7 +69,6 @@ export const MEAL_TYPE_ORDER: MealType[] = [
   'lunch',
   'afternoon_snack',
   'dinner',
-  'late_night',
 ];
 
 /**

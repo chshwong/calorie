@@ -1,8 +1,11 @@
 {
+  "scripts": {
+    "build:web": "cross-env EXPO_PUBLIC_APP_VERSION=$npm_package_version expo export --platform web"
+  },
   "expo": {
     "name": "calorie-tracker",
     "slug": "calorie-tracker",
-    "version": "1.2.0",
+    "version": "1.10.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "calorietracker",

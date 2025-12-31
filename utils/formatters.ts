@@ -50,19 +50,19 @@ export function formatDate(dateString: string, t: (key: string) => string): stri
 /**
  * Get the display label for a meal type
  * 
- * @param type - Meal type key (breakfast, lunch, dinner, afternoon_snack, late_night)
+ * @param type - Meal type key (breakfast, lunch, dinner, afternoon_snack)
  * @param t - Translation function from react-i18next
  * @returns Translated meal type label
  */
 export function getMealTypeLabel(type: string, t: (key: string) => string): string {
+  if (!type) return '';
   const labels: Record<string, string> = {
     'breakfast': t('mealtype_log.meal_types.breakfast'),
     'lunch': t('mealtype_log.meal_types.lunch'),
     'dinner': t('mealtype_log.meal_types.dinner'),
     'afternoon_snack': t('mealtype_log.meal_types.snack'),
-    'late_night': t('mealtype_log.meal_types.late_night'),
   };
-  return labels[type.toLowerCase()] || t('mealtype_log.meal_types.late_night');
+  return labels[type.toLowerCase()] || type;
 }
 
 /**
@@ -77,7 +77,6 @@ export function getMealTypeLabels(t: (key: string) => string): Record<string, st
     'lunch': t('mealtype_log.meal_types.lunch'),
     'dinner': t('mealtype_log.meal_types.dinner'),
     'afternoon_snack': t('mealtype_log.meal_types.snack'),
-    'late_night': t('mealtype_log.meal_types.late_night'),
   };
 }
 

@@ -161,7 +161,6 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    paddingRight: 8,
   },
   titleNodeWrap: {
     flex: 1,

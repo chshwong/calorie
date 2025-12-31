@@ -79,8 +79,7 @@
       "breakfast": "Breakfast",
       "lunch": "Lunch",
       "dinner": "Dinner",
-      "afternoon_snack": "Snack",
-      "late_night": "Late Night"
+      "afternoon_snack": "Snack"
     },
     "food_log": {
       "log_food_prompt": "← Log Food",
@@ -1240,8 +1239,7 @@
       "breakfast": "Breakfast",
       "lunch": "Lunch",
       "dinner": "Dinner",
-      "snack": "Snack",
-      "late_night": "Late Night"
+      "snack": "Snack"
     },
     
     "multi_select": {

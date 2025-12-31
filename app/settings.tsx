@@ -36,6 +36,11 @@ import {
 } from '@/lib/services/settingsPreferences';
 
 export default function SettingsScreen() {
+  const APP_VERSION =
+  process.env.EXPO_PUBLIC_APP_VERSION ??
+  process.env.NODE_ENV === 'development'
+    ? 'dev'
+    : 'unknown';
   const { t, i18n: i18nInstance } = useTranslation();
   const { signOut, user } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
@@ -456,7 +461,7 @@ export default function SettingsScreen() {
           <SettingItem
             icon="info.circle.fill"
             title={t('settings.about.app_version')}
-            subtitle="1.0.0"
+            subtitle={APP_VERSION}
             onPress={undefined}
             showChevron={false}
           />
