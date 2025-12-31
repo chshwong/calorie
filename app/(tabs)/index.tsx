@@ -41,6 +41,7 @@ import {
   getFocusStyle,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { ensureContrast } from '@/theme/contrast';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
 import { addDays, toDateKey } from '@/utils/dateKey';
@@ -219,12 +220,14 @@ function EnergyBalanceBlock(props: {
 }) {
   const { burnedCal, eatenCal, goalType, colors, t, onEditBurned } = props;
   const [isBurnedHover, setIsBurnedHover] = useState(false);
+  const scheme = useColorScheme();
+  const modeKey = (scheme ?? 'light') as 'light' | 'dark';
 
   const net = burnedCal == null ? null : burnedCal - eatenCal;
   const netAbs = net == null ? null : Math.abs(net);
   const isDeficit = net == null ? true : net >= 0;
 
-  const netColor = (() => {
+  const netColorRaw = (() => {
     if (net == null) return colors.text;
     if (goalType !== 'lose') return colors.text;
 
@@ -233,6 +236,10 @@ function EnergyBalanceBlock(props: {
     if (net > -500) return colors.chartPink;
     return colors.chartRed;
   })();
+
+  // Match charts: ensure text color meets WCAG contrast.
+  // Light mode => darken; Dark mode => lighten.
+  const netColor = ensureContrast(netColorRaw, colors.card, modeKey, 4.5);
 
   const netLabel = isDeficit ? t('burned.energy_balance.labels.deficit') : t('burned.energy_balance.labels.surplus');
 
