@@ -1601,7 +1601,11 @@
   },
 
   "quick_add": {
-    "enter_weight": "Entrer le poids",
+    "log_food": "Enregistrer l’alimentation",
+    "log_exercise": "Enregistrer l’exercice",
+    "log_med_supp": "Enregistrer méd./suppl.",
+    "log_water": "Enregistrer l’eau",
+    "enter_weight": "Enregistrer le poids",
     "scan_barcode": "Scanner un code-barres"
   }
 }

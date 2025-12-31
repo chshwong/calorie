@@ -1909,7 +1909,11 @@
   },
 
   "quick_add": {
-    "enter_weight": "Enter Weight",
+    "log_food": "Log Food",
+    "log_exercise": "Log Exercise",
+    "log_med_supp": "Log Med/Supp",
+    "log_water": "Log Water",
+    "enter_weight": "Log Weight",
     "scan_barcode": "Scan Barcode"
   },
 

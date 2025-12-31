@@ -663,6 +663,147 @@ export const MoreSheetTokens = {
   },
 } as const;
 
+/**
+ * Big Circle Menu (Quick Add) bottom sheet tokens.
+ *
+ * Engineering guideline #11: components should not hardcode colors/sizes.
+ * Light mode keeps the current look; dark mode matches the AvoVibe premium spec.
+ */
+export const BigCircleMenuTokens = {
+  backdrop: {
+    color: {
+      // Matches existing light overlay appearance in tabs layout.
+      light: 'rgba(0,0,0,0.4)',
+      // Spec: slightly stronger in dark mode.
+      dark: 'rgba(0,0,0,0.55)',
+    },
+  },
+  container: {
+    paddingHorizontal: {
+      light: Spacing.xl, // 20 (keep existing light mode)
+      dark: Spacing.lg, // 16 (spec)
+    },
+    paddingTop: {
+      light: Spacing.md, // 12 (keep existing light mode)
+      dark: Layout.cardInnerPaddingCompact, // 10 (spec)
+    },
+    paddingBottomBase: {
+      light: Spacing.xl, // 20 (keep existing light mode)
+      dark: Layout.cardInnerPaddingCompact, // 10 (spec; safe-area added at runtime)
+    },
+    borderTopRadius: {
+      light: 22, // keep existing light mode
+      dark: BorderRadius['3xl'], // 24 (spec)
+    },
+    maxWidth: 1200, // keep existing sheet max-width
+  },
+  handle: {
+    width: {
+      light: 40, // keep existing light mode
+      dark: Layout.minTouchTarget, // 44 (spec)
+    },
+    height: {
+      light: 4, // keep existing light mode
+      dark: 5, // spec
+    },
+    borderRadius: {
+      light: 2, // keep existing light mode
+      dark: 3, // spec
+    },
+    marginBottom: Spacing.md, // 12
+    color: {
+      light: '#ccc', // keep existing light mode
+      dark: 'rgba(255,255,255,0.18)', // spec
+    },
+  },
+  grid: {
+    gap: {
+      // Existing: row gap 16, column gap 12
+      light: { row: Spacing.lg, column: Spacing.md },
+      // Spec: 12 in both directions
+      dark: { row: Spacing.md, column: Spacing.md },
+    },
+  },
+  tile: {
+    borderRadius: BorderRadius.card, // 18
+    paddingVertical: Spacing.lg + Spacing.xxs, // 18
+    paddingHorizontal: Spacing.md + Spacing.xxs, // 14
+    backgroundColor: {
+      light: 'rgba(255,255,255,0.85)', // keep existing light mode
+      dark: '#1B1F24', // spec
+    },
+    borderWidth: {
+      light: 0,
+      dark: 1,
+    },
+    borderColor: {
+      light: 'transparent',
+      dark: 'rgba(255,255,255,0.08)', // spec
+    },
+    rippleColor: {
+      light: 'rgba(0,0,0,0.08)', // not used by default (kept for completeness)
+      dark: 'rgba(255,255,255,0.10)', // spec
+    },
+    iosShadow: {
+      light: { color: '#000', opacity: 0.08, radius: 12, offsetY: 4 },
+      // Spec: subtle shadow only
+      dark: { color: '#000', opacity: 0.25, radius: 10, offsetY: 4 },
+    },
+    androidElevation: {
+      light: 4,
+      dark: 3, // spec max 2–3
+    },
+    iconChip: {
+      size: {
+        light: null,
+        dark: 44, // spec
+      },
+      borderRadius: {
+        light: null,
+        dark: 14, // spec
+      },
+      backgroundColor: {
+        light: 'transparent',
+        // Slightly softer than spec so the chip blends more like light mode.
+        dark: 'rgba(255,255,255,0.06)',
+      },
+      emojiSize: {
+        light: 32, // keep existing light mode
+        // No chip in dark mode (matches light mode layout), so keep emoji larger like light mode.
+        dark: 32,
+      },
+      marginBottom: {
+        light: Spacing.md, // 12 (existing is 10, but this is not applied directly; component controls exact)
+        dark: 0,
+      },
+    },
+    label: {
+      fontSize: {
+        light: 15, // keep existing light mode
+        dark: FontSize.base, // 14 (spec)
+      },
+      fontWeight: {
+        light: FontWeight.medium, // 500
+        dark: FontWeight.semibold, // 600
+      },
+      color: {
+        light: '#1a1a1a', // keep existing light mode
+        dark: '#F2F4F7', // spec
+      },
+      marginTop: {
+        light: Spacing.xs, // 4
+        dark: Spacing.md - Spacing.xxs, // 10
+      },
+    },
+  },
+  sheet: {
+    backgroundColor: {
+      light: 'rgba(255,255,255,0.9)', // keep existing light mode
+      dark: '#14161A', // spec
+    },
+  },
+} as const;
+
 // ============================================================================
 // FONTS (Legacy - kept for backwards compatibility)
 // ============================================================================

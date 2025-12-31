@@ -3,13 +3,14 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { PlusButtonTab } from '@/components/plus-button-tab';
 import { MoreButtonTab } from '@/components/more-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
-import { Colors, FontSize, Layout } from '@/constants/theme';
+import { BigCircleMenuTokens, Colors, FontSize, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
@@ -19,17 +20,22 @@ import type { FocusModule } from '@/utils/types';
 import { getLocalDateString } from '@/utils/calculations';
 import { useAuth } from '@/contexts/AuthContext';
 import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/navigation/weight';
+import { getBigCircleMenuColors } from '@/theme/getBigCircleMenuColors';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
-  const colors = Colors[colorScheme ?? 'light'];
-  const isDark = colorScheme === 'dark';
+  const themeKey = (colorScheme ?? 'light') as 'light' | 'dark';
+  const colors = Colors[themeKey];
+  const isDark = themeKey === 'dark';
+  const insets = useSafeAreaInsets();
+  const bigCircleColors = getBigCircleMenuColors(themeKey);
   const router = useRouter();
   const segments = useSegments();
   const { user, profile: authProfile, loading: authLoading } = useAuth();
   const { isQuickAddVisible, setQuickAddVisible } = useQuickAdd();
   const [isMoreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [quickAddSheetWidth, setQuickAddSheetWidth] = useState<number | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   
@@ -272,6 +278,21 @@ function TabLayoutContent() {
     openWeightEntryForTodayNav(router);
   };
 
+  const getBigCircleMenuModuleLabel = (moduleKey: FocusModule, fallback: string) => {
+    switch (moduleKey) {
+      case 'Food':
+        return t('quick_add.log_food');
+      case 'Exercise':
+        return t('quick_add.log_exercise');
+      case 'Med':
+        return t('quick_add.log_med_supp');
+      case 'Water':
+        return t('quick_add.log_water');
+      default:
+        return fallback;
+    }
+  };
+
   const renderQuickAddModuleCard = (config: typeof module1Config) => {
     const moduleIconMap: Record<FocusModule, string> = {
       'Food': '🍽️',
@@ -285,8 +306,31 @@ function TabLayoutContent() {
         key={config.key}
         style={({ pressed }) => [
           styles.quickAddCard,
-          pressed && styles.quickAddCardPressed,
+          {
+            width:
+              quickAddSheetWidth != null
+                ? (quickAddSheetWidth - BigCircleMenuTokens.container.paddingHorizontal[themeKey] * 2 - BigCircleMenuTokens.grid.gap[themeKey].column) / 2
+                : '48%',
+            backgroundColor: BigCircleMenuTokens.tile.backgroundColor[themeKey],
+            borderWidth: BigCircleMenuTokens.tile.borderWidth[themeKey],
+            borderColor: BigCircleMenuTokens.tile.borderColor[themeKey],
+            shadowColor: BigCircleMenuTokens.tile.iosShadow[themeKey].color,
+            shadowOpacity: BigCircleMenuTokens.tile.iosShadow[themeKey].opacity,
+            shadowOffset: { width: 0, height: BigCircleMenuTokens.tile.iosShadow[themeKey].offsetY },
+            shadowRadius: BigCircleMenuTokens.tile.iosShadow[themeKey].radius,
+            elevation: BigCircleMenuTokens.tile.androidElevation[themeKey],
+          },
+          themeKey === 'dark' && Platform.OS === 'android' ? { overflow: 'hidden' } : null,
+          pressed && themeKey === 'light' ? styles.quickAddCardPressed : null,
+          pressed && themeKey === 'dark' && Platform.OS === 'ios' ? { opacity: 0.75 } : null,
         ]}
+        android_ripple={
+          themeKey === 'dark'
+            ? {
+                color: bigCircleColors.ripple,
+              }
+            : undefined
+        }
         onPress={() => {
           setQuickAddVisible(false);
           if (config.key === 'Food') {
@@ -300,12 +344,46 @@ function TabLayoutContent() {
           }
         }}
       >
-        <View style={styles.quickAddCardIconCircle}>
-          <Text style={styles.quickAddCardIconEmoji}>
-            {moduleIconMap[config.key] || '•'}
-          </Text>
-        </View>
-        <Text style={styles.quickAddCardLabel}>{config.label}</Text>
+        {themeKey === 'dark' ? (
+          <View style={styles.quickAddIconRowDark}>
+            <Text
+              style={[
+                styles.quickAddCardIconEmoji,
+                {
+                  fontSize: BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey],
+                },
+              ]}
+            >
+              {moduleIconMap[config.key] || '•'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.quickAddCardIconCircle}>
+            <Text
+              style={[
+                styles.quickAddCardIconEmoji,
+                {
+                  fontSize: BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey],
+                },
+              ]}
+            >
+              {moduleIconMap[config.key] || '•'}
+            </Text>
+          </View>
+        )}
+        <Text
+          style={[
+            styles.quickAddCardLabel,
+            {
+              fontSize: BigCircleMenuTokens.tile.label.fontSize[themeKey],
+              fontWeight: BigCircleMenuTokens.tile.label.fontWeight[themeKey],
+              color: BigCircleMenuTokens.tile.label.color[themeKey],
+              marginTop: BigCircleMenuTokens.tile.label.marginTop[themeKey],
+            },
+          ]}
+        >
+          {getBigCircleMenuModuleLabel(config.key, config.label)}
+        </Text>
       </Pressable>
     );
   };
@@ -316,19 +394,76 @@ function TabLayoutContent() {
         key={params.key}
         style={({ pressed }) => [
           styles.quickAddCard,
-          pressed && styles.quickAddCardPressed,
+          {
+            width:
+              quickAddSheetWidth != null
+                ? (quickAddSheetWidth - BigCircleMenuTokens.container.paddingHorizontal[themeKey] * 2 - BigCircleMenuTokens.grid.gap[themeKey].column) / 2
+                : '48%',
+            backgroundColor: BigCircleMenuTokens.tile.backgroundColor[themeKey],
+            borderWidth: BigCircleMenuTokens.tile.borderWidth[themeKey],
+            borderColor: BigCircleMenuTokens.tile.borderColor[themeKey],
+            shadowColor: BigCircleMenuTokens.tile.iosShadow[themeKey].color,
+            shadowOpacity: BigCircleMenuTokens.tile.iosShadow[themeKey].opacity,
+            shadowOffset: { width: 0, height: BigCircleMenuTokens.tile.iosShadow[themeKey].offsetY },
+            shadowRadius: BigCircleMenuTokens.tile.iosShadow[themeKey].radius,
+            elevation: BigCircleMenuTokens.tile.androidElevation[themeKey],
+          },
+          themeKey === 'dark' && Platform.OS === 'android' ? { overflow: 'hidden' } : null,
+          pressed && themeKey === 'light' ? styles.quickAddCardPressed : null,
+          pressed && themeKey === 'dark' && Platform.OS === 'ios' ? { opacity: 0.75 } : null,
         ]}
+        android_ripple={
+          themeKey === 'dark'
+            ? {
+                color: bigCircleColors.ripple,
+              }
+            : undefined
+        }
         onPress={() => {
           setQuickAddVisible(false);
           params.onPress();
         }}
       >
-        <View style={styles.quickAddCardIconCircle}>
-          <Text style={styles.quickAddCardIconEmoji}>
-            {params.emoji}
-          </Text>
-        </View>
-        <Text style={styles.quickAddCardLabel}>{params.label}</Text>
+        {themeKey === 'dark' ? (
+          <View style={styles.quickAddIconRowDark}>
+            <Text
+              style={[
+                styles.quickAddCardIconEmoji,
+                {
+                  fontSize: BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey],
+                },
+              ]}
+            >
+              {params.emoji}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.quickAddCardIconCircle}>
+            <Text
+              style={[
+                styles.quickAddCardIconEmoji,
+                {
+                  fontSize: BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey],
+                },
+              ]}
+            >
+              {params.emoji}
+            </Text>
+          </View>
+        )}
+        <Text
+          style={[
+            styles.quickAddCardLabel,
+            {
+              fontSize: BigCircleMenuTokens.tile.label.fontSize[themeKey],
+              fontWeight: BigCircleMenuTokens.tile.label.fontWeight[themeKey],
+              color: BigCircleMenuTokens.tile.label.color[themeKey],
+              marginTop: BigCircleMenuTokens.tile.label.marginTop[themeKey],
+            },
+          ]}
+        >
+          {params.label}
+        </Text>
       </Pressable>
     );
   };
@@ -465,7 +600,10 @@ function TabLayoutContent() {
           <Pressable
             style={[
               styles.quickAddOverlay,
-              { pointerEvents: isQuickAddVisible ? 'auto' : 'none' },
+              {
+                pointerEvents: isQuickAddVisible ? 'auto' : 'none',
+                backgroundColor: bigCircleColors.backdrop,
+              },
             ]}
             onPress={() => setQuickAddVisible(false)}
           >
@@ -476,18 +614,46 @@ function TabLayoutContent() {
                     styles.quickAddSheetInner,
                     {
                       transform: [{ translateY: sheetTranslateY }],
+                      maxWidth: BigCircleMenuTokens.container.maxWidth,
+                      backgroundColor: BigCircleMenuTokens.sheet.backgroundColor[themeKey],
+                      paddingHorizontal: BigCircleMenuTokens.container.paddingHorizontal[themeKey],
+                      paddingTop: BigCircleMenuTokens.container.paddingTop[themeKey],
+                      paddingBottom:
+                        BigCircleMenuTokens.container.paddingBottomBase[themeKey] +
+                        (themeKey === 'dark' ? Math.max(insets.bottom, 0) : 0),
+                      borderTopLeftRadius: BigCircleMenuTokens.container.borderTopRadius[themeKey],
+                      borderTopRightRadius: BigCircleMenuTokens.container.borderTopRadius[themeKey],
                     },
+                    themeKey === 'light' ? { backdropFilter: 'blur(10px)' } : null,
                   ]}
                   {...panResponder.panHandlers}
+                  onLayout={(e) => setQuickAddSheetWidth(e.nativeEvent.layout.width)}
                 >
                   {/* drag handle */}
                   <Pressable
-                    style={styles.quickAddHandle}
+                    style={[
+                      styles.quickAddHandle,
+                      {
+                        width: BigCircleMenuTokens.handle.width[themeKey],
+                        height: BigCircleMenuTokens.handle.height[themeKey],
+                        borderRadius: BigCircleMenuTokens.handle.borderRadius[themeKey],
+                        backgroundColor: BigCircleMenuTokens.handle.color[themeKey],
+                        marginBottom: BigCircleMenuTokens.handle.marginBottom,
+                      },
+                    ]}
                     onPress={() => setQuickAddVisible(false)}
                   />
 
                   {/* cards grid */}
-                  <View style={styles.quickAddGrid}>
+                  <View
+                    style={[
+                      styles.quickAddGrid,
+                      {
+                        rowGap: BigCircleMenuTokens.grid.gap[themeKey].row,
+                        columnGap: BigCircleMenuTokens.grid.gap[themeKey].column,
+                      },
+                    ]}
+                  >
                     {renderQuickAddModuleCard(module1Config)}
                     {renderQuickAddModuleCard(module2Config)}
                     {renderQuickAddCard({
@@ -554,7 +720,6 @@ const styles = StyleSheet.create({
   },
   quickAddOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   quickAddSheet: {
@@ -565,42 +730,19 @@ const styles = StyleSheet.create({
   },
   quickAddSheetInner: {
     width: '100%',
-    maxWidth: 1200,
-    backgroundColor: 'rgba(255,255,255,0.9)', // softer, modern
-    paddingTop: 12,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    backdropFilter: 'blur(10px)', // web only, ignored on RN, safe to include
   },
   quickAddHandle: {
     alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#ccc',
-    marginBottom: 12,
   },
   quickAddGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 16,
-    columnGap: 12,
   },
   quickAddCard: {
-    width: '48%',
-    backgroundColor: 'rgba(255,255,255,0.85)', // slight frosted feel
-    borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
-    // shadows — modern soft look
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 4,
+    borderRadius: BigCircleMenuTokens.tile.borderRadius,
+    paddingVertical: BigCircleMenuTokens.tile.paddingVertical,
+    paddingHorizontal: BigCircleMenuTokens.tile.paddingHorizontal,
   },
   quickAddCardPressed: {
     transform: [{ scale: 0.97 }],
@@ -609,16 +751,17 @@ const styles = StyleSheet.create({
   quickAddCardIconCircle: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    // Engineering guideline #11: spacing via tokens (10 is spec-driven compact spacing)
+    marginBottom: Layout.cardInnerPaddingCompact,
   },
   quickAddCardIconEmoji: {
-    fontSize: 32,
+  },
+  quickAddIconRowDark: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickAddCardLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#1a1a1a',
-    marginTop: 4,
     textAlign: 'center',
   },
   moreMenuOverlay: {
