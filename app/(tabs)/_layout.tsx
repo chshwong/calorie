@@ -10,7 +10,8 @@ import { PlusButtonTab } from '@/components/plus-button-tab';
 import { MoreButtonTab } from '@/components/more-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
-import { BigCircleMenuTokens, Colors, FontSize, Layout } from '@/constants/theme';
+import { BigCircleMenuTokens, Colors, FontSize, FontWeight, Layout } from '@/constants/theme';
+import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
@@ -38,6 +39,14 @@ function TabLayoutContent() {
   const [quickAddSheetWidth, setQuickAddSheetWidth] = useState<number | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+  const isDismissingRef = useRef(false);
+  const sheetHeightRef = useRef(0);
+
+  // More sheet (separate animation state so it never fights QuickAdd)
+  const moreSlideAnim = useRef(new Animated.Value(0)).current;
+  const moreDragY = useRef(new Animated.Value(0)).current;
+  const moreIsDismissingRef = useRef(false);
+  const moreSheetHeightRef = useRef(0);
   
   // Get user config for focus module preferences
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
@@ -71,30 +80,87 @@ function TabLayoutContent() {
   const used = new Set([focusModule1, focusModule2, focusModule3]);
   const remainingModule = ALL_MODULES.find(m => !used.has(m)) || null;
 
+  const closeQuickAdd = (mode: 'tap' | 'drag') => {
+    if (isDismissingRef.current) return;
+
+    isDismissingRef.current = true;
+
+    // Avoid competing animations as we transition to a stable "closed" state.
+    dragY.stopAnimation();
+    slideAnim.stopAnimation();
+
+    const offscreenY =
+      (sheetHeightRef.current || 300) + Math.max(insets.bottom, 0) + 40;
+
+    Animated.parallel([
+      Animated.timing(dragY, {
+        toValue: mode === 'drag' ? offscreenY : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setQuickAddVisible(false);
+      dragY.setValue(0);
+      slideAnim.setValue(0);
+      isDismissingRef.current = false;
+    });
+  };
+
+  const closeMore = (mode: 'tap' | 'drag') => {
+    if (moreIsDismissingRef.current) return;
+
+    moreIsDismissingRef.current = true;
+
+    moreDragY.stopAnimation();
+    moreSlideAnim.stopAnimation();
+
+    const offscreenY =
+      (moreSheetHeightRef.current || 260) + Math.max(insets.bottom, 0) + 40;
+
+    Animated.parallel([
+      Animated.timing(moreDragY, {
+        toValue: mode === 'drag' ? offscreenY : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(moreSlideAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setMoreMenuVisible(false);
+      moreDragY.setValue(0);
+      moreSlideAnim.setValue(0);
+      moreIsDismissingRef.current = false;
+    });
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (isDismissingRef.current) return false;
         // start responding when there is a noticeable vertical drag
         return Math.abs(gestureState.dy) > 5;
       },
       onPanResponderMove: (_, gestureState) => {
+        if (isDismissingRef.current) return;
         // only allow dragging down (positive dy)
         if (gestureState.dy > 0) {
           dragY.setValue(gestureState.dy);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
+        if (isDismissingRef.current) return;
+
         const threshold = 80; // pixels to consider it a dismiss
         if (gestureState.dy > threshold) {
-          // animate sheet down and then close, without resetting dragY here
-          Animated.timing(dragY, {
-            toValue: 300, // larger value so it moves fully off screen
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            setQuickAddVisible(false);
-            // DO NOT reset dragY here
-          });
+          closeQuickAdd('drag');
         } else {
           // not enough drag: spring back to original position
           Animated.spring(dragY, {
@@ -108,6 +174,7 @@ function TabLayoutContent() {
 
   useEffect(() => {
     if (isQuickAddVisible) {
+      isDismissingRef.current = false;
       slideAnim.setValue(0);
       dragY.setValue(0);
       Animated.timing(slideAnim, {
@@ -118,6 +185,19 @@ function TabLayoutContent() {
     }
   }, [isQuickAddVisible, slideAnim, dragY]);
 
+  useEffect(() => {
+    if (isMoreMenuVisible) {
+      moreIsDismissingRef.current = false;
+      moreSlideAnim.setValue(0);
+      moreDragY.setValue(0);
+      Animated.timing(moreSlideAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isMoreMenuVisible, moreSlideAnim, moreDragY]);
+
   const sheetTranslateY = Animated.add(
     slideAnim.interpolate({
       inputRange: [0, 1],
@@ -125,6 +205,58 @@ function TabLayoutContent() {
     }),
     dragY
   );
+
+  const backdropOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.55],
+  });
+
+  const moreSheetTranslateY = Animated.add(
+    moreSlideAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [40, 0],
+    }),
+    moreDragY
+  );
+
+  const moreBackdropOpacity = moreSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.35],
+  });
+
+  const morePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (moreIsDismissingRef.current) return false;
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        if (moreIsDismissingRef.current) return false;
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (moreIsDismissingRef.current) return;
+        if (gestureState.dy > 0) {
+          moreDragY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderRelease: (_, gestureState) => {
+        if (moreIsDismissingRef.current) return;
+
+        const threshold = 80;
+        if (gestureState.dy > threshold) {
+          closeMore('drag');
+        } else {
+          Animated.spring(moreDragY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const handleMoreSettings = () => {
     setMoreMenuVisible(false);
@@ -332,7 +464,7 @@ function TabLayoutContent() {
             : undefined
         }
         onPress={() => {
-          setQuickAddVisible(false);
+          closeQuickAdd('tap');
           if (config.key === 'Food') {
             openMealTypeLogForNow();
           } else if (config.key === 'Exercise') {
@@ -388,7 +520,18 @@ function TabLayoutContent() {
     );
   };
 
-  const renderQuickAddCard = (params: { key: 'enter_weight' | 'scan_barcode'; label: string; emoji: string; onPress: () => void }) => {
+  const renderQuickAddCard = (params: {
+    key: 'enter_weight' | 'scan_barcode';
+    label: string;
+    emoji?: string;
+    iconName?: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+    onPress: () => void;
+  }) => {
+    const iconVisualSize = BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey];
+    // Emojis typically render with extra line-height/vertical padding compared to vector icons.
+    // Give icon-based tiles a consistent "icon box" height so the label aligns with emoji-based tiles.
+    const iconBoxHeight = Math.round(iconVisualSize * 1.4);
+
     return (
       <Pressable
         key={params.key}
@@ -420,35 +563,55 @@ function TabLayoutContent() {
             : undefined
         }
         onPress={() => {
-          setQuickAddVisible(false);
+          closeQuickAdd('tap');
           params.onPress();
         }}
       >
         {themeKey === 'dark' ? (
           <View style={styles.quickAddIconRowDark}>
-            <Text
-              style={[
-                styles.quickAddCardIconEmoji,
-                {
-                  fontSize: BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey],
-                },
-              ]}
-            >
-              {params.emoji}
-            </Text>
+            {params.iconName ? (
+              <View style={{ height: iconBoxHeight, justifyContent: 'center' }}>
+                <MaterialCommunityIcons
+                  name={params.iconName}
+                  size={iconVisualSize}
+                  color={BigCircleMenuTokens.tile.label.color[themeKey]}
+                />
+              </View>
+            ) : (
+              <Text
+                style={[
+                  styles.quickAddCardIconEmoji,
+                  {
+                    fontSize: iconVisualSize,
+                  },
+                ]}
+              >
+                {params.emoji}
+              </Text>
+            )}
           </View>
         ) : (
           <View style={styles.quickAddCardIconCircle}>
-            <Text
-              style={[
-                styles.quickAddCardIconEmoji,
-                {
-                  fontSize: BigCircleMenuTokens.tile.iconChip.emojiSize[themeKey],
-                },
-              ]}
-            >
-              {params.emoji}
-            </Text>
+            {params.iconName ? (
+              <View style={{ height: iconBoxHeight, justifyContent: 'center' }}>
+                <MaterialCommunityIcons
+                  name={params.iconName}
+                  size={iconVisualSize}
+                  color={BigCircleMenuTokens.tile.label.color[themeKey]}
+                />
+              </View>
+            ) : (
+              <Text
+                style={[
+                  styles.quickAddCardIconEmoji,
+                  {
+                    fontSize: iconVisualSize,
+                  },
+                ]}
+              >
+                {params.emoji}
+              </Text>
+            )}
           </View>
         )}
         <Text
@@ -471,11 +634,11 @@ function TabLayoutContent() {
   return (
     <View style={styles.container}>
         <Tabs
+          tabBar={(props: any) => <ConstrainedTabBar {...props} />}
           screenOptions={{
             tabBarActiveTintColor: colors.tint,
             headerShown: false,
             tabBarButton: HapticTab,
-            tabBar: (props) => <ConstrainedTabBar {...props} />,
             tabBarStyle: [
               {
                 backgroundColor: colors.background,
@@ -505,18 +668,18 @@ function TabLayoutContent() {
           }}>
         <Tabs.Screen
           name="index"
+          listeners={{
+            tabPress: (e: any) => {
+              // If focusModule1 is not 'Food', redirect to the correct route
+              if (focusModule1 !== 'Food' && module1Config.routeName !== 'index') {
+                e.preventDefault();
+                router.push(`/(tabs)/${module1Config.routeName}` as any);
+              }
+            },
+          }}
           options={{
             title: module1Config.label,
             tabBarIcon: ({ color }) => module1Config.icon({ color, size: 28 }),
-            listeners: {
-              tabPress: (e) => {
-                // If focusModule1 is not 'Food', redirect to the correct route
-                if (focusModule1 !== 'Food' && module1Config.routeName !== 'index') {
-                  e.preventDefault();
-                  router.push(`/(tabs)/${module1Config.routeName}` as any);
-                }
-              },
-            },
           }}
         />
         <Tabs.Screen
@@ -561,18 +724,18 @@ function TabLayoutContent() {
         />
         <Tabs.Screen
           name="exercise"
+          listeners={{
+            tabPress: (e: any) => {
+              // If focusModule2 is not 'Exercise', redirect to the correct route
+              if (focusModule2 !== 'Exercise' && module2Config.routeName !== 'exercise') {
+                e.preventDefault();
+                router.push(`/(tabs)/${module2Config.routeName}` as any);
+              }
+            },
+          }}
           options={{
             title: module2Config.label,
             tabBarIcon: ({ color }) => module2Config.icon({ color, size: 28 }),
-            listeners: {
-              tabPress: (e) => {
-                // If focusModule2 is not 'Exercise', redirect to the correct route
-                if (focusModule2 !== 'Exercise' && module2Config.routeName !== 'exercise') {
-                  e.preventDefault();
-                  router.push(`/(tabs)/${module2Config.routeName}` as any);
-                }
-              },
-            },
           }}
         />
         <Tabs.Screen
@@ -594,19 +757,22 @@ function TabLayoutContent() {
         <Modal
           visible={isQuickAddVisible}
           transparent
-          animationType="fade"
-          onRequestClose={() => setQuickAddVisible(false)}
+          animationType="none"
+          onRequestClose={() => closeQuickAdd('tap')}
         >
           <Pressable
             style={[
               styles.quickAddOverlay,
               {
                 pointerEvents: isQuickAddVisible ? 'auto' : 'none',
-                backgroundColor: bigCircleColors.backdrop,
               },
             ]}
-            onPress={() => setQuickAddVisible(false)}
+            onPress={() => closeQuickAdd('tap')}
           >
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdropOpacity }]}
+            />
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.quickAddSheet}>
                 <Animated.View
@@ -627,7 +793,10 @@ function TabLayoutContent() {
                     themeKey === 'light' ? { backdropFilter: 'blur(10px)' } : null,
                   ]}
                   {...panResponder.panHandlers}
-                  onLayout={(e) => setQuickAddSheetWidth(e.nativeEvent.layout.width)}
+                  onLayout={(e) => {
+                    setQuickAddSheetWidth(e.nativeEvent.layout.width);
+                    sheetHeightRef.current = e.nativeEvent.layout.height;
+                  }}
                 >
                   {/* drag handle */}
                   <Pressable
@@ -641,8 +810,29 @@ function TabLayoutContent() {
                         marginBottom: BigCircleMenuTokens.handle.marginBottom,
                       },
                     ]}
-                    onPress={() => setQuickAddVisible(false)}
+                    onPress={() => closeQuickAdd('tap')}
                   />
+
+                  <View style={styles.quickAddTitleRow}>
+                    <Text
+                      style={[
+                        styles.quickAddTitleText,
+                        {
+                          color: BigCircleMenuTokens.tile.label.color[themeKey],
+                          fontSize: FontSize.lg,
+                          fontWeight: FontWeight.bold,
+                        },
+                      ]}
+                    >
+                      {t('quick_add.log_now', { defaultValue: 'Log Now' })}
+                    </Text>
+                    <IconSymbol
+                      name="plus"
+                      size={FontSize.lg}
+                      color={BigCircleMenuTokens.tile.label.color[themeKey]}
+                      decorative
+                    />
+                  </View>
 
                   {/* cards grid */}
                   <View
@@ -665,7 +855,7 @@ function TabLayoutContent() {
                     {renderQuickAddCard({
                       key: 'scan_barcode',
                       label: t('quick_add.scan_barcode'),
-                      emoji: '📷',
+                      iconName: 'barcode-scan',
                       onPress: () => openMealTypeLogForNow(true),
                     })}
                     {renderQuickAddModuleCard(module3Config)}
@@ -679,28 +869,53 @@ function TabLayoutContent() {
         <Modal
           visible={isMoreMenuVisible}
           transparent
-          animationType="fade"
-          onRequestClose={() => setMoreMenuVisible(false)}
+          animationType="none"
+          onRequestClose={() => closeMore('tap')}
         >
-          <Pressable
-            style={[
-              styles.moreMenuOverlay,
-              { pointerEvents: isMoreMenuVisible ? 'auto' : 'none' },
-            ]}
-            onPress={() => setMoreMenuVisible(false)}
+          <View
+            style={[styles.moreMenuOverlay, { pointerEvents: isMoreMenuVisible ? 'auto' : 'none' }]}
           >
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <View style={styles.moreMenuSheetContainer}>
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: moreBackdropOpacity }]}
+            />
+
+            {/* Backdrop tap target */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMore('tap')} />
+
+            {/* Sheet container (not pressable) */}
+            <View style={styles.moreMenuSheetContainer} pointerEvents="box-none">
+              <Animated.View
+                style={{ width: '100%', transform: [{ translateY: moreSheetTranslateY }] }}
+                onLayout={(e) => {
+                  moreSheetHeightRef.current = e.nativeEvent.layout.height;
+                }}
+              >
                 <MoreSheetContent
                   isDark={isDark}
                   title={t('tabs.more')}
-                  closeLabel={t('common.close', { defaultValue: 'Close' })}
+                  titleNode={<BrandLogoMascotOnly width={104} accessibilityLabel={t('tabs.more')} />}
                   items={moreSheetItems}
-                  onClose={() => setMoreMenuVisible(false)}
+                  iconColor={colors.tint}
+                  topAccessory={
+                    <View
+                      {...morePanResponder.panHandlers}
+                      style={{ paddingTop: 10, paddingBottom: 8, width: '100%', alignItems: 'center' }}
+                    >
+                      <View
+                        style={{
+                          width: 44,
+                          height: 5,
+                          borderRadius: 3,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)',
+                        }}
+                      />
+                    </View>
+                  }
                 />
-              </View>
-            </Pressable>
-          </Pressable>
+              </Animated.View>
+            </View>
+          </View>
         </Modal>
       </View>
   );
@@ -734,6 +949,15 @@ const styles = StyleSheet.create({
   quickAddHandle: {
     alignSelf: 'center',
   },
+  quickAddTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Layout.cardInnerPaddingCompact,
+  },
+  quickAddTitleText: {
+    marginRight: 6,
+  },
   quickAddGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -766,7 +990,6 @@ const styles = StyleSheet.create({
   },
   moreMenuOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
   moreMenuSheetContainer: {

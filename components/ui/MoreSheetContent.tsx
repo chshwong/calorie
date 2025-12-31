@@ -16,21 +16,24 @@ export type MoreSheetItem = {
 type MoreSheetContentProps = {
   isDark: boolean;
   title: string;
-  closeLabel: string;
+  titleNode?: React.ReactNode;
   items: MoreSheetItem[];
-  onClose: () => void;
+  topAccessory?: React.ReactNode;
+  iconColor?: string;
 };
 
 export function MoreSheetContent({
   isDark,
   title,
-  closeLabel,
+  titleNode,
   items,
-  onClose,
+  topAccessory,
+  iconColor,
 }: MoreSheetContentProps) {
   const insets = useSafeAreaInsets();
   const themeKey = isDark ? 'dark' : 'light';
   const t = MoreSheetTokens;
+  const iconColorToUse = iconColor ?? t.iconChip.iconColor[themeKey];
 
   return (
     <View
@@ -46,60 +49,26 @@ export function MoreSheetContent({
         },
       ]}
     >
-      <View
-        style={[
-          styles.handle,
-          {
-            width: t.handle.width,
-            height: t.handle.height,
-            borderRadius: t.handle.borderRadius,
-            backgroundColor: t.handle.color[themeKey],
-            marginBottom: t.handle.marginBottom,
-          },
-        ]}
-      />
+      {topAccessory ? <View style={styles.topAccessory}>{topAccessory}</View> : null}
 
       <View style={[styles.headerRow, { marginBottom: t.header.marginBottom }]}>
-        <Text
-          style={[
-            styles.title,
-            {
-              fontSize: t.header.title.fontSize,
-              fontWeight: t.header.title.fontWeight,
-              color: t.header.title.color[themeKey],
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
-
-        <Pressable
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel={closeLabel}
-          style={({ pressed }) => [
-            styles.closeButton,
-            {
-              width: t.header.closeButton.size,
-              height: t.header.closeButton.size,
-              borderRadius: t.header.closeButton.borderRadius,
-              backgroundColor: t.header.closeButton.backgroundColor[themeKey],
-            },
-            pressed && Platform.OS === 'ios' ? { opacity: 0.75 } : null,
-          ]}
-          android_ripple={{
-            color: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
-            borderless: true,
-          }}
-          hitSlop={8}
-        >
-          <Ionicons
-            name="close"
-            size={t.header.closeButton.iconSize}
-            color={t.header.closeButton.iconColor[themeKey]}
-          />
-        </Pressable>
+        {titleNode ? (
+          <View style={styles.titleNodeWrap}>{titleNode}</View>
+        ) : (
+          <Text
+            style={[
+              styles.title,
+              {
+                fontSize: t.header.title.fontSize,
+                fontWeight: t.header.title.fontWeight,
+                color: t.header.title.color[themeKey],
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+        )}
       </View>
 
       <View>
@@ -146,7 +115,7 @@ export function MoreSheetContent({
                 <Ionicons
                   name={item.icon}
                   size={t.iconChip.iconSize}
-                  color={t.iconChip.iconColor[themeKey]}
+                  color={iconColorToUse}
                 />
               </View>
 
@@ -181,20 +150,22 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
   },
-  handle: {
-    alignSelf: 'center',
+  topAccessory: {
+    width: '100%',
+    alignItems: 'center',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   title: {
     flex: 1,
     paddingRight: 8,
   },
-  closeButton: {
-    alignItems: 'center',
+  titleNodeWrap: {
+    flex: 1,
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   row: {
