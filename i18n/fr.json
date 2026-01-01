@@ -262,7 +262,14 @@
         "feature_no_paywalls_body": "Les fonctions de base restent gratuites. Aucun piège d’abonnement.",
         "social_no_subscriptions": "Conçu pour la vraie vie",
         "social_no_ads": "Des infos utiles, sans bruit",
-        "social_private_by_default": "Vos données restent à vous"
+        "social_private_by_default": "Vos données restent à vous",
+        "steps_section_title": "Atteignez vos objectifs santé en 1–2–3",
+        "steps_1_title": "Suivez calories, macros et plus",
+        "steps_1_body": "Enregistrez vos repas en quelques secondes grâce à la recherche, aux favoris et au scan de code‑barres.",
+        "steps_2_title": "Suivez vos progrès",
+        "steps_2_body": "Visualisez tendances, objectifs et régularité d’un coup d’œil—sans surcharge.",
+        "steps_3_title": "Mangez mieux et atteignez vos objectifs",
+        "steps_3_body": "Transformez ce que vous saisissez en conseils simples et concrets, faciles à suivre."
       }
     },
 
@@ -460,7 +467,6 @@
     "module_preferences": {
       "title": "Que suivez-vous d'autre?",
       "subtitle": "En plus de la nutrition, choisissez vos 2 priorités.",
-      "helper": "Vous pourrez changer cela plus tard dans les paramètres.",
       "pick_up_to_2": "Choisissez jusqu'à 2",
       "tap_to_toggle": "Touchez pour sélectionner ou désélectionner",
       "selected_rank": "sélectionné en #{{rank}}",

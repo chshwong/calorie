@@ -23,7 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
 import { showAppToast } from '@/components/ui/app-toast';
-import { BorderRadius, Colors, FontSize, FontWeight, Layout, Shadows, Spacing, type ThemeColors } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Nudge, Shadows, Spacing, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
@@ -204,59 +204,337 @@ function HeroVisualComposite({
   );
 }
 
-function FeatureCardsSection({
+type StepsMockVariant = 'logging' | 'progress' | 'plan';
+
+function PhoneMock({
   colors,
-  isTwoCol,
+  colorScheme,
+  isWeb,
+  variant,
 }: {
   colors: ThemeColors;
+  colorScheme: 'light' | 'dark';
+  isWeb: boolean;
+  variant: StepsMockVariant;
+}) {
+  // Use theme surfaces (no hardcoded colors).
+  const frameBg = colors.card;
+  const screenBg = colors.backgroundSecondary;
+
+  const renderVariant = () => {
+    switch (variant) {
+      case 'logging':
+        return (
+          <View style={styles.mockContent}>
+            <View style={styles.mockTopRow}>
+              <View style={[styles.mockPill, { backgroundColor: colors.appTeal + '18', borderColor: colors.appTeal + '35' }]}>
+                <View style={[styles.mockDot, { backgroundColor: colors.appTeal }]} />
+                <View style={[styles.mockPillText, { backgroundColor: colors.textSecondary + '55' }]} />
+              </View>
+              <View style={[styles.mockChip, { backgroundColor: colors.tintLight, borderColor: colors.tint + '35' }]}>
+                <View style={[styles.mockChipText, { backgroundColor: colors.textSecondary + '55' }]} />
+              </View>
+            </View>
+
+            <View style={styles.mockList}>
+              <View style={[styles.mockListRow, { borderColor: colors.border }]}>
+                <View style={[styles.mockAvatar, { backgroundColor: colors.tint + '18' }]} />
+                <View style={styles.mockListTextCol}>
+                  <View style={[styles.mockLine, { width: '78%', backgroundColor: colors.textSecondary + '55' }]} />
+                  <View style={[styles.mockLine, { width: '52%', backgroundColor: colors.textSecondary + '35' }]} />
+                </View>
+              </View>
+              <View style={[styles.mockListRow, { borderColor: colors.border }]}>
+                <View style={[styles.mockAvatar, { backgroundColor: colors.appTeal + '18' }]} />
+                <View style={styles.mockListTextCol}>
+                  <View style={[styles.mockLine, { width: '70%', backgroundColor: colors.textSecondary + '55' }]} />
+                  <View style={[styles.mockLine, { width: '46%', backgroundColor: colors.textSecondary + '35' }]} />
+                </View>
+              </View>
+              <View style={[styles.mockListRow, { borderColor: colors.border }]}>
+                <View style={[styles.mockAvatar, { backgroundColor: colors.chartGreen + '18' }]} />
+                <View style={styles.mockListTextCol}>
+                  <View style={[styles.mockLine, { width: '66%', backgroundColor: colors.textSecondary + '55' }]} />
+                  <View style={[styles.mockLine, { width: '40%', backgroundColor: colors.textSecondary + '35' }]} />
+                </View>
+              </View>
+            </View>
+
+            <View style={[styles.mockCtaBar, { backgroundColor: colors.tint, borderColor: (colors.cardBorder ?? colors.border) + '55' }]}>
+              <View style={[styles.mockCtaText, { backgroundColor: colors.textInverse + 'AA' }]} />
+              <View style={[styles.mockCtaIcon, { backgroundColor: colors.textInverse + 'CC' }]} />
+            </View>
+          </View>
+        );
+
+      case 'progress':
+        return (
+          <View style={styles.mockContent}>
+            <View style={styles.mockTopRow}>
+              <View style={[styles.mockChip, { backgroundColor: colors.tintLight, borderColor: colors.tint + '35' }]}>
+                <View style={[styles.mockChipText, { backgroundColor: colors.textSecondary + '55' }]} />
+              </View>
+              <View style={[styles.mockPill, { backgroundColor: colors.chartGreen + '14', borderColor: colors.chartGreen + '35' }]}>
+                <View style={[styles.mockDot, { backgroundColor: colors.chartGreen }]} />
+                <View style={[styles.mockPillText, { backgroundColor: colors.textSecondary + '55' }]} />
+              </View>
+            </View>
+
+            <View style={[styles.mockChartCard, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
+              <View style={styles.mockChartBars}>
+                <View style={[styles.mockBar, { height: '55%', backgroundColor: colors.tint + '55' }]} />
+                <View style={[styles.mockBar, { height: '72%', backgroundColor: colors.appTeal + '55' }]} />
+                <View style={[styles.mockBar, { height: '46%', backgroundColor: colors.chartGreen + '55' }]} />
+                <View style={[styles.mockBar, { height: '82%', backgroundColor: colors.tint + '55' }]} />
+                <View style={[styles.mockBar, { height: '64%', backgroundColor: colors.appTeal + '55' }]} />
+              </View>
+              <View style={styles.mockDividerRow}>
+                <View style={[styles.mockTinyLine, { backgroundColor: colors.textSecondary + '35' }]} />
+                <View style={[styles.mockTinyLine, { width: '38%', backgroundColor: colors.textSecondary + '35' }]} />
+              </View>
+            </View>
+
+            <View style={styles.mockRowChips}>
+              <View style={[styles.mockChip, { backgroundColor: colors.appTeal + '18', borderColor: colors.appTeal + '35' }]} />
+              <View style={[styles.mockChip, { backgroundColor: colors.tint + '18', borderColor: colors.tint + '35' }]} />
+              <View style={[styles.mockChip, { backgroundColor: colors.chartGreen + '14', borderColor: colors.chartGreen + '35' }]} />
+            </View>
+          </View>
+        );
+
+      case 'plan':
+        return (
+          <View style={styles.mockContent}>
+            <View style={styles.mockTopRow}>
+              <View style={[styles.mockPill, { backgroundColor: colors.tint + '12', borderColor: colors.tint + '35' }]}>
+                <View style={[styles.mockDot, { backgroundColor: colors.tint }]} />
+                <View style={[styles.mockPillText, { backgroundColor: colors.textSecondary + '55' }]} />
+              </View>
+              <View style={[styles.mockChip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <View style={[styles.mockChipText, { backgroundColor: colors.textSecondary + '55' }]} />
+              </View>
+            </View>
+
+            <View style={[styles.mockCalendar, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
+              <View style={styles.mockCalendarRow}>
+                {(['m', 't', 'w', 'th', 'f', 'sa', 'su'] as const).map((dayKey, i) => (
+                  <View
+                    key={dayKey}
+                    style={[
+                      styles.mockCalendarDot,
+                      {
+                        backgroundColor:
+                          i === 2 ? colors.tint : i === 4 ? colors.appTeal : colors.textSecondary + '35',
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              <View style={[styles.mockLine, { width: '72%', backgroundColor: colors.textSecondary + '45' }]} />
+            </View>
+
+            <View style={styles.mockGrid}>
+              <View style={[styles.mockMealCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <View style={[styles.mockMealThumb, { backgroundColor: colors.appTeal + '18' }]} />
+                <View style={[styles.mockLine, { width: '70%', backgroundColor: colors.textSecondary + '55' }]} />
+                <View style={[styles.mockLine, { width: '48%', backgroundColor: colors.textSecondary + '35' }]} />
+              </View>
+              <View style={[styles.mockMealCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <View style={[styles.mockMealThumb, { backgroundColor: colors.tint + '18' }]} />
+                <View style={[styles.mockLine, { width: '62%', backgroundColor: colors.textSecondary + '55' }]} />
+                <View style={[styles.mockLine, { width: '42%', backgroundColor: colors.textSecondary + '35' }]} />
+              </View>
+            </View>
+          </View>
+        );
+    }
+  };
+
+  return (
+    <View
+      style={[
+        styles.phoneMockFrame,
+        {
+          borderColor: colors.cardBorder ?? colors.border,
+          backgroundColor: frameBg,
+        },
+      ]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View
+        style={[
+          styles.phoneMockNotch,
+          { backgroundColor: colorScheme === 'dark' ? colors.backgroundSecondary : colors.border },
+        ]}
+      />
+
+      <View
+        style={[
+          styles.phoneMockScreen,
+          { borderColor: colors.border, backgroundColor: screenBg },
+          isWeb
+            ? ({
+                backgroundImage:
+                  colorScheme === 'dark'
+                    ? 'radial-gradient(160px circle at 30% 22%, rgba(91, 194, 198, 0.28), transparent 62%), radial-gradient(240px circle at 76% 60%, rgba(233, 135, 111, 0.22), transparent 62%), linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))'
+                    : 'radial-gradient(160px circle at 28% 20%, rgba(47, 164, 169, 0.26), transparent 62%), radial-gradient(240px circle at 76% 62%, rgba(184, 85, 63, 0.18), transparent 62%), linear-gradient(135deg, rgba(15,23,42,0.02), rgba(15,23,42,0.00))',
+              } as any)
+            : null,
+        ]}
+      >
+        {renderVariant()}
+      </View>
+    </View>
+  );
+}
+
+function StepsShowcaseSection({
+  colors,
+  colorScheme,
+  isTwoCol,
+  isWeb,
+  screenWidth,
+}: {
+  colors: ThemeColors;
+  colorScheme: 'light' | 'dark';
   isTwoCol: boolean;
+  isWeb: boolean;
+  screenWidth: number;
 }) {
   const { t } = useTranslation();
+
+  // Overlap/collage is web-desktop only. This ensures mobile never uses transforms even if viewport math is weird.
+  const enableOverlap = isWeb && isTwoCol && screenWidth >= 1200;
+
+  // Constrain decorative mockups with theme tokens (no magic pixels).
+  const phoneMaxWidth = Math.max(Spacing['5xl'], Math.round(Layout.maxContentWidth * (isTwoCol ? 0.62 : 0.56)));
+  const phoneWidth = Math.min(phoneMaxWidth, Math.max(Spacing['6xl'], Math.round(screenWidth - Spacing['3xl'])));
+  const desktopTextMaxWidth = Math.round(Layout.maxContentWidth * 0.72);
+
+  // Explicit spacing (avoid relying on `gap`, which is inconsistent across RN targets).
+  const rowSpacing = enableOverlap ? Spacing.lg : Spacing['5xl'];
+  // Desktop-only overlap between step mockups.
+  // We scale overlap off the current mock height so it looks consistent across desktop widths.
+  const phoneHeight = Math.round(phoneWidth * (16 / 10)); // matches phoneMockFrame aspectRatio (10/16)
+  const maxLift = Spacing['6xl'] * 8;
+  const liftStep2Y = enableOverlap ? -clamp(Math.round(phoneHeight * 0.25), 0, maxLift) : 0; // ~25% overlap with step 1
+  // Step 3 needs to be much higher so the collage feels stacked (per screenshots).
+  const liftStep3Y = enableOverlap ? -clamp(Math.round(phoneHeight * 0.55), 0, maxLift) : 0;
+  // Desktop-only horizontal overlap (bring step 2 toward center; step 3 tuned separately).
+  const mediaOverlapShiftXStep2 = enableOverlap ? Spacing['6xl'] + Spacing['4xl'] + Spacing['3xl'] : 0;
+  // Step 3 should overlap step 2 by ~25% (less than before) so we shift it left.
+  // Note: `Spacing['1xl']` is not a valid token; use `Spacing.xl`.
+  const mediaOverlapShiftXStep3 = enableOverlap ? Spacing.xl : 0;
+
+  const bodyLineHeight = Math.round(FontSize.md * 1.45);
+  const step1TextLiftY = enableOverlap ? -clamp(bodyLineHeight * 4, 0, Spacing['6xl'] * 2) : 0; // ~3 lines
+  const step2TextLiftY = enableOverlap ? -clamp(Math.round(phoneHeight * 0.28), 0, Spacing['6xl'] * 3) : 0;
+  const step3TextLiftY = enableOverlap ? -clamp(Math.round(phoneHeight * 0.42), 0, Spacing['6xl'] * 6) : 0;
+
+  const steps: Array<{
+    variant: StepsMockVariant;
+    titleKey: string;
+    bodyKey: string;
+  }> = [
+    { variant: 'logging', titleKey: 'auth.login.marketing.steps_1_title', bodyKey: 'auth.login.marketing.steps_1_body' },
+    { variant: 'progress', titleKey: 'auth.login.marketing.steps_2_title', bodyKey: 'auth.login.marketing.steps_2_body' },
+    { variant: 'plan', titleKey: 'auth.login.marketing.steps_3_title', bodyKey: 'auth.login.marketing.steps_3_body' },
+  ];
+
   return (
-    <View style={[styles.featureSection, { marginTop: isTwoCol ? 52 : 30 }]}>
-      <ThemedText
-        style={[styles.featureSectionTitle, { color: colors.text }]}
-        accessibilityRole="header"
-      >
-        {t('auth.login.marketing.feature_section_title')}
+    <View style={[styles.stepsSection, { marginTop: isTwoCol ? Spacing['3xl'] : Spacing['3xl'] }]}>
+      <ThemedText style={[styles.stepsHeading, { color: colors.text }]} accessibilityRole="header">
+        {t('auth.login.marketing.steps_section_title')}
       </ThemedText>
 
-      <View style={[styles.featureCardsRow, { flexDirection: isTwoCol ? 'row' : 'column' }]}>
-        <View style={[styles.featureCard, { backgroundColor: colors.card, borderColor: colors.cardBorder ?? colors.border }]}>
-          <View style={[styles.featureIconBadge, { backgroundColor: colors.appTeal + '18' }]}>
-            <Text style={styles.featureEmoji} accessibilityElementsHidden>
-              ⚡
-            </Text>
-          </View>
-          <Text style={[styles.featureTitle, { color: colors.text }]}>{t('auth.login.marketing.feature_fast_title')}</Text>
-          <Text style={[styles.featureBody, { color: colors.textSecondary }]}>
-            {t('auth.login.marketing.feature_fast_body')}
-          </Text>
-        </View>
+      <View style={styles.stepsList}>
+        {steps.map((step, idx) => {
+          const isReversed = isTwoCol && idx === 1;
+          const rowDirection = enableOverlap ? (isReversed ? 'row-reverse' : 'row') : 'column';
+          const rowZIndex = enableOverlap ? steps.length - idx : undefined;
+          const liftMediaY = enableOverlap ? (idx === 1 ? liftStep2Y : idx === 2 ? liftStep3Y : 0) : 0;
+          const shiftMediaX = enableOverlap ? (idx === 1 ? -mediaOverlapShiftXStep2 : idx === 2 ? mediaOverlapShiftXStep3 : 0) : 0;
 
-        <View style={[styles.featureCard, { backgroundColor: colors.card, borderColor: colors.cardBorder ?? colors.border }]}>
-          <View style={[styles.featureIconBadge, { backgroundColor: colors.tint + '18' }]}>
-            <Text style={styles.featureEmoji} accessibilityElementsHidden>
-              📊
-            </Text>
-          </View>
-          <Text style={[styles.featureTitle, { color: colors.text }]}>{t('auth.login.marketing.feature_clear_title')}</Text>
-          <Text style={[styles.featureBody, { color: colors.textSecondary }]}>
-            {t('auth.login.marketing.feature_clear_body')}
-          </Text>
-        </View>
+          const isStep2 = idx === 1;
+          const isStep3 = idx === 2;
+          const textLiftY = enableOverlap ? (idx === 0 ? step1TextLiftY : isStep2 ? step2TextLiftY : isStep3 ? step3TextLiftY : 0) : 0;
+          const textAlign = enableOverlap && isStep2 ? 'right' : 'left';
+          return (
+            <View
+              key={step.variant}
+              style={[
+                styles.stepsRow,
+                {
+                  flexDirection: rowDirection,
+                  marginTop: idx === 0 ? 0 : rowSpacing,
+                  zIndex: rowZIndex,
+                  justifyContent: enableOverlap ? 'center' : 'flex-start',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.stepMediaCol,
+                  enableOverlap
+                    ? {
+                        flexGrow: 0,
+                        flexShrink: 1,
+                        flexBasis: 'auto',
+                        width: phoneMaxWidth,
+                        maxWidth: phoneMaxWidth,
+                      }
+                    : null,
+                ]}
+              >
+                <View
+                  style={{
+                    width: phoneWidth,
+                    maxWidth: phoneMaxWidth,
+                    alignSelf: 'center',
+                    transform: enableOverlap
+                      ? [
+                          ...(liftMediaY !== 0 ? [{ translateY: liftMediaY }] : []),
+                          ...(shiftMediaX !== 0 ? [{ translateX: shiftMediaX }] : []),
+                        ]
+                      : undefined,
+                  }}
+                >
+                  <PhoneMock colors={colors} colorScheme={colorScheme} isWeb={isWeb} variant={step.variant} />
+                </View>
+              </View>
 
-        <View style={[styles.featureCard, { backgroundColor: colors.card, borderColor: colors.cardBorder ?? colors.border }]}>
-          <View style={[styles.featureIconBadge, { backgroundColor: colors.chartGreen + '14' }]}>
-            <Text style={styles.featureEmoji} accessibilityElementsHidden>
-              🔓
-            </Text>
-          </View>
-          <Text style={[styles.featureTitle, { color: colors.text }]}>{t('auth.login.marketing.feature_no_paywalls_title')}</Text>
-          <Text style={[styles.featureBody, { color: colors.textSecondary }]}>
-            {t('auth.login.marketing.feature_no_paywalls_body')}
-          </Text>
-        </View>
+              <View
+                style={[
+                  styles.stepTextCol,
+                  enableOverlap
+                    ? {
+                        flexGrow: 0,
+                        flexShrink: 1,
+                        flexBasis: 'auto',
+                        maxWidth: desktopTextMaxWidth,
+                        marginLeft: isReversed ? 0 : Spacing['5xl'],
+                        // Step 2 needs extra clearance so the phone mock never covers the text.
+                        marginRight: isReversed
+                          ? isStep2
+                            ? Spacing['6xl'] + Spacing['6xl'] + Spacing['4xl']
+                            : Spacing['5xl']
+                          : 0,
+                        alignItems: isStep2 ? 'flex-end' : 'flex-start',
+                        transform: textLiftY !== 0 ? [{ translateY: textLiftY }] : undefined,
+                      }
+                    : { marginTop: Spacing['2xl'], alignItems: 'flex-start' },
+                ]}
+              >
+                <Text style={[styles.stepNumber, { color: colors.tint }]} accessibilityElementsHidden>
+                  {String(idx + 1)}
+                </Text>
+                <ThemedText style={[styles.stepTitle, { color: colors.text, textAlign }]}>{t(step.titleKey)}</ThemedText>
+                <ThemedText style={[styles.stepBody, { color: colors.textSecondary, textAlign }]}>{t(step.bodyKey)}</ThemedText>
+              </View>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -265,9 +543,11 @@ function FeatureCardsSection({
 function SocialProofStrip({
   colors,
   isTwoCol,
+  isCompact,
 }: {
   colors: ThemeColors;
   isTwoCol: boolean;
+  isCompact?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -278,6 +558,17 @@ function SocialProofStrip({
           borderColor: colors.cardBorder ?? colors.border,
           backgroundColor: colors.backgroundSecondary,
           flexDirection: isTwoCol ? 'row' : 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          alignSelf: 'center',
+          ...(isCompact
+            ? ({
+                maxWidth: Layout.desktopMaxWidth,
+                paddingVertical: Layout.rowGapCompact,
+                paddingHorizontal: Spacing.lg,
+              } as any)
+            : null),
         },
       ]}
     >
@@ -320,6 +611,26 @@ export default function LoginScreen() {
   const isTwoCol = screenWidth >= 1024;
   const isWeb = Platform.OS === 'web';
   const isMobileWeb = isWeb && !isTwoCol;
+  const overlapMode = isWeb && isTwoCol && screenWidth >= 1200;
+
+  // In overlap/collage mode, the step mockups are lifted via transforms (visual-only),
+  // which leaves extra layout space below the collage. Pull the social proof strip up
+  // by approximately the same amount as step 3's lift, minus a small buffer.
+  const socialProofOffsetY = useMemo(() => {
+    if (!overlapMode) return Spacing.lg;
+
+    const phoneMaxWidth = Math.max(Spacing['5xl'], Math.round(Layout.maxContentWidth * 0.62));
+    const phoneWidth = Math.min(
+      phoneMaxWidth,
+      Math.max(Spacing['6xl'], Math.round(screenWidth - Spacing['3xl']))
+    );
+    const phoneHeight = Math.round(phoneWidth * (16 / 10)); // matches PhoneMock aspect ratio
+    const maxLift = Spacing['6xl'] * 8;
+    const liftStep3Y = -clamp(Math.round(phoneHeight * 0.55), 0, maxLift);
+
+    // Keep a small gap between the collage and the strip.
+    return liftStep3Y + Spacing['4xl'];
+  }, [overlapMode, screenWidth]);
 
   const scrollViewRef = useRef<ScrollViewType | null>(null);
   const authSectionYRef = useRef<number | null>(null);
@@ -1001,8 +1312,22 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <FeatureCardsSection colors={colors} isTwoCol={isTwoCol} />
-          <SocialProofStrip colors={colors} isTwoCol={isTwoCol} />
+          <StepsShowcaseSection
+            colors={colors}
+            colorScheme={colorScheme ?? 'light'}
+            isTwoCol={isTwoCol}
+            isWeb={isWeb}
+            screenWidth={screenWidth}
+          />
+          <View
+            style={{
+              width: '100%',
+              alignItems: 'center',
+              marginTop: socialProofOffsetY,
+            }}
+          >
+            <SocialProofStrip colors={colors} isTwoCol={isTwoCol} isCompact={overlapMode} />
+          </View>
         </View>
       </ScrollView>
     </ThemedView>
@@ -1445,55 +1770,7 @@ const styles = StyleSheet.create({
   legalDot: {
     fontSize: 12,
   },
-  featureSection: {
-    width: '100%',
-  },
-  featureSectionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-    textAlign: 'left',
-  },
-  featureCardsRow: {
-    marginTop: 16,
-    width: '100%',
-    gap: 14,
-  },
-  featureCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 18,
-    minWidth: 0,
-    ...Platform.select({
-      web: { boxShadow: '0 10px 28px rgba(15, 23, 42, 0.08)' },
-      default: {},
-    }),
-  },
-  featureIconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  featureEmoji: {
-    fontSize: 16,
-  },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  featureBody: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
   socialStrip: {
-    marginTop: 16,
     width: '100%',
     borderWidth: 1,
     borderRadius: 18,
@@ -1512,5 +1789,279 @@ const styles = StyleSheet.create({
   socialText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+
+  // ---------------------------------------------------------------------------
+  // Steps (1–2–3) showcase section
+  // ---------------------------------------------------------------------------
+  stepsSection: {
+    width: '100%',
+  },
+  stepsHeading: {
+    fontSize: FontSize['3xl'],
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    textAlign: 'center',
+    lineHeight: Math.round(FontSize['3xl'] * 1.15),
+  },
+  stepsList: {
+    marginTop: Spacing['4xl'],
+    width: '100%',
+  },
+  stepsRow: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'relative',
+  },
+  stepMediaCol: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    width: '100%',
+  },
+  stepTextCol: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  stepNumber: {
+    fontSize: FontSize['4xl'],
+    fontWeight: '900',
+    letterSpacing: -1.2,
+    lineHeight: Math.round(FontSize['4xl'] * 1.0),
+  },
+  stepTitle: {
+    marginTop: Spacing.sm,
+    fontSize: FontSize.xl,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    lineHeight: Math.round(FontSize.xl * 1.25),
+  },
+  stepBody: {
+    marginTop: Spacing.md,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    lineHeight: Math.round(FontSize.md * 1.45),
+    maxWidth: Layout.maxContentWidth,
+  },
+
+  // ---------------------------------------------------------------------------
+  // PhoneMock (local placeholder visuals; decorative)
+  // ---------------------------------------------------------------------------
+  phoneMockFrame: {
+    width: '100%',
+    aspectRatio: 10 / 16,
+    borderWidth: 1,
+    borderRadius: BorderRadius['3xl'],
+    overflow: 'hidden',
+    ...Platform.select({
+      web: { boxShadow: '0 16px 44px rgba(15, 23, 42, 0.10)' },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.10,
+        shadowRadius: 22,
+        elevation: 8,
+      },
+    }),
+  },
+  phoneMockNotch: {
+    position: 'absolute',
+    top: Spacing.sm,
+    alignSelf: 'center',
+    width: '28%',
+    height: Spacing.sm,
+    borderRadius: BorderRadius.chip,
+    zIndex: 2,
+  },
+  phoneMockScreen: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: BorderRadius['3xl'],
+    paddingTop: Spacing['2xl'],
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+    overflow: 'hidden',
+  },
+  mockContent: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'space-between',
+    gap: Spacing.lg,
+  },
+  mockTopRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  mockPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.chip,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+  mockDot: {
+    width: Spacing.sm,
+    height: Spacing.sm,
+    borderRadius: BorderRadius.chip,
+  },
+  mockPillText: {
+    height: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    flexGrow: 1,
+  },
+  mockChip: {
+    height: Layout.minTouchTarget,
+    borderRadius: BorderRadius.chip,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mockChipText: {
+    width: Spacing['4xl'],
+    height: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+
+  // Logging variant
+  mockList: {
+    width: '100%',
+    gap: Spacing.md,
+    flexGrow: 1,
+  },
+  mockListRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+  },
+  mockAvatar: {
+    width: Layout.minTouchTarget,
+    height: Layout.minTouchTarget,
+    borderRadius: BorderRadius.xl,
+  },
+  mockListTextCol: {
+    flex: 1,
+    gap: Spacing.sm,
+  },
+  mockLine: {
+    height: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  mockCtaBar: {
+    width: '100%',
+    height: Layout.minTouchTarget,
+    borderRadius: BorderRadius.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+  },
+  mockCtaText: {
+    width: '52%',
+    height: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  mockCtaIcon: {
+    width: Spacing.lg,
+    height: Spacing.lg,
+    borderRadius: BorderRadius.chip,
+  },
+
+  // Progress variant
+  mockChartCard: {
+    width: '100%',
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    flexGrow: 1,
+  },
+  mockChartBars: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    flexGrow: 1,
+  },
+  mockBar: {
+    width: '18%',
+    borderRadius: BorderRadius.md,
+  },
+  mockDividerRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  mockTinyLine: {
+    width: '24%',
+    height: Nudge.px2,
+    borderRadius: BorderRadius.sm,
+  },
+  mockRowChips: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+
+  // Plan variant
+  mockCalendar: {
+    width: '100%',
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  mockCalendarRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  mockCalendarDot: {
+    width: Spacing.sm,
+    height: Spacing.sm,
+    borderRadius: BorderRadius.chip,
+  },
+  mockGrid: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: Spacing.lg,
+    flexGrow: 1,
+  },
+  mockMealCard: {
+    flex: 1,
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  mockMealThumb: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: BorderRadius.xl,
   },
 });

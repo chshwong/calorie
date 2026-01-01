@@ -303,7 +303,14 @@
         "feature_no_paywalls_body": "Core features stay free. No subscription traps.",
         "social_no_subscriptions": "Designed for real life",
         "social_no_ads": "Simple insights, no noise",
-        "social_private_by_default": "Your data stays yours"
+        "social_private_by_default": "Your data stays yours",
+        "steps_section_title": "Hit your health goals in 1–2–3",
+        "steps_1_title": "Track calories, macros & more",
+        "steps_1_body": "Log meals in seconds with fast search, favorites, and barcode scan.",
+        "steps_2_title": "Follow your progress",
+        "steps_2_body": "See trends, targets, and consistency at a glance—without the clutter.",
+        "steps_3_title": "Eat better and hit your goals",
+        "steps_3_body": "Turn what you log into simple, actionable guidance you can stick with."
       }
     },
 
@@ -495,7 +502,6 @@
     "module_preferences": {
       "title": "What else do you track?",
       "subtitle": "Besides nutrition, pick your top 2 priorities.",
-      "helper": "You can change this later in Settings.",
       "pick_up_to_2": "Pick up to 2",
       "tap_to_toggle": "Tap to select or deselect",
       "selected_rank": "selected as #{{rank}}",
