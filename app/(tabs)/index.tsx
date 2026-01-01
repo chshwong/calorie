@@ -15,7 +15,7 @@ import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
-import { BorderRadius, Colors, FontSize, Layout, Spacing } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, Layout, Nudge, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -251,7 +251,6 @@ function EnergyBalanceBlock(props: {
         onPress: onEditBurned,
         activeOpacity: 0.8,
         hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
-        accessibilityRole: 'button' as const,
         ...getButtonAccessibilityProps(t('burned.energy_balance.accessibility.edit_burned')),
         onHoverIn: () => setIsBurnedHover(true),
         onHoverOut: () => setIsBurnedHover(false),
@@ -1617,20 +1616,23 @@ const styles = StyleSheet.create({
   },
   calorieGaugeWrap: {
     paddingHorizontal: 0, // card already has left/right padding
-    marginTop: -6, // pull gauge closer to header
+    // Keep content clearly below the header separator line (avoid overlap with settings gear)
+    marginTop: Spacing.none,
     marginBottom: -18, // pull macro gauges up under the curve
     position: 'relative',
   },
   calorieTargetsGearButtonAbsolute: {
     position: 'absolute',
     right: 0,
-    top: -6,
+    // Anchor just below the nearest separator line
+    top: Spacing.xxs,
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
   macroGaugeRowWrap: {
-    marginTop: -10, // extra tightening (safe on web + native)
+    // Keep content clearly below the Energy Balance separator line (avoid overlap with settings gear)
+    marginTop: Spacing.none,
     position: 'relative',
   },
   macroGaugeRow: {
@@ -1646,7 +1648,8 @@ const styles = StyleSheet.create({
   },
   macroTargetsGearButtonAbsolute: {
     position: 'absolute',
-    top: -6,
+    // Anchor just below the nearest separator line
+    top: Nudge.none,
     right: 0,
     padding: 4,
     justifyContent: 'center',
@@ -1890,7 +1893,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    marginBottom: Spacing.sm,
+    // Keep layout tight without pulling the next section into the separator line
+    marginBottom: Spacing.xs,
   },
   energyBalanceRowNumbers: {
     flexDirection: 'row',

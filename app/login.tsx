@@ -1,6 +1,6 @@
 import Lottie from "lottie-react";
 import animationData from "../assets/lottie/Wobbling.json";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Platform,
   ScrollView,
   useWindowDimensions,
+  Image,
+  type ScrollView as ScrollViewType,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
@@ -19,7 +22,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { showAppToast } from '@/components/ui/app-toast';
-import { Colors, type ThemeColors } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Shadows, Spacing, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
@@ -31,6 +34,45 @@ import {
   getMinTouchTargetStyle,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function animateScrollTo(scrollViewRef: React.RefObject<ScrollViewType | null>, targetY: number, durationMs = 550) {
+  const refAny = scrollViewRef.current as any;
+  const node: any = refAny?.getScrollableNode?.() ?? refAny;
+  if (!node) return;
+
+  // RN Web: scrollable node is typically an HTMLElement with scrollTop.
+  const hasDomScrollTop = typeof node.scrollTop === 'number' && typeof node.scrollTo === 'function';
+  const startY = hasDomScrollTop ? (node.scrollTop as number) : (refAny?.__lastScrollY ?? 0);
+  const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+  const step = (now: number) => {
+    const elapsed = now - start;
+    const t = clamp(elapsed / durationMs, 0, 1);
+    const eased = easeInOutCubic(t);
+    const nextY = startY + (targetY - startY) * eased;
+
+    if (hasDomScrollTop) {
+      node.scrollTo({ top: nextY, behavior: 'auto' });
+    } else if (typeof refAny?.scrollTo === 'function') {
+      // Fallback for non-web implementations (shouldn't be used per requirements, but safe).
+      refAny.scrollTo({ y: nextY, animated: false });
+    }
+
+    if (t < 1) {
+      requestAnimationFrame(step);
+    }
+  };
+
+  requestAnimationFrame(step);
+}
 
 function HeroVisualComposite({
   colors,
@@ -276,6 +318,17 @@ export default function LoginScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const isTwoCol = screenWidth >= 1024;
   const isWeb = Platform.OS === 'web';
+  const isMobileWeb = isWeb && !isTwoCol;
+
+  const scrollViewRef = useRef<ScrollViewType | null>(null);
+  const authSectionYRef = useRef<number | null>(null);
+
+  const onAuthSectionLayout = useMemo(
+    () => (e: LayoutChangeEvent) => {
+      authSectionYRef.current = e.nativeEvent.layout.y;
+    },
+    []
+  );
 
   const countryParamRaw = searchParams?.country;
   const countryParam = Array.isArray(countryParamRaw) ? countryParamRaw[0] : countryParamRaw;
@@ -304,6 +357,23 @@ export default function LoginScreen() {
   if (user) {
     return null;
   }
+
+  const handleScrollToAuth = () => {
+    if (isMobileWeb && typeof document !== 'undefined') {
+      const el = document.getElementById('login-auth-start');
+      // On RN Web, nativeID becomes the DOM id; scrollIntoView scrolls the nearest scroll container.
+      if (el && typeof (el as any).scrollIntoView === 'function') {
+        // Web-only UI behavior (allowed): smooth in-page scroll (no navigation).
+        (el as any).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
+
+    const y = authSectionYRef.current;
+    if (typeof y !== 'number') return;
+    // Small offset so the auth card isn't flush to the very top.
+    animateScrollTo(scrollViewRef, Math.max(0, y - 12), 600);
+  };
 
   const handleSendMagicLink = async () => {
     if (magicLinkLoading) return;
@@ -466,6 +536,7 @@ export default function LoginScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[
           styles.scrollContent,
           {
@@ -544,7 +615,65 @@ export default function LoginScreen() {
                     {t('auth.login.marketing.bullet_honest_no_paywalls')}
                   </ThemedText>
                 </View>
+
+                {country === 'CA' ? (
+                  <View style={styles.bulletRow}>
+                    <View style={[styles.bulletIcon, { backgroundColor: colors.tintLight }]}>
+                      <Image
+                        // Twemoji Canada flag (1F1E8-1F1E6). Using an image avoids "CA" fallback rendering on some platforms.
+                        source={{ uri: 'https://twemoji.maxcdn.com/v/latest/72x72/1f1e8-1f1e6.png' }}
+                        style={styles.flagIcon}
+                        accessibilityLabel="Canada"
+                      />
+                    </View>
+                    <ThemedText style={[styles.bulletText, { color: colors.text }]}>
+                      {t('auth.login.marketing.bullet_canadian_values')}
+                    </ThemedText>
+                  </View>
+                ) : null}
               </View>
+
+              {isMobileWeb ? (
+                <Pressable
+                  onPress={handleScrollToAuth}
+                  {...getButtonAccessibilityProps(t('auth.login.track_now_aria'), t('auth.login.track_now_aria'), false)}
+                  style={(state) => {
+                    const pressed = state.pressed;
+                    const hovered = Boolean((state as any).hovered);
+                    const focused = Boolean((state as any).focused);
+                    return [
+                      styles.heroCtaButton,
+                      getMinTouchTargetStyle(),
+                      {
+                        width: '100%',
+                        height: Layout.minTouchTarget,
+                        backgroundColor: colors.tint,
+                        borderColor: (colors.cardBorder ?? colors.border) + '55',
+                        opacity: pressed ? 0.94 : hovered ? 0.98 : 1,
+                        transform: isWeb && hovered && !pressed ? [{ translateY: -1 }] : [{ translateY: 0 }],
+                        ...(isWeb
+                          ? ({
+                              // Spec-driven web-only sheen. We keep it here (not a theme token) because RN native doesn't
+                              // support gradients the same way without additional deps.
+                              backgroundImage:
+                                'linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04))',
+                            } as any)
+                          : null),
+                      },
+                      focused && isWeb
+                        ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
+                        : null,
+                    ];
+                  }}
+                >
+                  <View style={styles.heroCtaInner}>
+                    <Text style={[styles.heroCtaText, { color: colors.textInverse }]}>{t('auth.login.track_now')}</Text>
+                    <View style={styles.heroCtaChevron} pointerEvents="none">
+                      <IconSymbol name="chevron.right" size={FontSize.lg} color={colors.textInverse} decorative />
+                    </View>
+                  </View>
+                </Pressable>
+              ) : null}
 
               {showHeroVisual ? (
                 <HeroVisualComposite
@@ -564,6 +693,7 @@ export default function LoginScreen() {
                 isTwoCol ? { width: cardMaxWidth, maxWidth: cardMaxWidth, flexGrow: 0, flexShrink: 0 } : null,
                 { alignItems: isTwoCol ? 'flex-end' : 'center' },
               ]}
+              onLayout={onAuthSectionLayout}
             >
               <View
                 style={[
@@ -578,7 +708,7 @@ export default function LoginScreen() {
                 ]}
               >
                 {/* Brand header */}
-                <View style={[styles.header, { marginBottom: sectionGap }]}>
+                <View nativeID="login-auth-start" style={[styles.header, { marginBottom: sectionGap }]}>
                   <Lottie
                     animationData={animationData}
                     loop
@@ -943,11 +1073,39 @@ const styles = StyleSheet.create({
   bulletEmoji: {
     fontSize: 16,
   },
+  flagIcon: {
+    width: Spacing.lg,
+    height: Spacing.lg,
+    resizeMode: 'contain',
+  },
   bulletText: {
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
     flex: 1,
+  },
+  heroCtaButton: {
+    marginTop: Spacing.lg,
+    borderRadius: BorderRadius.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+    borderWidth: 1, // no token; intentional minimal border for depth
+    overflow: 'hidden',
+    ...(Shadows.card as any),
+  },
+  heroCtaInner: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCtaChevron: {
+    position: 'absolute',
+    right: Spacing.lg,
+  },
+  heroCtaText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.medium,
   },
   heroVisualWrap: {
     marginTop: 22,
@@ -1170,6 +1328,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    // Reserve space for the absolute-positioned Google icon pill so it never overlaps the label.
+    paddingLeft: Spacing['5xl'],
+    paddingRight: Spacing.lg,
   },
   leftIconPill: {
     position: 'absolute',

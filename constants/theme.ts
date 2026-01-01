@@ -300,6 +300,16 @@ export const Spacing = {
   '6xl': 64,
 } as const;
 
+/**
+ * Micro-adjustments (in px/dp) for rare cases where design needs 1px nudges.
+ * Keep these in theme to avoid "magic numbers" in component styles.
+ */
+export const Nudge = {
+  none: 0,
+  px1: 1,
+  px2: 2,
+} as const;
+
 // ============================================================================
 // BORDER RADIUS
 // ============================================================================

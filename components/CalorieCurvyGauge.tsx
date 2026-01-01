@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Path, Text as SvgText, Circle, TSpan } from 'react-native-svg';
-import { Colors, FontFamilies } from '@/constants/theme';
+import { Colors, FontFamilies, FontSize, Nudge, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MACRO_GAUGE_TEXT } from '@/components/MacroGauge';
 import { useTranslation } from 'react-i18next';
@@ -127,6 +127,11 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
   const calTextColor =
     safeTarget > 0 ? ensureContrast(lineColor, colors.card, modeKey, 4.5) : colors.textSecondary;
 
+  // Nudge the tip label slightly left to avoid clipping on narrow screens when the gauge is full.
+  const tipLabelX = tip.x - Spacing.xxs;
+  // Slightly smaller label to reduce clipping risk (requested: -1pt).
+  const tipLabelFontSize = Math.max(FontSize.xs, MACRO_GAUGE_TEXT.value.sm.fontSize - Nudge.px1);
+
   return (
     <View style={styles.wrap}>
       <Svg width="100%" height={110} viewBox={`0 8 ${vbW} 100`}>
@@ -148,9 +153,9 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
         <Circle cx={tip.x} cy={tip.y} r={4} fill={lineColor} />
         {/* Text halo (drawn first) */}
         <SvgText
-          x={tip.x}
+          x={tipLabelX}
           y={tip.y - 10}
-          fontSize={MACRO_GAUGE_TEXT.value.sm.fontSize}
+          fontSize={tipLabelFontSize}
           fontFamily={FontFamilies.regular}
           fill={colors.card}
           stroke={colors.card}
@@ -160,24 +165,24 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
           strokeLinejoin="round"
           textAnchor="middle"
         >
-          <TSpan x={tip.x}>{`${consumedRounded} ${calUnit}`}</TSpan>
+          <TSpan x={tipLabelX}>{`${consumedRounded} ${calUnit}`}</TSpan>
           {percentDisplay != null ? (
-            <TSpan x={tip.x} dy={MACRO_GAUGE_TEXT.value.sm.fontSize + 2}>{`${percentDisplay}%`}</TSpan>
+            <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
           ) : null}
         </SvgText>
 
         {/* Foreground text */}
         <SvgText
-          x={tip.x}
+          x={tipLabelX}
           y={tip.y - 10}
-          fontSize={MACRO_GAUGE_TEXT.value.sm.fontSize}
+          fontSize={tipLabelFontSize}
           fontFamily={FontFamilies.regular}
           fill={colors.textSecondary}
           textAnchor="middle"
         >
-          <TSpan x={tip.x}>{`${consumedRounded} ${calUnit}`}</TSpan>
+          <TSpan x={tipLabelX}>{`${consumedRounded} ${calUnit}`}</TSpan>
           {percentDisplay != null ? (
-            <TSpan x={tip.x} dy={MACRO_GAUGE_TEXT.value.sm.fontSize + 2}>{`${percentDisplay}%`}</TSpan>
+            <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
           ) : null}
         </SvgText>
 
