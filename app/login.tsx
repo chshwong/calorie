@@ -492,6 +492,8 @@ export default function LoginScreen() {
             <View
               style={[
                 styles.hero,
+                // In two-col layout, the hero should flex to fill remaining space (not claim 100% width).
+                isTwoCol ? { width: 'auto', flexGrow: 1, flexShrink: 1, flexBasis: 0 } : null,
                 {
                   maxWidth: isTwoCol ? 620 : '100%',
                   minWidth: isTwoCol ? 420 : undefined,
@@ -571,7 +573,14 @@ export default function LoginScreen() {
             </View>
 
             {/* Auth card */}
-            <View style={[styles.authCol, { alignItems: isTwoCol ? 'flex-end' : 'center' }]}>
+            <View
+              style={[
+                styles.authCol,
+                // In two-col layout, keep the auth column clamped so it can't overflow off-screen.
+                isTwoCol ? { width: cardMaxWidth, maxWidth: cardMaxWidth, flexGrow: 0, flexShrink: 0 } : null,
+                { alignItems: isTwoCol ? 'flex-end' : 'center' },
+              ]}
+            >
               <View
                 style={[
                   styles.card,
