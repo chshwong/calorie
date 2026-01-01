@@ -1429,14 +1429,9 @@ export function useOnboardingForm() {
       }
       
       // Navigate after DB save succeeded
-      // On web: force full reload to home so StartupGate re-evaluates from persisted sources (same as manual refresh)
       if (destination) {
-        if (Platform.OS === 'web') {
-          window.location.assign(destination as any);
-          return;
-        }
-        
-        // On native: use router navigation
+        // Engineering guideline #14: avoid window.location.* navigation.
+        // Expo Router replace is sufficient; caches/persisted flags already drive routing decisions.
         router.replace(destination as any);
       }
     } catch (error: any) {

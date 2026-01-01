@@ -391,17 +391,8 @@ export default function FoodLogHomeScreen() {
 
   const [burnedModalVisible, setBurnedModalVisible] = useState(false);
 
-  // SECURITY: Check if we're in password recovery mode and block access
-  const { isPasswordRecovery } = useAuth();
-  useEffect(() => {
-    const inRecoveryMode = isPasswordRecovery();
-    
-    if (inRecoveryMode) {
-      // User is in password recovery mode - redirect to reset-password page
-      router.replace('/reset-password');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]); // Only depend on router, call isPasswordRecovery inside effect
+  // Password recovery UI is not supported (passwordless-only).
+  // If Supabase ever enters PASSWORD_RECOVERY mode, we intentionally do nothing here.
   
   // Pull-to-refresh state for web
   const [pullToRefreshDistance, setPullToRefreshDistance] = useState(0);
@@ -984,6 +975,23 @@ export default function FoodLogHomeScreen() {
 
               <View style={styles.calorieGaugeWrap}>
                 <CalorieCurvyGauge consumed={calorieConsumed} target={calorieTarget} goalType={goalType} />
+
+                <TouchableOpacity
+                  style={[
+                    styles.calorieTargetsGearButtonAbsolute,
+                    getMinTouchTargetStyle(),
+                    Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                  ]}
+                  onPress={() => router.push('/settings/my-goal/edit-calories')}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  {...getButtonAccessibilityProps(
+                    t('settings.my_goal.a11y.edit_calories'),
+                    t('settings.my_goal.a11y.navigate_to_edit')
+                  )}
+                >
+                  <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
+                </TouchableOpacity>
               </View>
             
             {(entries.length > 0 || !showLoadingSpinner) && (
@@ -1005,16 +1013,16 @@ export default function FoodLogHomeScreen() {
                         style={[
                           { flexDirection: 'row' },
                           // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
-                          Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
+                          Platform.OS === 'web' ? ({ columnGap: 4 } as any) : null,
                         ]}
                       >
                         {/* Protein */}
-                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
+                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
                           <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
                         </View>
 
                         {/* Fiber */}
-                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
+                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
                           <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
                         </View>
 
@@ -1611,6 +1619,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0, // card already has left/right padding
     marginTop: -6, // pull gauge closer to header
     marginBottom: -18, // pull macro gauges up under the curve
+    position: 'relative',
+  },
+  calorieTargetsGearButtonAbsolute: {
+    position: 'absolute',
+    right: 0,
+    top: -6,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   macroGaugeRowWrap: {
     marginTop: -10, // extra tightening (safe on web + native)
@@ -1624,12 +1641,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     // Reserve space for the gear button while keeping gauges centered
-    paddingLeft: 32,
-    paddingRight: 32,
+    paddingLeft: 0,
+    paddingRight: 0,
   },
   macroTargetsGearButtonAbsolute: {
     position: 'absolute',
-    top: 0,
+    top: -6,
     right: 0,
     padding: 4,
     justifyContent: 'center',

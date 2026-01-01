@@ -220,8 +220,48 @@
       "error_account_removed": "Désolé, votre compte a été supprimé.",
       "error_supabase_not_configured": "Supabase n'est pas configuré. Veuillez vérifier votre fichier .env.",
       "error_google_sign_in_failed": "La connexion Google a échoué. Veuillez réessayer.",
+      "error_facebook_sign_in_failed": "La connexion Facebook a échoué. Veuillez réessayer.",
       "accessibility_show_password": "Afficher le mot de passe",
       "accessibility_hide_password": "Masquer le mot de passe"
+    },
+
+    "callback": {
+      "signing_in_title": "Connexion…",
+      "coming_soon_title": "Bientôt disponible",
+      "web_only_detail": "Le traitement du retour OAuth est actuellement configuré uniquement pour le web.",
+      "cancelled_toast": "Connexion annulée",
+      "account_exists_toast": "Compte existant — liaison requise",
+      "failed_title": "Échec de la connexion",
+      "needs_email_title": "Un courriel est requis",
+      "needs_email_detail": "Cette méthode de connexion n'a pas fourni de courriel. Ajoutez un courriel au fournisseur, ou connectez‑vous avec Google ou un lien magique.",
+      "no_session_detail": "Aucune session utilisateur n’a été créée. Veuillez réessayer.",
+      "please_wait": "Veuillez patienter…",
+      "back_to_login": "Retour à la connexion"
+    },
+
+    "linking": {
+      "title": "Lier des comptes",
+      "subtitle_with_target": "Un compte existe déjà pour ce courriel. Pour garder un seul compte AvoVibe par courriel, confirmez votre compte existant pour lier {{provider}}.",
+      "expired_detail": "Cette session de liaison a expiré. Veuillez recommencer depuis l’écran de connexion.",
+      "back_to_login": "Retour à la connexion",
+      "verify_intro": "Confirmez votre compte existant avec Google ou un lien magique.",
+      "google_continue": "Continuer avec Google",
+      "google_continue_loading": "Connexion Google…",
+      "continuing": "Connexion…",
+      "or_confirm_via_email": "Ou confirmez par courriel :",
+      "email_placeholder": "vous@exemple.com",
+      "magic_send": "M’envoyer un lien de connexion",
+      "magic_sending": "Envoi du lien…",
+      "sending": "Envoi…",
+      "magic_sent_hint": "Vérifiez votre courriel pour le lien de connexion, puis revenez sur cet onglet.",
+      "signed_in_as": "Connecté en tant que :",
+      "link_provider": "Lier {{provider}}",
+      "linking": "Liaison…",
+      "already_linked_toast": "Compte déjà lié",
+      "invalid_email": "Veuillez saisir un courriel valide.",
+      "google_start_failed": "Impossible de démarrer la connexion Google. Veuillez réessayer.",
+      "magic_link_send_failed": "Impossible d’envoyer le lien magique. Veuillez réessayer.",
+      "link_start_failed": "Impossible de démarrer la liaison. Veuillez réessayer."
     },
 
     "register": {

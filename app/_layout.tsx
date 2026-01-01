@@ -195,11 +195,7 @@ function ThemeProviderWrapper() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(minimal)" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="register-confirmation" options={{ headerShown: false }} />
-          <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
-          <Stack.Screen name="reset-password" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />

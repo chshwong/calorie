@@ -261,8 +261,48 @@
       "error_account_removed": "Sorry, your account has been removed.",
       "error_supabase_not_configured": "Supabase is not configured. Please check your .env file.",
       "error_google_sign_in_failed": "Google sign-in failed. Please try again.",
+      "error_facebook_sign_in_failed": "Facebook sign-in failed. Please try again.",
       "accessibility_show_password": "Show password",
       "accessibility_hide_password": "Hide password"
+    },
+
+    "callback": {
+      "signing_in_title": "Signing you in…",
+      "coming_soon_title": "Coming soon",
+      "web_only_detail": "OAuth callback handling is currently configured for web only.",
+      "cancelled_toast": "Sign-in cancelled",
+      "account_exists_toast": "Account already exists — link required",
+      "failed_title": "Sign-in failed",
+      "needs_email_title": "Sign-in needs an email",
+      "needs_email_detail": "This sign-in method didn't provide an email address. Please add an email to the provider, or sign in with Google or a magic link instead.",
+      "no_session_detail": "No user session was created. Please try again.",
+      "please_wait": "Please wait…",
+      "back_to_login": "Back to login"
+    },
+
+    "linking": {
+      "title": "Link accounts",
+      "subtitle_with_target": "An account already exists for this email. To keep one AvoVibe account per email, confirm your existing account to link {{provider}}.",
+      "expired_detail": "This linking session has expired. Please start again from the login screen.",
+      "back_to_login": "Back to login",
+      "verify_intro": "Confirm your existing account using Google or a magic link.",
+      "google_continue": "Continue with Google",
+      "google_continue_loading": "Continuing with Google",
+      "continuing": "Continuing…",
+      "or_confirm_via_email": "Or confirm via email:",
+      "email_placeholder": "you@example.com",
+      "magic_send": "Email me a sign-in link",
+      "magic_sending": "Sending magic link",
+      "sending": "Sending…",
+      "magic_sent_hint": "Check your email for a sign-in link, then come back to this tab.",
+      "signed_in_as": "Signed in as:",
+      "link_provider": "Link {{provider}}",
+      "linking": "Linking…",
+      "already_linked_toast": "Account already linked",
+      "invalid_email": "Please enter a valid email address.",
+      "google_start_failed": "Failed to start Google sign-in. Please try again.",
+      "magic_link_send_failed": "Failed to send magic link. Please try again.",
+      "link_start_failed": "Failed to start linking. Please try again."
     },
 
     "register": {

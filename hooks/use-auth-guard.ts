@@ -10,14 +10,12 @@ import { Platform } from 'react-native';
 export function useAuthGuard(options?: {
   requireAuth?: boolean;
   redirectTo?: string;
-  allowInRecovery?: boolean;
 }) {
-  const { session, loading, isPasswordRecovery } = useAuth();
+  const { session, loading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const requireAuth = options?.requireAuth ?? true;
   const redirectTo = options?.redirectTo;
-  const allowInRecovery = options?.allowInRecovery ?? false;
 
   useEffect(() => {
     // Don't redirect while loading
@@ -26,35 +24,24 @@ export function useAuthGuard(options?: {
     }
 
     const currentRoute = segments[0];
-    const inRecoveryMode = isPasswordRecovery();
-
-    // Handle password recovery mode
-    if (inRecoveryMode && !allowInRecovery) {
-      // SECURITY: If in recovery mode, redirect to reset-password
-      // Recovery sessions should NOT grant access to protected routes
-      if (currentRoute !== 'reset-password' && currentRoute !== 'login') {
-        router.replace('/reset-password');
-      }
-      return;
-    }
 
     // Handle authentication requirement
     if (requireAuth && !session) {
       // Not authenticated, redirect to login
-      if (currentRoute !== 'login' && currentRoute !== 'register' && currentRoute !== 'forgot-password' && currentRoute !== 'register-confirmation') {
+      if (currentRoute !== 'login') {
         router.replace(redirectTo || '/login');
       }
       return;
     }
 
-    // If authenticated but on auth screens (and not in recovery), redirect to home
-    if (session && !inRecoveryMode) {
-      const isAuthScreen = currentRoute === 'login' || currentRoute === 'register' || currentRoute === 'forgot-password' || currentRoute === 'register-confirmation';
+    // If authenticated but on auth screens, redirect to home
+    if (session) {
+      const isAuthScreen = currentRoute === 'login';
       if (isAuthScreen && currentRoute !== 'index') {
         router.replace('/(tabs)');
       }
     }
-  }, [session, loading, isPasswordRecovery, requireAuth, redirectTo, allowInRecovery, router, segments]);
+  }, [session, loading, requireAuth, redirectTo, router, segments]);
 }
 
 

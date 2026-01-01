@@ -22,8 +22,7 @@ Created a comprehensive utility module with:
 
 **Updated screens:**
 - `app/login.tsx` - Email and password inputs
-- `app/register.tsx` - All registration form fields
-- `app/forgot-password.tsx` - Email input
+- Passwordless auth: registration + password reset screens removed (Google/Facebook + Magic Link only)
 
 ### 3. Interactive Elements
 **All buttons, links, and interactive elements now have:**
@@ -77,8 +76,7 @@ Created a comprehensive utility module with:
 
 ### Screens
 - `app/login.tsx` - Full accessibility implementation
-- `app/register.tsx` - Full accessibility implementation
-- `app/forgot-password.tsx` - Full accessibility implementation
+- Passwordless auth screens: login + magic link are accessible per shared button/input helpers
 - `app/(tabs)/index.tsx` - Key interactive elements updated
 - `app/settings.tsx` - Settings menu accessibility
 

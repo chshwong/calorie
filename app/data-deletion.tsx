@@ -34,11 +34,6 @@ export default function DataDeletionInstructionsScreen() {
 
   const openSupportEmail = useCallback(async () => {
     try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        // Use location for mailto so the browser can hand off to the mail client.
-        window.location.href = SUPPORT_EMAIL_MAILTO;
-        return;
-      }
       await Linking.openURL(SUPPORT_EMAIL_MAILTO);
     } catch {
       // No-op: if mail client can't open, user can still copy the email from the page.

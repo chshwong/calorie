@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
 import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -22,6 +22,7 @@ import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -331,7 +332,7 @@ export default function LoginScreen() {
       supabaseUrl.includes('YOUR-PROJECT') ||
       supabaseKey.includes('YOUR-ANON-KEY')
     ) {
-      showAppToast('Coming soon');
+      showAppToast(t('auth.callback.coming_soon_title'));
       return;
     }
 
@@ -345,24 +346,18 @@ export default function LoginScreen() {
 
     setMagicLinkLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: {
-          emailRedirectTo: Platform.OS === 'web' && typeof window !== 'undefined'
-            ? window.location.origin
-            : undefined,
-        },
-      });
+      const emailRedirectTo = getOAuthRedirectTo();
+      const { error } = await sendMagicLink({ email: trimmedEmail, emailRedirectTo });
 
       if (error) {
         // If OTP isn't enabled yet, keep UI calm and non-blocking
-        showAppToast('Coming soon');
+        showAppToast(t('auth.callback.coming_soon_title'));
         return;
       }
 
       setMagicLinkSent(true);
     } catch (e: any) {
-      showAppToast('Coming soon');
+      showAppToast(t('auth.callback.coming_soon_title'));
     } finally {
       setMagicLinkLoading(false);
     }
@@ -375,38 +370,26 @@ export default function LoginScreen() {
     setFacebookError(null);
 
     try {
-      const redirectTo =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? `${window.location.origin}/auth/callback`
-          : undefined;
+      const redirectTo = getOAuthRedirectTo();
+      if (Platform.OS === 'web') {
+        setPendingLinkState({ targetProvider: 'google', stage: 'auth_start', startedAt: Date.now() });
+      }
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo,
-          // We handle navigation ourselves so this also works later on native.
-          skipBrowserRedirect: true,
-          // Encourage users to pick the correct Google account.
-          queryParams: { prompt: 'select_account' },
-        },
+        redirectTo,
+        queryParams: { prompt: 'select_account' },
       });
 
       if (error) {
-        console.error(error);
+        if (process.env.NODE_ENV !== 'production') console.error(error);
         setGoogleError(t('auth.login.error_google_sign_in_failed'));
+        clearPendingLinkState();
         return;
       }
-
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        if (!data?.url) {
-          setGoogleError(t('auth.login.error_google_sign_in_failed'));
-          return;
-        }
-        window.location.assign(data.url);
-        return;
-      }
-
-      showAppToast('Coming soon');
+      // On web, Supabase triggers a redirect automatically.
+      // On native (future), we'll implement WebBrowser/deep-link handling.
+      if (Platform.OS !== 'web') showAppToast(t('auth.callback.coming_soon_title'));
     } finally {
       setGoogleLoading(false);
     }
@@ -421,35 +404,23 @@ export default function LoginScreen() {
     setGoogleError(null);
 
     try {
-      const redirectTo =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? `${window.location.origin}/auth/callback`
-          : undefined;
+      const redirectTo = getOAuthRedirectTo();
+      if (Platform.OS === 'web') {
+        setPendingLinkState({ targetProvider: 'facebook', stage: 'auth_start', startedAt: Date.now() });
+      }
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await signInWithOAuth({
         provider: 'facebook',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
+        redirectTo,
       });
 
       if (error) {
-        console.error(error);
-        setFacebookError(t('auth.login.error_facebook_sign_in_failed', { defaultValue: 'Facebook sign-in failed. Please try again.' }));
+        if (process.env.NODE_ENV !== 'production') console.error(error);
+        setFacebookError(t('auth.login.error_facebook_sign_in_failed'));
+        clearPendingLinkState();
         return;
       }
-
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        if (!data?.url) {
-          setFacebookError(t('auth.login.error_facebook_sign_in_failed', { defaultValue: 'Facebook sign-in failed. Please try again.' }));
-          return;
-        }
-        window.location.assign(data.url);
-        return;
-      }
-
-      showAppToast('Coming soon');
+      if (Platform.OS !== 'web') showAppToast(t('auth.callback.coming_soon_title'));
     } finally {
       setFacebookLoading(false);
     }

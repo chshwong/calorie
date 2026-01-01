@@ -65,11 +65,8 @@ export const PlanStep: React.FC<PlanStepProps> = ({
     }
 
     try {
-      if (Platform.OS === 'web') {
-        window.open(DONATION_URL, '_blank', 'noopener,noreferrer');
-      } else {
-        await Linking.openURL(DONATION_URL);
-      }
+      // Engineering guideline #14: avoid window.open / window.location.
+      await Linking.openURL(DONATION_URL);
     } catch {
       showAppToast(t('common.unexpected_error'));
     }

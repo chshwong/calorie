@@ -41,7 +41,7 @@ export default function StartupGate() {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { session, user, loading: authLoading, isPasswordRecovery } = useAuth();
+  const { session, user, loading: authLoading } = useAuth();
   
   // Trigger userConfig query in background (for refetch), but don't wait for it
   // Uses React Query hook per guideline 4: All UI data loaded via React Query
@@ -261,15 +261,6 @@ export default function StartupGate() {
   useEffect(() => {
     if (hasNavigatedRef.current || hasNavigated) return;
 
-    // Password recovery takes precedence
-    if (isPasswordRecovery()) {
-      hasNavigatedRef.current = true;
-      clearMaxDurationTimeout();
-      router.replace('/reset-password');
-      setHasNavigated(true);
-      return;
-    }
-
     // Get decision
     const decision = getDecision();
     
@@ -282,7 +273,6 @@ export default function StartupGate() {
     hasNavigated,
     session,
     user,
-    isPasswordRecovery,
     authReady,
     hasSession,
     onboardingComplete,

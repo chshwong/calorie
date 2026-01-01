@@ -201,13 +201,8 @@ export default function LegalAgreementScreen() {
       }
 
       // Navigate after DB save succeeded
-      // On web: force full reload to home so StartupGate re-evaluates from persisted sources (same as manual refresh)
-      if (Platform.OS === 'web') {
-        window.location.assign('/(tabs)');
-        return;
-      }
-
-      // On native: use router navigation
+      // Engineering guideline #14: avoid window.location.* navigation.
+      // StartupGate already re-evaluates from persisted sources without requiring a full page reload.
       router.replace('/(tabs)');
     } catch (err: any) {
       const errorMessage = err?.message || t('legal.error_loading');
