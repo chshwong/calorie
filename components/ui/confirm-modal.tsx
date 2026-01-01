@@ -6,6 +6,8 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
+  type StyleProp,
+  type TextStyle,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
@@ -62,6 +64,11 @@ export interface ConfirmModalProps {
    * Optional: Custom cancel button style
    */
   cancelButtonStyle?: object;
+
+  /**
+   * Optional: Custom cancel button text style (useful when cancelButtonStyle sets a light background)
+   */
+  cancelTextStyle?: StyleProp<TextStyle>;
   
   /**
    * Optional: Whether the confirm button is disabled
@@ -107,6 +114,7 @@ export function ConfirmModal({
   onCancel,
   confirmButtonStyle,
   cancelButtonStyle,
+  cancelTextStyle,
   confirmDisabled = false,
   animationType = 'fade',
 }: ConfirmModalProps) {
@@ -146,12 +154,15 @@ export function ConfirmModal({
                   `Cancel ${title.toLowerCase()}`
                 )}
               >
-                <Text style={[
-                  styles.modalButtonText, 
-                  { 
-                    color: cancelButtonStyle?.backgroundColor ? '#fff' : colors.text 
-                  }
-                ]}>
+                <Text
+                  style={[
+                    styles.modalButtonText,
+                    {
+                      color: cancelButtonStyle?.backgroundColor ? '#fff' : colors.text,
+                    },
+                    cancelTextStyle,
+                  ]}
+                >
                   {cancelText}
                 </Text>
               </TouchableOpacity>

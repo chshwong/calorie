@@ -12,6 +12,8 @@ function normalizeCountry(value: unknown): string | null {
 }
 
 export default function handler(req: any, res: any) {
+  // Vercel's Node serverless runtime provides req/res; we intentionally avoid adding a dependency
+  // on Vercel-specific TypeScript types here.
   const headers = req?.headers ?? {};
   const rawHeader =
     headers['x-vercel-ip-country'] ??

@@ -23,6 +23,7 @@ import { Colors, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
+import { useGeoCountry } from '@/hooks/use-geo-country';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -42,6 +43,7 @@ function HeroVisualComposite({
   isWeb: boolean;
   isTwoCol: boolean;
 }) {
+  const { t } = useTranslation();
   const height = isTwoCol ? 400 : 300;
   const phoneWidth = isTwoCol ? 280 : 240;
   const phoneHeight = isTwoCol ? 392 : 340;
@@ -122,12 +124,14 @@ function HeroVisualComposite({
           },
         ]}
       >
-        <Text style={[styles.floatingCardTitle, { color: colors.textSecondary }]}>Today</Text>
+        <Text style={[styles.floatingCardTitle, { color: colors.textSecondary }]}>
+          {t('auth.login.marketing.demo_today_label')}
+        </Text>
         <Text style={[styles.floatingCardValue, { color: colors.text }]} numberOfLines={1}>
-          1,842 cal
+          {t('auth.login.marketing.demo_today_calories')}
         </Text>
         <Text style={[styles.floatingCardSub, { color: colors.textSecondary }]} numberOfLines={1}>
-          Target: 1,900
+          {t('auth.login.marketing.demo_today_target')}
         </Text>
       </View>
 
@@ -143,12 +147,14 @@ function HeroVisualComposite({
           },
         ]}
       >
-        <Text style={[styles.floatingCardTitle, { color: colors.textSecondary }]}>Macros</Text>
+        <Text style={[styles.floatingCardTitle, { color: colors.textSecondary }]}>
+          {t('auth.login.marketing.demo_macros_label')}
+        </Text>
         <Text style={[styles.floatingCardValue, { color: colors.text }]} numberOfLines={1}>
-          Protein 132g
+          {t('auth.login.marketing.demo_macros_value_primary')}
         </Text>
         <Text style={[styles.floatingCardSub, { color: colors.textSecondary }]} numberOfLines={1}>
-          Fibre 28g
+          {t('auth.login.marketing.demo_macros_value_secondary')}
         </Text>
       </View>
     </View>
@@ -162,13 +168,14 @@ function FeatureCardsSection({
   colors: ThemeColors;
   isTwoCol: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.featureSection, { marginTop: isTwoCol ? 52 : 30 }]}>
       <ThemedText
         style={[styles.featureSectionTitle, { color: colors.text }]}
         accessibilityRole="header"
       >
-        Built to be simple, honest, and fast.
+        {t('auth.login.marketing.feature_section_title')}
       </ThemedText>
 
       <View style={[styles.featureCardsRow, { flexDirection: isTwoCol ? 'row' : 'column' }]}>
@@ -178,9 +185,9 @@ function FeatureCardsSection({
               ⚡
             </Text>
           </View>
-          <Text style={[styles.featureTitle, { color: colors.text }]}>Fast logging</Text>
+          <Text style={[styles.featureTitle, { color: colors.text }]}>{t('auth.login.marketing.feature_fast_title')}</Text>
           <Text style={[styles.featureBody, { color: colors.textSecondary }]}>
-            Fewer taps to log meals. Designed for everyday use.
+            {t('auth.login.marketing.feature_fast_body')}
           </Text>
         </View>
 
@@ -190,9 +197,9 @@ function FeatureCardsSection({
               📊
             </Text>
           </View>
-          <Text style={[styles.featureTitle, { color: colors.text }]}>Clear nutrition</Text>
+          <Text style={[styles.featureTitle, { color: colors.text }]}>{t('auth.login.marketing.feature_clear_title')}</Text>
           <Text style={[styles.featureBody, { color: colors.textSecondary }]}>
-            Macros and fibre in one place, without clutter.
+            {t('auth.login.marketing.feature_clear_body')}
           </Text>
         </View>
 
@@ -202,9 +209,9 @@ function FeatureCardsSection({
               🔓
             </Text>
           </View>
-          <Text style={[styles.featureTitle, { color: colors.text }]}>No paywalls</Text>
+          <Text style={[styles.featureTitle, { color: colors.text }]}>{t('auth.login.marketing.feature_no_paywalls_title')}</Text>
           <Text style={[styles.featureBody, { color: colors.textSecondary }]}>
-            Core features stay free. No subscription traps.
+            {t('auth.login.marketing.feature_no_paywalls_body')}
           </Text>
         </View>
       </View>
@@ -219,6 +226,7 @@ function SocialProofStrip({
   colors: ThemeColors;
   isTwoCol: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View
       style={[
@@ -234,19 +242,19 @@ function SocialProofStrip({
         <Text style={styles.socialEmoji} accessibilityElementsHidden>
           ✅
         </Text>
-        <Text style={[styles.socialText, { color: colors.text }]}>No subscriptions</Text>
+        <Text style={[styles.socialText, { color: colors.text }]}>{t('auth.login.marketing.social_no_subscriptions')}</Text>
       </View>
       <View style={styles.socialItem}>
         <Text style={styles.socialEmoji} accessibilityElementsHidden>
           ✅
         </Text>
-        <Text style={[styles.socialText, { color: colors.text }]}>No ads</Text>
+        <Text style={[styles.socialText, { color: colors.text }]}>{t('auth.login.marketing.social_no_ads')}</Text>
       </View>
       <View style={styles.socialItem}>
         <Text style={styles.socialEmoji} accessibilityElementsHidden>
           ✅
         </Text>
-        <Text style={[styles.socialText, { color: colors.text }]}>Private by default</Text>
+        <Text style={[styles.socialText, { color: colors.text }]}>{t('auth.login.marketing.social_private_by_default')}</Text>
       </View>
     </View>
   );
@@ -255,7 +263,6 @@ function SocialProofStrip({
 export default function LoginScreen() {
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
-  const [country, setCountry] = useState<string | null>(null);
   const searchParams = useLocalSearchParams<{ country?: string | string[] }>();
   const [email, setEmail] = useState('');
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
@@ -265,7 +272,7 @@ export default function LoginScreen() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme ?? 'light'] as ThemeColors;
   const { width: screenWidth } = useWindowDimensions();
   const isTwoCol = screenWidth >= 1024;
   const isWeb = Platform.OS === 'web';
@@ -273,47 +280,16 @@ export default function LoginScreen() {
   const countryParamRaw = searchParams?.country;
   const countryParam = Array.isArray(countryParamRaw) ? countryParamRaw[0] : countryParamRaw;
 
+  const forcedCountry = countryParam === 'CA' ? 'CA' : countryParam === 'NotCanada' ? 'NotCanada' : null;
+  const { data: geoCountry } = useGeoCountry({ enabled: isWeb && !forcedCountry });
+  const country = forcedCountry ?? geoCountry ?? null;
+
   // Redirect if already logged in
   useEffect(() => {
     if (!authLoading && user) {
       router.replace('/(tabs)');
     }
   }, [authLoading, user, router]);
-
-  // Optional geo badge (fails silently)
-  useEffect(() => {
-    if (!isWeb) return;
-
-    // If the override is removed, reset back to auto-detection.
-    if (!countryParam) setCountry(null);
-
-    if (countryParam === 'CA') {
-      setCountry('CA');
-      return;
-    }
-    if (countryParam === 'NotCanada') {
-      setCountry('NotCanada');
-      return;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch('/api/geo', { method: 'GET', cache: 'no-store' });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
-        const c = typeof data?.country === 'string' ? data.country.toUpperCase() : null;
-        if (!cancelled && c) setCountry(c);
-      } catch {
-        // ignore
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isWeb, countryParam]);
 
   // Show brief spinner only while auth is initializing
   if (authLoading) {
@@ -528,13 +504,11 @@ export default function LoginScreen() {
                 style={[styles.heroH1, isTwoCol ? styles.heroH1Desktop : null, { color: colors.text }]}
                 accessibilityRole="header"
               >
-                {country === 'CA'
-                  ? 'Simple nutrition tracking, built for Canadians.'
-                  : 'Simple nutrition tracking that stays out of your way.'}
+                {country === 'CA' ? t('auth.login.marketing.hero_headline_ca') : t('auth.login.marketing.hero_headline_default')}
               </ThemedText>
 
               <ThemedText style={[styles.heroSub, isTwoCol ? styles.heroSubDesktop : null, { color: colors.textSecondary }]}>
-                Log fast. See what matters. No subscriptions. No ads.
+                {t('auth.login.marketing.hero_subtitle')}
               </ThemedText>
 
               <View style={styles.bulletList}>
@@ -545,7 +519,7 @@ export default function LoginScreen() {
                     </Text>
                   </View>
                   <ThemedText style={[styles.bulletText, { color: colors.text }]}>
-                    Fast logging with fewer taps
+                    {t('auth.login.marketing.bullet_fast_logging')}
                   </ThemedText>
                 </View>
 
@@ -556,7 +530,7 @@ export default function LoginScreen() {
                     </Text>
                   </View>
                   <ThemedText style={[styles.bulletText, { color: colors.text }]}>
-                    Clear macros + fibre tracking
+                    {t('auth.login.marketing.bullet_clear_macros')}
                   </ThemedText>
                 </View>
 
@@ -567,7 +541,7 @@ export default function LoginScreen() {
                     </Text>
                   </View>
                   <ThemedText style={[styles.bulletText, { color: colors.text }]}>
-                    Honest by design — no paywalls
+                    {t('auth.login.marketing.bullet_honest_no_paywalls')}
                   </ThemedText>
                 </View>
               </View>
@@ -615,10 +589,10 @@ export default function LoginScreen() {
                     style={[styles.brandName, { color: colors.text }]}
                     accessibilityRole="header"
                   >
-                    AvoVibe
+                    {t('auth.login.brand_name')}
                   </ThemedText>
                   <ThemedText style={[styles.tagline, { color: colors.textSecondary }]}>
-                    Simple, honest nutrition tracking.
+                    {t('auth.login.brand_tagline')}
                   </ThemedText>
                 </View>
 
@@ -646,24 +620,30 @@ export default function LoginScreen() {
                     onPress={handleGoogleLogin}
                     disabled={googleLoading}
                     {...getButtonAccessibilityProps(
-                      googleLoading ? t('auth.login.signing_in_google') : 'Continue with Google',
-                      'Continue with Google',
+                      googleLoading ? t('auth.login.signing_in_google') : t('auth.login.google_sign_in'),
+                      t('auth.login.google_sign_in'),
                       googleLoading
                     )}
-                    style={({ pressed, focused, hovered }: { pressed: boolean; focused: boolean; hovered?: boolean }) => [
-                      styles.primaryButton,
-                      getMinTouchTargetStyle(),
-                      {
-                        height: buttonHeight,
-                        backgroundColor: colors.tint,
-                        opacity: googleLoading ? 0.7 : pressed ? 0.9 : 1,
-                        transform:
-                          isWeb && hovered && !pressed && !googleLoading ? [{ translateY: -1 }] : [{ translateY: 0 }],
-                      },
-                      focused && isWeb
-                        ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
-                        : null,
-                    ]}
+                    style={(state) => {
+                      // RN's PressableStateCallbackType doesn't include web-only fields, but RN Web provides them.
+                      const hovered = isWeb ? Boolean((state as any).hovered) : false;
+                      const focused = isWeb ? Boolean((state as any).focused) : false;
+                      const pressed = state.pressed;
+                      return [
+                        styles.primaryButton,
+                        getMinTouchTargetStyle(),
+                        {
+                          height: buttonHeight,
+                          backgroundColor: colors.tint,
+                          opacity: googleLoading ? 0.7 : pressed ? 0.9 : 1,
+                          transform:
+                            isWeb && hovered && !pressed && !googleLoading ? [{ translateY: -1 }] : [{ translateY: 0 }],
+                        },
+                        focused && isWeb
+                          ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
+                          : null,
+                      ];
+                    }}
                   >
                     {googleLoading ? (
                       <View style={styles.buttonLoading} accessibilityElementsHidden={true}>
@@ -678,7 +658,7 @@ export default function LoginScreen() {
                           <Text style={styles.leftIconText}>G</Text>
                         </View>
                         <Text style={[styles.primaryButtonText, { color: colors.textInverse }]}>
-                          Continue with Google
+                          {t('auth.login.google_sign_in')}
                         </Text>
                       </View>
                     )}
@@ -688,7 +668,7 @@ export default function LoginScreen() {
                   <View style={styles.dividerContainer}>
                     <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
                     <ThemedText style={[styles.dividerText, { color: colors.textSecondary }]}>
-                      or
+                      {t('common.or')}
                     </ThemedText>
                     <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
                   </View>
@@ -696,7 +676,7 @@ export default function LoginScreen() {
                   {/* Magic link */}
                   <View style={{ gap: 10 }}>
                     <ThemedText style={[styles.label, { color: colors.text }]}>
-                      Email
+                      {t('auth.login.email_label')}
                     </ThemedText>
 
                     <View
@@ -717,7 +697,7 @@ export default function LoginScreen() {
                             backgroundColor: colors.backgroundSecondary,
                           },
                         ]}
-                        placeholder="you@example.com"
+                        placeholder={t('auth.login.email_placeholder_short')}
                         placeholderTextColor={colors.textSecondary}
                         value={email}
                         onChangeText={(text) => {
@@ -730,14 +710,14 @@ export default function LoginScreen() {
                         autoComplete="email"
                         editable={!magicLinkLoading}
                         {...getInputAccessibilityProps(
-                          'Email',
-                          'you@example.com',
+                          t('auth.login.email_label'),
+                          t('auth.login.email_placeholder_short'),
                           magicLinkError ?? undefined,
                           true
                         )}
                         {...getWebAccessibilityProps(
                           'textbox',
-                          'Email',
+                          t('auth.login.email_label'),
                           magicLinkError ? 'magic-email-error' : undefined,
                           magicLinkError ? true : undefined,
                           true
@@ -748,38 +728,46 @@ export default function LoginScreen() {
                         onPress={handleSendMagicLink}
                         disabled={magicLinkLoading}
                         {...getButtonAccessibilityProps(
-                          'Email me a sign-in link',
-                          'Email me a sign-in link',
+                          t('auth.login.magic_link_send'),
+                          t('auth.login.magic_link_send'),
                           magicLinkLoading
                         )}
-                        style={({ pressed, focused, hovered }: { pressed: boolean; focused: boolean; hovered?: boolean }) => [
-                          styles.magicButton,
-                          getMinTouchTargetStyle(),
-                          {
-                            height: buttonHeight,
-                            backgroundColor: colors.backgroundTertiary,
-                            borderColor: colors.border,
-                            opacity: magicLinkLoading ? 0.7 : pressed ? 0.92 : 1,
-                            width: isTwoCol ? undefined : '100%',
-                            minWidth: isTwoCol ? 220 : undefined,
-                            transform:
-                              isWeb && hovered && !pressed && !magicLinkLoading ? [{ translateY: -1 }] : [{ translateY: 0 }],
-                          },
-                          focused && isWeb
-                            ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
-                            : null,
-                        ]}
+                        style={(state) => {
+                          // RN's PressableStateCallbackType doesn't include web-only fields, but RN Web provides them.
+                          const hovered = isWeb ? Boolean((state as any).hovered) : false;
+                          const focused = isWeb ? Boolean((state as any).focused) : false;
+                          const pressed = state.pressed;
+                          return [
+                            styles.magicButton,
+                            getMinTouchTargetStyle(),
+                            {
+                              height: buttonHeight,
+                              backgroundColor: colors.backgroundTertiary,
+                              borderColor: colors.border,
+                              opacity: magicLinkLoading ? 0.7 : pressed ? 0.92 : 1,
+                              width: isTwoCol ? undefined : '100%',
+                              minWidth: isTwoCol ? 220 : undefined,
+                              transform:
+                                isWeb && hovered && !pressed && !magicLinkLoading
+                                  ? [{ translateY: -1 }]
+                                  : [{ translateY: 0 }],
+                            },
+                            focused && isWeb
+                              ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
+                              : null,
+                          ];
+                        }}
                       >
                         {magicLinkLoading ? (
                           <View style={styles.buttonLoading} accessibilityElementsHidden={true}>
                             <ActivityIndicator color={colors.text} size="small" />
                             <Text style={[styles.magicButtonText, { color: colors.text }]}>
-                              Sending…
+                              {t('auth.login.magic_link_sending')}
                             </Text>
                           </View>
                         ) : (
                           <Text style={[styles.magicButtonText, { color: colors.text }]}>
-                            Email me a sign-in link
+                            {t('auth.login.magic_link_send')}
                           </Text>
                         )}
                       </Pressable>
@@ -807,7 +795,7 @@ export default function LoginScreen() {
                         style={[styles.successText, { color: colors.textSecondary }]}
                         accessibilityLiveRegion="polite"
                       >
-                        Check your email for a sign-in link.
+                        {t('auth.login.magic_link_sent_hint')}
                       </ThemedText>
                     ) : null}
                   </View>
@@ -815,51 +803,54 @@ export default function LoginScreen() {
                   {/* Legal footer */}
                   <View style={[styles.legalRow, { borderTopColor: colors.border }]}>
                     <Pressable
-                      onPress={() => router.push('/legal/privacy')}
-                      {...getLinkAccessibilityProps('Privacy Policy', 'Privacy Policy')}
-                      style={({ focused }) => [
+                      // Route typegen doesn't currently include /legal/* in this file.
+                      onPress={() => router.push('/legal/privacy' as any)}
+                      {...getLinkAccessibilityProps(t('auth.login.legal_privacy'), t('auth.login.legal_privacy'))}
+                      style={(state) => [
                         styles.legalLink,
-                        focused && isWeb
+                        isWeb && Boolean((state as any).focused)
                           ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
                           : null,
                       ]}
                     >
                       <ThemedText type="link" style={styles.legalLinkText}>
-                        Privacy Policy
+                        {t('auth.login.legal_privacy')}
                       </ThemedText>
                     </Pressable>
 
                     <Text style={[styles.legalDot, { color: colors.textSecondary }]}>{' · '}</Text>
 
                     <Pressable
-                      onPress={() => router.push('/legal/terms')}
-                      {...getLinkAccessibilityProps('Terms', 'Terms')}
-                      style={({ focused }) => [
+                      // Route typegen doesn't currently include /legal/* in this file.
+                      onPress={() => router.push('/legal/terms' as any)}
+                      {...getLinkAccessibilityProps(t('auth.login.legal_terms'), t('auth.login.legal_terms'))}
+                      style={(state) => [
                         styles.legalLink,
-                        focused && isWeb
+                        isWeb && Boolean((state as any).focused)
                           ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
                           : null,
                       ]}
                     >
                       <ThemedText type="link" style={styles.legalLinkText}>
-                        Terms
+                        {t('auth.login.legal_terms')}
                       </ThemedText>
                     </Pressable>
 
                     <Text style={[styles.legalDot, { color: colors.textSecondary }]}>{' · '}</Text>
 
                     <Pressable
-                      onPress={() => router.push('/legal/health')}
-                      {...getLinkAccessibilityProps('Health Disclaimer', 'Health Disclaimer')}
-                      style={({ focused }) => [
+                      // Route typegen doesn't currently include /legal/* in this file.
+                      onPress={() => router.push('/legal/health' as any)}
+                      {...getLinkAccessibilityProps(t('auth.login.legal_health'), t('auth.login.legal_health'))}
+                      style={(state) => [
                         styles.legalLink,
-                        focused && isWeb
+                        isWeb && Boolean((state as any).focused)
                           ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
                           : null,
                       ]}
                     >
                       <ThemedText type="link" style={styles.legalLinkText}>
-                        Health Disclaimer
+                        {t('auth.login.legal_health')}
                       </ThemedText>
                     </Pressable>
                   </View>

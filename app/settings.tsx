@@ -594,6 +594,7 @@ export default function SettingsScreen() {
         onCancel={() => setShowLogoutConfirm(false)}
         confirmButtonStyle={{ backgroundColor: colors.tint }}
         cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
+        cancelTextStyle={{ color: colors.text }}
         confirmDisabled={false}
         animationType="fade"
       />
