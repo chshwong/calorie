@@ -332,7 +332,8 @@ export default function LoginScreen() {
       supabaseUrl.includes('YOUR-PROJECT') ||
       supabaseKey.includes('YOUR-ANON-KEY')
     ) {
-      showAppToast(t('auth.callback.coming_soon_title'));
+      // Magic link is enabled; if env is missing, show a real configuration error.
+      setMagicLinkError(t('auth.login.error_supabase_not_configured'));
       return;
     }
 
@@ -350,14 +351,14 @@ export default function LoginScreen() {
       const { error } = await sendMagicLink({ email: trimmedEmail, emailRedirectTo });
 
       if (error) {
-        // If OTP isn't enabled yet, keep UI calm and non-blocking
-        showAppToast(t('auth.callback.coming_soon_title'));
+        // Show a user-friendly error (no "coming soon" messaging).
+        setMagicLinkError(error.message || t('common.unexpected_error'));
         return;
       }
 
       setMagicLinkSent(true);
     } catch (e: any) {
-      showAppToast(t('auth.callback.coming_soon_title'));
+      setMagicLinkError(e?.message || t('common.unexpected_error'));
     } finally {
       setMagicLinkLoading(false);
     }
