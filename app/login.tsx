@@ -21,6 +21,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
 import { showAppToast } from '@/components/ui/app-toast';
 import { BorderRadius, Colors, FontSize, FontWeight, Layout, Shadows, Spacing, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -551,6 +552,21 @@ export default function LoginScreen() {
         <View style={[styles.shell, { maxWidth: isTwoCol ? 1180 : 740 }]}>
           <View
             style={[
+              styles.topLogoWrap,
+              {
+                alignItems: isTwoCol ? 'flex-start' : 'center',
+              },
+            ]}
+          >
+            <BrandLogoNameAndTag
+              width={252}
+              style={styles.topLogo}
+              accessibilityLabel={t('auth.login.brand_logo_alt')}
+            />
+          </View>
+
+          <View
+            style={[
               styles.grid,
               {
                 flexDirection: isTwoCol ? 'row' : 'column',
@@ -715,15 +731,11 @@ export default function LoginScreen() {
                     autoplay
                     style={{ width: lottieSize, height: lottieSize, marginBottom: 12 }}
                   />
-                  <ThemedText
-                    style={[styles.brandName, { color: colors.text }]}
-                    accessibilityRole="header"
-                  >
-                    {t('auth.login.brand_name')}
-                  </ThemedText>
-                  <ThemedText style={[styles.tagline, { color: colors.textSecondary }]}>
-                    {t('auth.login.brand_tagline')}
-                  </ThemedText>
+                  <BrandLogoNameAndTag
+                    width={315}
+                    style={styles.brandLogoNameTag}
+                    accessibilityLabel={t('auth.login.brand_logo_alt')}
+                  />
                 </View>
 
                 {/* Auth gateway */}
@@ -1020,6 +1032,14 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 0,
   },
+  topLogoWrap: {
+    width: '100%',
+    marginBottom: Spacing.xl,
+  },
+  topLogo: {
+    // BrandLogoNameAndTag centers internally; outer wrapper controls alignment per breakpoint.
+    alignItems: 'center',
+  },
   grid: {
     width: '100%',
     alignItems: 'stretch',
@@ -1246,6 +1266,11 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
+  },
+  brandLogoNameTag: {
+    width: '100%',
+    height: Spacing['6xl'],
+    marginTop: Spacing.sm,
   },
   brandName: {
     fontSize: 26,

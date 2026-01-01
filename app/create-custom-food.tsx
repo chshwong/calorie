@@ -13,6 +13,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getLocalDateString } from '@/utils/calculations';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -73,7 +74,8 @@ export default function CreateCustomFoodScreen() {
 
   // Get meal type and entry date from params (for navigation back)
   const mealType = params.mealType as string || 'breakfast';
-  const entryDate = params.entryDate as string || getLocalDateString();
+  const entryDateParam = params.entryDate as string | undefined;
+  const { dateKey: entryDate } = useClampedDateParam({ paramKey: 'entryDate' });
   const foodId = params.foodId as string | undefined;
   const cloneFoodId = params.cloneFoodId as string | undefined;
   const isEditing = !!foodId; // Only true if editing (not cloning)

@@ -439,6 +439,8 @@ export default function MedsHomeScreen() {
     selectedDateString,
     isToday,
     today,
+    minDate,
+    canGoBack,
   } = useSelectedDate();
   
   // Calendar view month state removed - now handled by DatePickerButton component
@@ -983,13 +985,19 @@ export default function MedsHomeScreen() {
             onDateSelect={navigateWithDate}
             today={today}
             module="meds"
+            minimumDate={minDate}
+            maximumDate={today}
           />
         }
-        goBackOneDay={() => {
-          const newDate = new Date(selectedDate);
-          newDate.setDate(newDate.getDate() - 1);
-          navigateWithDate(newDate);
-        }}
+        goBackOneDay={
+          canGoBack
+            ? () => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() - 1);
+                navigateWithDate(newDate);
+              }
+            : undefined
+        }
         goForwardOneDay={() => {
           if (!isToday) {
             const newDate = new Date(selectedDate);

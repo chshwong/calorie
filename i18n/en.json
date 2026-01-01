@@ -36,6 +36,10 @@
     "fat": "Fat"
   },
 
+  "date_guard": {
+    "tracking_starts_on": "Tracking starts on {{date}}."
+  },
+
   "home": {
     "greeting": {
       "morning": "Good Morning",
@@ -242,6 +246,7 @@
       "subtitle": "Sign in to continue tracking your calories",
       "track_now": "Track now",
       "track_now_aria": "Track now — scroll to sign in",
+      "brand_logo_alt": "AvoVibe logo",
       "brand_name": "AvoVibe",
       "brand_tagline": "Simple, honest nutrition tracking.",
       "email_label": "Email",
@@ -296,9 +301,9 @@
         "feature_clear_body": "Macros and fibre in one place, without clutter.",
         "feature_no_paywalls_title": "No paywalls",
         "feature_no_paywalls_body": "Core features stay free. No subscription traps.",
-        "social_no_subscriptions": "No subscriptions",
-        "social_no_ads": "No ads",
-        "social_private_by_default": "Private by default"
+        "social_no_subscriptions": "Designed for real life",
+        "social_no_ads": "Simple insights, no noise",
+        "social_private_by_default": "Your data stays yours"
       }
     },
 

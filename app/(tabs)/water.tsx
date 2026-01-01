@@ -43,6 +43,8 @@ export default function WaterScreen() {
     selectedDateString,
     isToday,
     today,
+    minDate,
+    canGoBack,
   } = useSelectedDate();
   
   // Calendar view month state removed - now handled by DatePickerButton component
@@ -355,11 +357,17 @@ export default function WaterScreen() {
             onDateSelect={navigateWithDate}
             today={today}
             module="water"
+            minimumDate={minDate}
+            maximumDate={today}
           />
         }
-        goBackOneDay={() => {
-          navigateWithDate(addDays(selectedDate, -1));
-        }}
+        goBackOneDay={
+          canGoBack
+            ? () => {
+                navigateWithDate(addDays(selectedDate, -1));
+              }
+            : undefined
+        }
         goForwardOneDay={() => {
           if (!isToday) {
             navigateWithDate(addDays(selectedDate, 1));

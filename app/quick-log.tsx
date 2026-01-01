@@ -22,6 +22,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CalorieEntry } from '@/utils/types';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { clampDateKey } from '@/lib/date-guard';
+import { toDateKey } from '@/utils/dateKey';
 
 type QuickLogRouteParams = {
   date?: string;
@@ -63,7 +66,10 @@ export default function QuickLogScreen() {
   const mealTypeParam = Array.isArray(params.mealType) ? params.mealType[0] : params.mealType;
   const quickLogId = Array.isArray(params.quickLogId) ? params.quickLogId[0] : params.quickLogId;
 
-  const date = dateParam ?? initialEntry?.entry_date ?? getLocalDateString();
+  const { dateKey: routeDateKey, minDateKey, todayKey } = useClampedDateParam({ paramKey: 'date' });
+  const hasRouteDateParam = !!dateParam;
+  const dateRaw = hasRouteDateParam ? routeDateKey : (initialEntry?.entry_date ?? getLocalDateString());
+  const date = clampDateKey(toDateKey(dateRaw), minDateKey, todayKey);
   const mealType = mealTypeParam ?? initialEntry?.meal_type ?? 'breakfast';
 
   // Seed the entries cache so the form can hydrate instantly from cache

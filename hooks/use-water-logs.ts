@@ -24,6 +24,7 @@ import {
 import { WaterUnit, toMl, fromMl } from '@/utils/waterUnits';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
 import { toDateKey, addDays } from '@/utils/dateKey';
+import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 
 
 
@@ -173,7 +174,10 @@ export function useWaterDaily(options?: {
   const daysForward = options?.daysForward ?? 0;
   
   // Calculate start and end date keys
-  const startDateKey = addDays(targetDateKey, -daysBack);
+  const minDateKey = user?.created_at ? getMinAllowedDateKeyFromSignupAt(user.created_at) : targetDateKey;
+  const startDateKeyUnclamped = addDays(targetDateKey, -daysBack);
+  const startDateKey =
+    compareDateKeys(startDateKeyUnclamped, minDateKey) < 0 ? minDateKey : startDateKeyUnclamped;
   const endDateKey = addDays(targetDateKey, daysForward);
 
   // Fetch range data

@@ -22,13 +22,15 @@ import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { formatLocalTime, getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { clampDateKey, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { toDateKey } from '@/utils/dateKey';
 
 export default function WeightHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { profile: authProfile } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const todayLocal = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -45,6 +47,19 @@ export default function WeightHomeScreen() {
   const weight180Query = useWeightLogs180d();
   const todayKey = getLocalDateKey(todayLocal);
   const isToday = getLocalDateKey(selectedDate) === getLocalDateKey(todayLocal);
+  const minDateKey = useMemo(() => {
+    const signupAt = user?.created_at;
+    if (!signupAt) return toDateKey(todayLocal);
+    return getMinAllowedDateKeyFromSignupAt(signupAt);
+  }, [todayLocal, user?.created_at]);
+  const minDate = useMemo(() => dateKeyToLocalStartOfDay(minDateKey), [minDateKey]);
+  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
+  const canGoBack = selectedDateKey > minDateKey;
+
+  const setSelectedDateClamped = (date: Date) => {
+    const clampedKey = clampDateKey(toDateKey(date), minDateKey, toDateKey(todayLocal));
+    setSelectedDate(dateKeyToLocalStartOfDay(clampedKey));
+  };
 
   const unit: 'kg' | 'lbs' = profile?.weight_unit === 'kg' ? 'kg' : 'lbs';
   const latestEntry = weight180Query.data ? getLatestWeightEntry(weight180Query.data) : null;
@@ -191,8 +206,10 @@ export default function WeightHomeScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <DatePickerButton
               selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
+              onDateSelect={setSelectedDateClamped}
               today={todayLocal}
+              minimumDate={minDate}
+              maximumDate={todayLocal}
             />
             <TouchableOpacity
               style={styles.gearButton}
@@ -204,16 +221,20 @@ export default function WeightHomeScreen() {
             </TouchableOpacity>
           </View>
         }
-        goBackOneDay={() => {
-          const newDate = new Date(selectedDate);
-          newDate.setDate(newDate.getDate() - 1);
-          setSelectedDate(newDate);
-        }}
+        goBackOneDay={
+          canGoBack
+            ? () => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() - 1);
+                setSelectedDateClamped(newDate);
+              }
+            : undefined
+        }
         goForwardOneDay={() => {
           if (!isToday) {
             const newDate = new Date(selectedDate);
             newDate.setDate(newDate.getDate() + 1);
-            setSelectedDate(newDate);
+            setSelectedDateClamped(newDate);
           }
         }}
         isToday={isToday}

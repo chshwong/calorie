@@ -11,6 +11,7 @@
     "build": "expo export --platform web",
     "build:web": "expo export --platform web",
     "lint": "expo lint",
+    "test": "vitest run",
     "seed:legal": "tsx scripts/seed-legal-docs.ts"
   },
   "dependencies": {
@@ -73,7 +74,8 @@
     "eslint-config-expo": "~10.0.0",
     "react-native-svg-transformer": "^1.5.2",
     "tsx": "^4.21.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^2.1.9"
   },
   "private": true
 }

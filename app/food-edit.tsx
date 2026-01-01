@@ -29,6 +29,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getFoodMasterById } from '@/lib/services/foodMaster';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { clampDateKey } from '@/lib/date-guard';
+import { toDateKey } from '@/utils/dateKey';
 
 // Hide default Expo Router header; we render our own in-screen header
 export const options = {
@@ -78,7 +81,10 @@ export default function FoodEditScreen() {
     }
   }, [entryPayloadParam]);
 
-  const entryDateFallback = entryDateParam ?? initialEntry?.entry_date ?? getLocalDateString();
+  const { dateKey: routeDateKey, minDateKey, todayKey } = useClampedDateParam({ paramKey: 'date' });
+  const hasRouteDateParam = !!entryDateParam;
+  const entryDateFallbackRaw = hasRouteDateParam ? routeDateKey : (initialEntry?.entry_date ?? getLocalDateString());
+  const entryDateFallback = clampDateKey(toDateKey(entryDateFallbackRaw), minDateKey, todayKey);
   const mealTypeFallback = mealTypeParam ?? initialEntry?.meal_type ?? 'breakfast';
   const foodId = foodIdParam;
 

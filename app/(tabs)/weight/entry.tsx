@@ -37,6 +37,8 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatLocalTime } from '@/utils/dateTime';
 import { useAuth } from '@/contexts/AuthContext';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import i18n from '@/i18n';
 
 type WeightUnit = 'kg' | 'lbs';
 
@@ -51,12 +53,13 @@ export default function WeightEntryScreen() {
   const userId = user?.id;
   const { date: dateParam, weightLb: weightLbParam, bodyFatPercent: bodyFatParam, entryId: entryIdParam, weighedAt: weighedAtParam, mode: modeParam } =
     useLocalSearchParams<{ date?: string; weightLb?: string; bodyFatPercent?: string; entryId?: string; weighedAt?: string; mode?: EntryMode }>();
+  const { dateKey: clampedRouteDateKey, minDate } = useClampedDateParam({ paramKey: 'date' });
   const weight180Query = useWeightLogs180d();
   const deleteMutation = useDeleteWeightLog(userId ?? '');
 
   const initialDate = useMemo(() => {
     if (dateParam && typeof dateParam === 'string') {
-      const parsed = new Date(`${dateParam}T00:00:00`);
+      const parsed = new Date(`${clampedRouteDateKey}T00:00:00`);
       if (!isNaN(parsed.getTime())) {
         parsed.setHours(0, 0, 0, 0);
         return parsed;
@@ -176,7 +179,7 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
 
       if (mode === 'add_for_date' && dateParam && typeof dateParam === 'string') {
         // Prefill date from param, time = now, fields empty
-        const target = new Date(`${dateParam}T00:00:00`);
+        const target = new Date(`${clampedRouteDateKey}T00:00:00`);
         if (!isNaN(target.getTime())) {
           setSelectedDate(target);
           const dateTime = new Date(target);
@@ -215,7 +218,7 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
       setSelectedDateTime(now);
       setWebTimeInput(formatTimeInputValue(now));
       setError(null);
-    }, [isEditMode, modeParam, dateParam, profile?.weight_unit, latestEntry?.weighed_at, latestBodyFatEntry?.weighed_at])
+    }, [isEditMode, modeParam, dateParam, clampedRouteDateKey, profile?.weight_unit, latestEntry?.weighed_at, latestBodyFatEntry?.weighed_at])
   );
 
   const isToday = isSameDay(selectedDate, new Date());
@@ -255,6 +258,16 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
 
     if (selected.getTime() > today.getTime()) {
       setError('Date cannot be in the future.');
+      return;
+    }
+    if (selected.getTime() < minDate.getTime()) {
+      const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
+      const display = minDate.toLocaleDateString(locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      setError(i18n.t('date_guard.tracking_starts_on', { date: display }));
       return;
     }
 

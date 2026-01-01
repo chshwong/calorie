@@ -405,6 +405,8 @@ export default function FoodLogHomeScreen() {
     selectedDateString,
     isToday,
     today,
+    minDate,
+    canGoBack,
   } = useSelectedDate();
 
   const queryClient = useQueryClient();
@@ -927,12 +929,19 @@ export default function FoodLogHomeScreen() {
             selectedDate={selectedDate}
             onDateSelect={navigateWithDate}
             today={today}
+            minimumDate={minDate}
+            maximumDate={today}
+            module="food"
           />
         }
-        goBackOneDay={() => {
-          const prevDateKey = addDays(selectedDateString, -1);
-          navigateWithDate(prevDateKey);
-        }}
+        goBackOneDay={
+          canGoBack
+            ? () => {
+                const prevDateKey = addDays(selectedDateString, -1);
+                navigateWithDate(prevDateKey);
+              }
+            : undefined
+        }
         goForwardOneDay={() => {
           if (!isToday) {
             const nextDateKey = addDays(selectedDateString, 1);

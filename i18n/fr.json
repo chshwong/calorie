@@ -35,6 +35,10 @@
     "fat": "Lipides"
   },
 
+  "date_guard": {
+    "tracking_starts_on": "Le suivi commence le {{date}}."
+  },
+
   "home": {
     "greeting": {
       "morning": "Bonjour",
@@ -201,6 +205,7 @@
       "subtitle": "Connectez-vous pour continuer à suivre vos calories",
       "track_now": "Suivre maintenant",
       "track_now_aria": "Suivre maintenant — faire défiler jusqu’à la connexion",
+      "brand_logo_alt": "Logo AvoVibe",
       "brand_name": "AvoVibe",
       "brand_tagline": "Suivi nutritionnel simple et honnête.",
       "email_label": "Courriel",
@@ -255,9 +260,9 @@
         "feature_clear_body": "Macros et fibres au même endroit, sans surcharge.",
         "feature_no_paywalls_title": "Aucun paywall",
         "feature_no_paywalls_body": "Les fonctions de base restent gratuites. Aucun piège d’abonnement.",
-        "social_no_subscriptions": "Aucun abonnement",
-        "social_no_ads": "Aucune pub",
-        "social_private_by_default": "Privé par défaut"
+        "social_no_subscriptions": "Conçu pour la vraie vie",
+        "social_no_ads": "Des infos utiles, sans bruit",
+        "social_private_by_default": "Vos données restent à vous"
       }
     },
 

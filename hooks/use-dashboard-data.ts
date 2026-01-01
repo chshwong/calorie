@@ -27,6 +27,20 @@ import { useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
 import { calculateDailyTotals } from '@/utils/dailyTotals';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { getEntriesForDateRange } from '@/lib/services/calorieEntries';
+import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { addDays } from '@/utils/dateKey';
+
+function buildDateKeysInclusive(startKey: string, endKey: string, maxDays: number): string[] {
+  const keys: string[] = [];
+  if (compareDateKeys(startKey, endKey) > 0) return keys;
+  let cur = startKey;
+  for (let i = 0; i < maxDays; i++) {
+    if (compareDateKeys(cur, endKey) > 0) break;
+    keys.push(cur);
+    cur = addDays(cur, 1);
+  }
+  return keys;
+}
 
 /**
  * Daily food summary with macros and goals
@@ -84,16 +98,19 @@ export function useWeeklyFoodCalories(endDateString: string, days: number = 7) {
     const day = String(startDate.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   })();
+  const minDateKey = user?.created_at ? getMinAllowedDateKeyFromSignupAt(user.created_at) : startDateString;
+  const clampedStartDateString =
+    compareDateKeys(startDateString, minDateKey) < 0 ? minDateKey : startDateString;
 
   const { data: entries = [], isLoading } = useQuery({
-    queryKey: ['entriesRange', userId, startDateString, endDateString],
+    queryKey: ['entriesRange', userId, clampedStartDateString, endDateString],
     queryFn: () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      return getEntriesForDateRange(userId, startDateString, endDateString);
+      return getEntriesForDateRange(userId, clampedStartDateString, endDateString);
     },
-    enabled: !!userId && !!startDateString && !!endDateString,
+    enabled: !!userId && !!clampedStartDateString && !!endDateString,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
   });
@@ -112,16 +129,8 @@ export function useWeeklyFoodCalories(endDateString: string, days: number = 7) {
     entriesByDate.get(date)!.push(entry);
   });
 
-  // Generate all dates in range
-  const dates: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    dates.push(`${year}-${month}-${day}`);
-  }
+  // Generate all dates in range (never synthesize pre-signup days)
+  const dates = buildDateKeysInclusive(clampedStartDateString, endDateString, days);
 
   const weeklyData = dates.map(date => {
     const dateEntries = entriesByDate.get(date) || [];
@@ -181,11 +190,20 @@ export function useWeeklyExerciseMinutes(endDateString: string, days: number = 7
   const endDate = new Date(endDateString + 'T00:00:00');
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - (days - 1));
+  const startKey = (() => {
+    const year = startDate.getFullYear();
+    const month = String(startDate.getMonth() + 1).padStart(2, '0');
+    const day = String(startDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+  const minDateKey = user?.created_at ? getMinAllowedDateKeyFromSignupAt(user.created_at) : startKey;
+  const clampedStartKey = compareDateKeys(startKey, minDateKey) < 0 ? minDateKey : startKey;
+  const startDateClamped = new Date(clampedStartKey + 'T00:00:00');
 
   const weeklyData = summary
     .filter(item => {
       const itemDate = new Date(item.date + 'T00:00:00');
-      return itemDate >= startDate && itemDate <= endDate;
+      return itemDate >= startDateClamped && itemDate <= endDate;
     })
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(item => ({
@@ -194,15 +212,7 @@ export function useWeeklyExerciseMinutes(endDateString: string, days: number = 7
     }));
 
   // Fill in missing dates with 0
-  const allDates: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    allDates.push(`${year}-${month}-${day}`);
-  }
+  const allDates = buildDateKeysInclusive(clampedStartKey, endDateString, days);
 
   const filledData = allDates.map(date => {
     const existing = weeklyData.find(d => d.date === date);
@@ -253,11 +263,20 @@ export function useWeeklyMedPresence(endDateString: string, days: number = 7) {
   const endDate = new Date(endDateString + 'T00:00:00');
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - (days - 1));
+  const startKey = (() => {
+    const year = startDate.getFullYear();
+    const month = String(startDate.getMonth() + 1).padStart(2, '0');
+    const day = String(startDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+  const minDateKey = user?.created_at ? getMinAllowedDateKeyFromSignupAt(user.created_at) : startKey;
+  const clampedStartKey = compareDateKeys(startKey, minDateKey) < 0 ? minDateKey : startKey;
+  const startDateClamped = new Date(clampedStartKey + 'T00:00:00');
 
   const weeklyData = summary
     .filter(item => {
       const itemDate = new Date(item.date + 'T00:00:00');
-      return itemDate >= startDate && itemDate <= endDate;
+      return itemDate >= startDateClamped && itemDate <= endDate;
     })
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(item => ({
@@ -266,15 +285,7 @@ export function useWeeklyMedPresence(endDateString: string, days: number = 7) {
     }));
 
   // Fill in missing dates with false
-  const allDates: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    allDates.push(`${year}-${month}-${day}`);
-  }
+  const allDates = buildDateKeysInclusive(clampedStartKey, endDateString, days);
 
   const filledData = allDates.map(date => {
     const existing = weeklyData.find(d => d.date === date);
@@ -314,6 +325,7 @@ export function useStreakHeatmap(endDateString: string, weeks: number = 5) {
   // TODO: Implement actual heatmap calculation
   const data: Array<{ date: string; score: number }> = [];
   const endDate = new Date(endDateString + 'T00:00:00');
+  const minDateKey = user?.created_at ? getMinAllowedDateKeyFromSignupAt(user.created_at) : endDateString;
   
   for (let w = 0; w < weeks; w++) {
     for (let d = 0; d < 7; d++) {
@@ -322,8 +334,10 @@ export function useStreakHeatmap(endDateString: string, weeks: number = 5) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
       data.push({
-        date: `${year}-${month}-${day}`,
+        // Do not show/navigate pre-signup days
+        date: compareDateKeys(dateKey, minDateKey) < 0 ? '' : dateKey,
         score: 0,
       });
     }

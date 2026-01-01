@@ -58,7 +58,6 @@ import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
-import { CalendarModal } from '@/components/mealtype/CalendarModal';
 import { FrequentFoodsTab } from '@/components/mealtype/tabs/FrequentFoodsTab';
 import { RecentFoodsTab } from '@/components/mealtype/tabs/RecentFoodsTab';
 import { CustomFoodsTab } from '@/components/mealtype/tabs/CustomFoodsTab';
@@ -72,6 +71,8 @@ import { MealTypeLogHeader } from '@/components/mealtype/MealTypeLogHeader';
 import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
 import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
 import { styles } from '@/components/mealtype/mealtype-log-screen.styles';
+import { AppDatePicker } from '@/components/ui/app-date-picker';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 
 type CalorieEntry = {
   id: string;
@@ -141,9 +142,7 @@ export default function LogFoodScreen() {
   
   // Get entry date from params (in user's local timezone)
   const entryDateParam = params.entryDate;
-  const entryDate = Array.isArray(entryDateParam)
-    ? entryDateParam[0]
-    : (entryDateParam as string) || getLocalDateString(); // Use local date, not UTC
+  const { dateKey: entryDate, minDate, today } = useClampedDateParam({ paramKey: 'entryDate' });
   
   const selectedMealType = mealType;
   const selectedDateString = entryDate;
@@ -211,9 +210,7 @@ export default function LogFoodScreen() {
     return formatDate(dateString, t);
   }, [t]);
   
-  // Get today's date for comparison
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // `today` and `minDate` come from useClampedDateParam (device timezone).
   
   // Function to handle date selection
   const handleDateSelect = (date: Date) => {
@@ -1814,17 +1811,18 @@ export default function LogFoodScreen() {
   return (
     <ThemedView style={styles.container}>
       {/* Date Picker Modal */}
-      <CalendarModal
-        visible={showDatePicker}
-        onClose={() => setShowDatePicker(false)}
-        selectedDate={selectedDate}
-        onDateSelect={(date) => {
+      <AppDatePicker
+        value={selectedDate}
+        onChange={(date) => {
           setSelectedDate(date);
-        }}
-        onConfirm={(date) => {
           handleDateSelect(date);
         }}
-        colors={colors}
+        minimumDate={minDate}
+        maximumDate={today}
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        title={t('home.date_picker.title')}
+        accentColor={colors.tint}
       />
 
       <ScrollView 
