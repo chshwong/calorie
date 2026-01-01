@@ -18,6 +18,7 @@ import {
   updateWeightLogRow,
   type WeightLogRow,
 } from '@/lib/services/weightLogs';
+import { refreshBurnedFromWeightChange } from '@/lib/services/burned/refreshDailySumBurned';
 import { DEFAULT_CACHE_MAX_AGE_MS, getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
 import { useLocalDayKey } from './use-local-day-key';
 import { getLocalDateKey } from '@/utils/dateTime';
@@ -28,6 +29,8 @@ type SaveWeightInput = {
   weightLb: number;
   bodyFatPercent?: number | null;
   note?: string | null;
+  /** Optional previous timestamp (edit mode) to allow accurate refresh when the entry's timestamp changes. */
+  previousWeighedAtISO?: string | null;
 };
 
 type WeightDay = {
@@ -322,11 +325,36 @@ export function useSaveWeightEntry() {
 
       return saved;
     },
-    onSuccess: () => {
+    onSuccess: async (saved, variables) => {
+      // Refresh burned cache based on weight history changes (best-effort; never block the save).
+      try {
+        if (user?.id) {
+          const prevISO = variables?.previousWeighedAtISO ?? null;
+          const nextISO = saved?.weighed_at ?? null;
+
+          if (prevISO && nextISO && prevISO !== nextISO) {
+            // If an edit moved the weigh-in timestamp, refresh from both the old and new anchors.
+            await refreshBurnedFromWeightChange({ userId: user.id, changedAtISO: prevISO });
+            await refreshBurnedFromWeightChange({ userId: user.id, changedAtISO: nextISO });
+          } else if (nextISO) {
+            await refreshBurnedFromWeightChange({ userId: user.id, changedAtISO: nextISO });
+          }
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error refreshing daily_sum_burned after weight save', e);
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
       queryClient.invalidateQueries({ queryKey: ['weightLogs180d'] });
       queryClient.invalidateQueries({ queryKey: ['userConfig'] });
       queryClient.invalidateQueries({ queryKey: ['userProfile'] }); // Backward compatibility
+
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['dailySumBurned', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['dailySumBurnedRange', user.id] });
+      }
     },
   });
 }

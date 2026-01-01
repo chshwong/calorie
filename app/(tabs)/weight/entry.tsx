@@ -276,11 +276,16 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
     const weightLbValue = unit === 'kg' ? kgToLb(weightKgValue) : weightValue;
 
     try {
+      const previousWeighedAtISO =
+        (weighedAtParam && typeof weighedAtParam === 'string' ? weighedAtParam : null) ??
+        (editingEntryFromCache?.weighed_at ?? null);
+
       await saveMutation.mutateAsync({
         entryId: editingEntryId ?? undefined,
         weighedAt,
         weightLb: roundTo3(weightLbValue),
         bodyFatPercent: bodyFatValue,
+        previousWeighedAtISO,
       });
       showAppToast('Saved');
       router.replace('/weight' as any);
@@ -300,7 +305,11 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
     showAppToast('Delete pressed');
 
     const doDelete = () => {
-      deleteMutation.mutate(editingEntryId, {
+      const weighedAtISO =
+        (weighedAtParam && typeof weighedAtParam === 'string' ? weighedAtParam : null) ??
+        (editingEntryFromCache?.weighed_at ?? null);
+
+      deleteMutation.mutate({ id: editingEntryId, weighedAtISO }, {
         onSuccess: () => {
           showAppToast('Deleted');
           router.replace('/weight' as any);

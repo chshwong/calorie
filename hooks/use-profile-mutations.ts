@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateUserProfile } from '@/lib/services/profile';
 import { syncTodayWaterGoalWithProfile } from '@/lib/services/waterLogs';
+import { refreshBurnedTodayFromProfileChange } from '@/lib/services/burned/refreshDailySumBurned';
 import { setPersistentCache } from '@/lib/persistentCache';
 import { userConfigQueryKey } from '@/hooks/use-user-config';
 import type { UserConfig } from '@/lib/services/userConfig';
@@ -47,6 +48,26 @@ export function useUpdateProfile() {
         
         updateProfileState(updatedProfile);
         setPersistentCache('profile', updatedProfile);
+      }
+
+      // If TDEE inputs changed, refresh today's burned row (existing row only; best-effort).
+      // Height/activity/gender/dob are not backdated, so today-only is sufficient.
+      if (
+        userId &&
+        (variables.activity_level !== undefined ||
+          variables.height_cm !== undefined ||
+          variables.gender !== undefined ||
+          variables.date_of_birth !== undefined)
+      ) {
+        try {
+          await refreshBurnedTodayFromProfileChange(userId);
+          queryClient.invalidateQueries({ queryKey: ['dailySumBurned', userId] });
+          queryClient.invalidateQueries({ queryKey: ['dailySumBurnedRange', userId] });
+        } catch (e) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('Error refreshing daily_sum_burned after profile change', e);
+          }
+        }
       }
 
       // If water_goal_ml was updated, sync today's water_daily.goal_ml

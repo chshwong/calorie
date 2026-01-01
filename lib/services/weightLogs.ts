@@ -130,6 +130,71 @@ export async function fetchLatestBodyFatTimestamp(userId: string): Promise<strin
   }
 }
 
+/**
+ * Fetch the most recent weigh-in at or before the given timestamp.
+ * Used for historical "effective weight" computations.
+ */
+export async function fetchLatestWeighInAtOrBefore(
+  userId: string,
+  atOrBeforeISO: string
+): Promise<{ weighed_at: string; weight_lb: number } | null> {
+  if (!userId || !atOrBeforeISO) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('weight_log')
+      .select('weighed_at, weight_lb')
+      .eq('user_id', userId)
+      .lte('weighed_at', atOrBeforeISO)
+      .order('weighed_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching latest weigh-in at/before', error);
+      return null;
+    }
+
+    if (!data) return null;
+    return { weighed_at: data.weighed_at as string, weight_lb: data.weight_lb as number };
+  } catch (err) {
+    console.error('Exception fetching latest weigh-in at/before', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch the next weigh-in strictly after the given timestamp.
+ * Used to bound the affected window when a weigh-in changes.
+ */
+export async function fetchNextWeighInAfter(
+  userId: string,
+  afterISO: string
+): Promise<string | null> {
+  if (!userId || !afterISO) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('weight_log')
+      .select('weighed_at')
+      .eq('user_id', userId)
+      .gt('weighed_at', afterISO)
+      .order('weighed_at', { ascending: true, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching next weigh-in after', error);
+      return null;
+    }
+
+    return (data?.weighed_at as string | undefined) ?? null;
+  } catch (err) {
+    console.error('Exception fetching next weigh-in after', err);
+    return null;
+  }
+}
+
 export async function insertWeightLogRow(input: {
   userId: string;
   weighedAt: Date;

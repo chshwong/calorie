@@ -44,6 +44,9 @@ export const PROFILES = {
 export const BURNED = {
   TDEE_KCAL: { MIN: 0, MAX: 15000 },
   WARNING_KCAL: 6000,
+  // How far back we may recompute system_* burned values after a weight-log change.
+  // Keep centralized to avoid hardcoding "21" across the codebase.
+  REFRESH_LOOKBACK_DAYS: 21,
 } as const;
 
   // Daily nutrient target ranges (for onboarding and daily focus targets)

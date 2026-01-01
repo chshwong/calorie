@@ -3,6 +3,7 @@ import type { DailySumBurned } from '@/utils/types';
 import { getUserConfig } from '@/lib/services/userConfig';
 import { computeSystemBurnedDefaults } from '@/lib/domain/burned/systemBurnedDefaults';
 import { getDailySumBurnedByDate, insertDailySumBurned } from '@/lib/services/burned/dailySumBurned';
+import { fetchLatestWeighInAtOrBefore } from '@/lib/services/weightLogs';
 
 /**
  * CANONICAL SERVICE FUNCTION (SPEC)
@@ -38,11 +39,17 @@ export async function getOrCreateDailySumBurned(
     throw new Error('BURNED_DEFAULTS_PROFILE_MISSING');
   }
 
+  // Use historical weight if available: latest weigh-in at/before the local end-of-day for entryDate.
+  const endOfDayISO = endOfLocalDayISO(entryDate);
+  const weightLog = await fetchLatestWeighInAtOrBefore(userId, endOfDayISO);
+  const effectiveWeightLb =
+    typeof weightLog?.weight_lb === 'number' ? weightLog.weight_lb : userConfig.weight_lb;
+
   const defaults = computeSystemBurnedDefaults({
     gender: userConfig.gender,
     date_of_birth: userConfig.date_of_birth,
     height_cm: userConfig.height_cm,
-    weight_lb: userConfig.weight_lb,
+    weight_lb: effectiveWeightLb,
     activity_level: userConfig.activity_level,
   });
 
@@ -84,6 +91,13 @@ export async function getOrCreateDailySumBurned(
 
   // 5) Return the row
   return inserted;
+}
+
+function endOfLocalDayISO(dateKey: string): string {
+  // dateKey is YYYY-MM-DD (local calendar day). Build a local Date and convert to ISO for DB comparisons.
+  const [y, m, d] = dateKey.split('-').map((x) => parseInt(x, 10));
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999);
+  return dt.toISOString();
 }
 
 

@@ -65,9 +65,6 @@ export const ModulePreferencesStep: React.FC<ModulePreferencesStepProps> = ({
       <ThemedText style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
         {t('onboarding.module_preferences.subtitle')}
       </ThemedText>
-      <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
-        {t('onboarding.module_preferences.helper')}
-      </ThemedText>
 
       <View style={styles.cardStack}>
         {OPTIONS.map((opt) => {
@@ -143,11 +140,6 @@ const styles = StyleSheet.create({
     ...Typography.bodyLarge,
     textAlign: 'center',
     marginTop: -Spacing.sm,
-  },
-  helperText: {
-    ...Typography.bodySmall,
-    textAlign: 'center',
-    marginTop: -Spacing.md,
   },
   cardStack: {
     gap: Spacing.md,
