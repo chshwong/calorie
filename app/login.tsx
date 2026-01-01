@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -30,8 +30,6 @@ import {
   getMinTouchTargetStyle,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
-
-const ENABLE_FACEBOOK_AUTH = process.env.EXPO_PUBLIC_FACEBOOK_ENABLED === 'true';
 
 function HeroVisualComposite({
   colors,
@@ -258,20 +256,22 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const [country, setCountry] = useState<string | null>(null);
+  const searchParams = useLocalSearchParams<{ country?: string | string[] }>();
   const [email, setEmail] = useState('');
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const [facebookLoading, setFacebookLoading] = useState(false);
-  const [facebookError, setFacebookError] = useState<string | null>(null);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { width: screenWidth } = useWindowDimensions();
   const isTwoCol = screenWidth >= 1024;
   const isWeb = Platform.OS === 'web';
+
+  const countryParamRaw = searchParams?.country;
+  const countryParam = Array.isArray(countryParamRaw) ? countryParamRaw[0] : countryParamRaw;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -284,11 +284,23 @@ export default function LoginScreen() {
   useEffect(() => {
     if (!isWeb) return;
 
+    // If the override is removed, reset back to auto-detection.
+    if (!countryParam) setCountry(null);
+
+    if (countryParam === 'CA') {
+      setCountry('CA');
+      return;
+    }
+    if (countryParam === 'NotCanada') {
+      setCountry('NotCanada');
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await fetch('/api/geo', { method: 'GET' });
+        const res = await fetch('/api/geo', { method: 'GET', cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         const c = typeof data?.country === 'string' ? data.country.toUpperCase() : null;
@@ -301,7 +313,7 @@ export default function LoginScreen() {
     return () => {
       cancelled = true;
     };
-  }, [isWeb]);
+  }, [isWeb, countryParam]);
 
   // Show brief spinner only while auth is initializing
   if (authLoading) {
@@ -368,7 +380,6 @@ export default function LoginScreen() {
     if (googleLoading) return;
     setGoogleLoading(true);
     setGoogleError(null);
-    setFacebookError(null);
 
     try {
       const redirectTo = getOAuthRedirectTo();
@@ -393,37 +404,6 @@ export default function LoginScreen() {
       if (Platform.OS !== 'web') showAppToast(t('auth.callback.coming_soon_title'));
     } finally {
       setGoogleLoading(false);
-    }
-  };
-
-  const handleFacebookLogin = async () => {
-    if (!ENABLE_FACEBOOK_AUTH) return;
-    if (facebookLoading) return;
-
-    setFacebookLoading(true);
-    setFacebookError(null);
-    setGoogleError(null);
-
-    try {
-      const redirectTo = getOAuthRedirectTo();
-      if (Platform.OS === 'web') {
-        setPendingLinkState({ targetProvider: 'facebook', stage: 'auth_start', startedAt: Date.now() });
-      }
-
-      const { error } = await signInWithOAuth({
-        provider: 'facebook',
-        redirectTo,
-      });
-
-      if (error) {
-        if (process.env.NODE_ENV !== 'production') console.error(error);
-        setFacebookError(t('auth.login.error_facebook_sign_in_failed'));
-        clearPendingLinkState();
-        return;
-      }
-      if (Platform.OS !== 'web') showAppToast(t('auth.callback.coming_soon_title'));
-    } finally {
-      setFacebookLoading(false);
     }
   };
 
@@ -544,27 +524,13 @@ export default function LoginScreen() {
                 },
               ]}
             >
-              {country === 'CA' ? (
-                <View
-                  style={[
-                    styles.caBadge,
-                    {
-                      backgroundColor: colors.tintLight,
-                      borderColor: colors.cardBorder ?? colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.caBadgeText, { color: colors.text }]}>
-                    🇨🇦 Canadian-made
-                  </Text>
-                </View>
-              ) : null}
-
               <ThemedText
                 style={[styles.heroH1, isTwoCol ? styles.heroH1Desktop : null, { color: colors.text }]}
                 accessibilityRole="header"
               >
-                Simple nutrition tracking that stays out of your way.
+                {country === 'CA'
+                  ? 'Simple nutrition tracking, built for Canadians.'
+                  : 'Simple nutrition tracking that stays out of your way.'}
               </ThemedText>
 
               <ThemedText style={[styles.heroSub, isTwoCol ? styles.heroSubDesktop : null, { color: colors.textSecondary }]}>
@@ -718,80 +684,6 @@ export default function LoginScreen() {
                     )}
                   </Pressable>
 
-                  {/* Secondary + microtrust */}
-                  <View style={{ gap: 10 }}>
-                    <Pressable
-                      onPress={handleFacebookLogin}
-                      disabled={!ENABLE_FACEBOOK_AUTH || facebookLoading}
-                      accessibilityState={{ disabled: !ENABLE_FACEBOOK_AUTH || facebookLoading }}
-                      {...getButtonAccessibilityProps(
-                        facebookLoading ? 'Signing in with Facebook' : 'Continue with Facebook',
-                        'Continue with Facebook',
-                        !ENABLE_FACEBOOK_AUTH || facebookLoading
-                      )}
-                      style={({ pressed, focused, hovered }: { pressed: boolean; focused: boolean; hovered?: boolean }) => [
-                        styles.secondaryButton,
-                        getMinTouchTargetStyle(),
-                        {
-                          height: buttonHeight,
-                          borderColor: colors.border,
-                          backgroundColor: colors.backgroundSecondary,
-                          opacity: !ENABLE_FACEBOOK_AUTH || facebookLoading ? 0.5 : pressed ? 0.92 : 1,
-                          transform:
-                            isWeb && hovered && !pressed && ENABLE_FACEBOOK_AUTH && !facebookLoading ? [{ translateY: -1 }] : [{ translateY: 0 }],
-                        },
-                        focused && isWeb
-                          ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
-                          : null,
-                      ]}
-                    >
-                      {facebookLoading ? (
-                        <View style={styles.buttonLoading} accessibilityElementsHidden={true}>
-                          <ActivityIndicator color={colors.text} size="small" />
-                          <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                            Signing in…
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={styles.buttonInner}>
-                          <View style={[styles.leftIconPill, { backgroundColor: '#1877F2' }]}>
-                            <Text style={[styles.leftIconText, { color: '#FFFFFF' }]}>f</Text>
-                          </View>
-                          <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                            Continue with Facebook
-                          </Text>
-                        </View>
-                      )}
-                    </Pressable>
-
-                    {!ENABLE_FACEBOOK_AUTH ? (
-                      <ThemedText style={[styles.comingSoon, { color: colors.textSecondary }]}>
-                        Coming soon
-                      </ThemedText>
-                    ) : null}
-
-                    {facebookError ? (
-                      <View
-                        style={[
-                          styles.errorContainer,
-                          { backgroundColor: colors.errorLight, borderColor: colors.error },
-                        ]}
-                        accessibilityRole="alert"
-                        accessibilityLiveRegion="polite"
-                        {...(isWeb ? { role: 'alert', 'aria-live': 'polite' as const } : {})}
-                      >
-                        <IconSymbol name="info.circle.fill" size={18} color={colors.error} />
-                        <ThemedText style={[styles.errorText, { color: colors.error }]}>
-                          {facebookError}
-                        </ThemedText>
-                      </View>
-                    ) : null}
-
-                    <ThemedText style={[styles.secureLine, { color: colors.textSecondary }]}>
-                      Secure sign-in
-                    </ThemedText>
-                  </View>
-
                   {/* Divider */}
                   <View style={styles.dividerContainer}>
                     <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
@@ -920,11 +812,6 @@ export default function LoginScreen() {
                     ) : null}
                   </View>
 
-                  {/* Trust line */}
-                  <ThemedText style={[styles.trustLine, { color: colors.textSecondary }]}>
-                    No subscriptions. No ads. Your data stays private.
-                  </ThemedText>
-
                   {/* Legal footer */}
                   <View style={[styles.legalRow, { borderTopColor: colors.border }]}>
                     <Pressable
@@ -1022,19 +909,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexGrow: 1,
     flexShrink: 1,
-  },
-  caBadge: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderRadius: 9999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginBottom: 14,
-  },
-  caBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.2,
   },
   heroH1: {
     fontSize: 28,
