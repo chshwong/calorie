@@ -116,7 +116,9 @@
   "burned": {
     "modal": {
       "title": "Estimated Day Burn",
-      "estimated_banner": "Estimated (no food logged for this day)"
+      "estimated_banner": "Estimates are based on your profile. For better accuracy, use data from your wearable device.",
+      "high_value_warning": "Value looks unusually high, please double check",
+      "too_high": "Value is too high, please correct"
     },
     "day": {
       "net": "Net"
@@ -128,15 +130,23 @@
       "placeholder": "0"
     },
     "actions": {
-      "reset": "Reset"
+      "reset": "Reset",
+      "reset_estimates": "Reset Estimates"
     },
     "errors": {
       "load_failed": "Could not load burned calories.",
       "no_changes": "Make a change before saving.",
       "invalid_number": "Please enter a valid non-negative number.",
       "tdee_below_bmr": "TDEE cannot be below your system BMR.",
+      "max_kcal": "Max is 15,000 kcal.",
       "save_failed": "Could not save burned calories.",
       "reset_failed": "Could not reset burned calories."
+    },
+    "warning": {
+      "title": "Unusually high burn",
+      "body": "6,000+ kcal is rare. Double-check your wearable or workout entry.",
+      "cancel": "Cancel",
+      "save_anyway": "Save anyway"
     },
     "toast": {
       "saved": "Burned calories saved.",

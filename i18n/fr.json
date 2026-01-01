@@ -112,6 +112,27 @@
     "admin_button": "ADMIN"
   },
 
+  "burned": {
+    "modal": {
+      "title": "Dépense quotidienne estimée",
+      "estimated_banner": "Les estimations sont basées sur votre profil. Pour plus de précision, utilisez les données de votre appareil connecté.",
+      "high_value_warning": "La valeur semble inhabituellement élevée, veuillez vérifier",
+      "too_high": "La valeur est trop élevée, veuillez corriger"
+    },
+    "actions": {
+      "reset_estimates": "Réinitialiser les estimations"
+    },
+    "errors": {
+      "max_kcal": "Le maximum est de 15 000 kcal."
+    },
+    "warning": {
+      "title": "Dépense inhabituellement élevée",
+      "body": "6 000+ kcal est rare. Vérifiez votre appareil connecté ou votre saisie d’entraînement.",
+      "cancel": "Annuler",
+      "save_anyway": "Enregistrer quand même"
+    }
+  },
+
   "auth": {
     "login": {
       "title": "Bon retour",

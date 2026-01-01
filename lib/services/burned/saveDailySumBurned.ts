@@ -2,6 +2,7 @@ import { toDateKey } from '@/utils/dateKey';
 import type { DailySumBurned } from '@/utils/types';
 import { getOrCreateDailySumBurned } from '@/lib/services/burned/getOrCreateDailySumBurned';
 import { updateDailySumBurnedById } from '@/lib/services/burned/dailySumBurned';
+import { BURNED } from '@/constants/constraints';
 
 export type BurnedTouchedFields = {
   bmr: boolean;
@@ -52,6 +53,9 @@ export async function saveDailySumBurned(params: {
       throw new Error('BURNED_TDEE_BELOW_BMR');
     }
     const derivedTdee = nextTdee;
+    if (derivedTdee > BURNED.TDEE_KCAL.MAX) {
+      throw new Error('BURNED_MAX_EXCEEDED');
+    }
 
     return updateDailySumBurnedById({
       userId,
@@ -78,6 +82,9 @@ export async function saveDailySumBurned(params: {
   const tdeeCal = bmrCal + activeCal;
   if (tdeeCal < 0) {
     throw new Error('BURNED_NEGATIVE_NOT_ALLOWED');
+  }
+  if (tdeeCal > BURNED.TDEE_KCAL.MAX) {
+    throw new Error('BURNED_MAX_EXCEEDED');
   }
 
   const bmrOverridden = touched.bmr ? true : row.bmr_overridden;

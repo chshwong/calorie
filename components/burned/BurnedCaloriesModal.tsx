@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -7,22 +7,22 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
-import { RANGES } from '@/constants/constraints';
+import { BURNED, RANGES } from '@/constants/constraints';
 import { getMinTouchTargetStyle, getFocusStyle, getButtonAccessibilityProps } from '@/utils/accessibility';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import { useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
 import { showAppToast } from '@/components/ui/app-toast';
+import { validateBurnedTdeeKcal } from '@/utils/validation';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   entryDate: string; // YYYY-MM-DD
-  hasFoodEntries: boolean;
 };
 
 type Field = 'bmr' | 'active' | 'tdee';
 
-export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntries }: Props) {
+export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
@@ -73,6 +73,22 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
     return { bmr, active, tdee };
   }, [bmrText, activeText, tdeeText]);
 
+  const candidateTdeeToSave = useMemo(() => {
+    if (!burnedRow) return null;
+    const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : burnedRow.bmr_cal;
+    const active = Number.isFinite(parsed.active) ? parsed.active : burnedRow.active_cal;
+    // Spec invariant: tdee = bmr + active when saving manual overrides via this modal UI.
+    return bmr + active;
+  }, [burnedRow?.id, parsed.bmr, parsed.active]);
+
+  const isTooHighBurn =
+    candidateTdeeToSave !== null && candidateTdeeToSave >= BURNED.TDEE_KCAL.MAX;
+
+  const shouldWarnHighBurn =
+    candidateTdeeToSave !== null &&
+    candidateTdeeToSave >= BURNED.WARNING_KCAL &&
+    candidateTdeeToSave < BURNED.TDEE_KCAL.MAX;
+
   const validate = (): boolean => {
     if (!didResetToSystem && !touched.bmr && !touched.active && !touched.tdee) {
       setValidationError(t('burned.errors.no_changes'));
@@ -91,6 +107,14 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
     if (touched.tdee && burnedRow && Number.isFinite(parsed.tdee) && parsed.tdee < burnedRow.system_bmr_cal) {
       setValidationError(t('burned.errors.tdee_below_bmr'));
       return false;
+    }
+
+    if (candidateTdeeToSave !== null) {
+      const res = validateBurnedTdeeKcal(candidateTdeeToSave);
+      if (!res.valid) {
+        setValidationError(t(res.errorKey ?? 'burned.errors.save_failed'));
+        return false;
+      }
     }
 
     setValidationError(null);
@@ -114,7 +138,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
     // IMPORTANT: no onClose(), no network calls.
   };
 
-  const handleSave = async () => {
+  const persistSave = async () => {
     if (!burnedRow) return;
     if (!validate()) return;
 
@@ -166,12 +190,32 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
       const msg = String(e?.message ?? '');
       if (msg === 'BURNED_TDEE_BELOW_BMR') {
         setValidationError(t('burned.errors.tdee_below_bmr'));
+      } else if (msg === 'BURNED_MAX_EXCEEDED') {
+        setValidationError(t('burned.errors.max_kcal'));
       } else if (msg === 'BURNED_NEGATIVE_NOT_ALLOWED' || msg === 'BURNED_INVALID_NUMBER') {
         setValidationError(t('burned.errors.invalid_number'));
       } else {
         setValidationError(t('burned.errors.save_failed'));
       }
     }
+  };
+
+  const handleSave = async () => {
+    if (!burnedRow) return;
+
+    // UI guard: do not allow saving at/above the hard threshold; user must correct first.
+    if (isTooHighBurn) return;
+
+    const isManualSaveAttempt = touched.bmr || touched.active || touched.tdee;
+    if (isManualSaveAttempt && shouldWarnHighBurn) {
+      Alert.alert(t('burned.warning.title'), t('burned.warning.body'), [
+        { text: t('burned.warning.cancel'), style: 'cancel' },
+        { text: t('burned.warning.save_anyway'), style: 'destructive', onPress: () => void persistSave() },
+      ]);
+      return;
+    }
+
+    await persistSave();
   };
 
   const handleReset = async () => {
@@ -195,13 +239,11 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
             </TouchableOpacity>
           </View>
 
-          {!hasFoodEntries && (
-            <View style={[styles.banner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-              <ThemedText style={[styles.bannerText, { color: colors.textSecondary }]}>
-                {t('burned.modal.estimated_banner')}
-              </ThemedText>
-            </View>
-          )}
+          <View style={[styles.banner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <ThemedText style={[styles.bannerText, { color: colors.textSecondary }]}>
+              {t('burned.modal.estimated_banner')}
+            </ThemedText>
+          </View>
 
           {isBusy && !burnedRow ? (
             <View style={styles.loading}>
@@ -225,6 +267,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
                 <View style={styles.chipWrap}>
                   <InlineEditableNumberChip
                     value={Number.isFinite(parsed.bmr) ? parsed.bmr : null}
+                    disabled
                     onCommit={(next) => {
                       const nextBmr = next ?? 0;
                       markTouched('bmr');
@@ -258,6 +301,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
                 <View style={styles.chipWrap}>
                   <InlineEditableNumberChip
                     value={Number.isFinite(parsed.active) ? parsed.active : null}
+                    showEditIcon
                     onCommit={(next) => {
                       const nextActive = next ?? 0;
                       markTouched('active');
@@ -291,6 +335,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
                 <View style={styles.chipWrap}>
                   <InlineEditableNumberChip
                     value={Number.isFinite(parsed.tdee) ? parsed.tdee : null}
+                    showEditIcon
                     onCommit={(next) => {
                       const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
                       const requestedTdee = next ?? 0;
@@ -320,6 +365,36 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
                 </View>
               </View>
 
+              <TouchableOpacity
+                onPress={handleReset}
+                disabled={isBusy}
+                activeOpacity={0.8}
+                style={[styles.resetLinkWrap, Platform.OS === 'web' && getFocusStyle(colors.info)]}
+                {...getButtonAccessibilityProps(t('burned.actions.reset_estimates'))}
+              >
+                <ThemedText style={[styles.resetLinkText, { color: colors.info }]}>
+                  {t('burned.actions.reset_estimates')}
+                </ThemedText>
+              </TouchableOpacity>
+
+              {shouldWarnHighBurn && (
+                <View style={[styles.warnRow, { backgroundColor: colors.warningLight, borderColor: colors.warning }]}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={14} color={colors.warning} decorative />
+                  <ThemedText style={[styles.warnText, { color: colors.warning }]}>
+                    {t('burned.modal.high_value_warning')}
+                  </ThemedText>
+                </View>
+              )}
+
+              {isTooHighBurn && (
+                <View style={[styles.warnRow, { backgroundColor: colors.errorLight, borderColor: colors.error }]}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={14} color={colors.error} decorative />
+                  <ThemedText style={[styles.warnText, { color: colors.error }]}>
+                    {t('burned.modal.too_high')}
+                  </ThemedText>
+                </View>
+              )}
+
               {validationError && (
                 <ThemedText style={[styles.errorText, { color: colors.chartRed }]}>{validationError}</ThemedText>
               )}
@@ -332,23 +407,24 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate, hasFoodEntrie
                     getMinTouchTargetStyle(),
                     Platform.OS === 'web' && getFocusStyle(colors.tint),
                   ]}
-                  onPress={handleReset}
+                  onPress={onClose}
                   disabled={isBusy}
                   activeOpacity={0.8}
-                  {...getButtonAccessibilityProps(t('burned.actions.reset'))}
+                  {...getButtonAccessibilityProps(t('common.cancel'))}
                 >
-                  <ThemedText style={[styles.resetText, { color: colors.text }]}>{t('burned.actions.reset')}</ThemedText>
+                  <ThemedText style={[styles.resetText, { color: colors.text }]}>{t('common.cancel')}</ThemedText>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.saveBtn,
                     { backgroundColor: colors.tint },
+                    isTooHighBurn && { opacity: 0.45 },
                     getMinTouchTargetStyle(),
                     Platform.OS === 'web' && getFocusStyle('#fff'),
                   ]}
                   onPress={handleSave}
-                  disabled={isBusy}
+                  disabled={isBusy || isTooHighBurn}
                   activeOpacity={0.85}
                   {...getButtonAccessibilityProps(t('common.save'))}
                 >
@@ -415,6 +491,31 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.lg,
     paddingTop: Spacing.sm,
     gap: Spacing.md,
+  },
+  resetLinkWrap: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.xs,
+    ...getMinTouchTargetStyle(),
+  },
+  resetLinkText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+  warnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    marginTop: -Spacing.xs,
+  },
+  warnText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
   },
   row: {
     flexDirection: 'row',

@@ -39,6 +39,13 @@ export const PROFILES = {
     WATER_PRESET_SLOT: { MIN: 1, MAX: 5 },      // DB: water_quick_presets_slot_check
   } as const;
 
+// Burned calories (daily_sum_burned) — app/DB policy.
+// Keep in sync with DB constraints (see supabase-add-burned-max-kcal.sql).
+export const BURNED = {
+  TDEE_KCAL: { MIN: 0, MAX: 15000 },
+  WARNING_KCAL: 6000,
+} as const;
+
   // Daily nutrient target ranges (for onboarding and daily focus targets)
   export const NUTRIENT_TARGETS = {
     PROTEIN_G: { MIN: 80, MAX: 250, STEP: 5 },

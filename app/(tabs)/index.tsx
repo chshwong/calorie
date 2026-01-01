@@ -1564,7 +1564,6 @@ export default function FoodLogHomeScreen() {
         visible={burnedModalVisible}
         onClose={() => setBurnedModalVisible(false)}
         entryDate={selectedDateString}
-        hasFoodEntries={hasFoodEntries}
       />
     </ThemedView>
   );

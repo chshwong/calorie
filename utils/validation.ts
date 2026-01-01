@@ -8,12 +8,49 @@
 // constants/constraints.ts is where lives all the constraints constants that his file refers to.
 // to change ranges or other constraints, refer to constants/constraints
 
-import { PROFILES, DERIVED, POLICY } from '@/constants/constraints';
+import { PROFILES, DERIVED, POLICY, BURNED } from '@/constants/constraints';
 
 export type ValidationResult = {
   valid: boolean;
   error?: string;
 };
+
+export type BurnedTdeeValidationResult = {
+  valid: boolean;
+  errorKey?: string;
+  shouldWarn: boolean;
+};
+
+/**
+ * Validates a candidate "Burned Today" total (TDEE) in kcal.
+ *
+ * Rules:
+ * - Must be a finite integer
+ * - Must be within [MIN, MAX]
+ * - shouldWarn when >= WARNING_KCAL (non-blocking)
+ *
+ * Note: UI may allow empty while editing; callers should only invoke this
+ * for values they intend to persist.
+ */
+export function validateBurnedTdeeKcal(rawValue: number): BurnedTdeeValidationResult {
+  if (!Number.isFinite(rawValue)) {
+    return { valid: false, errorKey: 'burned.errors.invalid_number', shouldWarn: false };
+  }
+
+  const value = Math.trunc(rawValue);
+  if (value < BURNED.TDEE_KCAL.MIN) {
+    return { valid: false, errorKey: 'burned.errors.invalid_number', shouldWarn: false };
+  }
+
+  if (value > BURNED.TDEE_KCAL.MAX) {
+    return { valid: false, errorKey: 'burned.errors.max_kcal', shouldWarn: false };
+  }
+
+  return {
+    valid: true,
+    shouldWarn: value >= BURNED.WARNING_KCAL,
+  };
+}
 
 /**
  * Validates preferred name with visible rules only:

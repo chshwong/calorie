@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, TextInput, TouchableOpacity, View, type TextStyle, type ViewStyle } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Animated, Platform, StyleSheet, TextInput, TouchableOpacity, View, type TextStyle, type ViewStyle } from 'react-native';
 
-import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 
 type ColorScheme = typeof Colors.light | typeof Colors.dark;
@@ -18,6 +18,7 @@ export type InlineEditableNumberChipProps = {
   max?: number;
   allowNull?: boolean;
   disabled?: boolean;
+  showEditIcon?: boolean;
   colors: ColorScheme;
   commitOnBlur?: boolean;
   inputWidth?: number;
@@ -41,6 +42,7 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
     max,
     allowNull = true,
     disabled = false,
+    showEditIcon = false,
     colors,
     commitOnBlur = true,
     inputWidth = 50,
@@ -199,7 +201,7 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
             onChangeText={handleInputChange}
             onBlur={commitOnBlur ? commit : undefined}
             onSubmitEditing={commit}
-            keyboardType={Platform.OS === 'web' ? 'text' : 'number-pad'}
+            keyboardType={Platform.OS === 'web' ? 'default' : 'number-pad'}
             maxLength={typeof max === 'number' ? String(max).length : undefined}
             selectTextOnFocus
           />
@@ -240,7 +242,14 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
           activeOpacity={0.7}
           {...getButtonAccessibilityProps(accessibilityLabel ?? t('common.edit'))}
         >
-          <ThemedText style={[styles.badgeText, { color: badgeTextColor }, badgeTextStyle]}>{displayText}</ThemedText>
+          <View style={styles.badgeContent}>
+            <ThemedText style={[styles.badgeText, { color: badgeTextColor }, badgeTextStyle]}>{displayText}</ThemedText>
+            {showEditIcon && !disabled && (
+              <View style={styles.editIconWrap}>
+                <IconSymbol name="pencil" size={12} color={badgeTextColor} decorative />
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       )}
     </View>
@@ -253,13 +262,20 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    minWidth: 60,
     alignItems: 'center',
     ...getMinTouchTargetStyle(),
   },
   badgeText: {
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  badgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editIconWrap: {
+    marginLeft: Spacing.xs,
   },
   editorContainer: {
     flexDirection: 'row',

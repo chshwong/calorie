@@ -45,6 +45,7 @@ const MAPPING = {
   'chart.bar.fill': 'bar-chart',
   'checkmark': 'check',
   'checkmark.circle.fill': 'check-circle',
+  'exclamationmark.triangle.fill': 'warning',
   'barcode.viewfinder': { type: 'community', name: 'barcode' },
   'magnifyingglass': 'search',
   'plus.circle.fill': 'add-circle',
