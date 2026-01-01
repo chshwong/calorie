@@ -20,6 +20,7 @@ import { Colors } from '@/constants/theme';
 import { ToastProvider } from '@/components/ui/app-toast';
 import { DebugOverlay } from '@/components/DebugOverlay';
 import { setupFocusWarmup } from '@/lib/utils/session-warmup';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 
 // Import QueryClient from separate module to avoid circular dependency with AuthContext
 import { queryClient } from '@/lib/query-client';
@@ -190,6 +191,7 @@ function ThemeProviderWrapper() {
   return (
     <AuthProvider>
       <ToastProvider>
+        <GlobalAuthGuard />
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -215,6 +217,17 @@ function ThemeProviderWrapper() {
       </ToastProvider>
     </AuthProvider>
   );
+}
+
+function GlobalAuthGuard() {
+  // Allow unauthenticated access to a small set of public routes.
+  // Everything else will redirect to /login when logged out.
+  useAuthGuard({
+    requireAuth: true,
+    redirectTo: '/login',
+    publicSegments: ['login', 'auth', 'legal', 'data-deletion', '(minimal)'],
+  });
+  return null;
 }
 
 const styles = StyleSheet.create({

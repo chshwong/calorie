@@ -10,12 +10,19 @@ import { Platform } from 'react-native';
 export function useAuthGuard(options?: {
   requireAuth?: boolean;
   redirectTo?: string;
+  /**
+   * Public route allowlist by first segment (e.g. 'login', 'auth', 'legal').
+   * When provided, unauthenticated users are allowed to stay on these routes
+   * even when requireAuth=true (intended for global guards).
+   */
+  publicSegments?: string[];
 }) {
   const { session, loading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const requireAuth = options?.requireAuth ?? true;
   const redirectTo = options?.redirectTo;
+  const publicSegments = options?.publicSegments;
 
   useEffect(() => {
     // Don't redirect while loading
@@ -24,9 +31,16 @@ export function useAuthGuard(options?: {
     }
 
     const currentRoute = segments[0];
+    const isPublicRoute =
+      !!currentRoute && Array.isArray(publicSegments) && publicSegments.includes(currentRoute);
 
     // Handle authentication requirement
     if (requireAuth && !session) {
+      // Allow public routes through when configured (global guard use-case)
+      if (isPublicRoute) {
+        return;
+      }
+
       // Not authenticated, redirect to login
       if (currentRoute !== 'login') {
         router.replace(redirectTo || '/login');
