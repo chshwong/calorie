@@ -999,28 +999,49 @@ export default function FoodLogHomeScreen() {
 
                 {/* Macro Gauges Row */}
                 <View style={styles.macroGaugeRowWrap}>
-                  <View
-                    style={[
-                      { flexDirection: 'row' },
-                      // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
-                      Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
-                    ]}
-                  >
-                    {/* Protein */}
-                    <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
-                      <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
-                    </View>
+                  <View style={styles.macroGaugeRow}>
+                    <View style={styles.macroGaugeRowGauges}>
+                      <View
+                        style={[
+                          { flexDirection: 'row' },
+                          // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
+                          Platform.OS === 'web' ? ({ columnGap: 10 } as any) : null,
+                        ]}
+                      >
+                        {/* Protein */}
+                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
+                          <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
+                        </View>
 
-                    {/* Fiber */}
-                    <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
-                      <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
-                    </View>
+                        {/* Fiber */}
+                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 10 } : {}) }}>
+                          <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
+                        </View>
 
-                    {/* Carbs */}
-                    <View style={{ flex: 1 }}>
-                      <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                        {/* Carbs */}
+                        <View style={{ flex: 1 }}>
+                          <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                        </View>
+                      </View>
                     </View>
                   </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.macroTargetsGearButtonAbsolute,
+                      getMinTouchTargetStyle(),
+                      Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                    ]}
+                    onPress={() => router.push('/settings/my-goal/edit-targets')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    {...getButtonAccessibilityProps(
+                      t('settings.my_goal.a11y.edit_targets'),
+                      t('settings.my_goal.a11y.navigate_to_edit')
+                    )}
+                  >
+                    <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
+                  </TouchableOpacity>
                 </View>
                 
                 {/* Sub-fats Section - Collapsible */}
@@ -1593,6 +1614,26 @@ const styles = StyleSheet.create({
   },
   macroGaugeRowWrap: {
     marginTop: -10, // extra tightening (safe on web + native)
+    position: 'relative',
+  },
+  macroGaugeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  macroGaugeRowGauges: {
+    flex: 1,
+    minWidth: 0,
+    // Reserve space for the gear button while keeping gauges centered
+    paddingLeft: 32,
+    paddingRight: 32,
+  },
+  macroTargetsGearButtonAbsolute: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContentContainer: {
     flexGrow: 1,

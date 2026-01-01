@@ -30,7 +30,7 @@ import {
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
 
-const ENABLE_FACEBOOK_AUTH = false;
+const ENABLE_FACEBOOK_AUTH = process.env.EXPO_PUBLIC_FACEBOOK_ENABLED === 'true';
 
 function HeroVisualComposite({
   colors,
@@ -263,6 +263,8 @@ export default function LoginScreen() {
   const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+  const [facebookLoading, setFacebookLoading] = useState(false);
+  const [facebookError, setFacebookError] = useState<string | null>(null);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -367,19 +369,89 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
+    if (googleLoading) return;
     setGoogleLoading(true);
     setGoogleError(null);
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        // Redirect back to where the app is now (web only)
-        redirectTo: Platform.OS === 'web' ? window.location.origin : undefined,
-      },
-    });
-    if (error) {
-      console.error(error);
-      setGoogleError(t('auth.login.error_google_sign_in_failed'));
+    setFacebookError(null);
+
+    try {
+      const redirectTo =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          // We handle navigation ourselves so this also works later on native.
+          skipBrowserRedirect: true,
+          // Encourage users to pick the correct Google account.
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+
+      if (error) {
+        console.error(error);
+        setGoogleError(t('auth.login.error_google_sign_in_failed'));
+        return;
+      }
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        if (!data?.url) {
+          setGoogleError(t('auth.login.error_google_sign_in_failed'));
+          return;
+        }
+        window.location.assign(data.url);
+        return;
+      }
+
+      showAppToast('Coming soon');
+    } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleFacebookLogin = async () => {
+    if (!ENABLE_FACEBOOK_AUTH) return;
+    if (facebookLoading) return;
+
+    setFacebookLoading(true);
+    setFacebookError(null);
+    setGoogleError(null);
+
+    try {
+      const redirectTo =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        console.error(error);
+        setFacebookError(t('auth.login.error_facebook_sign_in_failed', { defaultValue: 'Facebook sign-in failed. Please try again.' }));
+        return;
+      }
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        if (!data?.url) {
+          setFacebookError(t('auth.login.error_facebook_sign_in_failed', { defaultValue: 'Facebook sign-in failed. Please try again.' }));
+          return;
+        }
+        window.location.assign(data.url);
+        return;
+      }
+
+      showAppToast('Coming soon');
+    } finally {
+      setFacebookLoading(false);
     }
   };
 
@@ -677,13 +749,13 @@ export default function LoginScreen() {
                   {/* Secondary + microtrust */}
                   <View style={{ gap: 10 }}>
                     <Pressable
-                      onPress={() => showAppToast('Coming soon')}
-                      disabled={!ENABLE_FACEBOOK_AUTH}
-                      accessibilityState={{ disabled: !ENABLE_FACEBOOK_AUTH }}
+                      onPress={handleFacebookLogin}
+                      disabled={!ENABLE_FACEBOOK_AUTH || facebookLoading}
+                      accessibilityState={{ disabled: !ENABLE_FACEBOOK_AUTH || facebookLoading }}
                       {...getButtonAccessibilityProps(
+                        facebookLoading ? 'Signing in with Facebook' : 'Continue with Facebook',
                         'Continue with Facebook',
-                        'Continue with Facebook',
-                        !ENABLE_FACEBOOK_AUTH
+                        !ENABLE_FACEBOOK_AUTH || facebookLoading
                       )}
                       style={({ pressed, focused, hovered }: { pressed: boolean; focused: boolean; hovered?: boolean }) => [
                         styles.secondaryButton,
@@ -692,29 +764,55 @@ export default function LoginScreen() {
                           height: buttonHeight,
                           borderColor: colors.border,
                           backgroundColor: colors.backgroundSecondary,
-                          opacity: !ENABLE_FACEBOOK_AUTH ? 0.5 : pressed ? 0.92 : 1,
+                          opacity: !ENABLE_FACEBOOK_AUTH || facebookLoading ? 0.5 : pressed ? 0.92 : 1,
                           transform:
-                            isWeb && hovered && !pressed && ENABLE_FACEBOOK_AUTH ? [{ translateY: -1 }] : [{ translateY: 0 }],
+                            isWeb && hovered && !pressed && ENABLE_FACEBOOK_AUTH && !facebookLoading ? [{ translateY: -1 }] : [{ translateY: 0 }],
                         },
                         focused && isWeb
                           ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: colors.tint, outlineOffset: 2 }
                           : null,
                       ]}
                     >
-                      <View style={styles.buttonInner}>
-                        <View style={[styles.leftIconPill, { backgroundColor: '#1877F2' }]}>
-                          <Text style={[styles.leftIconText, { color: '#FFFFFF' }]}>f</Text>
+                      {facebookLoading ? (
+                        <View style={styles.buttonLoading} accessibilityElementsHidden={true}>
+                          <ActivityIndicator color={colors.text} size="small" />
+                          <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+                            Signing in…
+                          </Text>
                         </View>
-                        <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                          Continue with Facebook
-                        </Text>
-                      </View>
+                      ) : (
+                        <View style={styles.buttonInner}>
+                          <View style={[styles.leftIconPill, { backgroundColor: '#1877F2' }]}>
+                            <Text style={[styles.leftIconText, { color: '#FFFFFF' }]}>f</Text>
+                          </View>
+                          <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+                            Continue with Facebook
+                          </Text>
+                        </View>
+                      )}
                     </Pressable>
 
                     {!ENABLE_FACEBOOK_AUTH ? (
                       <ThemedText style={[styles.comingSoon, { color: colors.textSecondary }]}>
                         Coming soon
                       </ThemedText>
+                    ) : null}
+
+                    {facebookError ? (
+                      <View
+                        style={[
+                          styles.errorContainer,
+                          { backgroundColor: colors.errorLight, borderColor: colors.error },
+                        ]}
+                        accessibilityRole="alert"
+                        accessibilityLiveRegion="polite"
+                        {...(isWeb ? { role: 'alert', 'aria-live': 'polite' as const } : {})}
+                      >
+                        <IconSymbol name="info.circle.fill" size={18} color={colors.error} />
+                        <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                          {facebookError}
+                        </ThemedText>
+                      </View>
                     ) : null}
 
                     <ThemedText style={[styles.secureLine, { color: colors.textSecondary }]}>
