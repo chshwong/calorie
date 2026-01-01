@@ -121,7 +121,7 @@ export default function EditProfileScreen() {
     const normalizedName = normalizeSpaces(preferredName);
     const nameValidation = validatePreferredName(normalizedName);
     if (!nameValidation.valid) {
-      setErrorText(nameValidation.error || 'Please enter a valid name.');
+      setErrorText(nameValidation.error || t('edit_profile.error_invalid_name'));
       return;
     }
 
@@ -169,7 +169,7 @@ export default function EditProfileScreen() {
     const normalizedName = normalizeSpaces(preferredName);
     const nameValidation = validatePreferredName(normalizedName);
     if (!nameValidation.valid) {
-      setErrorText(nameValidation.error || 'Please enter a valid name.');
+      setErrorText(nameValidation.error || t('edit_profile.error_invalid_name'));
       return;
     }
 
@@ -261,7 +261,7 @@ export default function EditProfileScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <StandardSubheader title="Edit Profile" onBack={handleBack} />
+      <StandardSubheader title={t('edit_profile.title')} onBack={handleBack} />
 
       <ScrollView 
         style={styles.scrollView}

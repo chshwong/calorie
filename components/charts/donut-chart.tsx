@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type DonutSegment = {
   value: number;
@@ -32,6 +33,7 @@ export function DonutChart({
   strokeWidth = 12,
   animated = true,
 }: DonutChartProps) {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
@@ -78,7 +80,7 @@ export function DonutChart({
           {centerValue}
         </ThemedText>
         <ThemedText style={[styles.centerLabel, { color: colors.textSecondary }]}>
-          kcal
+          {t('units.kcal')}
         </ThemedText>
       </View>
       

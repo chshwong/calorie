@@ -24,49 +24,44 @@ export default function MyGoalScreen() {
 
   // Helper to format goal type
   const getGoalTypeLabel = (goalType: string | null | undefined): string => {
-    if (!goalType) return 'Not set';
-    const labels: Record<string, string> = {
-      lose: 'Weight loss',
-      maintain: 'Maintain',
-      gain: 'Weight gain',
-      recomp: 'Recomposition',
+    if (!goalType) return t('common.not_set');
+    const keyByGoalType: Record<string, string> = {
+      lose: 'onboarding.goal.lose_weight.label',
+      maintain: 'onboarding.goal.maintain_weight.label',
+      gain: 'onboarding.goal.gain_weight.label',
+      recomp: 'onboarding.goal.recomp.label',
     };
-    return labels[goalType] || goalType;
+    const key = keyByGoalType[goalType];
+    return key ? t(key) : goalType;
   };
 
   // Helper to format activity level
   const getActivityLabel = (activityLevel: string | null | undefined): string => {
-    if (!activityLevel) return 'Not set';
-    const labels: Record<string, string> = {
-      sedentary: 'Sedentary',
-      light: 'Light',
-      moderate: 'Moderate',
-      high: 'High',
-      very_high: 'Very High',
-    };
-    return labels[activityLevel] || activityLevel;
+    if (!activityLevel) return t('common.not_set');
+    const key = `onboarding.activity.${activityLevel}.label`;
+    return t(key);
   };
 
   // Helper to format goal weight
   const getGoalWeightDisplay = (): string => {
-    if (!profile) return 'Not set';
+    if (!profile) return t('common.not_set');
     const weightUnit = profile.weight_unit || 'lb';
     if (weightUnit === 'kg') {
       if (profile.goal_weight_kg) {
-        return `${roundTo1(profile.goal_weight_kg)} kg`;
+        return `${roundTo1(profile.goal_weight_kg)} ${t('units.kg')}`;
       }
       if (profile.goal_weight_lb) {
-        return `${roundTo1(lbToKg(profile.goal_weight_lb))} kg`;
+        return `${roundTo1(lbToKg(profile.goal_weight_lb))} ${t('units.kg')}`;
       }
     } else {
       if (profile.goal_weight_lb) {
-        return `${roundTo1(profile.goal_weight_lb)} lbs`;
+        return `${roundTo1(profile.goal_weight_lb)} ${t('units.lbs')}`;
       }
       if (profile.goal_weight_kg) {
-        return `${roundTo1(profile.goal_weight_kg * 2.20462)} lbs`;
+        return `${roundTo1(profile.goal_weight_kg * 2.20462)} ${t('units.lbs')}`;
       }
     }
-    return 'Not set';
+    return t('common.not_set');
   };
 
   if (isLoading) {
@@ -74,7 +69,7 @@ export default function MyGoalScreen() {
       <ThemedView style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={colors.tint} />
         <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
-          Loading...
+          {t('common.loading')}
         </ThemedText>
       </ThemedView>
     );
@@ -97,37 +92,37 @@ export default function MyGoalScreen() {
           style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
           onPress={() => openMyGoalEdit(router, 'goal')}
           activeOpacity={0.7}
-          {...getLinkAccessibilityProps('Edit Goal', AccessibilityHints.EDIT)}
+          {...getLinkAccessibilityProps(t('settings.my_goal.a11y.edit_goal'), AccessibilityHints.EDIT)}
         >
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconContainer, { backgroundColor: colors.tint + '15' }]}>
               <IconSymbol name="target" size={24} color={colors.tint} />
             </View>
             <View style={styles.cardHeaderText}>
-              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Goal</ThemedText>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>{t('settings.my_goal.cards.goal.title')}</ThemedText>
             </View>
             <IconSymbol 
               name="chevron.right" 
               size={20} 
               color={colors.textSecondary}
-              {...getIconAccessibilityProps('Navigate to edit', true)}
+              {...getIconAccessibilityProps(t('settings.my_goal.a11y.navigate_to_edit'), true)}
             />
           </View>
           <View style={styles.cardContent}>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Goal Type:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.goal.goal_type')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
                 {getGoalTypeLabel(profile?.goal_type)}
               </ThemedText>
             </View>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Goal Weight:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.goal.goal_weight')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
                 {getGoalWeightDisplay()}
               </ThemedText>
             </View>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Activity Level:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.goal.activity_level')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
                 {getActivityLabel(profile?.activity_level)}
               </ThemedText>
@@ -140,34 +135,34 @@ export default function MyGoalScreen() {
           style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
           onPress={() => router.push('/settings/my-goal/edit-calories')}
           activeOpacity={0.7}
-          {...getLinkAccessibilityProps('Edit Daily Calorie Target', AccessibilityHints.EDIT)}
+          {...getLinkAccessibilityProps(t('settings.my_goal.a11y.edit_calories'), AccessibilityHints.EDIT)}
         >
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconContainer, { backgroundColor: colors.tint + '15' }]}>
               <IconSymbol name="chart.bar.fill" size={24} color={colors.tint} />
             </View>
             <View style={styles.cardHeaderText}>
-              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Daily Calorie Target</ThemedText>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>{t('onboarding.calorie_target.title')}</ThemedText>
             </View>
             <IconSymbol 
               name="chevron.right" 
               size={20} 
               color={colors.textSecondary}
-              {...getIconAccessibilityProps('Navigate to edit', true)}
+              {...getIconAccessibilityProps(t('settings.my_goal.a11y.navigate_to_edit'), true)}
             />
           </View>
           <View style={styles.cardContent}>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Target:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.calories.target')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                {profile?.daily_calorie_target ? `${profile.daily_calorie_target} kcal` : 'Not set'}
+                {profile?.daily_calorie_target ? `${profile.daily_calorie_target} ${t('units.kcal')}` : t('common.not_set')}
               </ThemedText>
             </View>
             {profile?.maintenance_calories && (
               <View style={styles.cardRow}>
-                <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Maintenance:</ThemedText>
+                <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.calories.maintenance')}</ThemedText>
                 <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                  {profile.maintenance_calories} kcal
+                  {profile.maintenance_calories} {t('units.kcal')}
                 </ThemedText>
               </View>
             )}
@@ -179,58 +174,58 @@ export default function MyGoalScreen() {
           style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
           onPress={() => router.push('/settings/my-goal/edit-targets')}
           activeOpacity={0.7}
-          {...getLinkAccessibilityProps('Edit Daily Focus Targets', AccessibilityHints.EDIT)}
+          {...getLinkAccessibilityProps(t('settings.my_goal.a11y.edit_targets'), AccessibilityHints.EDIT)}
         >
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconContainer, { backgroundColor: colors.tint + '15' }]}>
               <IconSymbol name="slider.horizontal.3" size={24} color={colors.tint} />
             </View>
             <View style={styles.cardHeaderText}>
-              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Daily Focus Targets</ThemedText>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>{t('onboarding.daily_targets.title')}</ThemedText>
             </View>
             <IconSymbol 
               name="chevron.right" 
               size={20} 
               color={colors.textSecondary}
-              {...getIconAccessibilityProps('Navigate to edit', true)}
+              {...getIconAccessibilityProps(t('settings.my_goal.a11y.navigate_to_edit'), true)}
             />
           </View>
           <View style={styles.cardContent}>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Protein min:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.targets.protein_min')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                {profile?.protein_g_min ? `${profile.protein_g_min} g` : 'Not set'}
+                {profile?.protein_g_min ? `${profile.protein_g_min} ${t('units.g')}` : t('common.not_set')}
               </ThemedText>
             </View>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Fibre min:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.targets.fiber_min')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                {profile?.fiber_g_min ? `${profile.fiber_g_min} g` : 'Not set'}
+                {profile?.fiber_g_min ? `${profile.fiber_g_min} ${t('units.g')}` : t('common.not_set')}
               </ThemedText>
             </View>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Carbs max:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.targets.carbs_max')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                {profile?.carbs_g_max ? `${profile.carbs_g_max} g` : 'Not set'}
+                {profile?.carbs_g_max ? `${profile.carbs_g_max} ${t('units.g')}` : t('common.not_set')}
               </ThemedText>
             </View>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Sugar max:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.targets.sugar_max')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                {profile?.sugar_g_max ? `${profile.sugar_g_max} g` : 'Not set'}
+                {profile?.sugar_g_max ? `${profile.sugar_g_max} ${t('units.g')}` : t('common.not_set')}
               </ThemedText>
             </View>
             <View style={styles.cardRow}>
-              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>Sodium max:</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: colors.textSecondary }]}>{t('settings.my_goal.cards.targets.sodium_max')}</ThemedText>
               <ThemedText style={[styles.cardValue, { color: colors.text }]}>
-                {profile?.sodium_mg_max ? `${profile.sodium_mg_max} mg` : 'Not set'}
+                {profile?.sodium_mg_max ? `${profile.sodium_mg_max} ${t('units.mg')}` : t('common.not_set')}
               </ThemedText>
             </View>
           </View>
         </TouchableOpacity>
 
         <ThemedText style={[styles.disclaimer, { color: colors.textSecondary }]}>
-          AvoVibe offers general guidance only and is not medical advice.
+          {t('settings.my_goal.disclaimer')}
         </ThemedText>
           </View>
         </DesktopPageContainer>

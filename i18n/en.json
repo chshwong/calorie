@@ -7,6 +7,7 @@
     "cancel": "Cancel",
     "edit": "Edit",
     "close": "Close",
+    "close_hint": "Double tap to close menu",
     "loading": "Loading",
     "error": "Error",
     "success": "Success",
@@ -23,7 +24,16 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "add": "Add",
+    "go_back": "Go Back",
+    "not_set": "Not set",
     "no_target": "No target"
+  },
+
+  "nutrition": {
+    "calories": "Calories",
+    "protein": "Protein",
+    "carbs": "Carbs",
+    "fat": "Fat"
   },
 
   "home": {
@@ -55,6 +65,7 @@
       "entry_other": "{{count}} entries",
       "total_calories": "Total Calories",
       "remaining": "remaining",
+      "over_budget": "over budget",
       "more_details": "More Details",
       "protein": "Protein",
       "carbs": "Carbs",
@@ -64,6 +75,8 @@
       "trans_fat": "Trans Fat",
       "sugar": "Sugar",
       "sodium": "Sodium",
+      "other_limits": "Other limits",
+      "hide_other_limits": "Hide other limits",
       "loading_entries": "Loading entries..."
     },
     "date_picker": {
@@ -81,6 +94,15 @@
       "lunch": "Lunch",
       "dinner": "Dinner",
       "afternoon_snack": "Snack"
+    },
+    "meal_menu": {
+      "quick_log": "Quick Log",
+      "quick_log_a11y_label": "Quick Log for {{mealType}}",
+      "quick_log_a11y_hint": "Add quick log for {{mealType}}",
+      "copy_to_another_date_a11y": "Copy {{mealType}} to another date",
+      "move_to_another_date_a11y": "Move {{mealType}} to another date",
+      "notes_a11y_label": "Notes for {{mealType}}",
+      "notes_a11y_hint": "Add or edit notes for {{mealType}}"
     },
     "food_log": {
       "log_food_prompt": "← Log Food",
@@ -140,13 +162,13 @@
       "no_changes": "Make a change before saving.",
       "invalid_number": "Please enter a valid non-negative number.",
       "tdee_below_bmr": "TDEE cannot be below your system BMR.",
-      "max_kcal": "Max is 15,000 kcal.",
+      "max_kcal": "Max is 15,000 cal.",
       "save_failed": "Could not save burned calories.",
       "reset_failed": "Could not reset burned calories."
     },
     "warning": {
       "title": "Unusually high burn",
-      "body": "6,000+ kcal is rare. Double-check your wearable or workout entry.",
+      "body": "6,000+ cal is rare. Double-check your wearable or workout entry.",
       "cancel": "Cancel",
       "save_anyway": "Save anyway"
     },
@@ -163,8 +185,8 @@
       "labels": {
         "burned": "🔥 Burned",
         "eaten": "🍴 Eaten",
-        "deficit": "✅ Deficit",
-        "surplus": "✅ Surplus"
+        "deficit": "Deficit",
+        "surplus": "Surplus"
       },
       "words": {
         "eaten": "Eaten"
@@ -179,7 +201,12 @@
   "food": {
     "menu": {
       "copy_to": "Copy To",
-      "move_to": "Move To"
+      "move_to": "Move To",
+      "notes": "Notes"
+    },
+    "note": {
+      "edit": "Edit notes for {{mealType}}",
+      "save_error": "Failed to save note"
     },
     "copy": {
       "title": "Copy To",
@@ -615,6 +642,9 @@
       "gain_warning_below_maintenance": "Below maintenance — weight gain unlikely.",
       "gain_warning_high": "Higher fat gain likely.",
       "below_safe_minimum": "Below safe minimum",
+      "try_custom_pace_instead": "Try using Set Custom Pace instead",
+      "below_700_not_supported": "Below 700 cal/day is not supported. Choose another target date or weight.",
+      "lower_safety_boundary": "At the lower safety boundary.",
       "unsafe_cannot_select": "This option is unsafe and cannot be selected.",
       "a11y_plan_below_safe_minimum": "This option is below the safe minimum intake.",
       "a11y_select_plan": "Double tap to select {{planTitle}}",
@@ -629,7 +659,7 @@
       "plan_custom": "Set Custom Pace",
       "plan_custom_desc": "Set your own target",
       "below_minimum": "Below recommended minimum intake.",
-      "kcal_per_day": "kcal/day",
+      "kcal_per_day": "cal/day",
       "warning_below_recommended": "Below our recommended minimum, proceed with caution",
       "warning_unsafe": "⚠️ Unsafe, consider changing your target date or weight",
       "warning_critical": "⚠️ This would require an unsafe calorie intake. Choose another target date or weight.",
@@ -729,6 +759,57 @@
       "adjust_activity_level_subtitle": "Update your daily activity setting",
       "my_weight": "My Weight",
       "my_weight_subtitle": "Log or review your weight entries"
+    },
+    "my_goal": {
+      "cards": {
+        "goal": {
+          "title": "Goal",
+          "goal_type": "Goal Type:",
+          "goal_weight": "Goal Weight:",
+          "activity_level": "Activity Level:"
+        },
+        "calories": {
+          "target": "Target:",
+          "maintenance": "Maintenance:"
+        },
+        "targets": {
+          "protein_min": "Protein min:",
+          "fiber_min": "Fiber min:",
+          "carbs_max": "Carbs max:",
+          "sugar_max": "Sugar max:",
+          "sodium_max": "Sodium max:"
+        }
+      },
+      "a11y": {
+        "edit_goal": "Edit Goal",
+        "edit_calories": "Edit Daily Calorie Target",
+        "edit_targets": "Edit Daily Focus Targets",
+        "navigate_to_edit": "Navigate to edit"
+      },
+      "edit_calories": {
+        "sheet_title": "Edit Daily Calorie Target",
+        "toast_missing_target": "Please set a calorie target",
+        "toast_updated": "Daily calories updated",
+        "toast_update_failed": "Failed to update calories. Please try again."
+      },
+      "edit_targets": {
+        "sheet_title": "Edit Daily Focus Targets",
+        "toast_updated": "Focus targets updated",
+        "toast_update_failed": "Failed to update targets. Please try again."
+      },
+      "edit_goal": {
+        "step_title_goal": "Edit Goal",
+        "step_title_goal_weight": "Edit Goal Weight",
+        "step_title_activity_level": "Edit Activity Level",
+        "step_title_daily_calorie_target": "Edit Daily Calorie Target",
+        "toast_select_goal_type": "Please select a goal type",
+        "toast_enter_goal_weight": "Please enter a goal weight",
+        "toast_select_activity_level": "Please select an activity level",
+        "toast_set_calorie_target": "Please set a calorie target",
+        "toast_updated": "Goal updated",
+        "toast_update_failed": "Failed to update goal. Please try again."
+      },
+      "disclaimer": "AvoVibe offers general guidance only and is not medical advice."
     },
     "account": {
       "title": "Account",
@@ -832,6 +913,7 @@
     "go_back": "Go Back",
     "select_date_title": "Select Date of Birth",
     "error_user_not_authenticated": "User not authenticated",
+    "error_invalid_name": "Please enter a valid name.",
     "error_name_dob_required": "Preferred Name and Date of Birth are required",
     "error_update_failed": "Failed to update profile: {{message}}"
   },
@@ -1017,7 +1099,11 @@
       "done": "Done",
       "no_entries": "No entries yet. Add one above!",
       "unknown_food": "Unknown",
-      "select_all": "Select All"
+      "select_all": "Select All",
+      "more_options": "More options",
+      "more_options_hint": "Double tap to open menu",
+      "exit_selection_mode": "Exit selection mode",
+      "exit_selection_mode_hint": "Double tap to exit selection mode"
     },
     
     "form": {

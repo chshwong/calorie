@@ -913,13 +913,13 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
           </View>
           <Text variant="body" style={[styles.presetCalories, { color: textColor }]}>
             {plan.caloriesPerDay !== null && isSelectable
-              ? `${plan.caloriesPerDay} cal/day`
+              ? `${plan.caloriesPerDay} ${t('onboarding.calorie_target.kcal_per_day')}`
               : plan.caloriesPerDay !== null && !isSelectable
               ? plan.caloriesPerDay < HARD_HARD_STOP
                 ? planKey === 'standard'
-                  ? 'Try using Set Custom Pace instead'
-                  : 'Below 700 kcal/day is not supported. Choose another target date or weight.'
-                : 'Below safe minimum'
+                  ? t('onboarding.calorie_target.try_custom_pace_instead')
+                  : t('onboarding.calorie_target.below_700_not_supported')
+                : t('onboarding.calorie_target.below_safe_minimum')
               : ''}
           </Text>
           {paceText && (
@@ -934,7 +934,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
           )}
           {plan.key === 'cautiousMinimum' && plan.isVisible && (
             <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
-              At the lower safety boundary.
+              {t('onboarding.calorie_target.lower_safety_boundary')}
             </Text>
           )}
           {plan.subtitle && (

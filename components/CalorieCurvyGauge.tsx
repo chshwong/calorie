@@ -54,6 +54,15 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
   const pct = safeTarget > 0 ? safeConsumed / safeTarget : 0;
   const fillT = clamp(pct, 0, 1); // cap fill at 100% of path
 
+  const consumedRounded = Math.round(safeConsumed);
+  const percentDisplay = useMemo(() => {
+    if (safeTarget <= 0) return null;
+    const rawPct = (safeConsumed / safeTarget) * 100;
+    if (!Number.isFinite(rawPct)) return null;
+    // 1 decimal, but trim trailing ".0"
+    return rawPct.toFixed(1).replace(/\.0$/, '');
+  }, [safeConsumed, safeTarget]);
+
   // Color rules
   const lineColor = useMemo(() => {
     if (safeTarget <= 0) return colors.textSecondary;
@@ -78,7 +87,9 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
     return ORANGE; // <90%
   }, [pct, goalType, safeTarget, colors.textSecondary, GREEN, ORANGE, PINK, RED, TEAL]);
 
-  const remaining = safeTarget > 0 ? Math.round(safeTarget - safeConsumed) : 0;
+  const remainingRaw = safeTarget > 0 ? Math.round(safeTarget - safeConsumed) : 0;
+  const isOverBudget = safeTarget > 0 && remainingRaw < 0;
+  const remainingAmount = safeTarget > 0 ? (isOverBudget ? Math.abs(remainingRaw) : remainingRaw) : 0;
 
   // SVG geometry (responsive via viewBox)
   const vbW = 320;
@@ -112,6 +123,7 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
   const tip = cubicPoint(tipT, p0, p1, p2, p3);
 
   const trackColor = colors.chartGrey;
+  const calUnit = t('home.food_log.kcal');
   const calTextColor =
     safeTarget > 0 ? ensureContrast(lineColor, colors.card, modeKey, 4.5) : colors.textSecondary;
 
@@ -134,15 +146,39 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
 
         {/* Tip marker + consumed label */}
         <Circle cx={tip.x} cy={tip.y} r={4} fill={lineColor} />
+        {/* Text halo (drawn first) */}
         <SvgText
           x={tip.x}
-          y={tip.y -6}
+          y={tip.y - 10}
+          fontSize={MACRO_GAUGE_TEXT.value.sm.fontSize}
+          fontFamily={FontFamilies.regular}
+          fill={colors.card}
+          stroke={colors.card}
+          // NOTE: This SVG text halo width is tuned visually for readability across themes.
+          // We don't currently have a dedicated theme token for SVG text strokes.
+          strokeWidth={4}
+          strokeLinejoin="round"
+          textAnchor="middle"
+        >
+          <TSpan x={tip.x}>{`${consumedRounded} ${calUnit}`}</TSpan>
+          {percentDisplay != null ? (
+            <TSpan x={tip.x} dy={MACRO_GAUGE_TEXT.value.sm.fontSize + 2}>{`${percentDisplay}%`}</TSpan>
+          ) : null}
+        </SvgText>
+
+        {/* Foreground text */}
+        <SvgText
+          x={tip.x}
+          y={tip.y - 10}
           fontSize={MACRO_GAUGE_TEXT.value.sm.fontSize}
           fontFamily={FontFamilies.regular}
           fill={colors.textSecondary}
           textAnchor="middle"
         >
-          {Math.round(safeConsumed)}
+          <TSpan x={tip.x}>{`${consumedRounded} ${calUnit}`}</TSpan>
+          {percentDisplay != null ? (
+            <TSpan x={tip.x} dy={MACRO_GAUGE_TEXT.value.sm.fontSize + 2}>{`${percentDisplay}%`}</TSpan>
+          ) : null}
         </SvgText>
 
         {/* Center text below the curve */}
@@ -155,10 +191,12 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
         >
           <TSpan fill={calTextColor}>
             {safeTarget > 0
-              ? `${remaining} ${t('home.food_log.kcal')}`
+              ? `${remainingAmount} ${t('home.food_log.kcal')}`
               : `-- ${t('home.food_log.kcal')}`}
           </TSpan>
-          <TSpan fill={colors.textSecondary}>{` ${t('home.summary.remaining')}`}</TSpan>
+          <TSpan fill={colors.textSecondary}>
+            {` ${isOverBudget ? t('home.summary.over_budget') : t('home.summary.remaining')}`}
+          </TSpan>
         </SvgText>
       </Svg>
     </View>

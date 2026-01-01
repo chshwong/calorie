@@ -11,8 +11,10 @@ import { showAppToast } from '@/components/ui/app-toast';
 import EditSheet from './_components/EditSheet';
 import { returnToMyGoal } from './_components/returnToMyGoal';
 import { DailyFocusTargetsStep, type DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
+import { useTranslation } from 'react-i18next';
 
 export default function EditTargetsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -50,11 +52,11 @@ export default function EditTargetsScreen() {
         sodium_mg_max: targets.sodiumMgMax,
       });
 
-      showAppToast('Focus targets updated');
+      showAppToast(t('settings.my_goal.edit_targets.toast_updated'));
       returnToMyGoal(router);
     } catch (error) {
       console.error('Error saving targets:', error);
-      showAppToast('Failed to update targets. Please try again.');
+      showAppToast(t('settings.my_goal.edit_targets.toast_update_failed'));
     }
   };
 
@@ -62,9 +64,9 @@ export default function EditTargetsScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <ThemedView style={{ flex: 1 }}>
-        <StandardSubheader title="Daily Focus Targets" />
+        <StandardSubheader title={t('onboarding.daily_targets.title')} />
         <EditSheet
-          title="Edit Daily Focus Targets"
+          title={t('settings.my_goal.edit_targets.sheet_title')}
           hideHeader={true}
           onCancel={() => returnToMyGoal(router)}
           onSave={handleSave}

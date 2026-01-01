@@ -171,7 +171,7 @@ export default function LogFoodScreen() {
         },
         onError: (error) => {
           console.error('Error saving note:', error);
-          Alert.alert(t('common.error', { defaultValue: 'Error' }), t('food.note.save_error', { defaultValue: 'Failed to save note' }));
+          Alert.alert(t('common.error'), t('food.note.save_error'));
         },
       }
     );
@@ -2166,11 +2166,11 @@ export default function LogFoodScreen() {
                   activeOpacity={0.7}
                   {...getButtonAccessibilityProps(
                     entriesEditMode 
-                      ? t('mealtype_log.food_log.exit_selection_mode', { defaultValue: 'Exit selection mode' })
-                      : t('mealtype_log.food_log.more_options', { defaultValue: 'More options' }),
+                      ? t('mealtype_log.food_log.exit_selection_mode')
+                      : t('mealtype_log.food_log.more_options'),
                     entriesEditMode
-                      ? t('mealtype_log.food_log.exit_selection_mode_hint', { defaultValue: 'Double tap to exit selection mode' })
-                      : t('mealtype_log.food_log.more_options_hint', { defaultValue: 'Double tap to open menu' })
+                      ? t('mealtype_log.food_log.exit_selection_mode_hint')
+                      : t('mealtype_log.food_log.more_options_hint')
                   )}
                 >
                   {entriesEditMode ? (
@@ -2194,7 +2194,7 @@ export default function LogFoodScreen() {
               }}
               activeOpacity={0.7}
               {...getButtonAccessibilityProps(
-                t('food.note.edit', { defaultValue: `Edit notes for ${t(`home.meal_types.${selectedMealType}`)}`, mealType: t(`home.meal_types.${selectedMealType}`) })
+                t('food.note.edit', { mealType: t(`home.meal_types.${selectedMealType}`) })
               )}
             >
               <ThemedText

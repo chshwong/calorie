@@ -116,25 +116,25 @@ export default function EditGoalScreen() {
     try {
       // Validate required fields
       if (!goal) {
-        showAppToast('Please select a goal type');
+        showAppToast(t('settings.my_goal.edit_goal.toast_select_goal_type'));
         setSubStepIndex(0);
         return;
       }
 
       if (!goalWeightLb && !goalWeightKg) {
-        showAppToast('Please enter a goal weight');
+        showAppToast(t('settings.my_goal.edit_goal.toast_enter_goal_weight'));
         setSubStepIndex(1);
         return;
       }
 
       if (!activityLevel) {
-        showAppToast('Please select an activity level');
+        showAppToast(t('settings.my_goal.edit_goal.toast_select_activity_level'));
         setSubStepIndex(2);
         return;
       }
 
       if (!calorieTarget) {
-        showAppToast('Please set a calorie target');
+        showAppToast(t('settings.my_goal.edit_goal.toast_set_calorie_target'));
         setSubStepIndex(3);
         return;
       }
@@ -169,11 +169,11 @@ export default function EditGoalScreen() {
       // Update profile
       await updateProfileMutation.mutateAsync(updatePayload);
 
-      showAppToast('Goal updated');
+      showAppToast(t('settings.my_goal.edit_goal.toast_updated'));
       returnToMyGoal(router);
     } catch (error) {
       console.error('Error saving goal:', error);
-      showAppToast('Failed to update goal. Please try again.');
+      showAppToast(t('settings.my_goal.edit_goal.toast_update_failed'));
     }
   };
 
@@ -189,21 +189,21 @@ export default function EditGoalScreen() {
     if (subStepIndex === 0) {
       // Validate goal
       if (!goal) {
-        showAppToast('Please select a goal type');
+        showAppToast(t('settings.my_goal.edit_goal.toast_select_goal_type'));
         return;
       }
       setSubStepIndex(1);
     } else if (subStepIndex === 1) {
       // Validate goal weight
       if (!goalWeightLb && !goalWeightKg) {
-        showAppToast('Please enter a goal weight');
+        showAppToast(t('settings.my_goal.edit_goal.toast_enter_goal_weight'));
         return;
       }
       setSubStepIndex(2);
     } else if (subStepIndex === 2) {
       // Validate activity level
       if (!activityLevel) {
-        showAppToast('Please select an activity level');
+        showAppToast(t('settings.my_goal.edit_goal.toast_select_activity_level'));
         return;
       }
       setSubStepIndex(3);
@@ -303,11 +303,11 @@ export default function EditGoalScreen() {
   };
 
   const getStepTitle = () => {
-    if (subStepIndex === 0) return 'Edit Goal';
-    if (subStepIndex === 1) return 'Edit Goal Weight';
-    if (subStepIndex === 2) return 'Edit Activity Level';
-    if (subStepIndex === 3) return 'Edit Daily Calorie Target';
-    return 'Edit Goal';
+    if (subStepIndex === 0) return t('settings.my_goal.edit_goal.step_title_goal');
+    if (subStepIndex === 1) return t('settings.my_goal.edit_goal.step_title_goal_weight');
+    if (subStepIndex === 2) return t('settings.my_goal.edit_goal.step_title_activity_level');
+    if (subStepIndex === 3) return t('settings.my_goal.edit_goal.step_title_daily_calorie_target');
+    return t('settings.my_goal.edit_goal.step_title_goal');
   };
 
   const isSettingsAdjustActivityEntry = params?.start === 'activity';
@@ -325,7 +325,7 @@ export default function EditGoalScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <ThemedView style={{ flex: 1 }}>
-        <StandardSubheader title="Goal" />
+        <StandardSubheader title={t('settings.my_goal.cards.goal.title')} />
         <EditSheet
           title={getStepTitle()}
           hideHeader={true}

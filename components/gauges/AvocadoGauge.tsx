@@ -153,7 +153,9 @@ export function AvocadoGauge({
     return ORANGE; // <90%
   }, [pct, goalType, safeTarget, colors.textSecondary, GREEN, ORANGE, PINK, RED, TEAL]);
 
-  const remaining = safeTarget > 0 ? Math.round(safeTarget - safeConsumed) : 0;
+  const remainingRaw = safeTarget > 0 ? Math.round(safeTarget - safeConsumed) : 0;
+  const isOverBudget = safeTarget > 0 && remainingRaw < 0;
+  const remainingAmount = safeTarget > 0 ? (isOverBudget ? Math.abs(remainingRaw) : remainingRaw) : 0;
   const bgForContrast = surfaceBg ?? colors.background;
   const calTextColor =
     safeTarget > 0 ? ensureContrast(lineColor, bgForContrast, modeKey, 4.5) : colors.textSecondary;
@@ -204,7 +206,7 @@ export function AvocadoGauge({
             {/* Line 1 */}
             <TSpan fill={calTextColor}>
               {safeTarget > 0
-                ? `${remaining} ${t('home.food_log.kcal')}`
+                ? `${remainingAmount} ${t('home.food_log.kcal')}`
                 : `-- ${t('home.food_log.kcal')}`}
             </TSpan>
 
@@ -214,7 +216,7 @@ export function AvocadoGauge({
               dy={MACRO_GAUGE_TEXT.value.md.fontSize + 2} // next line
               fill={colors.textSecondary}
             >
-              {t('home.summary.remaining')}
+              {isOverBudget ? t('home.summary.over_budget') : t('home.summary.remaining')}
             </TSpan>
           </SvgText>
         )}

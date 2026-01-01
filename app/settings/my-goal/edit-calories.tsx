@@ -12,8 +12,10 @@ import EditSheet from './_components/EditSheet';
 import { returnToMyGoal } from './_components/returnToMyGoal';
 import { DailyCalorieTargetStep } from '@/components/onboarding/steps/DailyCalorieTargetStep';
 import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
+import { useTranslation } from 'react-i18next';
 
 export default function EditCaloriesScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -51,7 +53,7 @@ export default function EditCaloriesScreen() {
   const handleSave = async () => {
     try {
       if (!calorieTarget) {
-        showAppToast('Please set a calorie target');
+        showAppToast(t('settings.my_goal.edit_calories.toast_missing_target'));
         return;
       }
 
@@ -69,11 +71,11 @@ export default function EditCaloriesScreen() {
 
       await updateProfileMutation.mutateAsync(updatePayload);
 
-      showAppToast('Daily calories updated');
+      showAppToast(t('settings.my_goal.edit_calories.toast_updated'));
       returnToMyGoal(router);
     } catch (error) {
       console.error('Error saving calories:', error);
-      showAppToast('Failed to update calories. Please try again.');
+      showAppToast(t('settings.my_goal.edit_calories.toast_update_failed'));
     }
   };
 
@@ -81,9 +83,9 @@ export default function EditCaloriesScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <ThemedView style={{ flex: 1 }}>
-        <StandardSubheader title="Daily Calorie Target" />
+        <StandardSubheader title={t('onboarding.calorie_target.title')} />
         <EditSheet
-          title="Edit Daily Calorie Target"
+          title={t('settings.my_goal.edit_calories.sheet_title')}
           hideHeader={true}
           onCancel={() => returnToMyGoal(router)}
           onSave={handleSave}

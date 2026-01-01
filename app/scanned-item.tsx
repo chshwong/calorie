@@ -365,7 +365,7 @@ export default function ScannedItemScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.tint} />
           <ThemedText style={[styles.loadingText, { color: colors.text }]}>
-            {t('scanned_item.looking_up', 'Looking up product...')}
+            {t('scanned_item.looking_up')}
           </ThemedText>
           <ThemedText style={[styles.barcodeSmall, { color: colors.textSecondary }]}>
             {formatBarcodeForDisplay(barcode || '')}
@@ -412,7 +412,7 @@ export default function ScannedItemScreen() {
         </View>
 
         <ThemedText style={styles.successText}>
-          {t('scanned_item.found_in_database', 'Found in Database!')}
+          {t('scanned_item.found_in_database')}
         </ThemedText>
 
         {/* Product info */}
@@ -425,21 +425,21 @@ export default function ScannedItemScreen() {
           )}
           
           <View style={styles.nutritionGrid}>
-            <NutritionItem label={t('nutrition.calories', 'Calories')} value={`${food.calories_kcal}`} unit="kcal" colors={colors} />
-            <NutritionItem label={t('nutrition.protein', 'Protein')} value={`${food.protein_g}`} unit="g" colors={colors} />
-            <NutritionItem label={t('nutrition.carbs', 'Carbs')} value={`${food.carbs_g}`} unit="g" colors={colors} />
-            <NutritionItem label={t('nutrition.fat', 'Fat')} value={`${food.fat_g}`} unit="g" colors={colors} />
+            <NutritionItem label={t('nutrition.calories')} value={`${food.calories_kcal}`} unit={t('units.kcal')} colors={colors} />
+            <NutritionItem label={t('nutrition.protein')} value={`${food.protein_g}`} unit="g" colors={colors} />
+            <NutritionItem label={t('nutrition.carbs')} value={`${food.carbs_g}`} unit="g" colors={colors} />
+            <NutritionItem label={t('nutrition.fat')} value={`${food.fat_g}`} unit="g" colors={colors} />
           </View>
 
           <ThemedText style={[styles.servingInfo, { color: colors.textSecondary }]}>
-            {t('scanned_item.per_serving', 'Per')} {food.serving_size} {food.serving_unit}
+            {t('scanned_item.per_serving')} {food.serving_size} {food.serving_unit}
           </ThemedText>
         </View>
 
         {/* Barcode */}
         <View style={[styles.barcodeContainer, { borderColor: colors.separator }]}>
           <ThemedText style={[styles.barcodeLabel, { color: colors.textSecondary }]}>
-            {t('scanned_item.ean13_code', 'EAN-13 Code')}
+            {t('scanned_item.ean13_code')}
           </ThemedText>
           <ThemedText style={[styles.barcodeValue, { color: colors.text }]}>
             {formatBarcodeForDisplay(result.normalizedBarcode)}
@@ -453,12 +453,12 @@ export default function ScannedItemScreen() {
             onPress={() => handleUseCanonicalFood(food.id)}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              t('scanned_item.log_it', 'Log it'),
-              t('scanned_item.log_it_hint', 'Add this food to your meal')
+              t('scanned_item.log_it'),
+              t('scanned_item.log_it_hint')
             )}
           >
             <ThemedText style={styles.primaryButtonText}>
-              {t('scanned_item.log_it', 'Log it')}
+              {t('scanned_item.log_it')}
             </ThemedText>
           </TouchableOpacity>
 
@@ -468,7 +468,7 @@ export default function ScannedItemScreen() {
             activeOpacity={0.7}
           >
             <ThemedText style={[styles.textButtonText, { color: colors.textSecondary }]}>
-              {t('common.go_back', 'Go Back')}
+              {t('common.go_back')}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -508,7 +508,7 @@ export default function ScannedItemScreen() {
 
         <View style={styles.foundOnContainer}>
           <ThemedText style={styles.foundOnText}>
-            {t('scanned_item.found_on', 'Found on')}{' '}
+            {t('scanned_item.found_on')}{' '}
           </ThemedText>
           <View style={[styles.sourceBadge, { backgroundColor: colors.tint + '20' }]}>
             <ThemedText style={[styles.sourceBadgeText, { color: colors.tint }]}>
@@ -522,7 +522,7 @@ export default function ScannedItemScreen() {
           <View style={[styles.alreadySavedContainer, { backgroundColor: colors.tint + '15' }]}>
             <IconSymbol name="checkmark.circle.fill" size={18} color={colors.tint} />
             <ThemedText style={[styles.alreadySavedText, { color: colors.tint }]}>
-              {t('scanned_item.already_saved_as_custom', 'You previously saved it as Custom already!')}
+              {t('scanned_item.already_saved_as_custom')}
             </ThemedText>
           </View>
         )}
@@ -530,7 +530,7 @@ export default function ScannedItemScreen() {
         {/* Product info */}
         <View style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.separator }]}>
           <ThemedText style={styles.productName}>
-            {cacheRow.product_name || t('scanned_item.unknown_product', 'Unknown Product')}
+            {cacheRow.product_name || t('scanned_item.unknown_product')}
           </ThemedText>
           {cacheRow.brand && (
             <ThemedText style={[styles.productBrand, { color: colors.icon }]}>
@@ -540,25 +540,25 @@ export default function ScannedItemScreen() {
           
           <View style={styles.nutritionGrid}>
             <NutritionItem 
-              label={t('nutrition.calories', 'Calories')} 
+              label={t('nutrition.calories')} 
               value={nutrition.calories.toString()} 
-              unit="kcal" 
+              unit={t('units.kcal')} 
               colors={colors} 
             />
             <NutritionItem 
-              label={t('nutrition.protein', 'Protein')} 
+              label={t('nutrition.protein')} 
               value={nutrition.protein.toString()} 
               unit="g" 
               colors={colors} 
             />
             <NutritionItem 
-              label={t('nutrition.carbs', 'Carbs')} 
+              label={t('nutrition.carbs')} 
               value={nutrition.carbs.toString()} 
               unit="g" 
               colors={colors} 
             />
             <NutritionItem 
-              label={t('nutrition.fat', 'Fat')} 
+              label={t('nutrition.fat')} 
               value={nutrition.fat.toString()} 
               unit="g" 
               colors={colors} 
@@ -566,12 +566,12 @@ export default function ScannedItemScreen() {
           </View>
 
           <ThemedText style={[styles.servingInfo, { color: colors.textSecondary }]}>
-            {t('scanned_item.per_100g', 'Per 100g/ml')}
+            {t('scanned_item.per_100g')}
           </ThemedText>
 
           {cacheRow.serving_size && (
             <ThemedText style={[styles.servingSizeHint, { color: colors.textSecondary }]}>
-              {t('scanned_item.typical_serving', 'Typical serving')}: {cacheRow.serving_size}
+              {t('scanned_item.typical_serving')}: {cacheRow.serving_size}
             </ThemedText>
           )}
         </View>
@@ -579,7 +579,7 @@ export default function ScannedItemScreen() {
         {/* Barcode */}
         <View style={[styles.barcodeContainer, { borderColor: colors.separator }]}>
           <ThemedText style={[styles.barcodeLabel, { color: colors.textSecondary }]}>
-            {t('scanned_item.ean13_code', 'EAN-13 Code')}
+            {t('scanned_item.ean13_code')}
           </ThemedText>
           <ThemedText style={[styles.barcodeValue, { color: colors.text }]}>
             {formatBarcodeForDisplay(normalizedBarcode)}
@@ -608,11 +608,11 @@ export default function ScannedItemScreen() {
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
               alreadySavedAsCustom 
-                ? t('scanned_item.log_existing_custom', 'Log my existing Custom food')
-                : t('scanned_item.save_and_log', 'Save as Custom and Log Food'),
+                ? t('scanned_item.log_existing_custom')
+                : t('scanned_item.save_and_log'),
               alreadySavedAsCustom
-                ? t('scanned_item.log_existing_custom_hint', 'Log your existing custom food')
-                : t('scanned_item.save_and_log_hint', 'Save this food and log it in your meal')
+                ? t('scanned_item.log_existing_custom_hint')
+                : t('scanned_item.save_and_log_hint')
             )}
           >
             {isSaving ? (
@@ -620,8 +620,8 @@ export default function ScannedItemScreen() {
             ) : (
               <ThemedText style={styles.primaryButtonText}>
                 {alreadySavedAsCustom 
-                  ? t('scanned_item.log_existing_custom', 'Log my existing Custom food')
-                  : t('scanned_item.save_and_log', 'Save as Custom and Log Food')}
+                  ? t('scanned_item.log_existing_custom')
+                  : t('scanned_item.save_and_log')}
               </ThemedText>
             )}
           </TouchableOpacity>
@@ -633,7 +633,7 @@ export default function ScannedItemScreen() {
             activeOpacity={0.7}
           >
             <ThemedText style={[styles.textButtonText, { color: colors.textSecondary }]}>
-              {t('common.cancel', 'Cancel')}
+              {t('common.cancel')}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -650,7 +650,7 @@ export default function ScannedItemScreen() {
         </View>
 
         <ThemedText style={styles.notFoundText}>
-          {t('scanned_item.not_found_title', 'Product Not Found')}
+          {t('scanned_item.not_found_title')}
         </ThemedText>
 
         <ThemedText style={[styles.notFoundDescription, { color: colors.textSecondary }]}>
@@ -662,7 +662,7 @@ export default function ScannedItemScreen() {
         {/* Barcode */}
         <View style={[styles.barcodeContainer, { borderColor: colors.separator }]}>
           <ThemedText style={[styles.barcodeLabel, { color: colors.textSecondary }]}>
-            {t('scanned_item.scanned_barcode', 'Scanned Barcode')}
+            {t('scanned_item.scanned_barcode')}
           </ThemedText>
           <ThemedText style={[styles.barcodeValue, { color: colors.text }]}>
             {formatBarcodeForDisplay(result.normalizedBarcode)}
@@ -677,7 +677,7 @@ export default function ScannedItemScreen() {
             activeOpacity={0.7}
           >
             <ThemedText style={[styles.textButtonText, { color: colors.textSecondary }]}>
-              {t('common.go_back', 'Go Back')}
+              {t('common.go_back')}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -694,7 +694,7 @@ export default function ScannedItemScreen() {
         </View>
 
         <ThemedText style={styles.errorTitle}>
-          {t('scanned_item.invalid_barcode_title', 'Invalid Barcode')}
+          {t('scanned_item.invalid_barcode_title')}
         </ThemedText>
 
         <ThemedText style={[styles.errorDescription, { color: colors.textSecondary }]}>
@@ -704,7 +704,7 @@ export default function ScannedItemScreen() {
         {/* Raw code */}
         <View style={[styles.barcodeContainer, { borderColor: colors.separator }]}>
           <ThemedText style={[styles.barcodeLabel, { color: colors.textSecondary }]}>
-            {t('scanned_item.scanned_code', 'Scanned Code')}
+            {t('scanned_item.scanned_code')}
           </ThemedText>
           <ThemedText style={[styles.barcodeRaw, { color: colors.text }]}>
             {result.rawCode}
@@ -719,7 +719,7 @@ export default function ScannedItemScreen() {
             activeOpacity={0.7}
           >
             <ThemedText style={styles.primaryButtonText}>
-              {t('scanned_item.try_again', 'Try Again')}
+              {t('scanned_item.try_again')}
             </ThemedText>
           </TouchableOpacity>
 
@@ -729,7 +729,7 @@ export default function ScannedItemScreen() {
             activeOpacity={0.7}
           >
             <ThemedText style={[styles.textButtonText, { color: colors.textSecondary }]}>
-              {t('common.go_back', 'Go Back')}
+              {t('common.go_back')}
             </ThemedText>
           </TouchableOpacity>
         </View>

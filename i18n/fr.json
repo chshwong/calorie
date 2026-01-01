@@ -7,6 +7,7 @@
     "cancel": "Annuler",
     "edit": "Modifier",
     "close": "Fermer",
+    "close_hint": "Appuyez deux fois pour fermer le menu",
     "loading": "Chargement...",
     "error": "Erreur",
     "success": "Succès",
@@ -22,7 +23,16 @@
     "unexpected_error": "Une erreur inattendue s'est produite. Veuillez réessayer.",
     "today": "Aujourd'hui",
     "yesterday": "Hier",
+    "go_back": "Retour",
+    "not_set": "Non défini",
     "no_target": "Aucun objectif"
+  },
+
+  "nutrition": {
+    "calories": "Calories",
+    "protein": "Protéines",
+    "carbs": "Glucides",
+    "fat": "Lipides"
   },
 
   "home": {
@@ -54,6 +64,7 @@
       "entry_other": "{{count}} entrées",
       "total_calories": "Calories totales",
       "remaining": "restant",
+      "over_budget": "au-dessus du budget",
       "more_details": "Plus de détails",
       "protein": "Protéines",
       "carbs": "Glucides",
@@ -63,6 +74,8 @@
       "trans_fat": "Gras trans",
       "sugar": "Sucre",
       "sodium": "Sodium",
+      "other_limits": "Autres limites",
+      "hide_other_limits": "Masquer les autres limites",
       "loading_entries": "Chargement des entrées..."
     },
     "date_picker": {
@@ -80,6 +93,15 @@
       "lunch": "Déjeuner",
       "dinner": "Dîner",
       "afternoon_snack": "Collation"
+    },
+    "meal_menu": {
+      "quick_log": "Ajout rapide",
+      "quick_log_a11y_label": "Ajout rapide pour {{mealType}}",
+      "quick_log_a11y_hint": "Ajouter un aliment rapidement pour {{mealType}}",
+      "copy_to_another_date_a11y": "Copier {{mealType}} vers une autre date",
+      "move_to_another_date_a11y": "Déplacer {{mealType}} vers une autre date",
+      "notes_a11y_label": "Notes pour {{mealType}}",
+      "notes_a11y_hint": "Ajouter ou modifier les notes pour {{mealType}}"
     },
     "food_log": {
       "log_food_prompt": "← Ajouter aliment",
@@ -125,13 +147,51 @@
       "reset_estimates": "Réinitialiser les estimations"
     },
     "errors": {
-      "max_kcal": "Le maximum est de 15 000 kcal."
+      "max_kcal": "Le maximum est de 15 000 cal."
     },
     "warning": {
       "title": "Dépense inhabituellement élevée",
-      "body": "6 000+ kcal est rare. Vérifiez votre appareil connecté ou votre saisie d’entraînement.",
+      "body": "6 000+ cal est rare. Vérifiez votre appareil connecté ou votre saisie d’entraînement.",
       "cancel": "Annuler",
       "save_anyway": "Enregistrer quand même"
+    }
+  },
+
+  "food": {
+    "menu": {
+      "copy_to": "Copier vers",
+      "move_to": "Déplacer vers",
+      "notes": "Notes"
+    },
+    "note": {
+      "edit": "Modifier les notes pour {{mealType}}",
+      "save_error": "Impossible d’enregistrer la note"
+    },
+    "copy": {
+      "title": "Copier vers",
+      "subtitle": "Choisissez une date et un type de repas vers lequel copier.",
+      "confirm": "Copier",
+      "meal_type_label": "Type de repas",
+      "date_label": "Date",
+      "exclude_notes": "Exclure les notes",
+      "override_notes": "Remplacer les notes",
+      "same_meal_error": "Impossible de copier dans le même repas. Choisissez un autre repas ou une autre date.",
+      "same_date_error": "Impossible de copier vers la même date et le même type de repas",
+      "success_toast": "{{count}} élément(s) copiés vers {{mealType}} le {{date}}",
+      "error_message": "Impossible de copier les entrées. Veuillez réessayer."
+    },
+    "move": {
+      "title": "Déplacer vers",
+      "subtitle": "Choisissez une date et un type de repas vers lequel déplacer.",
+      "confirm": "Déplacer",
+      "meal_type_label": "Type de repas",
+      "date_label": "Date",
+      "exclude_notes": "Exclure les notes",
+      "override_notes": "Remplacer les notes",
+      "same_meal_error": "Impossible de déplacer dans le même repas. Choisissez un autre repas ou une autre date.",
+      "same_date_error": "Impossible de déplacer vers la même date et le même type de repas",
+      "success_toast": "{{count}} élément(s) déplacés vers {{mealType}} le {{date}}",
+      "error_message": "Impossible de déplacer les entrées. Veuillez réessayer."
     }
   },
 
@@ -275,6 +335,13 @@
   "onboarding": {
     "title": "Votre configuration de fitness",
     "header_prefix": "Votre ",
+    "calorie_target": {
+      "kcal_per_day": "cal/jour",
+      "below_safe_minimum": "Sous le minimum sécuritaire",
+      "try_custom_pace_instead": "Essayez plutôt « Définir un rythme personnalisé »",
+      "below_700_not_supported": "En dessous de 700 cal/jour n’est pas pris en charge. Choisissez une autre date ou un autre poids.",
+      "lower_safety_boundary": "À la limite inférieure de sécurité."
+    },
     "plan": {
       "title": "Choisissez votre forfait",
       "subtitle_prefix": "",
@@ -523,6 +590,57 @@
       "my_weight": "Mon poids",
       "my_weight_subtitle": "Enregistrer ou consulter vos entrées de poids"
     },
+    "my_goal": {
+      "cards": {
+        "goal": {
+          "title": "Objectif",
+          "goal_type": "Type d’objectif :",
+          "goal_weight": "Poids cible :",
+          "activity_level": "Niveau d’activité :"
+        },
+        "calories": {
+          "target": "Cible :",
+          "maintenance": "Maintien :"
+        },
+        "targets": {
+          "protein_min": "Protéines min. :",
+          "fiber_min": "Fibres min. :",
+          "carbs_max": "Glucides max. :",
+          "sugar_max": "Sucre max. :",
+          "sodium_max": "Sodium max. :"
+        }
+      },
+      "a11y": {
+        "edit_goal": "Modifier l’objectif",
+        "edit_calories": "Modifier la cible calorique quotidienne",
+        "edit_targets": "Modifier les cibles quotidiennes",
+        "navigate_to_edit": "Ouvrir l’édition"
+      },
+      "edit_calories": {
+        "sheet_title": "Modifier la cible calorique quotidienne",
+        "toast_missing_target": "Veuillez définir une cible calorique",
+        "toast_updated": "Calories quotidiennes mises à jour",
+        "toast_update_failed": "Impossible de mettre à jour les calories. Veuillez réessayer."
+      },
+      "edit_targets": {
+        "sheet_title": "Modifier les cibles quotidiennes",
+        "toast_updated": "Cibles mises à jour",
+        "toast_update_failed": "Impossible de mettre à jour les cibles. Veuillez réessayer."
+      },
+      "edit_goal": {
+        "step_title_goal": "Modifier l’objectif",
+        "step_title_goal_weight": "Modifier le poids cible",
+        "step_title_activity_level": "Modifier le niveau d’activité",
+        "step_title_daily_calorie_target": "Modifier la cible calorique quotidienne",
+        "toast_select_goal_type": "Veuillez choisir un type d’objectif",
+        "toast_enter_goal_weight": "Veuillez saisir un poids cible",
+        "toast_select_activity_level": "Veuillez choisir un niveau d’activité",
+        "toast_set_calorie_target": "Veuillez définir une cible calorique",
+        "toast_updated": "Objectif mis à jour",
+        "toast_update_failed": "Impossible de mettre à jour l’objectif. Veuillez réessayer."
+      },
+      "disclaimer": "AvoVibe offre des conseils généraux seulement et ne constitue pas un avis médical."
+    },
     "account": {
       "title": "Compte",
       "edit_profile": "Modifier le profil",
@@ -620,6 +738,7 @@
     "go_back": "Retour",
     "select_date_title": "Sélectionnez la date de naissance",
     "error_user_not_authenticated": "Utilisateur non authentifié",
+    "error_invalid_name": "Veuillez entrer un nom valide.",
     "error_name_dob_required": "Le nom préféré et la date de naissance sont requis",
     "error_update_failed": "Échec de la mise à jour du profil: {{message}}"
   },
@@ -805,7 +924,11 @@
       "done": "Terminé",
       "no_entries": "Aucune entrée. Ajoutez-en une ci-dessus!",
       "unknown_food": "Inconnu",
-      "select_all": "Tout sélectionner"
+      "select_all": "Tout sélectionner",
+      "more_options": "Plus d’options",
+      "more_options_hint": "Appuyez deux fois pour ouvrir le menu",
+      "exit_selection_mode": "Quitter le mode de sélection",
+      "exit_selection_mode_hint": "Appuyez deux fois pour quitter le mode de sélection"
     },
     
     "form": {

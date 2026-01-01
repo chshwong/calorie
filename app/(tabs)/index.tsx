@@ -241,6 +241,9 @@ function EnergyBalanceBlock(props: {
   // Light mode => darken; Dark mode => lighten.
   const netColor = ensureContrast(netColorRaw, colors.card, modeKey, 4.5);
 
+  // Show checkmark only when the net label is in the "green" state.
+  const showCheckmark = goalType === 'lose' && net != null && net >= 200;
+
   const netLabel = isDeficit ? t('burned.energy_balance.labels.deficit') : t('burned.energy_balance.labels.surplus');
 
   const burnedPressableProps = onEditBurned
@@ -343,6 +346,17 @@ function EnergyBalanceBlock(props: {
 
         <View style={styles.energyBalanceCol}>
           <ThemedText style={[styles.energyBalanceLabel, { color: netColor }]} numberOfLines={1}>
+            {showCheckmark ? (
+              <>
+                <Text
+                  style={styles.energyBalanceEmojiInline}
+                  accessibilityElementsHidden={true}
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  ✅
+                </Text>{' '}
+              </>
+            ) : null}
             {netLabel}
           </ThemedText>
         </View>
@@ -790,7 +804,7 @@ export default function FoodLogHomeScreen() {
         },
         onError: (error) => {
           console.error('Error saving note:', error);
-          Alert.alert(t('common.error', { defaultValue: 'Error' }), t('food.note.save_error', { defaultValue: 'Failed to save note' }));
+          Alert.alert(t('common.error'), t('food.note.save_error'));
         },
       }
     );
@@ -832,13 +846,7 @@ export default function FoodLogHomeScreen() {
     
     if (sameDay && sameMealType) {
       const errorKey = mode === 'move' ? 'food.move.same_meal_error' : 'food.copy.same_meal_error';
-      showAppToast(
-        t(errorKey, {
-          defaultValue: mode === 'move' 
-            ? "You can't move into the same meal. Pick another meal or date."
-            : "You can't copy into the same meal. Pick another meal or date.",
-        })
-      );
+      showAppToast(t(errorKey));
       return; // Don't proceed with the transfer
     }
     
@@ -869,9 +877,6 @@ export default function FoodLogHomeScreen() {
           const successKey = mode === 'move' ? 'food.move.success_toast' : 'food.copy.success_toast';
           showAppToast(
             t(successKey, {
-              defaultValue: mode === 'move'
-                ? '{{count}} item(s) moved to {{mealType}} on {{date}}'
-                : '{{count}} item(s) copied to {{mealType}} on {{date}}',
               count: totalCount,
               mealType: mealTypeLabel,
               date: dateLabel,
@@ -882,18 +887,10 @@ export default function FoodLogHomeScreen() {
           setTransferMealtypeModal({ visible: false, mealType: null, mode: 'copy' });
           if (error.message === 'SAME_DATE') {
             const sameDateKey = mode === 'move' ? 'food.move.same_date_error' : 'food.copy.same_date_error';
-            showAppToast(t(sameDateKey, { 
-              defaultValue: mode === 'move' 
-                ? 'Cannot move to the same date and meal type' 
-                : 'Cannot copy to the same date and meal type' 
-            }));
+            showAppToast(t(sameDateKey));
           } else {
             const errorKey = mode === 'move' ? 'food.move.error_message' : 'food.copy.error_message';
-            showAppToast(t(errorKey, { 
-              defaultValue: mode === 'move' 
-                ? 'Unable to move entries. Please try again.' 
-                : 'Unable to copy entries. Please try again.' 
-            }));
+            showAppToast(t(errorKey));
           }
         },
       }
@@ -1045,7 +1042,7 @@ export default function FoodLogHomeScreen() {
                   >
                     <View style={styles.subFatsHeaderRight}>
                       <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>
-                        {summaryExpanded ? 'Hide other limits' : 'Other limits'}
+                        {summaryExpanded ? t('home.summary.hide_other_limits') : t('home.summary.other_limits')}
                       </ThemedText>
                       <IconSymbol 
                         name={summaryExpanded ? "chevron.up" : "chevron.down"} 
@@ -1358,7 +1355,7 @@ export default function FoodLogHomeScreen() {
                           }}
                           activeOpacity={0.7}
                           {...getButtonAccessibilityProps(
-                            t('food.note.edit', { defaultValue: `Edit notes for ${mealTypeLabel}`, mealType: mealTypeLabel })
+                            t('food.note.edit', { mealType: mealTypeLabel })
                           )}
                         >
                           <ThemedText
@@ -1408,8 +1405,8 @@ export default function FoodLogHomeScreen() {
                   onPress={() => setThreeDotMealMenuVisible({ mealType: null })}
                   activeOpacity={0.7}
                   {...getButtonAccessibilityProps(
-                    t('common.close', { defaultValue: 'Close' }),
-                    t('common.close_hint', { defaultValue: 'Double tap to close menu' })
+                    t('common.close'),
+                    t('common.close_hint')
                   )}
                 >
                   <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
@@ -1431,12 +1428,16 @@ export default function FoodLogHomeScreen() {
                       onPress={() => handleQuickLog(threeDotMealMenuVisible.mealType!)}
                       activeOpacity={0.7}
                       {...getButtonAccessibilityProps(
-                        `⚡Quick Log for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`,
-                        `Add quick log for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`
+                        t('home.meal_menu.quick_log_a11y_label', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        }),
+                        t('home.meal_menu.quick_log_a11y_hint', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        })
                       )}
                     >
                       <ThemedText style={[styles.threeDotMealMenuItemText, { color: colors.text }]}>
-                        ⚡Quick Log
+                        ⚡ {t('home.meal_menu.quick_log')}
                       </ThemedText>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1449,8 +1450,12 @@ export default function FoodLogHomeScreen() {
                       activeOpacity={hasAnythingToCopy ? 0.7 : 1}
                       disabled={!hasAnythingToCopy}
                       {...getButtonAccessibilityProps(
-                        `Copy ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`,
-                        `Copy ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`
+                        t('home.meal_menu.copy_to_another_date_a11y', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        }),
+                        t('home.meal_menu.copy_to_another_date_a11y', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        })
                       )}
                     >
                       <View style={styles.threeDotMealMenuItemWithIcon}>
@@ -1469,7 +1474,7 @@ export default function FoodLogHomeScreen() {
                             }
                           ]}
                         >
-                          {t('food.menu.copy_to', { defaultValue: 'Copy To' })}
+                          {t('food.menu.copy_to')}
                         </ThemedText>
                       </View>
                     </TouchableOpacity>
@@ -1483,8 +1488,12 @@ export default function FoodLogHomeScreen() {
                       activeOpacity={hasAnythingToCopy ? 0.7 : 1}
                       disabled={!hasAnythingToCopy}
                       {...getButtonAccessibilityProps(
-                        `Move ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`,
-                        `Move ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)} to another date`
+                        t('home.meal_menu.move_to_another_date_a11y', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        }),
+                        t('home.meal_menu.move_to_another_date_a11y', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        })
                       )}
                     >
                       <View style={styles.threeDotMealMenuItemWithIcon}>
@@ -1503,7 +1512,7 @@ export default function FoodLogHomeScreen() {
                             }
                           ]}
                         >
-                          {t('food.menu.move_to', { defaultValue: 'Move To' })}
+                          {t('food.menu.move_to')}
                         </ThemedText>
                       </View>
                     </TouchableOpacity>
@@ -1512,12 +1521,16 @@ export default function FoodLogHomeScreen() {
                       onPress={() => handleNotes(threeDotMealMenuVisible.mealType!)}
                       activeOpacity={0.7}
                       {...getButtonAccessibilityProps(
-                        `Notes for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`,
-                        `Add or edit notes for ${t(`home.meal_types.${threeDotMealMenuVisible.mealType}`)}`
+                        t('home.meal_menu.notes_a11y_label', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        }),
+                        t('home.meal_menu.notes_a11y_hint', {
+                          mealType: t(`home.meal_types.${threeDotMealMenuVisible.mealType}`),
+                        })
                       )}
                     >
                       <ThemedText style={[styles.threeDotMealMenuItemText, { color: colors.text }]}>
-                        📝 {t('food.menu.notes', { defaultValue: 'Notes' })}
+                        📝 {t('food.menu.notes')}
                       </ThemedText>
                     </TouchableOpacity>
                   </>
