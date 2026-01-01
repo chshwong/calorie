@@ -114,7 +114,9 @@
 
   "burned": {
     "modal": {
-      "title": "Dépense quotidienne estimée",
+      "title_yesterday": "🔥 Calories brûlées hier",
+      "title_today": "🔥 Calories à brûler aujourd’hui",
+      "title_default": "🔥 Calories brûlées",
       "estimated_banner": "Les estimations sont basées sur votre profil. Pour plus de précision, utilisez les données de votre appareil connecté.",
       "high_value_warning": "La valeur semble inhabituellement élevée, veuillez vérifier",
       "too_high": "La valeur est trop élevée, veuillez corriger"

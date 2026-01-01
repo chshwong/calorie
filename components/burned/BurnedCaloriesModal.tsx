@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
+import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { BURNED, RANGES } from '@/constants/constraints';
-import { getMinTouchTargetStyle, getFocusStyle, getButtonAccessibilityProps } from '@/utils/accessibility';
-import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
+import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import { useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
-import { showAppToast } from '@/components/ui/app-toast';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
+import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { getTodayKey, getYesterdayKey, toDateKey } from '@/utils/dateKey';
 import { validateBurnedTdeeKcal } from '@/utils/validation';
 
 type Props = {
@@ -26,6 +27,13 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
+
+  const titleText = useMemo(() => {
+    const key = toDateKey(entryDate);
+    if (key === getTodayKey()) return t('burned.modal.title_today');
+    if (key === getYesterdayKey()) return t('burned.modal.title_yesterday');
+    return t('burned.modal.title_default');
+  }, [entryDate, t]);
 
   // MUST call getOrCreate before rendering (spec) — enable only when visible.
   const { data: burnedRow, isLoading, isFetching, error } = useDailySumBurned(entryDate, { enabled: visible });
@@ -228,7 +236,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.header, { borderBottomColor: colors.separator }]}>
-            <ThemedText style={[styles.title, { color: colors.text }]}>{t('burned.modal.title')}</ThemedText>
+            <ThemedText style={[styles.title, { color: colors.text }]}>{titleText}</ThemedText>
             <TouchableOpacity
               style={[styles.iconBtn, getMinTouchTargetStyle(), Platform.OS === 'web' && getFocusStyle(colors.tint)]}
               onPress={onClose}
@@ -299,32 +307,39 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.active')}</ThemedText>
                 </View>
                 <View style={styles.chipWrap}>
-                  <InlineEditableNumberChip
-                    value={Number.isFinite(parsed.active) ? parsed.active : null}
-                    showEditIcon
-                    onCommit={(next) => {
-                      const nextActive = next ?? 0;
-                      markTouched('active');
-                      setActiveText(String(nextActive));
-                      if (!touched.tdee) {
-                        const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
-                        setTdeeText(String(bmr + nextActive));
-                      }
-                    }}
-                    placeholder={t('burned.fields.placeholder')}
-                    unitSuffix={t('home.food_log.kcal')}
-                    min={RANGES.CALORIES_KCAL.MIN}
-                    allowNull={false}
-                    colors={colors}
-                    badgeBackgroundColor={colors.backgroundSecondary}
-                    badgeBorderColor={colors.border}
-                    badgeTextColor={colors.text}
-                    badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
-                    inputTextStyle={{ fontSize: FontSize.xs + 2 }}
-                    accessibilityLabel={t('burned.fields.active')}
-                    inputWidth={64}
-                    commitOnBlur
-                  />
+                  <View style={styles.chipEquationWrap}>
+                    <View style={styles.operatorWrap} accessible={false}>
+                      <ThemedText style={[styles.operatorText, { color: colors.textSecondary }]} accessible={false}>
+                        +
+                      </ThemedText>
+                    </View>
+                    <InlineEditableNumberChip
+                      value={Number.isFinite(parsed.active) ? parsed.active : null}
+                      showEditIcon
+                      onCommit={(next) => {
+                        const nextActive = next ?? 0;
+                        markTouched('active');
+                        setActiveText(String(nextActive));
+                        if (!touched.tdee) {
+                          const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
+                          setTdeeText(String(bmr + nextActive));
+                        }
+                      }}
+                      placeholder={t('burned.fields.placeholder')}
+                      unitSuffix={t('home.food_log.kcal')}
+                      min={RANGES.CALORIES_KCAL.MIN}
+                      allowNull={false}
+                      colors={colors}
+                      badgeBackgroundColor={colors.backgroundSecondary}
+                      badgeBorderColor={colors.border}
+                      badgeTextColor={colors.text}
+                      badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
+                      inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                      accessibilityLabel={t('burned.fields.active')}
+                      inputWidth={64}
+                      commitOnBlur
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -333,35 +348,42 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.tdee')}</ThemedText>
                 </View>
                 <View style={styles.chipWrap}>
-                  <InlineEditableNumberChip
-                    value={Number.isFinite(parsed.tdee) ? parsed.tdee : null}
-                    showEditIcon
-                    onCommit={(next) => {
-                      const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
-                      const requestedTdee = next ?? 0;
-                      const nextTdee = Math.max(bmr, requestedTdee);
-                      const nextActive = nextTdee - bmr;
+                  <View style={styles.chipEquationWrap}>
+                    <View style={styles.operatorWrap} accessible={false}>
+                      <ThemedText style={[styles.operatorText, { color: colors.textSecondary }]} accessible={false}>
+                        =
+                      </ThemedText>
+                    </View>
+                    <InlineEditableNumberChip
+                      value={Number.isFinite(parsed.tdee) ? parsed.tdee : null}
+                      showEditIcon
+                      onCommit={(next) => {
+                        const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
+                        const requestedTdee = next ?? 0;
+                        const nextTdee = Math.max(bmr, requestedTdee);
+                        const nextActive = nextTdee - bmr;
 
-                      // Treat "edit TDEE" as "solve for Activity" so that TDEE always equals BMR + Activity.
-                      // This also ensures save uses the BMR/Active branch where TDEE is derived.
-                      markTouched('active');
-                      setActiveText(String(nextActive));
-                      setTdeeText(String(nextTdee));
-                    }}
-                    placeholder={t('burned.fields.placeholder')}
-                    unitSuffix={t('home.food_log.kcal')}
-                    min={RANGES.CALORIES_KCAL.MIN}
-                    allowNull={false}
-                    colors={colors}
-                    badgeBackgroundColor={colors.backgroundSecondary}
-                    badgeBorderColor={colors.border}
-                    badgeTextColor={colors.text}
-                    badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
-                    inputTextStyle={{ fontSize: FontSize.xs + 2 }}
-                    accessibilityLabel={t('burned.fields.tdee')}
-                    inputWidth={64}
-                    commitOnBlur
-                  />
+                        // Treat "edit TDEE" as "solve for Activity" so that TDEE always equals BMR + Activity.
+                        // This also ensures save uses the BMR/Active branch where TDEE is derived.
+                        markTouched('active');
+                        setActiveText(String(nextActive));
+                        setTdeeText(String(nextTdee));
+                      }}
+                      placeholder={t('burned.fields.placeholder')}
+                      unitSuffix={t('home.food_log.kcal')}
+                      min={RANGES.CALORIES_KCAL.MIN}
+                      allowNull={false}
+                      colors={colors}
+                      badgeBackgroundColor={colors.backgroundSecondary}
+                      badgeBorderColor={colors.border}
+                      badgeTextColor={colors.text}
+                      badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
+                      inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                      accessibilityLabel={t('burned.fields.tdee')}
+                      inputWidth={64}
+                      commitOnBlur
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -535,6 +557,21 @@ const styles = StyleSheet.create({
     width: '30%',
     minWidth: 110,
     alignItems: 'flex-end',
+  },
+  chipEquationWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.xs,
+  },
+  operatorWrap: {
+    width: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  operatorText: {
+    fontSize: FontSize.md,
+    fontWeight: '800',
   },
   errorText: {
     fontSize: FontSize.sm,

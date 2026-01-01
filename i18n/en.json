@@ -115,7 +115,9 @@
 
   "burned": {
     "modal": {
-      "title": "Estimated Day Burn",
+      "title_yesterday": "🔥 Calories burned yesterday",
+      "title_today": "🔥 Calories to be burned today",
+      "title_default": "🔥 Calories burned",
       "estimated_banner": "Estimates are based on your profile. For better accuracy, use data from your wearable device.",
       "high_value_warning": "Value looks unusually high, please double check",
       "too_high": "Value is too high, please correct"
