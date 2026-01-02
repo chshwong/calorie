@@ -1,5 +1,6 @@
 import { compareDateKeys } from '@/lib/date-guard';
 import { addDays } from '@/utils/dateKey';
+import { FOOD_LOG } from '@/constants/constraints';
 
 export type DoneCtaLabelKind = 'today' | 'yesterday' | 'day';
 
@@ -37,7 +38,7 @@ export type CompletionCalorieTier = 'zero' | 'low' | 'ok';
 
 export function getCompletionTier(calories: number): CompletionCalorieTier {
   if (!Number.isFinite(calories) || calories <= 0) return 'zero';
-  if (calories <= 499) return 'low';
+  if (calories <= FOOD_LOG.DONE_MODAL.LOW_CAL_MAX_INCLUSIVE) return 'low';
   return 'ok';
 }
 
@@ -51,15 +52,19 @@ export function getCompletionTier(calories: number): CompletionCalorieTier {
  */
 export function shouldShowFastedOptionInInitialConfirm(calories: number): boolean {
   if (!Number.isFinite(calories)) return true; // treat as 0
-  return calories < 1000;
+  return calories < FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE;
 }
 
 /**
- * Secondary confirm is required only when calories are in [500, 999].
+ * Secondary confirm is required only when calories are in
+ * [OK_CAL_MIN_INCLUSIVE, FASTED_PRIMARY_MAX_CAL_EXCLUSIVE).
  */
 export function shouldRequireFastedSecondaryConfirm(calories: number): boolean {
   if (!Number.isFinite(calories)) return false;
-  return calories >= 500 && calories < 1000;
+  return (
+    calories >= FOOD_LOG.DONE_MODAL.OK_CAL_MIN_INCLUSIVE &&
+    calories < FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE
+  );
 }
 
 

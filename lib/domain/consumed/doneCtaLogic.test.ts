@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FOOD_LOG } from '@/constants/constraints';
 import {
   getGraceWindowMinKey,
   isWithinGraceWindow,
@@ -37,20 +38,20 @@ describe('doneCtaLogic', () => {
   it('categorizes calorie tiers', () => {
     expect(getCompletionTier(0)).toBe('zero');
     expect(getCompletionTier(1)).toBe('low');
-    expect(getCompletionTier(499)).toBe('low');
-    expect(getCompletionTier(500)).toBe('ok');
+    expect(getCompletionTier(FOOD_LOG.DONE_MODAL.LOW_CAL_MAX_INCLUSIVE)).toBe('low');
+    expect(getCompletionTier(FOOD_LOG.DONE_MODAL.OK_CAL_MIN_INCLUSIVE)).toBe('ok');
   });
 
   it('applies fasted option visibility + secondary confirm rules', () => {
     expect(shouldShowFastedOptionInInitialConfirm(0)).toBe(true);
     expect(shouldShowFastedOptionInInitialConfirm(200)).toBe(true);
-    expect(shouldShowFastedOptionInInitialConfirm(999)).toBe(true);
-    expect(shouldShowFastedOptionInInitialConfirm(1000)).toBe(false);
+    expect(shouldShowFastedOptionInInitialConfirm(FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE - 1)).toBe(true);
+    expect(shouldShowFastedOptionInInitialConfirm(FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE)).toBe(false);
 
-    expect(shouldRequireFastedSecondaryConfirm(499)).toBe(false);
-    expect(shouldRequireFastedSecondaryConfirm(500)).toBe(true);
-    expect(shouldRequireFastedSecondaryConfirm(999)).toBe(true);
-    expect(shouldRequireFastedSecondaryConfirm(1000)).toBe(false);
+    expect(shouldRequireFastedSecondaryConfirm(FOOD_LOG.DONE_MODAL.OK_CAL_MIN_INCLUSIVE - 1)).toBe(false);
+    expect(shouldRequireFastedSecondaryConfirm(FOOD_LOG.DONE_MODAL.OK_CAL_MIN_INCLUSIVE)).toBe(true);
+    expect(shouldRequireFastedSecondaryConfirm(FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE - 1)).toBe(true);
+    expect(shouldRequireFastedSecondaryConfirm(FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE)).toBe(false);
   });
 });
 

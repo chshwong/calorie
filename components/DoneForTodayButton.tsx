@@ -626,8 +626,8 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     position: 'absolute',
-    left: -Spacing.sm,
-    top: -Spacing.sm,
+    right: Spacing.xs,
+    top: Spacing.md,
     zIndex: 1,
   },
   modalTitle: {
