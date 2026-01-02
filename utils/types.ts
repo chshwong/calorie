@@ -162,6 +162,48 @@ export interface DailySumBurned {
 }
 
 // ============================================================================
+// CONSUMED CALORIES TYPES
+// ============================================================================
+
+/**
+ * Explicit day-level log status for food logging.
+ *
+ * NOTE: This is user intent and must never be inferred from totals.
+ */
+export type DailyLogStatus = 'unknown' | 'completed' | 'fasted';
+
+/**
+ * Durable daily fact row for consumed totals + explicit day state.
+ * Maps to the 'daily_sum_consumed' table.
+ *
+ * Row existence = user touched/interacted with that day.
+ * Missing row = missed day (no interaction).
+ */
+export interface DailySumConsumed {
+  user_id: string;
+  entry_date: string;
+
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fibre_g: number;
+  sugar_g: number;
+  saturated_fat_g: number;
+  trans_fat_g: number;
+  sodium_mg: number;
+
+  log_status: DailyLogStatus;
+
+  created_at: string;
+  touched_at: string;
+  status_updated_at: string | null;
+  completed_at: string | null;
+  last_recomputed_at: string | null;
+  updated_at: string;
+}
+
+// ============================================================================
 // USER PROFILE TYPES
 // ============================================================================
 

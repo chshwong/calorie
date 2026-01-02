@@ -61,6 +61,41 @@
       "bmi_overweight": "Surpoids/Musculaire",
       "bmi_obese": "Obésité"
     },
+    "done_for_today": {
+      "cta_today": "Call It a Day",
+      "cta_yesterday": "Call It a Day",
+      "cta_day": "Call It a Day",
+      "cta_completed": "Completed ✓",
+      "cta_fasted": "Fasted",
+      "cta_a11y_hint": "Double tap to change today’s status.",
+      "not_authenticated": "Please sign in again.",
+
+      "confirm_title": "Done for Today?",
+      "confirm_title_for_date": "Done for {{date}}?",
+      "confirm_prefix_for_date": "You’re finishing logging for {{date}}.\n\n",
+      "confirm_message_zero": "You have 0 calories logged for today.\nIf you’re fasting, you can mark today as Fasted.\nIf not, you can finish now and come back later to add entries.",
+      "confirm_message_low": "Today’s total is {{calories}} calories, which looks low.\nIf this was a fasting day, you can mark it as Fasted.\nOtherwise, you can finish now and add more later.",
+      "confirm_message_ok": "You’ve logged {{calories}} calories today.\nAre you ready to mark today as done?\nYou can change this later if needed.",
+
+      "fasted_secondary_title": "Mark as Fasted?",
+      "fasted_secondary_message": "You’ve logged {{calories}} calories today.\nFasting is usually associated with very low intake.\nIf this reflects your intention, you can still mark today as Fasted.",
+
+      "change_completed_title": "Today is marked as Completed",
+      "change_fasted_title": "Today is marked as Fasted",
+      "change_message": "You can reopen today to keep logging or change how today is marked.",
+
+      "action_done_for_today": "Done for Today",
+      "action_done_for_yesterday": "Done for Yesterday",
+      "action_done_for_day": "Done for the Day",
+      "action_mark_fasted": "Mark as Fasted",
+      "action_keep_logging": "Keep Logging",
+      "action_reopen_log": "Re-Open Log",
+
+      "toast_completed": "Marked done for today.",
+      "toast_fasted": "Marked today as fasted.",
+      "toast_unknown": "Reopened today.",
+      "toast_error": "Could not update today. Try again."
+    },
     "summary": {
       "title_today": "Résumé d'aujourd'hui",
       "title_other": "Résumé",

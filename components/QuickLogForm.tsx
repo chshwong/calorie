@@ -25,6 +25,7 @@ import {
 import type { CalorieEntry } from '@/utils/types';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 
 type QuickLogFormProps = {
   date: string;                 // ISO date string (YYYY-MM-DD)
@@ -565,6 +566,9 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['entries', user.id] });
         queryClient.invalidateQueries({ queryKey: ['entries', user.id, date] });
+
+        // daily_sum_consumed is maintained by DB triggers; invalidate dashboard range caches for this day.
+        invalidateDailySumConsumedRangesForDate(queryClient, user.id, effectiveDate);
         
         Alert.alert(t('alerts.success'), t('mealtype_log.success.entry_saved', { 
           action: quickLogId ? t('mealtype_log.success.action_updated') : t('mealtype_log.success.action_saved') 

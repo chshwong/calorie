@@ -11,10 +11,10 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { useQuickAdd } from '@/contexts/quick-add-context';
-import PitDarkSvg from '@/assets/brand/Logo_DarkMode_PitOnly.svg';
-import PitDarkPng from '@/assets/brand/Logo_DarkMode_PitOnly.png';
-import PitLightSvg from '@/assets/brand/Logo_LightMode_PitOnly-01.svg';
-import PitLightPng from '@/assets/brand/Logo_LightMode_PitOnly-01.png';
+import PitDarkSvg from '@/assets/brand/Logo_DarkMode_PitwithPlus.svg';
+import PitDarkPng from '@/assets/brand/Logo_DarkMode_PitwithPlus.png';
+import PitLightSvg from '@/assets/brand/Logo_LightMode_PitwithPlus.svg';
+import PitLightPng from '@/assets/brand/Logo_LightMode_PitwithPLUS.png';
 
 const FAB_SIZE = 52;
 

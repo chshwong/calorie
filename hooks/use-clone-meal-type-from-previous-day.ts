@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cloneDayEntries } from '@/lib/services/cloneDayEntries';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { getMealtypeMetaByDate, upsertMealtypeMeta } from '@/lib/services/calories-entries-mealtype-meta';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 
 export interface CloneMealTypeFromPreviousDayResult {
   entriesCloned: number;
@@ -161,6 +162,10 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       // Also invalidate mealtype meta queries for both source and target dates
       if (userId) {
         queryClient.invalidateQueries({ queryKey: ['mealtypeMeta', userId] });
+
+        // daily_sum_consumed is maintained by DB triggers; invalidate dashboard ranges for the target date.
+        const targetDate = getLocalDateKey(currentDate);
+        invalidateDailySumConsumedRangesForDate(queryClient, userId, targetDate);
       }
 
       // Call user-provided success callback

@@ -46,7 +46,23 @@ export const BURNED = {
   WARNING_KCAL: 6000,
   // How far back we may recompute system_* burned values after a weight-log change.
   // Keep centralized to avoid hardcoding "21" across the codebase.
-  REFRESH_LOOKBACK_DAYS: 21,
+  REFRESH_LOOKBACK_DAYS: 14,
+} as const;
+
+// Food log / daily logging policies
+export const FOOD_LOG = {
+  // “Done for Today” CTA: how many recent days may be edited (inclusive).
+  // Example: 7 means today + previous 6 days.
+  DONE_CTA_GRACE_DAYS: 7,
+
+  // Done/fasted modal calorie tiers (UI policy).
+  // Keep centralized so thresholds aren't hardcoded in components.
+  DONE_MODAL: {
+    LOW_CAL_MAX_INCLUSIVE: 499,
+    OK_CAL_MIN_INCLUSIVE: 500,
+    // Above this, we require a secondary confirmation before allowing “Mark as Fasted”.
+    FASTED_PRIMARY_MAX_CAL_EXCLUSIVE: 1000,
+  },
 } as const;
 
   // Daily nutrient target ranges (for onboarding and daily focus targets)

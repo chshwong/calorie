@@ -10,7 +10,9 @@ import { Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Bundle } from '@/lib/services/bundles';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 
 interface UseAddBundleToMealParams {
   /** User ID for the entries */
@@ -45,6 +47,7 @@ export function useAddBundleToMeal({
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const { refetch: refetchEntries } = useDailyEntries(entryDate);
+  const queryClient = useQueryClient();
 
   // Get meal type label for success message
   const getMealTypeLabel = useCallback((type: string): string => {
@@ -251,6 +254,9 @@ export function useAddBundleToMeal({
       // Refresh entries - ensure we wait for it to complete
       // Force a fresh fetch to ensure we get the latest data
       await refetchEntries();
+
+      // daily_sum_consumed is maintained by DB triggers; invalidate dashboard range caches for this day.
+      invalidateDailySumConsumedRangesForDate(queryClient, userId, entryDate);
       
       // Double-check: fetch again after a brief moment to ensure consistency
       await new Promise(resolve => setTimeout(resolve, 200));

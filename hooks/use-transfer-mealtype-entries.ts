@@ -5,6 +5,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { transferMealtypeEntries, type TransferMode, type NotesMode } from '@/lib/services/clone-mealtype-entries';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 
 export interface TransferMealtypeEntriesParams {
   sourceDate: string;
@@ -49,6 +50,11 @@ export function useTransferMealtypeEntries() {
         queryClient.invalidateQueries({
           queryKey: ['mealtypeMeta', userId, variables.sourceDate],
         });
+
+        // daily_sum_consumed is maintained by DB triggers; client should only invalidate
+        // cached dashboard ranges that include the affected dates.
+        invalidateDailySumConsumedRangesForDate(queryClient, userId, variables.sourceDate);
+        invalidateDailySumConsumedRangesForDate(queryClient, userId, variables.targetDate);
       }
     },
   });

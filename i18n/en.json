@@ -125,6 +125,39 @@
       "error_message": "Failed to copy entries: {{error}}",
       "same_date_error": "Cannot copy entries to the same date."
     },
+    "done_for_today": {
+      "cta_today": "Call It a Day",
+      "cta_yesterday": "Call It a Day",
+      "cta_day": "Call It a Day",
+      "cta_completed": "Completed ✓",
+      "cta_fasted": "Fasted",
+      "cta_a11y_hint": "Double tap to change today’s status.",
+      "not_authenticated": "Please sign in again.",
+
+      "confirm_title": "Done for Today?",
+      "confirm_message_zero": "0 calories logged.\nIf you’re fasting, you can mark today as Fasted.\n",
+      "confirm_message_low": "{{calories}} calories logged, which looks low.\nIf this is correct, mark as Done or Fasted.",
+      "confirm_message_ok": "{{calories}} calories logged.\nAre you ready to mark today as done?",
+
+      "fasted_secondary_title": "Mark as Fasted?",
+      "fasted_secondary_message": "You’ve logged {{calories}} calories today.\nFasting is usually associated with very low intake.\nIf this reflects your intention, you can still mark today as Fasted.",
+
+      "change_completed_title": "Today is marked as Completed",
+      "change_fasted_title": "Today is marked as Fasted",
+      "change_message": "You can reopen today to keep logging or change how today is marked.",
+
+      "action_done_for_today": "Done for Today",
+      "action_done_for_yesterday": "Done for Yesterday",
+      "action_done_for_day": "Done for the Day",
+      "action_mark_fasted": "Mark as Fasted",
+      "action_keep_logging": "Keep Logging",
+      "action_reopen_log": "Reopen Log",
+
+      "toast_completed": "Marked done for today.",
+      "toast_fasted": "Marked today as fasted.",
+      "toast_unknown": "Reopened today.",
+      "toast_error": "Could not update today. Try again."
+    },
     "accessibility": {
       "refresh_entries": "Refresh entries",
       "refresh_hint": "Double tap to refresh calorie entries",

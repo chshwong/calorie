@@ -153,6 +153,8 @@ export const Colors = {
     // Accent
     tint: salmonColorLight,
     tintLight: salmonColorLight + '20',
+    // Text to render on `tint` backgrounds (e.g., primary CTA)
+    textOnTint: '#FFFFFF',
     appTeal: '#2FA4A9',
     softGlow: '#2FA4A9' + '1A',
     chartGrey: '#E6E6E6', // chartGreyLightMode
@@ -238,6 +240,8 @@ export const Colors = {
     // Accent
     tint: salmonColorDark,
     tintLight: salmonColorDark + '20',
+    // Text to render on `tint` backgrounds in dark mode (per spec: black on salmon)
+    textOnTint: '#000000',
     appTeal: '#5BC2C6',
     softGlow: '#5BC2C6' + '1A',
     chartGrey: '#3A3A3A', // chartGreyDarkMode
@@ -555,6 +559,9 @@ export const Layout = {
   
   /** Standard gap between list items */
   listGap: Spacing.sm,
+
+  /** Bottom tab bar height (see app/(tabs)/_layout.tsx and ConstrainedTabBar) */
+  bottomTabBarHeight: 54,
   
   /** Dashboard-specific spacing */
   sectionGap: Spacing.lg,      // Gap between sections

@@ -9,6 +9,7 @@ import { MacroGauge } from '@/components/MacroGauge';
 import { NoteEditor } from '@/components/note-editor';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
+import { DoneForTodayButton } from '@/components/DoneForTodayButton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -49,10 +50,12 @@ import { getLocalDateKey } from '@/utils/dateTime';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { calculateNetCalories, canComputeNetCalories } from '@/lib/domain/burned/netCalories';
 import { useQueryClient } from '@tanstack/react-query';
+import { compareDateKeys } from '@/lib/date-guard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FOOD_LOG } from '@/constants/constraints';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -916,6 +919,13 @@ export default function FoodLogHomeScreen() {
     ? `${t('common.yesterday')}, ${formattedDate}`
     : formattedDate;
 
+  // Done CTA: within last N days (today + previous N-1 days)
+  const todayKey = toDateKey(new Date());
+  const yesterdayKey = addDays(todayKey, -1);
+  const minDoneCtaKey = addDays(todayKey, -(FOOD_LOG.DONE_CTA_GRACE_DAYS - 1));
+  const shouldShowDoneCta =
+    compareDateKeys(selectedDateString, minDoneCtaKey) >= 0 && compareDateKeys(selectedDateString, todayKey) <= 0;
+
   return (
     <ThemedView style={styles.container}>
       <OfflineBanner />
@@ -1414,6 +1424,16 @@ export default function FoodLogHomeScreen() {
                 </View>
               )}
             </View>
+
+            {/* Done CTA (within grace window) - acts on the currently viewed date */}
+            {shouldShowDoneCta && (
+              <DoneForTodayButton
+                selectedDateKey={selectedDateString}
+                todayKey={todayKey}
+                yesterdayKey={yesterdayKey}
+                formattedSelectedDate={formattedDate}
+              />
+            )}
           </View>
           </DesktopPageContainer>
       </CollapsibleModuleHeader>

@@ -644,7 +644,7 @@ function TabLayoutContent() {
                 backgroundColor: colors.background,
                 borderTopColor: colors.border,
                 borderTopWidth: 0,
-                height: 54,
+                height: Layout.bottomTabBarHeight,
                 zIndex: 9999,
               },
               Platform.select({

@@ -20,6 +20,7 @@ import { useBundles } from '@/hooks/use-bundles';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useFoodMasterByIds } from '@/hooks/use-food-master-by-ids';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 import { validateAndNormalizeBarcode } from '@/lib/barcode';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -1024,6 +1025,11 @@ export default function LogFoodScreen() {
       setEntriesEditMode(false);
       await refetchEntries();
 
+      // daily_sum_consumed is maintained by DB triggers; invalidate dashboard range caches for this day.
+      if (user?.id) {
+        invalidateDailySumConsumedRangesForDate(queryClient, user.id, entryDate);
+      }
+
       Alert.alert(
         t('alerts.success'),
         t('mealtype_log.delete_entry.success_multiple', {
@@ -1068,6 +1074,11 @@ export default function LogFoodScreen() {
         Alert.alert(t('alerts.error_title'), t('mealtype_log.delete_entry.failed', { error: error.message }));
       } else {
         await refetchEntries();
+
+        // daily_sum_consumed is maintained by DB triggers; invalidate dashboard range caches for this day.
+        if (user?.id) {
+          invalidateDailySumConsumedRangesForDate(queryClient, user.id, entryDate);
+        }
       }
     } catch (error) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.unexpected_error'));
@@ -1553,6 +1564,9 @@ export default function LogFoodScreen() {
       // 7. Success! Clear search and refresh entries
       clearSearch();
       await refetchEntries();
+
+      // daily_sum_consumed is maintained by DB triggers; invalidate dashboard range caches for this day.
+      invalidateDailySumConsumedRangesForDate(queryClient, user.id, entryDate);
 
       // Show brief success feedback - meal type label for display
       const mealTypeLabel = t(`mealtype_log.meal_types.${mealType.toLowerCase()}`);

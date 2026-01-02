@@ -29,6 +29,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getFoodMasterById } from '@/lib/services/foodMaster';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import { clampDateKey } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
@@ -785,10 +786,21 @@ export default function FoodEditScreen() {
       return;
     }
 
-    if (entryDate || entryDateParam) {
+    const savedDateKey = (cleanedEntryData.entry_date ?? entryDate ?? entryDateParam) as string | undefined;
+
+    if (savedDateKey) {
       queryClient.invalidateQueries({
-        queryKey: ['entries', user.id, entryDate || entryDateParam],
+        queryKey: ['entries', user.id, savedDateKey],
       });
+      invalidateDailySumConsumedRangesForDate(queryClient, user.id, savedDateKey);
+    }
+
+    // If the entry moved dates (edit mode), invalidate the original day too.
+    if (mode === 'edit' && entryDateParam && savedDateKey && entryDateParam !== savedDateKey) {
+      queryClient.invalidateQueries({
+        queryKey: ['entries', user.id, entryDateParam],
+      });
+      invalidateDailySumConsumedRangesForDate(queryClient, user.id, entryDateParam);
     }
 
     // Use safe navigation: go back if possible, else navigate to mealtype-log

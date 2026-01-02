@@ -13,7 +13,7 @@ import { View, StyleSheet, Platform, Dimensions } from 'react-native';
 import { BottomTabBar, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout } from '@/constants/theme';
 
 export function ConstrainedTabBar(props: BottomTabBarProps) {
   const [screenWidth, setScreenWidth] = React.useState(
@@ -59,7 +59,7 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
             style={[
               props.style,
               {
-                height: 54,
+                height: Layout.bottomTabBarHeight,
                 paddingBottom: 0,
                 marginBottom: 0,
                 borderTopWidth: 0,
@@ -79,7 +79,7 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
       style={[
         props.style,
         Platform.OS === 'web' && {
-          height: 54,
+          height: Layout.bottomTabBarHeight,
           paddingBottom: 0,
         },
       ]}
