@@ -389,23 +389,95 @@ function PhoneMock({
   );
 }
 
+function StepsShowcaseMobileStack({
+  colors,
+  colorScheme,
+  isWeb,
+  screenWidth,
+}: {
+  colors: ThemeColors;
+  colorScheme: 'light' | 'dark';
+  isWeb: boolean;
+  screenWidth: number;
+}) {
+  const { t } = useTranslation();
+
+  const steps: Array<{
+    variant: StepsMockVariant;
+    titleKey: string;
+    bodyKey: string;
+  }> = [
+    { variant: 'logging', titleKey: 'auth.login.marketing.steps_1_title', bodyKey: 'auth.login.marketing.steps_1_body' },
+    { variant: 'progress', titleKey: 'auth.login.marketing.steps_2_title', bodyKey: 'auth.login.marketing.steps_2_body' },
+    { variant: 'plan', titleKey: 'auth.login.marketing.steps_3_title', bodyKey: 'auth.login.marketing.steps_3_body' },
+  ];
+
+  // Center the mockups and constrain their width. Use runtime math + theme tokens (no magic px constants).
+  const horizontalPadding = Spacing['2xl'];
+  const maxMockWidth = Math.min(Layout.maxContentWidth, Math.max(Spacing['6xl'], screenWidth - horizontalPadding * 2));
+
+  return (
+    <View style={[styles.stepsSection, { marginTop: Spacing['3xl'] }]}>
+      <ThemedText style={[styles.stepsHeading, { color: colors.text }]} accessibilityRole="header">
+        {t('auth.login.marketing.steps_section_title')}
+      </ThemedText>
+
+      <View style={[styles.stepsList, { marginTop: Spacing['4xl'] }]}>
+        {steps.map((step, idx) => (
+          <View key={step.variant} style={{ width: '100%', marginTop: idx === 0 ? 0 : Spacing['6xl'] }}>
+            <View style={{ width: '100%', alignItems: 'center' }}>
+              <View style={{ width: maxMockWidth, maxWidth: maxMockWidth }}>
+                <PhoneMock colors={colors} colorScheme={colorScheme} isWeb={isWeb} variant={step.variant} />
+              </View>
+            </View>
+
+            <View style={{ width: '100%', alignItems: 'center', marginTop: Spacing['3xl'] }}>
+              <Text style={[styles.stepNumber, { color: colors.tint }]} accessibilityElementsHidden>
+                {String(idx + 1)}
+              </Text>
+              <ThemedText style={[styles.stepTitle, { color: colors.text, textAlign: 'center' }]}>
+                {t(step.titleKey)}
+              </ThemedText>
+              <ThemedText
+                style={[
+                  styles.stepBody,
+                  { color: colors.textSecondary, textAlign: 'center', maxWidth: Layout.maxContentWidth },
+                ]}
+              >
+                {t(step.bodyKey)}
+              </ThemedText>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function StepsShowcaseSection({
   colors,
   colorScheme,
   isTwoCol,
   isWeb,
+  overlapMode,
   screenWidth,
 }: {
   colors: ThemeColors;
   colorScheme: 'light' | 'dark';
   isTwoCol: boolean;
   isWeb: boolean;
+  overlapMode: boolean;
   screenWidth: number;
 }) {
   const { t } = useTranslation();
 
-  // Overlap/collage is web-desktop only. This ensures mobile never uses transforms even if viewport math is weird.
-  const enableOverlap = isWeb && isTwoCol && screenWidth >= 1200;
+  // Overlap/collage is explicitly controlled by the parent so mobile can never accidentally enter collage mode.
+  const enableOverlap = overlapMode && isTwoCol;
+
+  // Mobile / non-collage layout: absolutely no transforms or overlap.
+  if (!enableOverlap) {
+    return <StepsShowcaseMobileStack colors={colors} colorScheme={colorScheme} isWeb={isWeb} screenWidth={screenWidth} />;
+  }
 
   // Constrain decorative mockups with theme tokens (no magic pixels).
   const phoneMaxWidth = Math.max(Spacing['5xl'], Math.round(Layout.maxContentWidth * (isTwoCol ? 0.62 : 0.56)));
@@ -611,7 +683,21 @@ export default function LoginScreen() {
   const isTwoCol = screenWidth >= 1024;
   const isWeb = Platform.OS === 'web';
   const isMobileWeb = isWeb && !isTwoCol;
-  const overlapMode = isWeb && isTwoCol && screenWidth >= 1200;
+  // Collage mode must NEVER activate on mobile browsers (even if viewport width is large due to viewport/meta quirks).
+  // Gate on desktop-like input (fine pointer + hover) AND no touch points.
+  const isDesktopLikePointer = useMemo(() => {
+    if (!isWeb) return false;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }, [isWeb]);
+
+  const hasTouchPoints = useMemo(() => {
+    if (!isWeb) return false;
+    if (typeof navigator === 'undefined') return false;
+    return (navigator as any).maxTouchPoints > 0;
+  }, [isWeb]);
+
+  const overlapMode = isWeb && isTwoCol && screenWidth >= 1200 && isDesktopLikePointer && !hasTouchPoints;
 
   // In overlap/collage mode, the step mockups are lifted via transforms (visual-only),
   // which leaves extra layout space below the collage. Pull the social proof strip up
@@ -1317,6 +1403,7 @@ export default function LoginScreen() {
             colorScheme={colorScheme ?? 'light'}
             isTwoCol={isTwoCol}
             isWeb={isWeb}
+            overlapMode={overlapMode}
             screenWidth={screenWidth}
           />
           <View
