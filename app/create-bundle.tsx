@@ -36,6 +36,8 @@ type BundleItem = {
   item_name: string | null;
   serving_id: string | null;
   quantity: number;
+  /** Raw user input for quantity (keeps intermediate states like "1.") */
+  quantityInput: string;
   unit: string;
   order_index: number;
   food?: FoodMaster;
@@ -43,6 +45,31 @@ type BundleItem = {
   availableServings?: ServingOption[];
   calculatedNutrition?: Nutrients;
 };
+
+function sanitizeOneDecimalQuantityInput(raw: string): string {
+  // Allow: empty (so user can delete), digits, and at most one '.' with at most 1 decimal digit
+  const t = raw.replace(',', '.'); // helpful for some keyboards/locales
+
+  // Keep only digits and dots
+  const filtered = t.replace(/[^0-9.]/g, '');
+  if (filtered.length === 0) return '';
+
+  // If it starts with '.', prefix '0'
+  const normalizedLeading = filtered.startsWith('.') ? `0${filtered}` : filtered;
+
+  // Keep only first '.'
+  const firstDot = normalizedLeading.indexOf('.');
+  if (firstDot === -1) return normalizedLeading;
+
+  const intPart = normalizedLeading.slice(0, firstDot);
+  const rest = normalizedLeading.slice(firstDot + 1).replace(/\./g, ''); // remove extra dots
+  return rest.length > 0 ? `${intPart}.${rest}` : `${intPart}.`;
+}
+
+function parseQuantityOrZero(input: string): number {
+  const n = Number.parseFloat(input);
+  return Number.isFinite(n) ? n : 0;
+}
 
 export default function CreateBundleScreen() {
   const router = useRouter();
@@ -200,6 +227,7 @@ export default function CreateBundleScreen() {
             serving: selectedServing,
             availableServings,
             order_index: index,
+            quantityInput: String(item.quantity ?? 0),
           };
           return calculateItemNutritionSync(bundleItem);
         })
@@ -250,6 +278,7 @@ export default function CreateBundleScreen() {
       item_name: null,
       serving_id: servingId,
       quantity: defaultQty,
+      quantityInput: String(defaultQty),
       unit: unit,
       order_index: bundleItems.length,
       food: food,
@@ -294,7 +323,8 @@ export default function CreateBundleScreen() {
 
   // Handle inline quantity change for a bundle item
   const handleItemQuantityChange = useCallback((itemId: string, newQuantity: string) => {
-    const parsedQuantity = parseFloat(newQuantity) || 0;
+    const sanitized = sanitizeOneDecimalQuantityInput(newQuantity);
+    const parsedQuantity = parseQuantityOrZero(sanitized);
     
     setBundleItems(prevItems => 
       prevItems.map(item => {
@@ -303,8 +333,37 @@ export default function CreateBundleScreen() {
         const updatedItem = {
           ...item,
           quantity: parsedQuantity,
+          quantityInput: sanitized,
         };
         
+        return calculateItemNutritionSync(updatedItem);
+      })
+    );
+  }, []);
+
+  // Normalize quantity when leaving the field (clamp and remove trailing '.')
+  const handleItemQuantityBlur = useCallback((itemId: string) => {
+    setBundleItems(prevItems =>
+      prevItems.map(item => {
+        if (item.id !== itemId) return item;
+
+        const trimmed = item.quantityInput.trim();
+        const withoutTrailingDot = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
+        const sanitized = sanitizeOneDecimalQuantityInput(withoutTrailingDot);
+        let parsed = parseQuantityOrZero(sanitized);
+
+        // Clamp to reasonable bounds
+        if (parsed < 0) parsed = 0;
+        if (parsed > MAX_QUANTITY) parsed = MAX_QUANTITY;
+
+        const finalInput = sanitized.length > 0 ? sanitizeOneDecimalQuantityInput(String(parsed)) : '';
+
+        const updatedItem = {
+          ...item,
+          quantity: parsed,
+          quantityInput: finalInput,
+        };
+
         return calculateItemNutritionSync(updatedItem);
       })
     );
@@ -623,8 +682,9 @@ export default function CreateBundleScreen() {
                       if (ref) quantityInputRefs.current.set(item.id, ref);
                     }}
                     style={[styles.bundleItemInput, { color: colors.text, borderColor: colors.icon + '40' }]}
-                    value={String(item.quantity)}
+                    value={item.quantityInput}
                     onChangeText={(text) => handleItemQuantityChange(item.id, text)}
+                    onBlur={() => handleItemQuantityBlur(item.id)}
                     keyboardType="decimal-pad"
                     placeholder="1"
                     placeholderTextColor={colors.textSecondary}
