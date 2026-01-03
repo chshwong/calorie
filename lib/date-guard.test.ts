@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt, minDateKey } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
 
 describe('date-guard', () => {
@@ -25,6 +25,12 @@ describe('date-guard', () => {
     expect(clampDateKey('2025-01-01', min, max)).toBe(min);
     expect(clampDateKey('2025-01-15', min, max)).toBe('2025-01-15');
     expect(clampDateKey('2025-02-01', min, max)).toBe(max);
+  });
+
+  it('minDateKey returns the earlier of two canonical keys', () => {
+    expect(minDateKey('2025-01-01', '2025-01-02')).toBe('2025-01-01');
+    expect(minDateKey('2025-01-02', '2025-01-01')).toBe('2025-01-01');
+    expect(minDateKey('2025-01-01', '2025-01-01')).toBe('2025-01-01');
   });
 
   it('dateKeyToLocalStartOfDay returns a local midnight Date for that key', () => {

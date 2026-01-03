@@ -41,6 +41,7 @@ type WeightDay = {
   weighedAt?: string | null;
   carriedForward: boolean;
   hasEntry: boolean;
+  entryCount: number;
 };
 
 export function useWeightLogsRange(startDate: Date, endDate: Date) {
@@ -214,6 +215,13 @@ export function useWeightHomeData(rangeDays: number = 7, rangeEndDate?: Date) {
     const earliestISO = earliestQuery.data;
     const firstEntryDate = earliestISO ? toDateKeyLocal(new Date(earliestISO)) : null;
 
+    // Count entries per local day (for multi-entry indicator + day view)
+    const countByDate = new Map<string, number>();
+    logs.forEach((log) => {
+      const key = toDateKeyLocal(new Date(log.weighed_at));
+      countByDate.set(key, (countByDate.get(key) ?? 0) + 1);
+    });
+
     // Map latest entry per day
     const latestByDate = new Map<string, WeightLogRow>();
     logs.forEach((log) => {
@@ -239,6 +247,7 @@ export function useWeightHomeData(rangeDays: number = 7, rangeEndDate?: Date) {
       const weightFromEntry = entry?.weight_lb ?? null;
       const bodyFatFromEntry = entry?.body_fat_percent ?? null;
       const entryId = entry?.id ?? null;
+      const entryCount = countByDate.get(dateKey) ?? 0;
 
       if (hasEntry && weightFromEntry !== null) {
         lastKnownWeight = weightFromEntry;
@@ -258,10 +267,19 @@ export function useWeightHomeData(rangeDays: number = 7, rangeEndDate?: Date) {
         weighedAt: entry?.weighed_at ?? null,
         carriedForward: shouldCarryForward && !hasEntry,
         hasEntry,
+        entryCount,
       };
     });
 
-    return timeline.slice(-rangeDays).reverse(); // Today first
+    const windowDays = timeline.slice(-rangeDays).reverse(); // Today first
+
+    // Hide days before the first-ever weigh-in day (module start day).
+    // Example: if firstEntryDate is Dec 29, do not show Dec 28/27 “No data yet” rows.
+    if (firstEntryDate) {
+      return windowDays.filter((d) => d.date >= firstEntryDate);
+    }
+
+    return windowDays;
   }, [rangeQuery.data, earliestQuery.data, fetchWindowDays, rangeDays, startDate]);
 
   return {

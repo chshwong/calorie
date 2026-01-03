@@ -39,6 +39,8 @@ import { formatLocalTime } from '@/utils/dateTime';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import i18n from '@/i18n';
+import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, minDateKey as minDateKeyOf } from '@/lib/date-guard';
+import { toDateKey } from '@/utils/dateKey';
 
 type WeightUnit = 'kg' | 'lbs';
 
@@ -51,9 +53,29 @@ export default function WeightEntryScreen() {
   const profile = userConfig; // Alias for backward compatibility
   const { user } = useAuth();
   const userId = user?.id;
-  const { date: dateParam, weightLb: weightLbParam, bodyFatPercent: bodyFatParam, entryId: entryIdParam, weighedAt: weighedAtParam, mode: modeParam } =
-    useLocalSearchParams<{ date?: string; weightLb?: string; bodyFatPercent?: string; entryId?: string; weighedAt?: string; mode?: EntryMode }>();
-  const { dateKey: clampedRouteDateKey, minDate } = useClampedDateParam({ paramKey: 'date' });
+  const {
+    date: dateParam,
+    weightLb: weightLbParam,
+    bodyFatPercent: bodyFatParam,
+    entryId: entryIdParam,
+    weighedAt: weighedAtParam,
+    mode: modeParam,
+    returnTo: returnToParam,
+    returnDate: returnDateParam,
+    fromDate: fromDateParam,
+  } =
+    useLocalSearchParams<{
+      date?: string;
+      weightLb?: string;
+      bodyFatPercent?: string;
+      entryId?: string;
+      weighedAt?: string;
+      mode?: EntryMode;
+      returnTo?: 'day';
+      returnDate?: string;
+      fromDate?: string;
+    }>();
+  const { dateKey: clampedRouteDateKey, minDate, minDateKey, today, todayKey } = useClampedDateParam({ paramKey: 'date' });
   const weight180Query = useWeightLogs180d();
   const deleteMutation = useDeleteWeightLog(userId ?? '');
 
@@ -68,7 +90,7 @@ export default function WeightEntryScreen() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return today;
-  }, [dateParam]);
+  }, [clampedRouteDateKey, dateParam]);
 
   const preferredUnit: WeightUnit = profile?.weight_unit === 'kg' ? 'kg' : 'lbs';
 const isWeb = Platform.OS === 'web';
@@ -101,12 +123,67 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
     [editingEntryId, weight180Query.data]
   );
 
+  const editingEntryDateKey = useMemo(() => {
+    if (!isEditMode) return null;
+    const ts =
+      (weighedAtParam && typeof weighedAtParam === 'string' ? weighedAtParam : null) ??
+      (editingEntryFromCache?.weighed_at ?? null);
+    if (!ts) return null;
+    return toDateKey(ts);
+  }, [editingEntryFromCache?.weighed_at, isEditMode, weighedAtParam]);
+
+  const isLegacyPreSignupEntry = useMemo(() => {
+    if (!isEditMode || !editingEntryDateKey) return false;
+    return compareDateKeys(editingEntryDateKey, minDateKey) < 0;
+  }, [editingEntryDateKey, isEditMode, minDateKey]);
+
+  // For legacy pre-signup entries: allow keeping/editing that existing day, but do not allow selecting *other*
+  // pre-signup days. We accomplish this by:
+  // - Setting the picker minimum to the entry's day (so the calendar can show/select it)
+  // - Clamping any other selection < signup min up to signup min
+  const effectiveMinDateKey = useMemo(() => {
+    if (isEditMode && editingEntryDateKey) return minDateKeyOf(minDateKey, editingEntryDateKey);
+    return minDateKey;
+  }, [editingEntryDateKey, isEditMode, minDateKey]);
+
+  const effectiveMinDate = useMemo(() => dateKeyToLocalStartOfDay(effectiveMinDateKey), [effectiveMinDateKey]);
+
   const saveMutation = useSaveWeightEntry();
-  const handleClose = () => {
+  const returnToDay = returnToParam === 'day';
+  const returnDateKey = useMemo(() => {
+    if (!returnToDay || !returnDateParam || typeof returnDateParam !== 'string') return null;
+    return clampDateKey(toDateKey(returnDateParam), minDateKey, todayKey);
+  }, [minDateKey, returnDateParam, returnToDay, todayKey]);
+  const returnFromDateKey = useMemo(() => {
+    if (!returnToDay || !fromDateParam || typeof fromDateParam !== 'string') return null;
+    return clampDateKey(toDateKey(fromDateParam), minDateKey, todayKey);
+  }, [fromDateParam, minDateKey, returnToDay, todayKey]);
+
+  const navigateAfterDone = useCallback(() => {
+    if (returnToDay && returnDateKey) {
+      router.replace({
+        pathname: '/weight/day',
+        params: {
+          date: returnDateKey,
+          ...(returnFromDateKey ? { fromDate: returnFromDateKey } : {}),
+        },
+      } as any);
+      return;
+    }
     router.replace('/weight' as any);
+  }, [returnDateKey, returnFromDateKey, returnToDay, router]);
+
+  const handleClose = () => {
+    navigateAfterDone();
   };
 
   const handleHeaderBack = useCallback(() => {
+    // When opened from Day Weight, mimic Cancel behavior exactly (never rely on browser history).
+    if (returnToDay) {
+      navigateAfterDone();
+      return;
+    }
+
     // Match StandardSubheader's default behavior, but prefer /weight as the deep-link fallback.
     // @ts-ignore - canGoBack exists on navigation but types can vary
     const canGoBack = typeof (navigation as any)?.canGoBack === 'function'
@@ -118,8 +195,8 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
       return;
     }
 
-    router.replace('/weight' as any);
-  }, [navigation, router]);
+    navigateAfterDone();
+  }, [navigateAfterDone, navigation, returnToDay, router]);
 
   // Prefill / sync with params (edit mode only)
   useEffect(() => {
@@ -256,11 +333,14 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
     const selected = new Date(selectedDate);
     selected.setHours(0, 0, 0, 0);
 
-    if (selected.getTime() > today.getTime()) {
+    const selectedKey = toDateKey(selected);
+    if (compareDateKeys(selectedKey, todayKey) > 0) {
       setError('Date cannot be in the future.');
       return;
     }
-    if (selected.getTime() < minDate.getTime()) {
+    const isAllowedLegacyDay =
+      isLegacyPreSignupEntry && editingEntryDateKey && selectedKey === editingEntryDateKey;
+    if (compareDateKeys(selectedKey, minDateKey) < 0 && !isAllowedLegacyDay) {
       const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
       const display = minDate.toLocaleDateString(locale, {
         month: 'short',
@@ -288,7 +368,7 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
         previousWeighedAtISO,
       });
       showAppToast('Saved');
-      router.replace('/weight' as any);
+      navigateAfterDone();
     } catch (err: any) {
       setError(err?.message || 'Something went wrong while saving.');
     }
@@ -312,7 +392,7 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
       deleteMutation.mutate({ id: editingEntryId, weighedAtISO }, {
         onSuccess: () => {
           showAppToast('Deleted');
-          router.replace('/weight' as any);
+          navigateAfterDone();
         },
         onError: (err: any) => {
           setError(err?.message || 'Failed to delete entry.');
@@ -559,11 +639,27 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
       <AppDatePicker
         visible={showDatePicker}
         value={selectedDate}
-        maximumDate={new Date()}
+        minimumDate={effectiveMinDate}
+        maximumDate={today}
         onChange={(date) => {
-          setSelectedDate(date);
+          const requestedKey = toDateKey(date);
+          let nextKey = clampDateKey(requestedKey, effectiveMinDateKey, todayKey);
+
+          // Legacy pre-signup entry rule: if user tries to move it to a different pre-signup day,
+          // snap to the signup minimum (so we don't allow creating additional pre-signup dates).
+          if (
+            isLegacyPreSignupEntry &&
+            editingEntryDateKey &&
+            compareDateKeys(nextKey, minDateKey) < 0 &&
+            nextKey !== editingEntryDateKey
+          ) {
+            nextKey = minDateKey;
+          }
+
+          const nextDate = dateKeyToLocalStartOfDay(nextKey);
+          setSelectedDate(nextDate);
           setSelectedDateTime((prev) => {
-            const next = new Date(date);
+            const next = new Date(nextDate);
             next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
             return next;
           });

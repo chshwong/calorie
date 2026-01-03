@@ -723,6 +723,12 @@ function TabLayoutContent() {
           }}
         />
         <Tabs.Screen
+          name="weight/day"
+          options={{
+            href: null, // Hide day view from tab bar
+          }}
+        />
+        <Tabs.Screen
           name="exercise"
           listeners={{
             tabPress: (e: { preventDefault: () => void }) => {

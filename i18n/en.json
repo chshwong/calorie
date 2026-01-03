@@ -2265,6 +2265,21 @@
       "cancel_hint": "Cancel and close Quick Log form",
       "save_hint": "Save Quick Log entry"
     }
+  },
+  "weight": {
+    "fab": {
+      "log_weight": "+ Log weight",
+      "log_weight_a11y": "Log weight"
+    },
+    "body_fat": "{{value}}% body fat",
+    "day": {
+      "title": "Weigh-ins of the day",
+      "entries": "{{count}} {{entries}}",
+      "entry_one": "entry",
+      "entry_other": "entries",
+      "no_entries": "No entries yet.",
+      "add_weigh_in": "Add weigh-in"
+    }
   }
 }
 

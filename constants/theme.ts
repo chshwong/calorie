@@ -72,7 +72,7 @@ export const DashboardAccents = {
 
 // Module theme tokens for visual differentiation
 // Used to create subtle but clear identity for each module (Exercise, Meds, etc.)
-export type ModuleType = 'exercise' | 'meds' | 'food' | 'water';
+export type ModuleType = 'exercise' | 'meds' | 'food' | 'water' | 'weight';
 
 export const ModuleThemes = {
   exercise: {
@@ -89,6 +89,12 @@ export const ModuleThemes = {
     accent: DashboardAccents.food,           // #3B82F6 - Blue
     tint: DashboardAccents.food + '08',
     iconColor: DashboardAccents.food,
+  },
+  weight: {
+    // Weight uses the global primary CTA tint (salmon) to match the module’s primary actions.
+    accent: salmonColorLight,
+    tint: salmonColorLight + '08',
+    iconColor: salmonColorLight,
   },
   water: {
     accent: '#0EA5E9',                      // Sky blue for water

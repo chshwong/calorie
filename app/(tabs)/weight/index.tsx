@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Pressable, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -22,12 +22,15 @@ import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { formatLocalTime, getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { clampDateKey, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
 
 export default function WeightHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const params = useLocalSearchParams<{ date?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, profile: authProfile } = useAuth();
@@ -37,6 +40,17 @@ export default function WeightHomeScreen() {
     return d;
   }, []);
   const [selectedDate, setSelectedDate] = useState<Date>(todayLocal);
+  const rawDate = params?.date;
+  const hasDateParam = Array.isArray(rawDate) ? typeof rawDate[0] === 'string' : typeof rawDate === 'string';
+  const { dateKey: routeDateKey } = useClampedDateParam({ paramKey: 'date', toastOnPreMin: false });
+
+  // If we were navigated here with a ?date= param (e.g., from Day Weight back),
+  // honor it once and display that day.
+  // Note: the Weight home screen otherwise manages date locally and does not persist it to the URL.
+  useEffect(() => {
+    if (!hasDateParam) return;
+    setSelectedDate(dateKeyToLocalStartOfDay(routeDateKey));
+  }, [hasDateParam, routeDateKey]);
   const [chartWidth, setChartWidth] = useState<number>(0);
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
@@ -85,12 +99,31 @@ export default function WeightHomeScreen() {
 
     const end = new Date(selectedDate);
     end.setHours(0, 0, 0, 0);
-    const start = new Date(end);
+    let start = new Date(end);
     start.setDate(start.getDate() - 6);
 
     const keys: string[] = [];
     const labels: string[] = [];
-    for (let i = 0; i < 7; i++) {
+
+    // If the user’s first weigh-in is within the 7-day window, don't show days before it.
+    // (Prevents “phantom” early points and avoids listing days before the module start.)
+    const logs = weight180Query.data ?? [];
+    let earliestKeyInCache: string | null = null;
+    logs.forEach((log) => {
+      const k = getLocalDateKey(new Date(log.weighed_at));
+      if (!earliestKeyInCache || compareDateKeys(k, earliestKeyInCache) < 0) {
+        earliestKeyInCache = k;
+      }
+    });
+    const startKey = getLocalDateKey(start);
+    const effectiveStartKey =
+      earliestKeyInCache && compareDateKeys(earliestKeyInCache, startKey) > 0
+        ? earliestKeyInCache
+        : startKey;
+    start = dateKeyToLocalStartOfDay(effectiveStartKey);
+
+    const dayCount = Math.max(1, 1 + Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)));
+    for (let i = 0; i < dayCount; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       keys.push(getLocalDateKey(d));
@@ -101,7 +134,6 @@ export default function WeightHomeScreen() {
       );
     }
 
-    const logs = weight180Query.data ?? [];
     // Build daily averages map
     const sums = new Map<string, { sum: number; count: number }>();
     logs.forEach((log) => {
@@ -121,12 +153,12 @@ export default function WeightHomeScreen() {
 
     // Find latest weight before the start of window for initial carry
     let initialCarry: number | null = null;
-    const startKey = getLocalDateKey(start);
+    const windowStartKey = getLocalDateKey(start);
     let latestPriorTime = -Infinity;
     logs.forEach((log) => {
       const t = new Date(log.weighed_at).getTime();
       const key = getLocalDateKey(new Date(log.weighed_at));
-      if (key < startKey && t > latestPriorTime && log.weight_lb !== null && log.weight_lb !== undefined) {
+      if (key < windowStartKey && t > latestPriorTime && log.weight_lb !== null && log.weight_lb !== undefined) {
         latestPriorTime = t;
         const lb = log.weight_lb;
         initialCarry = unit === 'kg' ? roundTo1(lbToKg(lb)) : roundTo1(lb);
@@ -241,14 +273,6 @@ export default function WeightHomeScreen() {
         module="weight"
       >
         <DesktopPageContainer>
-          {/* Latest weight info line */}
-          <View style={{ marginTop: Spacing.sm, marginBottom: Spacing.md }}>
-            <ThemedText style={{ color: colors.textSecondary }}>
-              Latest: {latestWeightDisplay} • {latestBodyFatDisplay}
-              {latestTimestamp ? ` · ${formatLocalTime(latestTimestamp)}` : ''}
-            </ThemedText>
-          </View>
-
           <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
             <View style={{ marginBottom: Spacing.sm, gap: Spacing.xs }}>
               <ThemedText style={{ color: colors.text, fontWeight: '600' }}>
@@ -392,13 +416,38 @@ export default function WeightHomeScreen() {
                           <ThemedText style={{ color: colors.text, fontWeight: '600' }}>
                             {dateLabel}
                           </ThemedText>
-                          <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>
-                            {day.bodyFatPercent !== null ? `${roundTo1(day.bodyFatPercent).toFixed(1)}% body fat` : '—'}
-                          </ThemedText>
                         </View>
                         <View style={{ alignItems: 'flex-end', gap: Spacing.xs }}>
-                          <ThemedText style={{ color: weightColor, fontSize: FontSize.lg, fontWeight: FontWeight.semibold }}>
-                            {weightDisplay}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                            {day.entryCount > 1 && (
+                              <TouchableOpacity
+                                style={[styles.multiEntryClue, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                                onPress={(e: any) => {
+                                  e?.stopPropagation?.();
+                                  router.push({
+                                    pathname: '/weight/day',
+                                    params: { date: day.date, fromDate: selectedDateKey },
+                                  });
+                                }}
+                                onPressIn={(e: any) => {
+                                  e?.stopPropagation?.();
+                                }}
+                                activeOpacity={0.8}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              >
+                                <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700' }}>
+                                  {'📚'} {day.entryCount}
+                                </ThemedText>
+                              </TouchableOpacity>
+                            )}
+                            <ThemedText style={{ color: weightColor, fontSize: FontSize.lg, fontWeight: FontWeight.semibold }}>
+                              {weightDisplay}
+                            </ThemedText>
+                          </View>
+                          <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.sm, textAlign: 'right' }}>
+                            {day.bodyFatPercent !== null && day.bodyFatPercent !== undefined
+                              ? t('weight.body_fat', { value: roundTo1(day.bodyFatPercent).toFixed(1) })
+                              : '—'}
                           </ThemedText>
                           {isCarried && (
                             <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs }}>
@@ -411,23 +460,27 @@ export default function WeightHomeScreen() {
                   })}
                 </View>
               )}
-
-              <TouchableOpacity
-                style={[
-                  styles.addButton,
-                  { backgroundColor: colors.tint, opacity: isFetching ? 0.9 : 1 },
-                ]}
-                onPress={() => router.push('/weight/entry')}
-                disabled={isFetching || isLoading}
-              >
-                <IconSymbol name="plus" size={18} color={colors.textInverse} />
-                <ThemedText style={[styles.addButtonText, { color: colors.textInverse }]}>
-                  Add weight
-                </ThemedText>
-              </TouchableOpacity>
             </View>
+
+            {/* Spacer so the last row can scroll above the floating action button */}
+            <View style={{ height: Layout.bottomTabBarHeight + Spacing.md }} />
         </DesktopPageContainer>
       </CollapsibleModuleHeader>
+
+      {/* Floating action button: Log weigh */}
+      <View pointerEvents="box-none" style={styles.fabContainer}>
+        <TouchableOpacity
+          style={[styles.fabButton, { backgroundColor: colors.tint, opacity: isFetching ? 0.95 : 1 }]}
+          onPress={() => router.push('/weight/entry')}
+          disabled={isFetching || isLoading}
+          activeOpacity={0.85}
+          {...getButtonAccessibilityProps(t('weight.fab.log_weight_a11y'))}
+        >
+          <ThemedText style={[styles.fabButtonText, { color: colors.textInverse }]}>
+            {t('weight.fab.log_weight')}
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
 
       <Modal
         visible={showMenu}
@@ -554,16 +607,34 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.none,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  addButton: {
+  multiEntryClue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  fabContainer: {
+    position: 'absolute',
+    right: Layout.screenPadding,
+    bottom: Layout.bottomTabBarHeight + Spacing.md,
+    zIndex: 9999,
+    pointerEvents: 'box-none',
+  },
+  fabButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
+    ...Shadows.md,
   },
-  addButtonText: {
-    fontSize: FontSize.md,
+  fabButtonText: {
+    fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
   },
   gearButton: {

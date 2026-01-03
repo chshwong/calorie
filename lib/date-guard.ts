@@ -31,6 +31,13 @@ export function clampDateKey(dateKey: string, minKey: string, maxKey: string): s
 }
 
 /**
+ * Return the earlier of two canonical date keys (YYYY-MM-DD).
+ */
+export function minDateKey(a: string, b: string): string {
+  return compareDateKeys(a, b) <= 0 ? a : b;
+}
+
+/**
  * Convert a signup timestamp (ISO string) into the user's *local* signup day dateKey.
  * This intentionally uses the device's current timezone (per product decision).
  */

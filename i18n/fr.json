@@ -1874,6 +1874,21 @@
     "log_water": "Enregistrer l’eau",
     "enter_weight": "Enregistrer le poids",
     "scan_barcode": "Scanner un code-barres"
+  },
+  "weight": {
+    "fab": {
+      "log_weight": "+ Noter le poids",
+      "log_weight_a11y": "Noter le poids"
+    },
+    "body_fat": "{{value}}% de graisse",
+    "day": {
+      "title": "Pesées du jour",
+      "entries": "{{count}} {{entries}}",
+      "entry_one": "entrée",
+      "entry_other": "entrées",
+      "no_entries": "Aucune entrée pour le moment.",
+      "add_weigh_in": "Ajouter une pesée"
+    }
   }
 }
 
