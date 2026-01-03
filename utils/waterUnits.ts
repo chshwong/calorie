@@ -49,33 +49,35 @@ export const WATER_LIMITS = {
 
 /**
  * Convert value from any unit to milliliters (canonical)
+ * Preserves full precision for storage (no rounding)
  */
 export function toMl(value: number, unit: WaterUnit): number {
   switch (unit) {
     case 'ml':
-      return Math.round(value);
+      return value; // No conversion needed, preserve precision
     case 'floz':
-      return Math.round(value * ML_PER_FL_OZ);
+      return value * ML_PER_FL_OZ; // Preserve full precision
     case 'cup':
-      return Math.round(value * ML_PER_CUP);
+      return value * ML_PER_CUP; // Preserve full precision
     default:
-      return Math.round(value);
+      return value;
   }
 }
 
 /**
  * Convert milliliters to target unit
+ * Preserves full precision for storage (no rounding)
  */
 export function fromMl(ml: number, targetUnit: WaterUnit): number {
   switch (targetUnit) {
     case 'ml':
-      return Math.round(ml);
+      return ml; // No conversion needed, preserve precision
     case 'floz':
-      return Math.round((ml / ML_PER_FL_OZ) * 10) / 10; // Round to 1 decimal place
+      return ml / ML_PER_FL_OZ; // Preserve full precision
     case 'cup':
-      return Math.round((ml / ML_PER_CUP) * 100) / 100; // Round to 2 decimal places to preserve 0.25, 0.5, etc.
+      return ml / ML_PER_CUP; // Preserve full precision
     default:
-      return Math.round(ml);
+      return ml;
   }
 }
 
@@ -215,25 +217,50 @@ export function getQuickAddOptionsByUnit(unit: WaterUnit): QuickAddOption[] {
 }
 
 /**
- * Format water value for display in a specific unit
+ * Format water value for display with unit-specific decimal places
+ * ML: 0 decimals (whole numbers)
+ * floz: 1 decimal max
+ * cups: 2 decimals max
+ * Removes trailing zeros
  */
-export function formatWaterValue(value: number, unit: WaterUnit): string {
-  // For display, use the value as-is (no normalization needed for presets)
-  // Round to 2 decimal places for display, but show without trailing zeros
-  const displayValue = Math.round(value * 100) / 100;
-  const formattedValue = displayValue % 1 === 0 ? displayValue.toString() : displayValue.toFixed(2).replace(/\.?0+$/, '');
+export function formatWaterValueForDisplay(value: number, unit: WaterUnit): string {
+  let displayValue: number;
+  let formattedValue: string;
   
   switch (unit) {
     case 'ml':
+      // Round to whole number (0 decimals)
+      displayValue = Math.round(value);
+      formattedValue = displayValue.toString();
       return `${formattedValue} ml`;
     case 'floz':
+      // Round to 1 decimal max
+      displayValue = Math.round(value * 10) / 10;
+      formattedValue = displayValue % 1 === 0 
+        ? displayValue.toString() 
+        : displayValue.toFixed(1).replace(/\.?0+$/, '');
       return `${formattedValue} fl oz`;
     case 'cup':
+      // Round to 2 decimals max
+      displayValue = Math.round(value * 100) / 100;
+      formattedValue = displayValue % 1 === 0 
+        ? displayValue.toString() 
+        : displayValue.toFixed(2).replace(/\.?0+$/, '');
       // Use singular "cup" for values <= 1, plural "cups" for values > 1
       return `${formattedValue} ${displayValue <= 1 ? 'cup' : 'cups'}`;
     default:
+      displayValue = Math.round(value);
+      formattedValue = displayValue.toString();
       return `${formattedValue} ml`;
   }
+}
+
+/**
+ * Format water value for display in a specific unit
+ * Uses centralized display formatting with proper decimal places
+ */
+export function formatWaterValue(value: number, unit: WaterUnit): string {
+  return formatWaterValueForDisplay(value, unit);
 }
 
 /**
@@ -264,6 +291,7 @@ export function formatWaterDisplay(
 /**
  * Format water value for display, returning value and unit separately
  * This is useful for UI components that need to display value and unit in different styles
+ * Uses centralized display formatting with proper decimal places
  * 
  * @param value - The value in the specified unit
  * @param unit - The unit (ml, floz, or cup)
@@ -273,28 +301,37 @@ export function formatWaterValueParts(
   value: number,
   unit: WaterUnit
 ): { value: string; unit: string } {
-  // Round to 2 decimal places for display, but show without trailing zeros
-  const displayValue = Math.round(value * 100) / 100;
-  const formattedValue = displayValue % 1 === 0 
-    ? displayValue.toString() 
-    : displayValue.toFixed(2).replace(/\.?0+$/, '');
+  let displayValue: number;
+  let formattedValue: string;
   
-  let unitLabel: string;
   switch (unit) {
     case 'ml':
-      unitLabel = 'ml';
-      break;
+      // Round to whole number (0 decimals)
+      displayValue = Math.round(value);
+      formattedValue = displayValue.toString();
+      return { value: formattedValue, unit: 'ml' };
     case 'floz':
-      unitLabel = 'fl oz';
-      break;
+      // Round to 1 decimal max
+      displayValue = Math.round(value * 10) / 10;
+      formattedValue = displayValue % 1 === 0 
+        ? displayValue.toString() 
+        : displayValue.toFixed(1).replace(/\.?0+$/, '');
+      return { value: formattedValue, unit: 'fl oz' };
     case 'cup':
-      unitLabel = displayValue <= 1 ? 'cup' : 'cups';
-      break;
+      // Round to 2 decimals max
+      displayValue = Math.round(value * 100) / 100;
+      formattedValue = displayValue % 1 === 0 
+        ? displayValue.toString() 
+        : displayValue.toFixed(2).replace(/\.?0+$/, '');
+      return { 
+        value: formattedValue, 
+        unit: displayValue <= 1 ? 'cup' : 'cups' 
+      };
     default:
-      unitLabel = 'ml';
+      displayValue = Math.round(value);
+      formattedValue = displayValue.toString();
+      return { value: formattedValue, unit: 'ml' };
   }
-  
-  return { value: formattedValue, unit: unitLabel };
 }
 
 /**

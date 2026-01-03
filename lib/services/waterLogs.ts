@@ -10,7 +10,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { getUserProfile, updateUserProfile } from '@/lib/services/profile';
-import { WaterUnit, toMl, fromMl, toGoalTripletFromMl, getEffectiveGoal } from '@/utils/waterUnits';
+import { WaterUnit, toMl, fromMl, getEffectiveGoal } from '@/utils/waterUnits';
 import { getLocalDateKey } from '@/utils/dateTime';
 
 // Type definition for water daily log
@@ -19,14 +19,8 @@ export type WaterDaily = {
   user_id: string;
   date: string; // YYYY-MM-DD format
   total: number; // Total in the row's water_unit
-  goal: number | null; // Goal in the row's water_unit
   water_unit: WaterUnit; // Unit used for this date
-  goal_ml: number | null; // Canonical goal in ml
-  goal_floz: number | null; // Cached goal in fl oz
-  goal_cup: number | null; // Cached goal in cups
-  // Legacy fields for backward compatibility during migration
-  total_ml?: number;
-  goal_ml_legacy?: number | null;
+  goal_ml: number | null; // Canonical goal in ml (single source of truth)
   created_at: string;
   updated_at: string;
 };
@@ -37,11 +31,8 @@ const WATER_DAILY_COLUMNS = `
   user_id,
   date,
   total,
-  goal,
   water_unit,
   goal_ml,
-  goal_floz,
-  goal_cup,
   created_at,
   updated_at
 `;
@@ -283,16 +274,12 @@ export async function setWaterGoal(
 
     // Convert goal to row's water_unit
     const goalInUnit = fromMl(goalMl, existing.water_unit);
-    const goalTriplet = toGoalTripletFromMl(goalMl);
 
-    // Update existing record's goal fields
+    // Update existing record's goal field (only goal_ml is stored)
     const { data, error } = await supabase
       .from('water_daily')
       .update({ 
-        goal: goalInUnit,
-        goal_ml: goalTriplet.goalMl,
-        goal_floz: goalTriplet.goalFloz,
-        goal_cup: goalTriplet.goalCup,
+        goal_ml: goalMl,
       })
       .eq('id', existing.id)
       .select(WATER_DAILY_COLUMNS)
@@ -309,11 +296,8 @@ export async function setWaterGoal(
     // Past dates do NOT update the profile to preserve historical accuracy
     if (isToday && data) {
       try {
-        const profileTriplet = toGoalTripletFromMl(goalMl);
         await updateUserProfile(userId, { 
-          goal_ml: profileTriplet.goalMl,
-          goal_floz: profileTriplet.goalFloz,
-          goal_cup: profileTriplet.goalCup,
+          water_goal_ml: goalMl,
         });
       } catch (profileError) {
         // Log error but don't fail the water goal update
@@ -361,12 +345,11 @@ export async function getOrCreateWaterDailyForDate(
     // Record doesn't exist - create it with goal from profile (using defaults if missing)
     const profile = await getUserProfile(userId);
     const profileWaterUnit = (profile?.water_unit as WaterUnit) || 'ml';
-    const storedProfileGoalMl = profile?.goal_ml || null;
+    const storedProfileGoalMl = profile?.water_goal_ml || null;
     const storedProfileGoalInUnit = storedProfileGoalMl ? fromMl(storedProfileGoalMl, profileWaterUnit) : null;
     
     // Get effective goal (with fallback to defaults)
     const { goalInUnit, goalMl: effectiveGoalMl } = getEffectiveGoal(profileWaterUnit, storedProfileGoalInUnit);
-    const goalTriplet = toGoalTripletFromMl(effectiveGoalMl);
 
     const { data, error } = await supabase
       .from('water_daily')
@@ -374,11 +357,8 @@ export async function getOrCreateWaterDailyForDate(
         user_id: userId,
         date: dateString,
         total: 0,
-        goal: goalInUnit,
         water_unit: profileWaterUnit,
-        goal_ml: goalTriplet.goalMl,
-        goal_floz: goalTriplet.goalFloz,
-        goal_cup: goalTriplet.goalCup,
+        goal_ml: effectiveGoalMl,
       })
       .select(WATER_DAILY_COLUMNS)
       .single();
@@ -419,7 +399,7 @@ export async function syncTodayWaterWithProfile(
     // Get current profile settings
     const profile = await getUserProfile(userId);
     const profileWaterUnit = (profile?.water_unit as WaterUnit) || 'ml';
-    const storedProfileGoalMl = profile?.goal_ml || null;
+    const storedProfileGoalMl = profile?.water_goal_ml || null;
     const storedProfileGoalInUnit = storedProfileGoalMl ? fromMl(storedProfileGoalMl, profileWaterUnit) : null;
 
     // Get today's date string
@@ -432,7 +412,6 @@ export async function syncTodayWaterWithProfile(
 
     // Get effective goal (with fallback to defaults)
     const { goalInUnit, goalMl: effectiveGoalMl } = getEffectiveGoal(profileWaterUnit, storedProfileGoalInUnit);
-    const goalTriplet = toGoalTripletFromMl(effectiveGoalMl);
 
     if (existing) {
       // If unit changed, convert total from old unit to new unit
@@ -448,10 +427,7 @@ export async function syncTodayWaterWithProfile(
         .update({ 
           water_unit: profileWaterUnit,
           total: newTotal,
-          goal: goalInUnit,
-          goal_ml: goalTriplet.goalMl,
-          goal_floz: goalTriplet.goalFloz,
-          goal_cup: goalTriplet.goalCup,
+          goal_ml: effectiveGoalMl,
         })
         .eq('id', existing.id)
         .select(WATER_DAILY_COLUMNS)
@@ -473,11 +449,8 @@ export async function syncTodayWaterWithProfile(
           user_id: userId,
           date: todayString,
           total: 0,
-          goal: goalInUnit,
           water_unit: profileWaterUnit,
-          goal_ml: goalTriplet.goalMl,
-          goal_floz: goalTriplet.goalFloz,
-          goal_cup: goalTriplet.goalCup,
+          goal_ml: effectiveGoalMl,
         })
         .select(WATER_DAILY_COLUMNS)
         .single();
@@ -526,14 +499,10 @@ export async function updateWaterUnitAndGoal(
       throw new Error('Goal must be between 480ml and 5000ml');
     }
 
-    const goalTriplet = toGoalTripletFromMl(goalMl);
-
-    // Update profile
+    // Update profile (only water_unit and water_goal_ml)
     await updateUserProfile(userId, {
       water_unit: waterUnit,
-      goal_ml: goalTriplet.goalMl,
-      goal_floz: goalTriplet.goalFloz,
-      goal_cup: goalTriplet.goalCup,
+      water_goal_ml: goalMl,
     });
 
     // Sync today's water_daily with profile

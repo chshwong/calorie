@@ -294,11 +294,8 @@ export function useWaterDaily(options?: {
           user_id: userId!,
           date: dateString,
           total: newTotal,
-          goal: null,
           water_unit: defaultUnit,
           goal_ml: null,
-          goal_floz: null,
-          goal_cup: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -372,14 +369,10 @@ export function useWaterDaily(options?: {
       if (previousTarget) {
         // Convert goal to row's water_unit
         const goalInUnit = fromMl(goalMl, previousTarget.water_unit);
-        const goalTriplet = toGoalTripletFromMl(goalMl);
         
         const updatedTarget: WaterDaily = {
           ...previousTarget,
-          goal: goalInUnit,
-          goal_ml: goalTriplet.goalMl,
-          goal_floz: goalTriplet.goalFloz,
-          goal_cup: goalTriplet.goalCup,
+          goal_ml: goalMl,
         };
         queryClient.setQueryData(['waterDaily', userId, dateString], updatedTarget);
         
@@ -398,18 +391,14 @@ export function useWaterDaily(options?: {
         const currentTotal = existing?.total || 0;
         const waterUnit = existing?.water_unit || 'ml';
         const goalInUnit = fromMl(goalMl, waterUnit);
-        const goalTriplet = toGoalTripletFromMl(goalMl);
         
         const newTarget: WaterDaily = {
           id: 'temp',
           user_id: userId!,
           date: dateString,
           total: currentTotal,
-          goal: goalInUnit,
           water_unit: waterUnit,
-          goal_ml: goalTriplet.goalMl,
-          goal_floz: goalTriplet.goalFloz,
-          goal_cup: goalTriplet.goalCup,
+          goal_ml: goalMl,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -527,11 +516,8 @@ export function useWaterDaily(options?: {
           user_id: userId!,
           date: dateString,
           total: totalInUnit,
-          goal: null,
           water_unit: 'ml',
           goal_ml: null,
-          goal_floz: null,
-          goal_cup: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -580,7 +566,8 @@ export function useWaterDaily(options?: {
     onSuccess: () => {
       // Invalidate all water and profile queries
       queryClient.invalidateQueries({ queryKey: ['waterDaily', userId] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile', userId] }); // Backward compatibility
+      queryClient.invalidateQueries({ queryKey: ['userConfig', userId] }); // Required for useUserConfig hook
     },
   });
 

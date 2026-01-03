@@ -22,7 +22,7 @@ import {
     getMinTouchTargetStyle
 } from '@/utils/accessibility';
 import { addDays, getDateString, getLastNDays } from '@/utils/calculations';
-import { formatWaterDisplay, formatWaterValue, fromMl, getEffectiveGoal, toMl, WATER_LIMITS, WaterUnit } from '@/utils/waterUnits';
+import { formatWaterValue, fromMl, getEffectiveGoal, toMl, WATER_LIMITS, WaterUnit } from '@/utils/waterUnits';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -88,24 +88,30 @@ export default function WaterScreen() {
   // Get values in active unit
   const total = todayWater?.total || 0;
   
-  // Get effective goal (with fallback to defaults)
-  const storedGoalInUnit = todayWater?.goal || (todayWater?.goal_ml ? fromMl(todayWater.goal_ml, activeWaterUnit) : null);
+  // Get effective goal for display (with fallback to defaults)
+  // For today, use todayWater.goal_ml if available, otherwise use profile goal
+  const storedGoalInUnit = todayWater?.goal_ml ? fromMl(todayWater.goal_ml, activeWaterUnit) : null;
   const effectiveGoal = getEffectiveGoal(activeWaterUnit, storedGoalInUnit);
   const goal = effectiveGoal.goalInUnit;
   const goalMl = effectiveGoal.goalMl; // Canonical ml for calculations
+  
+  // Get profile unit and goal for chart (chart always uses profile settings)
+  const profileWaterUnit = (profile?.water_unit as WaterUnit) || (authProfile?.water_unit as WaterUnit) || 'ml';
+  const profileGoalMl = profile?.water_goal_ml || authProfile?.water_goal_ml || null;
+  const profileGoalInUnit = profileGoalMl ? fromMl(profileGoalMl, profileWaterUnit) : null;
+  const profileEffectiveGoal = getEffectiveGoal(profileWaterUnit, profileGoalInUnit);
+  const chartGoalMl = profileEffectiveGoal.goalMl; // Profile goal for chart (in ml)
 
   // Get quick-add presets
-  const { presets, activeWaterUnit: presetsUnit } = useWaterQuickAddPresets();
+  const { presets } = useWaterQuickAddPresets();
   
   // Animation state for quick add chips
   const [animatingChipId, setAnimatingChipId] = useState<string | null>(null);
 
-  // Format display (for secondary/cups line)
-  // Convert total to ml using the row's water_unit, not activeWaterUnit
+  // Convert total to ml using the row's water_unit
   const totalMl = todayWater 
     ? toMl(total, todayWater.water_unit as WaterUnit)
     : 0;
-  const display = formatWaterDisplay(totalMl, activeWaterUnit === 'floz' ? 'imperial' : 'metric');
 
   // Water accent color from module theme
   const waterTheme = ModuleThemes.water;
@@ -121,7 +127,7 @@ export default function WaterScreen() {
   const [editTotalInput, setEditTotalInput] = useState('');
   const [editTotalError, setEditTotalError] = useState('');
   const [editTotalDateString, setEditTotalDateString] = useState<string | null>(null);
-  const [editTotalWaterUnit, setEditTotalWaterUnit] = useState<WaterUnit>(activeWaterUnit);
+  const [editTotalWaterUnit, setEditTotalWaterUnit] = useState<WaterUnit>(profileWaterUnit);
   
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -131,11 +137,15 @@ export default function WaterScreen() {
   // Open the existing Edit Total modal (reused by the droplet pressable)
   const openEditTotalModal = useCallback(() => {
     setEditTotalDateString(selectedDateString);
-    setEditTotalWaterUnit((todayWater?.water_unit as WaterUnit) || activeWaterUnit);
-    setEditTotalInput((todayWater?.total ?? 0).toString());
+    setEditTotalWaterUnit(profileWaterUnit);
+    // Convert todayWater.total from its stored unit to profile unit, then format
+    const totalInProfileUnit = todayWater?.total 
+      ? fromMl(toMl(todayWater.total, todayWater.water_unit as WaterUnit), profileWaterUnit)
+      : 0;
+    setEditTotalInput(formatValueForInput(totalInProfileUnit, profileWaterUnit));
     setEditTotalError('');
     setShowEditTotalModal(true);
-  }, [activeWaterUnit, selectedDateString, todayWater?.total, todayWater?.water_unit]);
+  }, [profileWaterUnit, selectedDateString, todayWater?.total, todayWater?.water_unit]);
 
   // Handle quick-add preset press
   const handleQuickAddPreset = useCallback((amount: number, unit: WaterUnit, presetId: string) => {
@@ -149,7 +159,7 @@ export default function WaterScreen() {
     
     if (newTotalMl > WATER_LIMITS.MAX_TOTAL_ML) {
       setErrorModalTitle(t('water.error.max_total_exceeded_title'));
-      setErrorModalMessage(t('water.error.max_total_exceeded_message', { max: WATER_LIMITS.MAX_TOTAL_ML }));
+      setErrorModalMessage(t('water.error.water_too_high'));
       setShowErrorModal(true);
       return;
     }
@@ -166,7 +176,7 @@ export default function WaterScreen() {
     if (addWaterError) {
       const errorMessage = addWaterError instanceof Error 
         ? addWaterError.message 
-        : t('water.error.max_total_exceeded_message', { max: WATER_LIMITS.MAX_TOTAL_ML });
+        : t('water.error.water_too_high');
       setErrorModalTitle(t('water.error.max_total_exceeded_title'));
       setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
@@ -177,7 +187,7 @@ export default function WaterScreen() {
 
   // Handle custom input (adds to current total)
   const handleCustomInput = () => {
-    // Parse input as if it's in the active unit
+    // Parse input as if it's in the profile unit
     const cleaned = customInput.trim().replace(/[^0-9.]/g, '');
     const numericValue = parseFloat(cleaned);
     
@@ -187,14 +197,11 @@ export default function WaterScreen() {
     }
 
     // Convert to ml for validation
-    const inputMl = toMl(numericValue, activeWaterUnit);
+    const inputMl = toMl(numericValue, profileWaterUnit);
     
     // Validate input amount is 0-MAX_SINGLE_ADD_ML
     if (inputMl < 0 || inputMl > WATER_LIMITS.MAX_SINGLE_ADD_ML) {
-      // Convert max to user's active unit for friendly error message
-      const maxInActiveUnit = fromMl(WATER_LIMITS.MAX_SINGLE_ADD_ML, activeWaterUnit);
-      const unitLabel = activeWaterUnit === 'floz' ? t('water.floz') : activeWaterUnit === 'cup' ? t('water.cup') : t('water.ml');
-      setCustomInputError(t('water.custom_input_error_range', { max: Math.round(maxInActiveUnit), unit: unitLabel }));
+      setCustomInputError(t('water.error.water_too_high'));
       return;
     }
     
@@ -203,7 +210,9 @@ export default function WaterScreen() {
     const newTotalMl = totalMl + inputMl;
     
     if (newTotalMl > WATER_LIMITS.MAX_TOTAL_ML) {
-      setCustomInputError(t('water.error.max_total_exceeded_message', { max: WATER_LIMITS.MAX_TOTAL_ML }));
+      setErrorModalTitle(t('water.error.max_total_exceeded_title'));
+      setErrorModalMessage(t('water.error.water_too_high'));
+      setShowErrorModal(true);
       return;
     }
     
@@ -213,12 +222,13 @@ export default function WaterScreen() {
     setShowCustomModal(false);
   };
 
-  // Handle edit total (set absolute value in active unit)
+  // Handle edit total (set absolute value in profile unit)
   const handleEditTotal = () => {
     const dateString = editTotalDateString || selectedDateString;
-    const unitForEdit = editTotalWaterUnit;
+    // Always use profile unit
+    const unitForEdit = profileWaterUnit;
 
-    // Parse input as if it's in the active unit
+    // Parse input as if it's in the profile unit
     const cleaned = editTotalInput.trim().replace(/[^0-9.]/g, '');
     const numericValue = parseFloat(cleaned);
     
@@ -232,36 +242,114 @@ export default function WaterScreen() {
 
     // Validate limits (0-MAX_SINGLE_ADD_ML)
     if (inputMl > WATER_LIMITS.MAX_SINGLE_ADD_ML) {
-      setEditTotalError(t('water.edit_total.max_limit', { max: WATER_LIMITS.MAX_SINGLE_ADD_ML }));
+      setEditTotalError(t('water.error.water_too_high'));
       return;
     }
 
     setEditTotalError('');
     try {
-      // setTotalForDate expects value in that row's water_unit
+      // Always convert from profile unit to the row's stored unit before saving
+      // Get the row's stored unit (for today, it should match profile, but we need to check)
+      const water = dateString === selectedDateString ? todayWater : waterDataMap.get(dateString);
+      const rowUnit = (water?.water_unit as WaterUnit) || profileWaterUnit;
+      
+      // Convert value from profile unit to row's stored unit
+      const valueInRowUnit = rowUnit === profileWaterUnit 
+        ? numericValue 
+        : fromMl(toMl(numericValue, profileWaterUnit), rowUnit);
+      
       if (dateString === selectedDateString) {
-        setTotal(numericValue);
+        setTotal(valueInRowUnit);
       } else {
-        setTotalForDate(numericValue, dateString);
+        setTotalForDate(valueInRowUnit, dateString);
       }
       setEditTotalInput('');
       setEditTotalDateString(null);
       setShowEditTotalModal(false);
-    } catch (error: any) {
-      setEditTotalError(error.message || t('water.edit_total.error'));
+    } catch (error: unknown) {
+      // Error can be from setTotal/setTotalForDate mutations or validation
+      // Extract message safely for user display
+      const errorMessage = error instanceof Error ? error.message : t('water.edit_total.error');
+      setEditTotalError(errorMessage);
     }
   };
 
   // Settings panel state
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [settingsWaterUnit, setSettingsWaterUnit] = useState<WaterUnit>(activeWaterUnit);
+  const [settingsWaterUnit, setSettingsWaterUnit] = useState<WaterUnit>(profileWaterUnit);
   const [settingsGoal, setSettingsGoal] = useState(goal.toString()); // Uses effective goal (with defaults)
   const [settingsGoalError, setSettingsGoalError] = useState('');
 
+  // Helper function to format value for input display based on unit
+  const formatValueForInput = (value: number, unit: WaterUnit): string => {
+    switch (unit) {
+      case 'ml':
+        // ML: whole numbers only (0 decimals)
+        return Math.round(value).toString();
+      case 'floz':
+        // floz: 1 decimal max
+        const flozValue = Math.round(value * 10) / 10;
+        return flozValue % 1 === 0 ? flozValue.toString() : flozValue.toFixed(1).replace(/\.?0+$/, '');
+      case 'cup':
+        // cups: 2 decimals max
+        const cupValue = Math.round(value * 100) / 100;
+        return cupValue % 1 === 0 ? cupValue.toString() : cupValue.toFixed(2).replace(/\.?0+$/, '');
+      default:
+        return value.toString();
+    }
+  };
+
+  // Helper function to validate and format input text based on unit
+  const validateAndFormatInput = (text: string, unit: WaterUnit): string => {
+    // Remove any non-numeric characters except decimal point
+    let cleaned = text.replace(/[^0-9.]/g, '');
+    
+    // Prevent multiple decimal points
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limit decimal places based on unit
+    if (cleaned.includes('.')) {
+      const decimalIndex = cleaned.indexOf('.');
+      const decimalPart = cleaned.substring(decimalIndex + 1);
+      
+      switch (unit) {
+        case 'ml':
+          // ML: no decimals allowed - remove decimal point and everything after
+          cleaned = cleaned.substring(0, decimalIndex);
+          break;
+        case 'floz':
+          // floz: max 1 decimal
+          if (decimalPart.length > 1) {
+            cleaned = cleaned.substring(0, decimalIndex + 2);
+          }
+          break;
+        case 'cup':
+          // cups: max 2 decimals
+          if (decimalPart.length > 2) {
+            cleaned = cleaned.substring(0, decimalIndex + 3);
+          }
+          break;
+      }
+    }
+    
+    return cleaned;
+  };
+
   // Initialize settings when panel opens
+  // Always use profile's water_unit and water_goal_ml (not from selected date)
   const handleOpenSettings = () => {
-    setSettingsWaterUnit(activeWaterUnit);
-    setSettingsGoal(goal.toString());
+    // Always use profile's water_unit (not activeWaterUnit which can be from past dates)
+    const profileWaterUnit = (profile?.water_unit as WaterUnit) || (authProfile?.water_unit as WaterUnit) || 'ml';
+    const profileGoalMl = profile?.water_goal_ml || authProfile?.water_goal_ml || null;
+    const profileGoalInUnit = profileGoalMl ? fromMl(profileGoalMl, profileWaterUnit) : null;
+    const profileEffectiveGoal = getEffectiveGoal(profileWaterUnit, profileGoalInUnit);
+    
+    setSettingsWaterUnit(profileWaterUnit);
+    // Format the value for display based on unit
+    setSettingsGoal(formatValueForInput(profileEffectiveGoal.goalInUnit, profileWaterUnit));
     setSettingsGoalError('');
     setShowSettingsPanel(true);
   };
@@ -276,21 +364,31 @@ export default function WaterScreen() {
       return;
     }
 
+    // Format the value before saving to ensure proper decimal precision
+    const formattedValue = parseFloat(formatValueForInput(goalValue, settingsWaterUnit));
+    
     // Convert to ml for validation
-    const goalMl = toMl(goalValue, settingsWaterUnit);
+    const goalMl = toMl(formattedValue, settingsWaterUnit);
 
     // Validate goal limits
-    if (goalMl < WATER_LIMITS.MIN_GOAL_ML || goalMl > WATER_LIMITS.MAX_GOAL_ML) {
-      setSettingsGoalError(t('water.settings.goal_out_of_range', { min: WATER_LIMITS.MIN_GOAL_ML, max: WATER_LIMITS.MAX_GOAL_ML }));
+    if (goalMl < WATER_LIMITS.MIN_GOAL_ML) {
+      setSettingsGoalError(t('water.error.goal_too_low'));
+      return;
+    }
+    if (goalMl > WATER_LIMITS.MAX_GOAL_ML) {
+      setSettingsGoalError(t('water.error.water_too_high'));
       return;
     }
 
     setSettingsGoalError('');
     try {
-      updateUnitAndGoal(settingsWaterUnit, goalValue);
+      updateUnitAndGoal(settingsWaterUnit, formattedValue);
       setShowSettingsPanel(false);
-    } catch (error: any) {
-      setSettingsGoalError(error.message || t('water.set_goal.error'));
+    } catch (error: unknown) {
+      // Error can be from updateUnitAndGoal mutation or validation
+      // Extract message safely for user display
+      const errorMessage = error instanceof Error ? error.message : t('water.set_goal.error');
+      setSettingsGoalError(errorMessage);
     }
   };
 
@@ -313,25 +411,25 @@ export default function WaterScreen() {
   });
 
   // Build chart data for last 7 days
-  // Chart uses ml internally for consistent scaling, but displays values in active unit
+  // Chart uses ml internally for consistent scaling, but displays values in profile's unit
   const historyData = last7Days.map((dateString) => {
     const water = waterDataMap.get(dateString);
     if (water) {
       const waterUnit = (water.water_unit as WaterUnit) || 'ml';
       const totalMl = toMl(water.total || 0, waterUnit);
-      const totalInActiveUnit = fromMl(totalMl, activeWaterUnit);
-      const displayValue = formatWaterValue(totalInActiveUnit, activeWaterUnit);
+      const totalInProfileUnit = fromMl(totalMl, profileWaterUnit);
+      const displayValue = formatWaterValue(totalInProfileUnit, profileWaterUnit);
       return {
         date: dateString,
         value: totalMl, // Use ml for chart calculations (consistent scale)
-        displayValue, // Formatted string for label in active unit
+        displayValue, // Formatted string for label in profile's unit
       };
     } else {
       // No data for this day - show 0 but still render bar
       return {
         date: dateString,
         value: 0,
-        displayValue: formatWaterValue(0, activeWaterUnit),
+        displayValue: formatWaterValue(0, profileWaterUnit),
       };
     }
   });
@@ -346,27 +444,28 @@ export default function WaterScreen() {
       }
 
       const water = waterDataMap.get(dateString);
-      const unitForEdit: WaterUnit =
-        (water?.water_unit as WaterUnit) || (todayWater?.water_unit as WaterUnit) || activeWaterUnit;
-      const totalForEdit = water?.total ?? 0; // stored in row's water_unit
+      // Always use profile unit, but convert the stored total from its unit to profile unit
+      const totalInProfileUnit = water?.total 
+        ? fromMl(toMl(water.total, water.water_unit as WaterUnit), profileWaterUnit)
+        : 0;
 
       setEditTotalDateString(dateString);
-      setEditTotalWaterUnit(unitForEdit);
-      setEditTotalInput(totalForEdit.toString());
+      setEditTotalWaterUnit(profileWaterUnit);
+      setEditTotalInput(formatValueForInput(totalInProfileUnit, profileWaterUnit));
       setEditTotalError('');
       setShowEditTotalModal(true);
     },
-    [activeWaterUnit, minAllowedDateString, todayWater?.water_unit, waterDataMap]
+    [profileWaterUnit, minAllowedDateString, waterDataMap]
   );
 
   // Calculate dynamic y-axis max: align goal line with bars when equal (no extra padding)
   const maxDailyValue = Math.max(...historyData.map(d => d.value), 0);
-  const chartMax = Math.max(maxDailyValue, goalMl, 1);
+  const chartMax = Math.max(maxDailyValue, chartGoalMl, 1);
 
-  // Calculate goal display value in active unit for reference line label
-  const goalInActiveUnit = fromMl(goalMl, activeWaterUnit);
+  // Calculate goal display value in profile's unit for reference line label (always use profile unit)
+  const chartGoalInProfileUnit = fromMl(chartGoalMl, profileWaterUnit);
   const goalDisplayValue = t('water.chart.goal_label', { 
-    value: formatWaterValue(goalInActiveUnit, activeWaterUnit)
+    value: formatWaterValue(chartGoalInProfileUnit, profileWaterUnit)
   });
 
   if (!user) {
@@ -439,7 +538,7 @@ export default function WaterScreen() {
               icon="drop.fill"
               module="water"
               isLoading={isLoading}
-              onPressSettings={isToday ? handleOpenSettings : undefined}
+              onPressSettings={handleOpenSettings}
               style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
             />
 
@@ -462,7 +561,7 @@ export default function WaterScreen() {
                     <WaterDropGauge
                       totalMl={totalMl}
                       goalMl={goalMl}
-                      unitPreference={activeWaterUnit}
+                      unitPreference={profileWaterUnit}
                       size="large"
                     />
                   </Pressable>
@@ -639,7 +738,7 @@ export default function WaterScreen() {
             <BarChart
               data={historyData}
               maxValue={chartMax}
-              goalValue={goalMl}
+              goalValue={chartGoalMl}
               goalDisplayValue={goalDisplayValue}
               selectedDate={selectedDateString}
               todayDateString={getDateString(today)}
@@ -678,7 +777,7 @@ export default function WaterScreen() {
 
             <View style={styles.modalBody}>
               <ThemedText style={[styles.formLabel, { color: colors.text }]}>
-                {t('water.custom_input_label', { unit: activeWaterUnit === 'floz' ? 'fl oz' : activeWaterUnit === 'cup' ? 'cups' : 'ml' })}
+                {t('water.custom_input_label', { unit: profileWaterUnit === 'floz' ? 'fl oz' : profileWaterUnit === 'cup' ? 'cups' : 'ml' })}
               </ThemedText>
               <TextInput
                 style={[
@@ -691,10 +790,12 @@ export default function WaterScreen() {
                 ]}
                 value={customInput}
                 onChangeText={(text) => {
-                  setCustomInput(text);
+                  // Validate and format input based on unit's decimal rules
+                  const formatted = validateAndFormatInput(text, profileWaterUnit);
+                  setCustomInput(formatted);
                   setCustomInputError('');
                 }}
-                placeholder={activeWaterUnit === 'floz' ? '20' : activeWaterUnit === 'cup' ? '8' : '500'}
+                placeholder={profileWaterUnit === 'floz' ? '20' : profileWaterUnit === 'cup' ? '8' : '500'}
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
                 autoFocus
@@ -780,7 +881,9 @@ export default function WaterScreen() {
                 ]}
                 value={editTotalInput}
                 onChangeText={(text) => {
-                  setEditTotalInput(text);
+                  // Validate and format input based on unit's decimal rules
+                  const formatted = validateAndFormatInput(text, profileWaterUnit);
+                  setEditTotalInput(formatted);
                   setEditTotalError('');
                 }}
                 placeholder={editTotalWaterUnit === 'floz' ? '64' : editTotalWaterUnit === 'cup' ? '8' : '2000'}
@@ -793,9 +896,6 @@ export default function WaterScreen() {
                   {editTotalError}
                 </ThemedText>
               )}
-              <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
-                {t('water.edit_total.helper', { max: WATER_LIMITS.MAX_SINGLE_ADD_ML })}
-              </ThemedText>
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
@@ -831,13 +931,12 @@ export default function WaterScreen() {
       </Modal>
 
       {/* Settings Panel Modal */}
-      {isToday && (
-        <Modal
-          visible={showSettingsPanel}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowSettingsPanel(false)}
-        >
+      <Modal
+        visible={showSettingsPanel}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSettingsPanel(false)}
+      >
           <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={styles.modalHeader}>
@@ -875,9 +974,8 @@ export default function WaterScreen() {
                           // Convert from current unit to ml, then to new unit
                           const goalMl = toMl(currentGoalValue, settingsWaterUnit);
                           const convertedGoal = fromMl(goalMl, newUnit);
-                          // Round to 1 decimal place for display
-                          const roundedGoal = Math.round(convertedGoal * 10) / 10;
-                          setSettingsGoal(roundedGoal.toString());
+                          // Format based on new unit's decimal rules
+                          setSettingsGoal(formatValueForInput(convertedGoal, newUnit));
                         }
                         
                         setSettingsWaterUnit(newUnit);
@@ -908,7 +1006,9 @@ export default function WaterScreen() {
                     ]}
                     value={settingsGoal}
                     onChangeText={(text) => {
-                      setSettingsGoal(text);
+                      // Validate and format input based on unit's decimal rules
+                      const formatted = validateAndFormatInput(text, settingsWaterUnit);
+                      setSettingsGoal(formatted);
                       setSettingsGoalError('');
                     }}
                     placeholder={settingsWaterUnit === 'floz' ? '64' : settingsWaterUnit === 'cup' ? '8' : '2000'}
@@ -952,7 +1052,6 @@ export default function WaterScreen() {
             </View>
           </View>
         </Modal>
-      )}
 
       {/* Error Modal */}
       <ConfirmModal
@@ -1178,6 +1277,12 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     maxHeight: '85%',
     width: '100%',
+    ...Platform.select({
+      web: {
+        maxWidth: Layout.desktopMaxWidth,
+        alignSelf: 'center',
+      },
+    }),
   },
   modalHeader: {
     flexDirection: 'row',

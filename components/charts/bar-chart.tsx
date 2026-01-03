@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   goalLabel: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     fontWeight: '600',
   },
   xAxisLabelsRow: {

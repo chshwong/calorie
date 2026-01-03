@@ -12,6 +12,7 @@ import {
   fetchLatestBodyFatTimestamp,
   fetchLatestWeighInTimestamp,
   fetchWeightLogsRange,
+  fetchWeightLogs366d,
   insertWeightLogRow,
   updateProfileBodyFat,
   updateProfileWeightLb,
@@ -90,59 +91,38 @@ export function useWeightLogsRange(startDate: Date, endDate: Date) {
 }
 
 /**
- * Fetch last 180 days of weight logs with persistent cache hydration.
+ * Fetch last 366 days of weight logs with persistent cache hydration.
  */
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const ONE_HUNDRED_EIGHTY_DAYS_MS = 180 * ONE_DAY_MS;
+const THREE_HUNDRED_SIXTY_SIX_DAYS_MS = 366 * ONE_DAY_MS;
 
-export function useWeightLogs180d() {
+export function useWeightLogs366d() {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
 
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-
-  const startDate = useMemo(() => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - 179);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, [today]);
-
-  const endDate = useMemo(() => {
-    const d = new Date(today);
-    d.setHours(23, 59, 59, 999);
-    return d;
-  }, [today]);
-
-  const startISO = startOfDayISO(startDate);
-  const endISO = endOfDayISO(endDate);
-  const cacheKey = userId ? `weightLogs180d:${userId}` : null;
+  const cacheKey = userId ? `weightLogs366d:${userId}` : null;
   const snapshot =
     cacheKey !== null
-      ? getPersistentCache<WeightLogRow[]>(cacheKey, ONE_HUNDRED_EIGHTY_DAYS_MS)
+      ? getPersistentCache<WeightLogRow[]>(cacheKey, THREE_HUNDRED_SIXTY_SIX_DAYS_MS)
       : null;
 
   return useQuery<WeightLogRow[]>({
-    queryKey: ['weightLogs180d', userId],
+    queryKey: ['weightLogs366d', userId],
     queryFn: async () => {
       if (!userId) throw new Error('User not authenticated');
-      const data = await fetchWeightLogsRange(userId, startISO, endISO);
+      const data = await fetchWeightLogs366d(userId);
       if (cacheKey !== null) {
         setPersistentCache(cacheKey, data);
       }
       return data;
     },
     enabled: !!userId,
-    staleTime: 60 * 1000,
-    gcTime: ONE_HUNDRED_EIGHTY_DAYS_MS,
+    staleTime: Infinity, // Rely on explicit invalidation
+    gcTime: THREE_HUNDRED_SIXTY_SIX_DAYS_MS,
     placeholderData: (previous) => {
       if (previous !== undefined) return previous;
-      const cached = queryClient.getQueryData<WeightLogRow[]>(['weightLogs180d', userId]);
+      const cached = queryClient.getQueryData<WeightLogRow[]>(['weightLogs366d', userId]);
       if (cached !== undefined) return cached;
       return snapshot ?? undefined;
     },
@@ -365,7 +345,7 @@ export function useSaveWeightEntry() {
       }
 
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['weightLogs180d'] });
+      queryClient.invalidateQueries({ queryKey: ['weightLogs366d', user.id] });
       queryClient.invalidateQueries({ queryKey: ['userConfig'] });
       queryClient.invalidateQueries({ queryKey: ['userProfile'] }); // Backward compatibility
 

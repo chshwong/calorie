@@ -57,6 +57,25 @@ export async function fetchWeightLogsRange(
   }
 }
 
+/**
+ * Fetch last 366 days of weight logs.
+ * Convenience function that calls fetchWeightLogsRange with a 366-day window.
+ */
+export async function fetchWeightLogs366d(userId: string): Promise<WeightLogRow[]> {
+  if (!userId) return [];
+
+  const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+  const endISO = endDate.toISOString();
+
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - 365); // 365 days ago = 366 days total (inclusive)
+  startDate.setHours(0, 0, 0, 0);
+  const startISO = startDate.toISOString();
+
+  return fetchWeightLogsRange(userId, startISO, endISO);
+}
+
 export async function fetchEarliestWeighInDate(userId: string): Promise<string | null> {
   if (!userId) return null;
 

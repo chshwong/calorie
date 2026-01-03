@@ -22,7 +22,7 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight } from '@/constants/theme';
 import { kgToLb, lbToKg, roundTo1, roundTo3 } from '@/utils/bodyMetrics';
-import { useSaveWeightEntry, useWeightLogs180d, getLatestBodyFatEntry, getLatestWeightEntry } from '@/hooks/use-weight-logs';
+import { useSaveWeightEntry, useWeightLogs366d, getLatestBodyFatEntry, getLatestWeightEntry } from '@/hooks/use-weight-logs';
 import { useDeleteWeightLog } from '@/hooks/useDeleteWeightLog';
 import { validateBodyFatPercent, validateWeightKg } from '@/utils/validation';
 import { PROFILES } from '@/constants/constraints';
@@ -76,7 +76,7 @@ export default function WeightEntryScreen() {
       fromDate?: string;
     }>();
   const { dateKey: clampedRouteDateKey, minDate, minDateKey, today, todayKey } = useClampedDateParam({ paramKey: 'date' });
-  const weight180Query = useWeightLogs180d();
+  const weight366Query = useWeightLogs366d();
   const deleteMutation = useDeleteWeightLog(userId ?? '');
 
   const initialDate = useMemo(() => {
@@ -117,10 +117,10 @@ const [selectedDateTime, setSelectedDateTime] = useState<Date>(() => {
 const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()));
   const editingEntryFromCache = useMemo(
     () =>
-      editingEntryId && weight180Query.data
-        ? weight180Query.data.find((e) => e.id === editingEntryId)
+      editingEntryId && weight366Query.data
+        ? weight366Query.data.find((e) => e.id === editingEntryId)
         : null,
-    [editingEntryId, weight180Query.data]
+    [editingEntryId, weight366Query.data]
   );
 
   const editingEntryDateKey = useMemo(() => {
@@ -243,8 +243,8 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
     setWebTimeInput(formatTimeInputValue(parsed));
   }, [isEditMode, weighedAtParam, editingEntryFromCache?.weighed_at]);
 
-  const latestEntry = weight180Query.data ? getLatestWeightEntry(weight180Query.data) : null;
-  const latestBodyFatEntry = weight180Query.data ? getLatestBodyFatEntry(weight180Query.data) : null;
+  const latestEntry = weight366Query.data ? getLatestWeightEntry(weight366Query.data) : null;
+  const latestBodyFatEntry = weight366Query.data ? getLatestBodyFatEntry(weight366Query.data) : null;
 
   // Add mode: refresh defaults on focus based on navigation mode
   useFocusEffect(

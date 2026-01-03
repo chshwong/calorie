@@ -13,11 +13,11 @@ export function useDeleteWeightLog(userId: string) {
       return input;
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: ['weightLogs180d', userId] });
+      await queryClient.cancelQueries({ queryKey: ['weightLogs366d', userId] });
 
-      const previous = queryClient.getQueryData<any[]>(['weightLogs180d', userId]);
+      const previous = queryClient.getQueryData<any[]>(['weightLogs366d', userId]);
 
-      queryClient.setQueryData<any[]>(['weightLogs180d', userId], (old) =>
+      queryClient.setQueryData<any[]>(['weightLogs366d', userId], (old) =>
         (old ?? []).filter((row) => row.id !== input.id)
       );
 
@@ -25,7 +25,7 @@ export function useDeleteWeightLog(userId: string) {
     },
     onError: (_err, _id, ctx) => {
       if (ctx?.previous) {
-        queryClient.setQueryData(['weightLogs180d', userId], ctx.previous);
+        queryClient.setQueryData(['weightLogs366d', userId], ctx.previous);
       }
     },
     onSettled: async (result) => {
@@ -38,7 +38,7 @@ export function useDeleteWeightLog(userId: string) {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['weightLogs180d', userId] });
+      queryClient.invalidateQueries({ queryKey: ['weightLogs366d', userId] });
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
       queryClient.invalidateQueries({ queryKey: ['userConfig', userId] });
       queryClient.invalidateQueries({ queryKey: ['userProfile', userId] }); // Backward compatibility

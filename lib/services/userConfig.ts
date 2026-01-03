@@ -53,7 +53,7 @@ export type UserConfig = {
   onboarding_targets_set_at: string | null;
   
   // Water goal
-  goal_ml: number | null;
+  water_goal_ml: number | null;
   
   // Weight Goals
   goal_weight_lb: number | null;

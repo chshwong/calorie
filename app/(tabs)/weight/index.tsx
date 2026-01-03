@@ -9,17 +9,18 @@ import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHe
 import { DatePickerButton } from '@/components/header/DatePickerButton';
 import {
   useWeightHomeData,
-  useWeightLogs180d,
+  useWeightLogs366d,
   getLatestWeightEntry,
   getLatestBodyFatEntry,
 } from '@/hooks/use-weight-logs';
+import { deriveDailyLatestWeight } from '@/lib/derive/daily-latest-weight';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
-import { formatLocalTime, getLocalDateKey } from '@/utils/dateTime';
+import { getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
@@ -58,7 +59,7 @@ export default function WeightHomeScreen() {
   const updateProfile = useUpdateProfile();
   const [showMenu, setShowMenu] = useState(false);
   const { days, isLoading, isFetching } = useWeightHomeData(7, selectedDate);
-  const weight180Query = useWeightLogs180d();
+  const weight366Query = useWeightLogs366d();
   const todayKey = getLocalDateKey(todayLocal);
   const isToday = getLocalDateKey(selectedDate) === getLocalDateKey(todayLocal);
   const minDateKey = useMemo(() => {
@@ -76,8 +77,8 @@ export default function WeightHomeScreen() {
   };
 
   const unit: 'kg' | 'lbs' = profile?.weight_unit === 'kg' ? 'kg' : 'lbs';
-  const latestEntry = weight180Query.data ? getLatestWeightEntry(weight180Query.data) : null;
-  const latestBodyFatEntry = weight180Query.data ? getLatestBodyFatEntry(weight180Query.data) : null;
+  const latestEntry = weight366Query.data ? getLatestWeightEntry(weight366Query.data) : null;
+  const latestBodyFatEntry = weight366Query.data ? getLatestBodyFatEntry(weight366Query.data) : null;
   const latestWeightValueLb = latestEntry?.weight_lb ?? null;
   const latestWeightDisplay =
     latestWeightValueLb !== null
@@ -99,34 +100,34 @@ export default function WeightHomeScreen() {
 
     const end = new Date(selectedDate);
     end.setHours(0, 0, 0, 0);
-    let start = new Date(end);
+    const start = new Date(end);
     start.setDate(start.getDate() - 6);
 
+    const rawLogs = weight366Query.data ?? [];
+    const dailyLatest = deriveDailyLatestWeight(rawLogs);
+
+    // Find earliest date key in dailyLatest for window adjustment
+    const startKey = getLocalDateKey(start);
+    const endKey = getLocalDateKey(end);
+    let earliestKeyInData: string | null = null;
+    if (dailyLatest.length > 0) {
+      earliestKeyInData = dailyLatest[0].date_key;
+    }
+    const effectiveStartKey =
+      earliestKeyInData && compareDateKeys(earliestKeyInData, startKey) > 0
+        ? earliestKeyInData
+        : startKey;
+    const effectiveStart = dateKeyToLocalStartOfDay(effectiveStartKey);
+
+    // Build date keys and labels for the 7-day window
     const keys: string[] = [];
     const labels: string[] = [];
-
-    // If the user’s first weigh-in is within the 7-day window, don't show days before it.
-    // (Prevents “phantom” early points and avoids listing days before the module start.)
-    const logs = weight180Query.data ?? [];
-    let earliestKeyInCache: string | null = null;
-    logs.forEach((log) => {
-      const k = getLocalDateKey(new Date(log.weighed_at));
-      if (!earliestKeyInCache || compareDateKeys(k, earliestKeyInCache) < 0) {
-        earliestKeyInCache = k;
-      }
-    });
-    const startKey = getLocalDateKey(start);
-    const effectiveStartKey =
-      earliestKeyInCache && compareDateKeys(earliestKeyInCache, startKey) > 0
-        ? earliestKeyInCache
-        : startKey;
-    start = dateKeyToLocalStartOfDay(effectiveStartKey);
-
-    const dayCount = Math.max(1, 1 + Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)));
+    const dayCount = Math.max(1, 1 + Math.round((end.getTime() - effectiveStart.getTime()) / (24 * 60 * 60 * 1000)));
     for (let i = 0; i < dayCount; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      keys.push(getLocalDateKey(d));
+      const d = new Date(effectiveStart);
+      d.setDate(effectiveStart.getDate() + i);
+      const key = getLocalDateKey(d);
+      keys.push(key);
       labels.push(
         d.toLocaleDateString('en-US', {
           weekday: 'short',
@@ -134,69 +135,32 @@ export default function WeightHomeScreen() {
       );
     }
 
-    // Build daily averages map
-    const sums = new Map<string, { sum: number; count: number }>();
-    logs.forEach((log) => {
-      const key = getLocalDateKey(new Date(log.weighed_at));
-      if (!sums.has(key)) sums.set(key, { sum: 0, count: 0 });
-      const bucket = sums.get(key)!;
-      bucket.sum += log.weight_lb ?? 0;
-      bucket.count += 1;
+    // Create map from date_key to daily latest weight for quick lookup
+    const dailyMap = new Map<string, typeof dailyLatest[0]>();
+    dailyLatest.forEach((day) => {
+      dailyMap.set(day.date_key, day);
     });
-    const dayAvg = new Map<string, number>();
-    sums.forEach((v, k) => {
-      if (v.count > 0) {
-        const avgLb = v.sum / v.count;
-        dayAvg.set(k, unit === 'kg' ? roundTo1(lbToKg(avgLb)) : roundTo1(avgLb));
+
+    // Map keys to values: use dailyLatest weight if available, otherwise null (gaps)
+    const values: Array<number | null> = keys.map((key) => {
+      const day = dailyMap.get(key);
+      if (day && day.weight_lb !== null && day.weight_lb !== undefined) {
+        const weightLb = day.weight_lb;
+        return unit === 'kg' ? roundTo1(lbToKg(weightLb)) : roundTo1(weightLb);
       }
+      return null;
     });
 
-    // Find latest weight before the start of window for initial carry
-    let initialCarry: number | null = null;
-    const windowStartKey = getLocalDateKey(start);
-    let latestPriorTime = -Infinity;
-    logs.forEach((log) => {
-      const t = new Date(log.weighed_at).getTime();
-      const key = getLocalDateKey(new Date(log.weighed_at));
-      if (key < windowStartKey && t > latestPriorTime && log.weight_lb !== null && log.weight_lb !== undefined) {
-        latestPriorTime = t;
-        const lb = log.weight_lb;
-        initialCarry = unit === 'kg' ? roundTo1(lbToKg(lb)) : roundTo1(lb);
-      }
-    });
-
-    const values: Array<number | null> = [];
-    let lastKnown: number | null = initialCarry;
-    let firstKnown: number | null = initialCarry;
-
-    keys.forEach((k) => {
-      const avg = dayAvg.get(k);
-      if (typeof avg === 'number' && Number.isFinite(avg)) {
-        values.push(avg);
-        lastKnown = avg;
-        if (firstKnown === null) firstKnown = avg;
-      } else if (lastKnown !== null) {
-        values.push(lastKnown);
-      } else {
-        values.push(null);
-      }
-    });
-
-    const filledValues =
-      firstKnown !== null
-        ? values.map((v) => (v === null ? firstKnown! : v))
-        : values;
-
-    const numericValues = filledValues.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const numericValues = values.filter((v): v is number => v !== null && Number.isFinite(v));
     const hasSufficient = numericValues.length >= 2;
 
     return {
       chartLabels: labels,
-      chartData: filledValues.map((v) => (typeof v === 'number' ? v : NaN)),
+      chartData: values.map((v) => (v !== null && Number.isFinite(v) ? v : NaN)),
       hasSufficientPoints: hasSufficient,
       chartPadding: { DOT_R, PAD_X, PAD_Y_TOP, PAD_Y_BOTTOM },
     };
-  }, [unit, weight180Query.data, selectedDate]);
+  }, [unit, weight366Query.data, selectedDate]);
 
   const renderWeight = (weightLb: number | null) => {
     if (weightLb === null) return 'No data yet';
@@ -307,15 +271,28 @@ export default function WeightHomeScreen() {
                         const denom = Math.max(1, n - 1);
                         const { PAD_X, PAD_Y_TOP, PAD_Y_BOTTOM, DOT_R } = chartPadding;
                         const usableWidth = Math.max(0, chartWidth - PAD_X * 2);
-                        const minY = Math.min(...chartData);
-                        const maxY = Math.max(...chartData);
+                        
+                        // Filter out NaN values for min/max calculation
+                        const finiteValues = chartData.filter((v) => Number.isFinite(v));
+                        if (finiteValues.length === 0) {
+                          return null;
+                        }
+                        const minY = Math.min(...finiteValues);
+                        const maxY = Math.max(...finiteValues);
                         const span = Math.max(1e-6, maxY - minY);
                         const usableHeight = Math.max(0, h - PAD_Y_TOP - PAD_Y_BOTTOM);
-                        const points = chartData.map((v, i) => {
-                          const x = PAD_X + (i / denom) * usableWidth;
-                          const y = PAD_Y_TOP + ((maxY - v) / span) * usableHeight;
-                          return { x, y, v };
-                        });
+                        
+                        // Build points, filtering out NaN values
+                        const points = chartData
+                          .map((v, i) => {
+                            if (!Number.isFinite(v)) return null;
+                            const x = PAD_X + (i / denom) * usableWidth;
+                            const y = PAD_Y_TOP + ((maxY - v) / span) * usableHeight;
+                            return { x, y, v };
+                          })
+                          .filter((p): p is { x: number; y: number; v: number } => p !== null);
+                        
+                        // Build path only from valid points
                         const pathD =
                           points.length > 0
                             ? points

@@ -14,7 +14,7 @@ import { Colors, BorderRadius, Shadows, Spacing, FontSize } from '@/constants/th
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useWaterDaily } from '@/hooks/use-water-logs';
 import { useUserConfig } from '@/hooks/use-user-config';
-import { formatWaterDisplay, WaterUnit, fromMl, getEffectiveGoal } from '@/utils/waterUnits';
+import { formatWaterDisplay, WaterUnit, fromMl, toMl, getEffectiveGoal } from '@/utils/waterUnits';
 import { ModuleThemes } from '@/constants/theme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
 import { Animated } from 'react-native';
@@ -42,7 +42,7 @@ export function WaterCard({ onPress }: WaterCardProps) {
   // Get today's values
   // Always read goal from water_daily.goal_ml (per-day snapshot)
   // Use getEffectiveGoal to apply unit-specific defaults if goal is missing
-  const totalMl = todayWater?.total_ml || 0;
+  const totalMl = todayWater ? toMl(todayWater.total, todayWater.water_unit as WaterUnit) : 0;
   const storedGoalMl = todayWater?.goal_ml || null;
   const activeWaterUnit = (todayWater?.water_unit as WaterUnit) || (profile?.water_unit as WaterUnit) || 'ml';
   const storedGoalInUnit = storedGoalMl ? fromMl(storedGoalMl, activeWaterUnit) : null;
