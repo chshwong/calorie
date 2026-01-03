@@ -31,6 +31,7 @@ function TabLayoutContent() {
   const colors = Colors[themeKey];
   const isDark = themeKey === 'dark';
   const insets = useSafeAreaInsets();
+  const tabBarBottomInset = Platform.OS === 'web' ? 0 : Math.max(insets.bottom, 0);
   const bigCircleColors = getBigCircleMenuColors(themeKey);
   const router = useRouter();
   const segments = useSegments();
@@ -644,7 +645,9 @@ function TabLayoutContent() {
                 backgroundColor: colors.background,
                 borderTopColor: colors.border,
                 borderTopWidth: 0,
-                height: Layout.bottomTabBarHeight,
+                // Ensure the tab bar background fully covers the bottom safe-area inset
+                height: Layout.bottomTabBarHeight + tabBarBottomInset,
+                paddingBottom: tabBarBottomInset,
                 zIndex: 9999,
               },
               Platform.select({
@@ -653,7 +656,6 @@ function TabLayoutContent() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  paddingBottom: 0,
                   marginBottom: 0,
                 },
                 default: {
@@ -749,7 +751,14 @@ function TabLayoutContent() {
           options={{
             title: t('tabs.more'),
             tabBarButton: (props) => <MoreButtonTab {...props} onPressCustom={() => setMoreMenuVisible(true)} />,
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="ellipsis.circle.fill" color={color} />,
+            tabBarIcon: ({ focused }) => (
+              <BrandLogoMascotOnly
+                width={28}
+                height={28}
+                accessibilityLabel={t('tabs.more')}
+                style={{ opacity: focused ? 1 : 0.7 }}
+              />
+            ),
           }}
         />
         {/* Hide explore tab - keeping it for backward compatibility but not showing in tab bar */}

@@ -1833,6 +1833,7 @@ export default function LogFoodScreen() {
         }}
         minimumDate={minDate}
         maximumDate={today}
+        showTodayButton={true}
         visible={showDatePicker}
         onClose={() => setShowDatePicker(false)}
         title={t('home.date_picker.title')}

@@ -594,6 +594,8 @@ export function useWaterDaily(options?: {
       addWaterMutation.mutate({ deltaMl, goalMl, dateString: targetDateKey }),
     setGoal: (goalMl: number) => setGoalMutation.mutate({ goalMl, dateString: targetDateKey }),
     setTotal: (totalInUnit: number) => setTotalMutation.mutate({ totalInUnit, dateString: targetDateKey }),
+    setTotalForDate: (totalInUnit: number, dateString: string) =>
+      setTotalMutation.mutate({ totalInUnit, dateString }),
     updateUnitAndGoal: (waterUnit: WaterUnit, goalInUnit: number) =>
       updateUnitAndGoalMutation.mutate({ waterUnit, goalInUnit }),
     isAddingWater: addWaterMutation.isPending,

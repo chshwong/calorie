@@ -37,6 +37,8 @@ export interface AppDatePickerProps {
   minimumDate?: Date;
   /** Maximum selectable date */
   maximumDate?: Date;
+  /** Whether to show a "Today" shortcut button (does not close; user still confirms with Select Date). */
+  showTodayButton?: boolean;
   /** Whether the picker is visible */
   visible: boolean;
   /** Callback when picker should close */
@@ -55,6 +57,7 @@ export function AppDatePicker({
   onChange,
   minimumDate,
   maximumDate,
+  showTodayButton = false,
   visible,
   onClose,
   title,
@@ -108,6 +111,14 @@ export function AppDatePicker({
     const d = new Date();
     d.setFullYear(d.getFullYear() - 120);
     return d;
+  })();
+
+  const isTodayShortcutDisabled = (() => {
+    // Both `today` and calendar dates are treated as local-midnight.
+    // Respect min/max rules in case the embedding screen sets unusual ranges.
+    if (today < minDate) return true;
+    if (maxDate !== undefined && today > maxDate) return true;
+    return false;
   })();
   
   // Calendar helper functions
@@ -402,6 +413,35 @@ export function AppDatePicker({
                     {t('common.cancel')}
                   </ThemedText>
                 </TouchableOpacity>
+                {showTodayButton && (
+                  <TouchableOpacity
+                    style={[
+                      styles.todayShortcutButton,
+                      getMinTouchTargetStyle(),
+                      {
+                        borderColor: colors.border,
+                        ...(Platform.OS === 'web' ? getFocusStyle(accent) : {}),
+                      },
+                      isTodayShortcutDisabled && { opacity: 0.4 },
+                    ]}
+                    onPress={() => {
+                      if (isTodayShortcutDisabled) return;
+                      setPendingDate(new Date(today));
+                      setCalendarViewMonth(new Date(today));
+                    }}
+                    activeOpacity={0.7}
+                    disabled={isTodayShortcutDisabled}
+                    {...getButtonAccessibilityProps(
+                      t('home.date_picker.today_button'),
+                      "Double tap to select today's date (then confirm with Select Date)",
+                      isTodayShortcutDisabled
+                    )}
+                  >
+                    <ThemedText style={[styles.todayShortcutButtonText, { color: colors.text }]}>
+                      {t('home.date_picker.today_button')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[
                     styles.todayButton, 
@@ -724,6 +764,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cancelButtonText: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+  },
+  todayShortcutButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  todayShortcutButtonText: {
     fontSize: FontSize.base,
     fontWeight: '600',
   },

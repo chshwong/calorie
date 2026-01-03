@@ -5,15 +5,13 @@
  * Uses View components for cross-platform compatibility
  */
 
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing, FontSize, FontWeight, BorderRadius, ModuleThemes } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, ModuleThemes, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Animated } from 'react-native';
-import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
 import { getFocusStyle } from '@/utils/accessibility';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Animated, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type BarData = {
   date: string;
@@ -57,11 +55,18 @@ export function BarChart({
   const waterTheme = ModuleThemes.water;
   
   // Calculate max value if not provided
-  // Use provided maxValue (which should already include padding) or compute from data
+  // Use provided maxValue (parent can add padding if desired) or compute from data without extra headroom
   const calculatedMax = maxValue || Math.max(...data.map(d => d.value), goalValue || 0, 1);
-  // If maxValue was provided, use it directly (it already has padding from parent)
-  // Otherwise, add 15% padding for headroom
-  const chartMax = maxValue ? maxValue : Math.max(calculatedMax * 1.15, 100);
+  const chartMax = maxValue ? maxValue : Math.max(calculatedMax, 1);
+
+  // Reserve space within the chart for labels without affecting the plot scaling.
+  // - topInset: lets value labels above bars remain visible (they can overflow upward into this space)
+  // - xAxisHeight: dedicated row for day labels, so it doesn't shrink the plot area and break scaling
+  // Extra headroom for multi-line value labels above tall bars
+  const topInset = Spacing['4xl'];
+  const xAxisHeight = showLabels ? (FontSize.xs + Spacing.md) : 0;
+  const plotHeight = Math.max(height - topInset - xAxisHeight, 1);
+  const goalLabelHaloRadius = Spacing.sm - Spacing.xs; // 8 - 4 = 4 (token-based)
   
   // Check if all data is empty (all values are 0)
   const hasData = data.some(d => d.value > 0);
@@ -128,139 +133,129 @@ export function BarChart({
 
   // Calculate goal line position
   const goalLineBottom = goalValue !== undefined && goalValue > 0 
-    ? (goalValue / chartMax) * height 
+    ? (goalValue / chartMax) * plotHeight 
     : null;
-  
-  // Minimum bar height for value labels (if bar is too short, show value above)
-  const MIN_BAR_HEIGHT_FOR_LABEL = 24;
-  
-  // Top padding for inside labels to prevent cutoff (12% of chart height or minimum spacing)
-  const TOP_PADDING_FOR_LABELS = Math.max(height * 0.12, Spacing.md + FontSize.xs);
 
   return (
     <View style={styles.container}>
       <View style={[styles.chartContainer, { height }]}>
-        {/* Goal line with label */}
-        {goalLineBottom !== null && (
-          <>
-            <View
-              style={[
-                styles.goalLine,
-                {
-                  bottom: goalLineBottom,
-                  borderColor: waterTheme.accent,
-                },
-              ]}
-            />
-            {/* Goal label - positioned above the line to avoid overlap with bar labels */}
-            {goalDisplayValue && (
-              <View
-                style={[
-                  styles.goalLabelContainer,
-                  {
-                    bottom: goalLineBottom + 4, // Position above the line
-                    left: Spacing.sm,
-                    backgroundColor: colors.background,
-                  },
-                ]}
-              >
-                <ThemedText style={[styles.goalLabel, { color: waterTheme.accent }]}>
-                  {goalDisplayValue}
-                </ThemedText>
-              </View>
-            )}
-          </>
-        )}
-        
-        {/* Bars */}
-        <View style={styles.barsContainer}>
-          {data.map((item, index) => {
-            const barHeight = (item.value / chartMax) * height;
-            const isSelected = selectedDate === item.date;
-            const showValueAbove = barHeight < MIN_BAR_HEIGHT_FOR_LABEL;
-            const barOpacity = !hasData && item.value === 0 ? 0.3 : 1;
-            
-            return (
-              <TouchableOpacity
-                key={item.date}
-                style={styles.barWrapper}
-                onPress={() => onBarPress?.(item.date)}
-                activeOpacity={0.7}
-                {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-              >
-                {/* Value label above bar (if bar is too short) */}
-                {showValueAbove && item.displayValue && (
-                  <ThemedText 
-                    style={[
-                      styles.barValueLabel, 
-                      styles.barValueLabelAbove,
-                      { color: colors.textSecondary }
-                    ]}
-                  >
-                    {item.displayValue}
-                  </ThemedText>
-                )}
-                
-                <View style={styles.barContainer}>
-                  <Animated.View
-                    style={[
-                      styles.bar,
-                      {
-                        height: animated && animatedHeightsRef.current[index] 
-                          ? animatedHeightsRef.current[index].interpolate({
-                              inputRange: [0, chartMax],
-                              outputRange: [0, height],
-                            })
-                          : barHeight,
-                        backgroundColor: getColor(item.value, chartMax),
-                        borderColor: isSelected ? colors.tint : 'transparent',
-                        borderWidth: isSelected ? 2 : 0,
-                        opacity: barOpacity,
-                      },
-                    ]}
-                  />
-                  
-                  {/* Value label inside bar (if bar is tall enough) */}
-                  {/* Positioned with top padding to ensure it stays inside even for tallest bars */}
-                  {!showValueAbove && item.displayValue && barHeight >= MIN_BAR_HEIGHT_FOR_LABEL && (
-                    <View 
+        {/* Plot area: bars + goal line share the same coordinate system */}
+        <View style={[styles.plotArea, { height: plotHeight, bottom: xAxisHeight }]}>
+          {/* Bars */}
+          <View style={styles.barsContainer}>
+            {data.map((item, index) => {
+              const barHeight = (item.value / chartMax) * plotHeight;
+              const isSelected = selectedDate === item.date;
+              const barOpacity = !hasData && item.value === 0 ? 0.3 : 1;
+              const valueLabelBottom = barHeight + Spacing.xs;
+              
+              return (
+                <TouchableOpacity
+                  key={item.date}
+                  style={styles.barWrapper}
+                  onPress={() => onBarPress?.(item.date)}
+                  activeOpacity={0.7}
+                  {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                >
+                  {/* Value label above bar (always) */}
+                  {item.displayValue && (
+                    <ThemedText 
                       style={[
-                        styles.barValueContainer,
-                        { 
-                          top: Math.min(TOP_PADDING_FOR_LABELS, barHeight * 0.15),
-                          // Ensure label doesn't go beyond bar top
-                          maxHeight: barHeight - Spacing.xs,
-                        }
+                        styles.barValueLabel, 
+                        styles.barValueLabelAbove,
+                        { color: colors.text, bottom: valueLabelBottom }
                       ]}
                     >
-                      <ThemedText 
-                        style={[
-                          styles.barValueLabel, 
-                          styles.barValueLabelInside,
-                          { color: colors.background }
-                        ]}
-                      >
-                        {item.displayValue}
-                      </ThemedText>
-                    </View>
+                      {item.displayValue}
+                    </ThemedText>
                   )}
-                </View>
-                
-                {showLabels && (
-                  <ThemedText 
+                  
+                  <View style={styles.barContainer}>
+                    <Animated.View
+                      style={[
+                        styles.bar,
+                        {
+                          height: animated && animatedHeightsRef.current[index] 
+                            ? animatedHeightsRef.current[index].interpolate({
+                                inputRange: [0, chartMax],
+                                outputRange: [0, plotHeight],
+                              })
+                            : barHeight,
+                          backgroundColor: getColor(item.value, chartMax),
+                          borderColor: isSelected ? colors.tint : 'transparent',
+                          borderWidth: isSelected ? 2 : 0,
+                          opacity: barOpacity,
+                        },
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Goal line with label (rendered above bars) */}
+          {goalLineBottom !== null && (
+            <>
+              <View
+                style={[
+                  styles.goalLine,
+                  {
+                    bottom: goalLineBottom,
+                    borderColor: waterTheme.accent,
+                  },
+                ]}
+              />
+              {/* Goal label - positioned above the line to avoid overlap with bar labels */}
+              {goalDisplayValue && (
+                <View
+                  style={[
+                    styles.goalLabelContainer,
+                    {
+                      // Keep the goal label visually “touching” the goal line
+                      bottom: goalLineBottom - Spacing.xs,
+                      left: Spacing.sm,
+                    },
+                  ]}
+                >
+                  <ThemedText
                     style={[
-                      styles.barLabel, 
-                      { color: colors.textSecondary },
-                      todayDateString && item.date === todayDateString && styles.barLabelToday
+                      styles.goalLabel,
+                      {
+                        color: colors.brandGreen,
+                        // Halo: white in light mode, black in dark mode (per theme token)
+                        textShadowColor: colors.textOnTint,
+                        textShadowOffset: { width: 0, height: 0 },
+                        textShadowRadius: goalLabelHaloRadius,
+                      },
                     ]}
                   >
-                    {formatDateLabel(item.date)}
+                    {goalDisplayValue}
                   </ThemedText>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+                </View>
+              )}
+            </>
+          )}
         </View>
+
+        {/* X-axis labels row (outside plot scaling) */}
+        {showLabels && (
+          <View style={[styles.xAxisLabelsRow, { height: xAxisHeight }]}>
+            {data.map((item) => (
+              <View key={item.date} style={styles.xAxisLabelCell}>
+                <ThemedText 
+                  style={[
+                    styles.barLabel,
+                    { color: colors.textSecondary },
+                    todayDateString && item.date === todayDateString && styles.barLabelToday
+                  ]}
+                >
+                  {formatDateLabel(item.date)}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
       
       {/* Empty state message */}
@@ -282,6 +277,11 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: Spacing.sm,
   },
+  plotArea: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
   goalLine: {
     position: 'absolute',
     left: 0,
@@ -289,6 +289,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderStyle: 'dashed',
     opacity: 0.5,
+    zIndex: 5,
   },
   barsContainer: {
     flexDirection: 'row',
@@ -302,6 +303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginHorizontal: Spacing.xs / 2,
+    position: 'relative',
   },
   barContainer: {
     width: '100%',
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderTopLeftRadius: BorderRadius.sm,
     borderTopRightRadius: BorderRadius.sm,
-    marginBottom: Spacing.xs,
+    marginBottom: 0,
   },
   barLabel: {
     fontSize: FontSize.xs,
@@ -326,11 +328,13 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
   barValueLabel: {
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.xs,
     fontWeight: '600',
   },
   barValueLabelAbove: {
-    marginBottom: Spacing.xs,
+    position: 'absolute',
+    left: 0,
+    right: 0,
     textAlign: 'center',
   },
   barValueLabelInside: {
@@ -350,14 +354,30 @@ const styles = StyleSheet.create({
   },
   goalLabelContainer: {
     position: 'absolute',
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.xs,
-    // backgroundColor will be set inline
+    // No chip background; keep minimal padding so halo/text doesn't feel cramped.
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    zIndex: 6,
   },
   goalLabel: {
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.xs,
     fontWeight: '600',
+  },
+  xAxisLabelsRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-around',
+    paddingHorizontal: Spacing.xs,
+    paddingTop: Spacing.xs,
+  },
+  xAxisLabelCell: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: Spacing.xs / 2,
   },
   emptyMessage: {
     fontSize: FontSize.xs,

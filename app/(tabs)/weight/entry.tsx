@@ -641,6 +641,7 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
         value={selectedDate}
         minimumDate={effectiveMinDate}
         maximumDate={today}
+        showTodayButton={true}
         onChange={(date) => {
           const requestedKey = toDateKey(date);
           let nextKey = clampDateKey(requestedKey, effectiveMinDateKey, todayKey);

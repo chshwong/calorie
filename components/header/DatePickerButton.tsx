@@ -76,6 +76,7 @@ export function DatePickerButton({
         }}
         minimumDate={minimumDate}
         maximumDate={max}
+        showTodayButton={true}
         visible={showDatePicker}
         onClose={() => setShowDatePicker(false)}
         title={t('home.date_picker.title')}

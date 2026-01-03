@@ -101,7 +101,8 @@ const styles = StyleSheet.create({
     }),
     left: 0,
     right: 0,
-    bottom: 0,
+    // Slightly overlap the viewport bottom on web to avoid a 1px gap from subpixel rounding.
+    bottom: Platform.OS === 'web' ? -StyleSheet.hairlineWidth : 0,
     zIndex: 9999, // ensure it stays above sheets
     // Background spans full width edge-to-edge
   },

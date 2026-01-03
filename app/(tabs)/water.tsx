@@ -1,33 +1,32 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Pressable, ScrollView, Modal, TextInput, Platform, ActivityIndicator, Text } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { BarChart } from '@/components/charts/bar-chart';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AnimatedWaterIcon } from '@/components/water/animated-water-icon';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
-import { BarChart } from '@/components/charts/bar-chart';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, ModuleThemes, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, ModuleThemes } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSelectedDate } from '@/hooks/use-selected-date';
-import { useWaterDaily } from '@/hooks/use-water-logs';
-import type { WaterDaily } from '@/lib/services/waterLogs';
 import { useUserConfig } from '@/hooks/use-user-config';
-import { formatWaterDisplay, formatWaterValue, parseWaterInput, toMl, fromMl, WaterUnit, getEffectiveGoal, WATER_LIMITS } from '@/utils/waterUnits';
-import { getLastNDays, addDays, formatDateForDisplay, getDateString } from '@/utils/calculations';
+import { useWaterDaily } from '@/hooks/use-water-logs';
 import { useWaterQuickAddPresets } from '@/hooks/use-water-quick-add-presets';
-import { AnimatedWaterIcon } from '@/components/water/animated-water-icon';
+import type { WaterDaily } from '@/lib/services/waterLogs';
 import {
-  getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
-  getFocusStyle,
+    getButtonAccessibilityProps,
+    getMinTouchTargetStyle
 } from '@/utils/accessibility';
+import { addDays, getDateString, getLastNDays } from '@/utils/calculations';
+import { formatWaterDisplay, formatWaterValue, fromMl, getEffectiveGoal, toMl, WATER_LIMITS, WaterUnit } from '@/utils/waterUnits';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // QUICK ADD ICON LAYOUT CONSTANTS (theme-token based; no magic numbers)
@@ -76,7 +75,7 @@ export default function WaterScreen() {
   const effectiveProfile = userConfig || authProfile; // For avatar
 
   // Get water data (last 14 days for history, using selected date)
-  const { todayWater, history, isLoading, addWater, setGoal, setTotal, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal, addWaterError } = useWaterDaily({ 
+  const { todayWater, history, isLoading, addWater, setGoal, setTotal, setTotalForDate, updateUnitAndGoal, isAddingWater, isSettingGoal, isSettingTotal, isUpdatingUnitAndGoal, addWaterError } = useWaterDaily({ 
     daysBack: 14,
     targetDateString: selectedDateString,
   });
@@ -121,6 +120,8 @@ export default function WaterScreen() {
   const [showEditTotalModal, setShowEditTotalModal] = useState(false);
   const [editTotalInput, setEditTotalInput] = useState('');
   const [editTotalError, setEditTotalError] = useState('');
+  const [editTotalDateString, setEditTotalDateString] = useState<string | null>(null);
+  const [editTotalWaterUnit, setEditTotalWaterUnit] = useState<WaterUnit>(activeWaterUnit);
   
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -129,10 +130,12 @@ export default function WaterScreen() {
 
   // Open the existing Edit Total modal (reused by the droplet pressable)
   const openEditTotalModal = useCallback(() => {
-    setEditTotalInput(total.toString());
+    setEditTotalDateString(selectedDateString);
+    setEditTotalWaterUnit((todayWater?.water_unit as WaterUnit) || activeWaterUnit);
+    setEditTotalInput((todayWater?.total ?? 0).toString());
     setEditTotalError('');
     setShowEditTotalModal(true);
-  }, [total]);
+  }, [activeWaterUnit, selectedDateString, todayWater?.total, todayWater?.water_unit]);
 
   // Handle quick-add preset press
   const handleQuickAddPreset = useCallback((amount: number, unit: WaterUnit, presetId: string) => {
@@ -212,6 +215,9 @@ export default function WaterScreen() {
 
   // Handle edit total (set absolute value in active unit)
   const handleEditTotal = () => {
+    const dateString = editTotalDateString || selectedDateString;
+    const unitForEdit = editTotalWaterUnit;
+
     // Parse input as if it's in the active unit
     const cleaned = editTotalInput.trim().replace(/[^0-9.]/g, '');
     const numericValue = parseFloat(cleaned);
@@ -222,7 +228,7 @@ export default function WaterScreen() {
     }
 
     // Convert to ml for validation
-    const inputMl = toMl(numericValue, activeWaterUnit);
+    const inputMl = toMl(numericValue, unitForEdit);
 
     // Validate limits (0-MAX_SINGLE_ADD_ML)
     if (inputMl > WATER_LIMITS.MAX_SINGLE_ADD_ML) {
@@ -232,9 +238,14 @@ export default function WaterScreen() {
 
     setEditTotalError('');
     try {
-      // setTotal expects value in the row's water_unit
-      setTotal(numericValue);
+      // setTotalForDate expects value in that row's water_unit
+      if (dateString === selectedDateString) {
+        setTotal(numericValue);
+      } else {
+        setTotalForDate(numericValue, dateString);
+      }
       setEditTotalInput('');
+      setEditTotalDateString(null);
       setShowEditTotalModal(false);
     } catch (error: any) {
       setEditTotalError(error.message || t('water.edit_total.error'));
@@ -287,7 +298,7 @@ export default function WaterScreen() {
   // Prepare history data for chart (last 7 calendar days including today)
   // Generate exactly 7 days, ordered oldest to newest (left to right)
   // Use the same date logic as the main "Today's Water" card (local date, not UTC)
-  const last7Days = getLastNDays(today, 7);
+  const last7Days = getLastNDays(selectedDate, 7);
 
   // Create a map of existing water data by date for quick lookup
   // IMPORTANT: Include todayWater in the map so today's value is always included
@@ -325,9 +336,32 @@ export default function WaterScreen() {
     }
   });
 
-  // Calculate dynamic y-axis max: max of all daily totals and goal, with 15% headroom
+  const minAllowedDateString = getDateString(minDate);
+
+  const openEditTotalModalForDate = useCallback(
+    (dateString: string) => {
+      // Guard against dates before signup/min allowed date (chart may still show placeholders)
+      if (dateString < minAllowedDateString) {
+        return;
+      }
+
+      const water = waterDataMap.get(dateString);
+      const unitForEdit: WaterUnit =
+        (water?.water_unit as WaterUnit) || (todayWater?.water_unit as WaterUnit) || activeWaterUnit;
+      const totalForEdit = water?.total ?? 0; // stored in row's water_unit
+
+      setEditTotalDateString(dateString);
+      setEditTotalWaterUnit(unitForEdit);
+      setEditTotalInput(totalForEdit.toString());
+      setEditTotalError('');
+      setShowEditTotalModal(true);
+    },
+    [activeWaterUnit, minAllowedDateString, todayWater?.water_unit, waterDataMap]
+  );
+
+  // Calculate dynamic y-axis max: align goal line with bars when equal (no extra padding)
   const maxDailyValue = Math.max(...historyData.map(d => d.value), 0);
-  const chartMax = Math.max(maxDailyValue, goalMl) * 1.15; // 15% padding above tallest bar/goal
+  const chartMax = Math.max(maxDailyValue, goalMl, 1);
 
   // Calculate goal display value in active unit for reference line label
   const goalInActiveUnit = fromMl(goalMl, activeWaterUnit);
@@ -595,9 +629,12 @@ export default function WaterScreen() {
 
         {/* History Chart Section - Card */}
         <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
-          <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
-            {t('water.history_title')}
-          </ThemedText>
+          <View style={styles.cardHeader}>
+            <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
+              {t('water.history_title')}
+            </ThemedText>
+            <View style={[styles.cardDivider, { backgroundColor: colors.separator }]} />
+          </View>
           <View style={styles.chartWrapper}>
             <BarChart
               data={historyData}
@@ -606,13 +643,9 @@ export default function WaterScreen() {
               goalDisplayValue={goalDisplayValue}
               selectedDate={selectedDateString}
               todayDateString={getDateString(today)}
-              colorScale={(value, max) => {
-                const ratio = value / max;
-                if (ratio < 0.5) return colors.infoLight;
-                if (ratio < 0.8) return colors.info;
-                return accentColor;
-              }}
-              height={Platform.OS === 'web' ? 260 : 180}
+              colorScale={() => accentColor}
+              onBarPress={openEditTotalModalForDate}
+              height={Platform.OS === 'web' ? 240 : 210}
               showLabels={true}
               emptyMessage={t('water.chart.empty_message')}
             />
@@ -709,7 +742,10 @@ export default function WaterScreen() {
         visible={showEditTotalModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowEditTotalModal(false)}
+        onRequestClose={() => {
+          setShowEditTotalModal(false);
+          setEditTotalDateString(null);
+        }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
@@ -718,7 +754,10 @@ export default function WaterScreen() {
                 {t('water.edit_total.title')}
               </ThemedText>
               <TouchableOpacity
-                onPress={() => setShowEditTotalModal(false)}
+                onPress={() => {
+                  setShowEditTotalModal(false);
+                  setEditTotalDateString(null);
+                }}
                 style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
                 {...getButtonAccessibilityProps(t('common.close'))}
               >
@@ -728,7 +767,7 @@ export default function WaterScreen() {
 
             <View style={styles.modalBody}>
               <ThemedText style={[styles.formLabel, { color: colors.text }]}>
-                {t('water.edit_total.label', { unit: activeWaterUnit === 'floz' ? 'fl oz' : activeWaterUnit === 'cup' ? 'cups' : 'ml' })}
+                {t('water.edit_total.label', { unit: editTotalWaterUnit === 'floz' ? 'fl oz' : editTotalWaterUnit === 'cup' ? 'cups' : 'ml' })}
               </ThemedText>
               <TextInput
                 style={[
@@ -744,7 +783,7 @@ export default function WaterScreen() {
                   setEditTotalInput(text);
                   setEditTotalError('');
                 }}
-                placeholder={activeWaterUnit === 'floz' ? '64' : activeWaterUnit === 'cup' ? '8' : '2000'}
+                placeholder={editTotalWaterUnit === 'floz' ? '64' : editTotalWaterUnit === 'cup' ? '8' : '2000'}
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
                 autoFocus
@@ -765,6 +804,7 @@ export default function WaterScreen() {
                     setShowEditTotalModal(false);
                     setEditTotalInput('');
                     setEditTotalError('');
+                    setEditTotalDateString(null);
                   }}
                   {...getButtonAccessibilityProps(t('common.cancel'))}
                 >
@@ -979,8 +1019,17 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     marginBottom: Spacing.xs,
   },
+  cardHeader: {
+    marginBottom: Spacing.sm,
+  },
+  cardDivider: {
+    height: 1,
+    width: '100%',
+  },
   chartWrapper: {
-    marginTop: Spacing.sm, // Add spacing between title and chart
+    marginTop: Spacing.sm, // Spacing below divider
+    overflow: 'hidden', // Prevent chart labels from rendering into the header area
+    paddingTop: Spacing.sm, // Ensure chart stays below divider visually
   },
   summary: {
     fontSize: FontSize.sm,

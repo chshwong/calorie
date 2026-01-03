@@ -2196,7 +2196,7 @@
     "settings": {
       "title": "Water Settings",
       "water_units": "Water Units",
-      "goal": "Goal",
+      "goal": "Daily Water Goal",
       "save": "Save",
       "cancel": "Cancel",
       "goal_out_of_range": "Goal must be between {{min}} and {{max}} ml",
@@ -2210,7 +2210,7 @@
       "minus100": "-100 ml"
     },
     "edit_total": {
-      "title": "Edit Total",
+      "title": "Water Consumed",
       "button": "Edit Total",
       "label": "Total Amount ({{unit}})",
       "helper": "Maximum: {{max}} ml",

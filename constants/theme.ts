@@ -159,6 +159,7 @@ export const Colors = {
     // Accent
     tint: salmonColorLight,
     tintLight: salmonColorLight + '20',
+    brandGreen: brandGreencolorLight,
     // Text to render on `tint` backgrounds (e.g., primary CTA)
     textOnTint: '#FFFFFF',
     appTeal: '#2FA4A9',
@@ -246,6 +247,7 @@ export const Colors = {
     // Accent
     tint: salmonColorDark,
     tintLight: salmonColorDark + '20',
+    brandGreen: brandGreenColorDark,
     // Text to render on `tint` backgrounds in dark mode (per spec: black on salmon)
     textOnTint: '#000000',
     appTeal: '#5BC2C6',

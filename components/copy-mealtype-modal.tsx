@@ -27,6 +27,8 @@ type CopyMealtypeModalProps = {
   onClose: () => void;
   onConfirm: (targetDate: Date, targetMealType: string, includeNotes: boolean) => void;
   sourceDate: Date;
+  /** Minimum selectable date (e.g. user's signup day). If provided, days before it are disabled. */
+  minimumDate?: Date;
   sourceMealType: string;
   isLoading?: boolean;
   mode?: TransferMode; // 'copy' or 'move'
@@ -43,6 +45,7 @@ export function CopyMealtypeModal({
   onClose,
   onConfirm,
   sourceDate,
+  minimumDate,
   sourceMealType,
   isLoading = false,
   mode = 'copy',
@@ -68,11 +71,19 @@ export function CopyMealtypeModal({
     ? t('food.move.confirm', { defaultValue: 'Move' })
     : t('food.copy.confirm', { defaultValue: 'Copy' }));
 
-  // Default target date to tomorrow
+  const minDate = (() => {
+    if (!minimumDate) return undefined;
+    const d = new Date(minimumDate);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+
+  // Default target date to tomorrow (clamped to minimumDate if provided)
   const getDefaultTargetDate = () => {
     const tomorrow = new Date(sourceDate);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
+    if (minDate && tomorrow < minDate) return new Date(minDate);
     return tomorrow;
   };
 
@@ -90,7 +101,7 @@ export function CopyMealtypeModal({
       setCalendarViewMonth(new Date(defaultDate));
       setIncludeNotes(false); // Reset to "Exclude Notes" (default)
     }
-  }, [visible, sourceDate, sourceMealType]);
+  }, [visible, sourceDate, sourceMealType, minimumDate]);
 
   // Calendar helper functions
   const generateCalendarDays = (viewMonth: Date) => {
@@ -117,6 +128,11 @@ export function CopyMealtypeModal({
   const handlePreviousMonth = () => {
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() - 1);
+    if (minDate) {
+      const newMonthFirst = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      const minMonthFirst = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+      if (newMonthFirst < minMonthFirst) return;
+    }
     setCalendarViewMonth(newMonth);
   };
 
@@ -129,6 +145,7 @@ export function CopyMealtypeModal({
   const handleDateSelect = (day: number) => {
     const selectedDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
     selectedDate.setHours(0, 0, 0, 0);
+    if (minDate && selectedDate < minDate) return;
     setTargetDate(selectedDate);
   };
 
@@ -330,6 +347,14 @@ export function CopyMealtypeModal({
                     Platform.OS === 'web' && getFocusStyle(colors.tint),
                   ]}
                   activeOpacity={0.7}
+                  disabled={(() => {
+                    if (!minDate) return false;
+                    const prevMonth = new Date(calendarViewMonth);
+                    prevMonth.setMonth(prevMonth.getMonth() - 1);
+                    const prevMonthFirst = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+                    const minMonthFirst = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+                    return prevMonthFirst < minMonthFirst;
+                  })()}
                   {...getButtonAccessibilityProps(t('home.date_picker.previous_month'))}
                 >
                   <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>←</ThemedText>
@@ -372,6 +397,7 @@ export function CopyMealtypeModal({
                   const isSelectedDay = isSelectedInCalendar(day, calendarViewMonth);
                   const dayDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
                   dayDate.setHours(0, 0, 0, 0);
+                  const isBeforeMin = !!minDate && dayDate < minDate;
 
                   return (
                     <TouchableOpacity
@@ -379,10 +405,12 @@ export function CopyMealtypeModal({
                       style={[
                         styles.calendarDay,
                         isSelectedDay && { backgroundColor: colors.tint },
+                        isBeforeMin && { opacity: 0.35 },
                       ]}
                       onPress={() => handleDateSelect(day)}
                       activeOpacity={0.7}
-                      {...getButtonAccessibilityProps(`Select ${day}`)}
+                      disabled={isBeforeMin}
+                      {...getButtonAccessibilityProps(`Select ${day}`, undefined, isBeforeMin)}
                     >
                       <ThemedText
                         style={[
