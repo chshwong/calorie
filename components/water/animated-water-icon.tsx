@@ -28,6 +28,12 @@ import Animated, {
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+// SVG stroke widths (not theme spacing): keep as named constants to avoid unexplained magic numbers.
+// These are in SVG user units; `vectorEffect="non-scaling-stroke"` keeps them consistent across transforms.
+const OUTLINE_STROKE_BASE = 0.9;
+const OUTLINE_STROKE_OPTICAL_SMALL = 1.1;
+const WAVE_STROKE = 0.75;
+
 type WaterIconVariant = 'cup' | 'glass' | 'bottleSmall' | 'bottleLarge';
 
 type AnimatedWaterIconProps = {
@@ -195,17 +201,34 @@ export function AnimatedWaterIcon({
   });
 
   // Apply base scale (for sizing different container types) and animation scale (for press feedback)
-  // The transform scale will visually scale the icon while keeping the base size for layout
+  // The transform scale will visually scale the icon while keeping the base size for layout.
+  // Also apply a translateY to bottom-anchor the scaled drawing inside its square box:
+  // - When scaled down (e.g., 50ml), the icon would otherwise float upward (center-scaled).
+  // - When scaled up (e.g., 1000ml), this also helps prevent bottom clipping.
   const animatedScaleStyle = useAnimatedStyle(() => {
+    const s = baseScale * scale.value;
+    // Bottom-anchor compensation for *scaled-down* icons only (e.g., 50ml).
+    // When scaling down around center, the drawing visually floats upward inside its square box.
+    // Pushing it down by (1 - s) * (size/2) keeps its bottom aligned with unscaled icons.
+    //
+    // IMPORTANT: Do NOT apply the inverse shift when scaling up (s > 1), otherwise larger
+    // icons get translated upward and their bottoms no longer align with the others.
+    const translateY = s < 1 ? (1 - s) * (size / 2) : 0;
     return {
-      transform: [{ scale: baseScale * scale.value }],
+      // Order matters: scale first, then translate in screen units.
+      transform: [{ scale: s }, { translateY }],
     };
-  });
+  }, [baseScale, size]);
 
   // Icon path and clip path
   const iconPath = ICON_PATHS[variant];
   const clipPathId = `water-clip-${variant}`;
   const clipPath = CLIP_PATHS[variant];
+
+  // Optical tweak: very small, down-scaled icons (50ml/250ml in the quick-add row)
+  // can look slightly lighter/thinner due to rasterization/anti-aliasing.
+  // Give them a tiny stroke bump so they visually match the larger icons.
+  const outlineStrokeWidth = baseScale < 1 ? OUTLINE_STROKE_OPTICAL_SMALL : OUTLINE_STROKE_BASE;
   
   return (
     <Animated.View style={[styles.container, animatedScaleStyle, { width: size, height: size }]}>
@@ -238,9 +261,10 @@ export function AnimatedWaterIcon({
           <AnimatedPath
             animatedProps={animatedWavePath}
             stroke={waveColor}
-            strokeWidth={1.5}
+            strokeWidth={WAVE_STROKE}
             fill="none"
             opacity={0.6}
+            vectorEffect="non-scaling-stroke"
           />
         </G>
         
@@ -249,9 +273,10 @@ export function AnimatedWaterIcon({
           d={iconPath}
           fill="none"
           stroke={iconColor}
-          strokeWidth={1.8}
+          strokeWidth={outlineStrokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
         />
       </Svg>
     </Animated.View>

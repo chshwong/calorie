@@ -29,6 +29,18 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 
+// ============================================================================
+// QUICK ADD ICON LAYOUT CONSTANTS (theme-token based; no magic numbers)
+// ============================================================================
+// Base icon size was 48dp; increased by ~20% to ~58dp.
+// Express ~58dp using theme tokens: 48 (5xl) + 12 (md) - 2 (xxs) = 58.
+const QUICK_ADD_ICON_SIZE = Spacing['5xl'] + Spacing.md - Spacing.xxs;
+// The 1000ml icon baseline nudge: -(12 - 2) = -10.
+const BOTTLE_LARGE_BASELINE_NUDGE_Y = -(Spacing.md - Spacing.xxs);
+// Custom “+” overlay position: top = 12 - 2 = 10, left = 12.
+const CUSTOM_PLUS_TOP = Spacing.md - Spacing.xxs;
+const CUSTOM_PLUS_LEFT = Spacing.md;
+
 
 export default function WaterScreen() {
   const { t } = useTranslation();
@@ -114,6 +126,13 @@ export default function WaterScreen() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorModalTitle, setErrorModalTitle] = useState('');
   const [errorModalMessage, setErrorModalMessage] = useState('');
+
+  // Open the existing Edit Total modal (reused by the droplet pressable)
+  const openEditTotalModal = useCallback(() => {
+    setEditTotalInput(total.toString());
+    setEditTotalError('');
+    setShowEditTotalModal(true);
+  }, [total]);
 
   // Handle quick-add preset press
   const handleQuickAddPreset = useCallback((amount: number, unit: WaterUnit, presetId: string) => {
@@ -383,7 +402,7 @@ export default function WaterScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
             <SummaryCardHeader
               titleKey="home.summary.title_other"
-              icon="cup.water.fill"
+              icon="drop.fill"
               module="water"
               isLoading={isLoading}
               onPressSettings={isToday ? handleOpenSettings : undefined}
@@ -398,75 +417,21 @@ export default function WaterScreen() {
             <>
               {/* Main content: Edit Total + Custom buttons (left) + Droplet (center) */}
               <View style={styles.waterDisplay}>
-                {/* Edit Total + Custom buttons - stacked vertically on left */}
-                <View style={styles.editTotalButtonContainer}>
-                  <TouchableOpacity
-                    style={[styles.editTotalButton, { 
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                    }]}
-                    onPress={() => {
-                      setEditTotalInput(total.toString());
-                      setEditTotalError('');
-                      setShowEditTotalModal(true);
-                    }}
-                    activeOpacity={0.7}
-                    {...getButtonAccessibilityProps(t('water.edit_total.button'))}
-                  >
-                    <View style={styles.editTotalButtonContent}>
-                      <IconSymbol
-                        name="drop.fill"
-                        size={Math.round(FontSize['4xl'] * 1.175)}
-                        color={waterTheme.accent}
-                      />
-                      <ThemedText style={[styles.editTotalButtonText, { color: colors.text }]}>
-                        {t('water.edit_total.button')}
-                      </ThemedText>
-                    </View>
-                  </TouchableOpacity>
-                  
-                  {/* Custom button - directly under Edit Total */}
-                  <TouchableOpacity
-                    style={[styles.customButton, { 
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                    }]}
-                    onPress={() => setShowCustomModal(true)}
-                    disabled={isAddingWater}
-                    activeOpacity={0.7}
-                    {...getButtonAccessibilityProps(t('water.custom_button'))}
-                  >
-                    <View style={styles.customButtonContent}>
-                      {/* Icon row: plus + droplet - droplet is main visual */}
-                      <View style={styles.customButtonIconRow}>
-                        <IconSymbol
-                          name="plus"
-                          size={Math.round(FontSize.sm * 0.7)} // Reduced by 30%
-                          color={colors.tint}
-                        />
-                        <IconSymbol
-                          name="drop.fill"
-                          size={Math.round(FontSize['4xl'] * 1.175 * 0.7)} // Reduced by 30% (42 * 0.7 = 29.4 → 29dp)
-                          color={waterTheme.accent}
-                          style={{ marginLeft: 0 }} // No spacing - icons touching
-                        />
-                      </View>
-                      {/* Label text */}
-                      <ThemedText style={[styles.customButtonText, { color: colors.text }]}>
-                        {t('water.quick_presets.custom')}
-                      </ThemedText>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-                
                 {/* Water Drop Gauge - centered */}
                 <View style={styles.dropletContainer}>
-                  <WaterDropGauge
-                    totalMl={totalMl}
-                    goalMl={goalMl}
-                    unitPreference={activeWaterUnit}
-                    size="large"
-                  />
+                  <Pressable
+                    onPress={openEditTotalModal}
+                    disabled={isAddingWater || isLoading}
+                    hitSlop={Spacing.sm}
+                    {...getButtonAccessibilityProps(t('water.edit_total.button'))}
+                  >
+                    <WaterDropGauge
+                      totalMl={totalMl}
+                      goalMl={goalMl}
+                      unitPreference={activeWaterUnit}
+                      size="large"
+                    />
+                  </Pressable>
                 </View>
               </View>
 
@@ -498,7 +463,7 @@ export default function WaterScreen() {
                     const BASE_SCALE = 1.0;
                     const scaleMultipliers = [
                       0.5,   // Index 0: smallest (50ml) - half height of base
-                      BASE_SCALE, // Index 1: base (250ml) - unchanged
+                      0.75,  // Index 1: base (250ml) - 25% smaller
                       1.2,   // Index 2: larger (500ml) - 20% bigger than base
                       1.45,  // Index 3: largest (1000ml) - 45% bigger than base (reduced from 1.5 to prevent bottom cutoff)
                     ];
@@ -535,12 +500,18 @@ export default function WaterScreen() {
                                   ]} 
                                 />
                               )}
-                              {/* Wrap 1000ml icon in View with translateY to raise it and prevent bottom cutoff */}
-                              <View style={index === 3 ? { transform: [{ translateY: -8 }] } : undefined}>
+                              {/* Tiny per-icon baseline nudge: 1000ml icon sits a touch lower due to its path geometry. */}
+                              <View
+                                style={
+                                  index === 3
+                                    ? { transform: [{ translateY: BOTTLE_LARGE_BASELINE_NUDGE_Y }] }
+                                    : undefined
+                                }
+                              >
                                 <AnimatedWaterIcon
                                   variant={iconVariant}
                                   isAnimating={isAnimating}
-                                  size={48} // Base icon size (40-48 dp range)
+                                  size={QUICK_ADD_ICON_SIZE}
                                   baseScale={iconScale} // Apply size multiplier
                                   color={colors.tint}
                                 />
@@ -561,6 +532,61 @@ export default function WaterScreen() {
                       </Pressable>
                     );
                   })}
+
+                  {/* Custom (5th button) - opens the custom modal, matches preset style */}
+                  <Pressable
+                    key="water-custom"
+                    style={({ pressed }) => [
+                      styles.quickAddControl,
+                      pressed && styles.quickAddControlPressed,
+                    ]}
+                    onPress={() => setShowCustomModal(true)}
+                    disabled={isAddingWater}
+                    hitSlop={Spacing.sm}
+                    {...getButtonAccessibilityProps(t('water.custom_button'))}
+                  >
+                    {({ pressed }) => (
+                      <View style={styles.quickAddControlContent}>
+                        <View style={styles.quickAddIconContainer}>
+                          {pressed && (
+                            <View
+                              style={[
+                                styles.quickAddIconHighlight,
+                                { backgroundColor: colors.tint + '20' },
+                              ]}
+                            />
+                          )}
+                          <View
+                            style={styles.quickAddCustomIconBox}
+                          >
+                            <IconSymbol
+                              name="drop.fill"
+                              size={Math.round(QUICK_ADD_ICON_SIZE * 0.8)}
+                              color={waterTheme.accent}
+                            />
+                            <View
+                              style={styles.quickAddCustomPlusOverlay}
+                            >
+                              <IconSymbol
+                                name="plus"
+                                size={Math.round(FontSize.sm * 0.9)}
+                                color={colors.tint}
+                              />
+                            </View>
+                          </View>
+                        </View>
+                        <ThemedText
+                          style={[
+                            styles.quickAddControlText,
+                            { color: pressed ? colors.tint : colors.text },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {t('water.quick_presets.custom')}
+                        </ThemedText>
+                      </View>
+                    )}
+                  </Pressable>
                 </View>
               </View>
             </>
@@ -973,36 +999,6 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
     minHeight: 280, // Ensure enough space for droplet
   },
-  editTotalButtonContainer: {
-    position: 'absolute',
-    top: Spacing.xs,
-    left: 0,
-    zIndex: 10,
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: Spacing.xs,
-  },
-  editTotalButton: {
-    paddingHorizontal: Spacing.md, // Increased from sm (~25% larger)
-    paddingVertical: Spacing.sm, // Increased from xs (~25% larger)
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...getMinTouchTargetStyle(),
-  },
-  editTotalButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-  },
-  editTotalButtonText: {
-    fontSize: FontSize.sm, // Increased from xs (~25% larger)
-    fontWeight: FontWeight.medium,
-    textAlign: 'center',
-    lineHeight: FontSize.sm * 1.5, // Use theme line height
-  },
   customButton: {
     paddingHorizontal: Math.round(Spacing.xs * 0.7), // Reduced by 30%
     paddingVertical: Math.round((Spacing.xs / 4) * 0.7), // Reduced by 30%
@@ -1046,8 +1042,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start', // Align from top - bottom alignment handled inside each preset
-    gap: Spacing.sm, // Use gap-based spacing for even distribution
-    paddingHorizontal: Spacing.xs, // Small horizontal padding
+    gap: Math.round(Spacing.xs / 2), // Tighter spacing so 5 buttons fit on one row
+    paddingHorizontal: 0, // Remove extra horizontal padding so 5 buttons fit
   },
   quickAddControl: {
     flex: 1, // Each control takes equal space (4 controls fill the row)
@@ -1066,9 +1062,9 @@ const styles = StyleSheet.create({
     width: '100%', // Full width of control
   },
   quickAddIconContainer: {
-    // Fixed height icon area - accommodates tallest icon (1.5x scale = 72dp)
-    // Base icon size 48dp * max scale 1.5 = 72dp, using 80dp for safety margin
-    height: Spacing['6xl'] + Spacing.lg, // Fixed height: 80dp - all icons align at bottom
+    // Fixed height icon area - accommodates tallest icon (base QUICK_ADD_ICON_SIZE * max scale ~1.45, plus press pulse)
+    // Old: 80dp for 48dp icons. Increase by ~20% to avoid clipping after bumping icon size.
+    height: Math.round((Spacing['6xl'] + Spacing.lg) * 1.2), // ~96dp - all icons align at bottom
     width: '100%', // Full width of control
     justifyContent: 'flex-end', // Bottom-align icons within this area
     alignItems: 'center', // Center horizontally
@@ -1079,19 +1075,32 @@ const styles = StyleSheet.create({
   },
   quickAddIconHighlight: {
     position: 'absolute',
-    width: Spacing['6xl'] + Spacing.lg + Spacing.sm, // Slightly larger than container for subtle glow
-    height: Spacing['6xl'] + Spacing.lg + Spacing.sm,
-    borderRadius: (Spacing['6xl'] + Spacing.lg + Spacing.sm) / 2, // Circular highlight
+    width: Math.round((Spacing['6xl'] + Spacing.lg + Spacing.sm) * 1.2), // Slightly larger than container for subtle glow
+    height: Math.round((Spacing['6xl'] + Spacing.lg + Spacing.sm) * 1.2),
+    borderRadius: Math.round((Spacing['6xl'] + Spacing.lg + Spacing.sm) * 1.2) / 2, // Circular highlight
     opacity: 0.3,
   },
   quickAddControlText: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
     textAlign: 'center',
-    lineHeight: FontSize.xs * 1.5, // Use theme line height
+    lineHeight: FontSize.sm * 1.5, // Use theme line height
     marginTop: Spacing.xs, // Fixed gap between icon area and label - prevents overlap
     marginBottom: 0, // No bottom margin
     padding: 0, // No padding
+  },
+  quickAddCustomIconBox: {
+    width: QUICK_ADD_ICON_SIZE,
+    height: QUICK_ADD_ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  quickAddCustomPlusOverlay: {
+    position: 'absolute',
+    // Move closer to the droplet so it overlaps more (visual “custom add” mark)
+    top: CUSTOM_PLUS_TOP,
+    left: CUSTOM_PLUS_LEFT,
   },
   stats: {
     alignItems: 'center',
@@ -1108,21 +1117,6 @@ const styles = StyleSheet.create({
   formHelper: {
     fontSize: FontSize.xs,
     marginTop: Spacing.xs,
-  },
-  customButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
-    ...getMinTouchTargetStyle(),
-  },
-  customButtonText: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
   },
   modalOverlay: {
     flex: 1,
