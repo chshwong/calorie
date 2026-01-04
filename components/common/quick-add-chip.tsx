@@ -14,7 +14,7 @@
  */
 
 import { useRef } from 'react';
-import { TouchableOpacity, Animated, Platform, StyleSheet, StyleProp, TextStyle } from 'react-native';
+import { TouchableOpacity, Animated, Platform, StyleSheet, StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
@@ -29,9 +29,10 @@ type QuickAddChipProps = {
   onPress: () => void;
   textStyle?: StyleProp<TextStyle>;
   disabled?: boolean;
+  chipStyle?: StyleProp<ViewStyle>;
 };
 
-export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle, disabled = false }: QuickAddChipProps) {
+export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle, disabled = false, chipStyle }: QuickAddChipProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Visual feedback only - scale down on press in
@@ -67,7 +68,7 @@ export function QuickAddChip({ label, icon, metadata, colors, onPress, textStyle
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={[styles.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: disabled ? 0.5 : 1 }]}
+        style={[styles.chip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: disabled ? 0.5 : 1 }, chipStyle]}
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}

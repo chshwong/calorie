@@ -283,6 +283,9 @@ export const Colors = {
     
     // Semantic (spread from SemanticColors)
     ...SemanticColors,
+    // Override info color for dark mode - brighter blue for better contrast on dark backgrounds
+    info: '#60A5FA', // Brighter blue-400 for dark mode (meets WCAG 4.5:1 contrast)
+    infoLight: '#60A5FA20', // Light variant with same opacity pattern
   },
 };
 

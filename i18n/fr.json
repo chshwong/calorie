@@ -1597,7 +1597,7 @@
     "title": "Exercice",
     "today_title": "Exercice d'aujourd'hui",
     "quick_add_title": "Ajout rapide",
-    "recent_days_title": "Jours récents",
+    "recent_days_title": "7 derniers jours",
     "summary": {
       "total": "Total : {{minutes}} min ({{count}} {{activities}})",
       "activity_one": "activité",

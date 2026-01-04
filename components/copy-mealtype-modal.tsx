@@ -20,6 +20,9 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 
+// Import i18n for locale detection
+import i18n from '@/i18n';
+
 export type TransferMode = 'copy' | 'move';
 
 type CopyMealtypeModalProps = {
@@ -29,6 +32,8 @@ type CopyMealtypeModalProps = {
   sourceDate: Date;
   /** Minimum selectable date (e.g. user's signup day). If provided, days before it are disabled. */
   minimumDate?: Date;
+  /** Maximum selectable date (e.g. today). If provided, days after it are disabled. */
+  maximumDate?: Date;
   sourceMealType: string;
   isLoading?: boolean;
   mode?: TransferMode; // 'copy' or 'move'
@@ -46,6 +51,7 @@ export function CopyMealtypeModal({
   onConfirm,
   sourceDate,
   minimumDate,
+  maximumDate,
   sourceMealType,
   isLoading = false,
   mode = 'copy',
@@ -78,12 +84,20 @@ export function CopyMealtypeModal({
     return d;
   })();
 
-  // Default target date to tomorrow (clamped to minimumDate if provided)
+  const maxDate = (() => {
+    if (!maximumDate) return undefined;
+    const d = new Date(maximumDate);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+
+  // Default target date to tomorrow (clamped to minimumDate or maximumDate if provided)
   const getDefaultTargetDate = () => {
     const tomorrow = new Date(sourceDate);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
     if (minDate && tomorrow < minDate) return new Date(minDate);
+    if (maxDate && tomorrow > maxDate) return new Date(maxDate);
     return tomorrow;
   };
 
@@ -101,7 +115,7 @@ export function CopyMealtypeModal({
       setCalendarViewMonth(new Date(defaultDate));
       setIncludeNotes(false); // Reset to "Exclude Notes" (default)
     }
-  }, [visible, sourceDate, sourceMealType, minimumDate]);
+  }, [visible, sourceDate, sourceMealType, minimumDate, maximumDate]);
 
   // Calendar helper functions
   const generateCalendarDays = (viewMonth: Date) => {
@@ -139,6 +153,12 @@ export function CopyMealtypeModal({
   const handleNextMonth = () => {
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() + 1);
+    // Prevent navigating to months after maximum date
+    if (maxDate) {
+      const newMonthFirst = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      const maxMonthFirst = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+      if (newMonthFirst > maxMonthFirst) return;
+    }
     setCalendarViewMonth(newMonth);
   };
 
@@ -146,6 +166,7 @@ export function CopyMealtypeModal({
     const selectedDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
     selectedDate.setHours(0, 0, 0, 0);
     if (minDate && selectedDate < minDate) return;
+    if (maxDate && selectedDate > maxDate) return;
     setTargetDate(selectedDate);
   };
 
@@ -162,7 +183,8 @@ export function CopyMealtypeModal({
   };
 
   const formatDateLabel = (date: Date): string => {
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
+    return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
@@ -360,7 +382,7 @@ export function CopyMealtypeModal({
                   <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>←</ThemedText>
                 </TouchableOpacity>
                 <ThemedText style={[styles.calendarMonthLabel, { color: colors.text }]}>
-                  {calendarViewMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                  {calendarViewMonth.toLocaleDateString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', { month: 'long', year: 'numeric' })}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={handleNextMonth}
@@ -370,6 +392,13 @@ export function CopyMealtypeModal({
                     Platform.OS === 'web' && getFocusStyle(colors.tint),
                   ]}
                   activeOpacity={0.7}
+                  disabled={maxDate ? (() => {
+                    const nextMonth = new Date(calendarViewMonth);
+                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                    const nextMonthFirst = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1);
+                    const maxMonthFirst = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+                    return nextMonthFirst > maxMonthFirst;
+                  })() : false}
                   {...getButtonAccessibilityProps(t('home.date_picker.next_month'))}
                 >
                   <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>→</ThemedText>
@@ -398,6 +427,8 @@ export function CopyMealtypeModal({
                   const dayDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
                   dayDate.setHours(0, 0, 0, 0);
                   const isBeforeMin = !!minDate && dayDate < minDate;
+                  const isAfterMax = !!maxDate && dayDate > maxDate;
+                  const isDisabled = isBeforeMin || isAfterMax;
 
                   return (
                     <TouchableOpacity
@@ -405,17 +436,17 @@ export function CopyMealtypeModal({
                       style={[
                         styles.calendarDay,
                         isSelectedDay && { backgroundColor: colors.tint },
-                        isBeforeMin && { opacity: 0.35 },
+                        isDisabled && { opacity: 0.35 },
                       ]}
                       onPress={() => handleDateSelect(day)}
                       activeOpacity={0.7}
-                      disabled={isBeforeMin}
-                      {...getButtonAccessibilityProps(`Select ${day}`, undefined, isBeforeMin)}
+                      disabled={isDisabled}
+                      {...getButtonAccessibilityProps(`Select ${day}`, undefined, isDisabled)}
                     >
                       <ThemedText
                         style={[
                           styles.calendarDayText,
-                          { color: isSelectedDay ? '#fff' : colors.text },
+                          { color: isSelectedDay ? colors.textInverse : colors.text },
                           isSelectedDay && styles.calendarDayTextSelected,
                         ]}
                       >
@@ -456,7 +487,7 @@ export function CopyMealtypeModal({
                 styles.confirmButton,
                 { backgroundColor: colors.tint },
                 getMinTouchTargetStyle(),
-                Platform.OS === 'web' && getFocusStyle('#fff'),
+                Platform.OS === 'web' && getFocusStyle(colors.textInverse),
               ]}
               onPress={handleConfirm}
               disabled={isLoading}
@@ -464,9 +495,9 @@ export function CopyMealtypeModal({
               {...getButtonAccessibilityProps(buttonText)}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.textInverse} />
               ) : (
-                <Text style={[styles.confirmButtonText, { color: '#fff' }]}>
+                <Text style={[styles.confirmButtonText, { color: colors.textInverse }]}>
                   {buttonText}
                 </Text>
               )}
@@ -651,6 +682,7 @@ const styles = StyleSheet.create({
   },
   calendarDayTextSelected: {
     fontWeight: '600',
+    // Color is set inline via colors.textInverse
   },
   modalFooter: {
     flexDirection: 'row',

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Modal, TouchableOpacity, TextInput, Platform, Animated, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, SemanticColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
@@ -17,10 +17,13 @@ type RepsRangeBottomSheetProps = {
 };
 
 const REPS_PRESETS = [
+  { min: 4, max: 7 },
   { min: 6, max: 10 },
   { min: 8, max: 12 },
   { min: 10, max: 15 },
   { min: 15, max: 20 },
+  { min: 20, max: 30 },
+  { min: 30, max: 50 },
 ];
 
 export function RepsRangeBottomSheet({
@@ -35,6 +38,42 @@ export function RepsRangeBottomSheet({
   const [repsMin, setRepsMin] = useState<string>('');
   const [repsMax, setRepsMax] = useState<string>('');
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+
+  // Validate both fields are filled correctly
+  const isValid = useMemo(() => {
+    const minTrimmed = repsMin.trim();
+    const maxTrimmed = repsMax.trim();
+
+    // Both fields must be non-empty
+    if (!minTrimmed || !maxTrimmed) {
+      return false;
+    }
+
+    // Both must parse to valid numbers
+    const min = parseInt(minTrimmed, 10);
+    const max = parseInt(maxTrimmed, 10);
+
+    if (isNaN(min) || isNaN(max)) {
+      return false;
+    }
+
+    // Min must be within valid range
+    if (min < RANGES.EXERCISE_REPS_MIN.MIN || min > RANGES.EXERCISE_REPS_MIN.MAX) {
+      return false;
+    }
+
+    // Max must be within valid range
+    if (max < RANGES.EXERCISE_REPS_MAX.MIN || max > RANGES.EXERCISE_REPS_MAX.MAX) {
+      return false;
+    }
+
+    // Min must be <= Max
+    if (min > max) {
+      return false;
+    }
+
+    return true;
+  }, [repsMin, repsMax]);
 
   useEffect(() => {
     if (visible) {
@@ -209,7 +248,7 @@ export function RepsRangeBottomSheet({
                   <QuickAddChip
                     key={index}
                     label={`${preset.min}–${preset.max}`}
-                    colors={colors}
+                    colors={colors as typeof Colors.light}
                     textStyle={{ fontSize: FontSize.sm }}
                     onPress={() => handlePreset(preset.min, preset.max)}
                   />
@@ -229,7 +268,7 @@ export function RepsRangeBottomSheet({
                     onPress={() => adjustValue('min', -1)}
                     {...getButtonAccessibilityProps('Decrease min reps')}
                   >
-                    <IconSymbol name="minus" size={16} color={colors.text} />
+                    <ThemedText style={[styles.minusSign, { color: colors.text }]}>−</ThemedText>
                   </TouchableOpacity>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
@@ -260,7 +299,7 @@ export function RepsRangeBottomSheet({
                     onPress={() => adjustValue('max', -1)}
                     {...getButtonAccessibilityProps('Decrease max reps')}
                   >
-                    <IconSymbol name="minus" size={16} color={colors.text} />
+                    <ThemedText style={[styles.minusSign, { color: colors.text }]}>−</ThemedText>
                   </TouchableOpacity>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
@@ -285,18 +324,36 @@ export function RepsRangeBottomSheet({
             {/* Action buttons */}
             <View style={styles.actions}>
               <TouchableOpacity
-                style={[styles.button, styles.clearButton, { borderColor: colors.border }]}
+                style={[styles.trashButton, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                 onPress={handleClear}
+                {...(Platform.OS === 'web' && getFocusStyle(SemanticColors.error))}
                 {...getButtonAccessibilityProps('Clear reps')}
               >
-                <ThemedText style={{ color: colors.text }}>Clear</ThemedText>
+                <IconSymbol name="trash.fill" size={20} color={SemanticColors.error} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.button, styles.saveButton, { backgroundColor: colors.tint }]}
+                style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+                onPress={onClose}
+                {...getButtonAccessibilityProps('Cancel')}
+              >
+                <ThemedText style={{ color: colors.text }}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.saveButton,
+                  {
+                    backgroundColor: isValid ? colors.tint : colors.backgroundSecondary,
+                    opacity: isValid ? 1 : 0.5,
+                  },
+                ]}
                 onPress={handleSave}
+                disabled={!isValid}
                 {...getButtonAccessibilityProps('Save reps')}
               >
-                <ThemedText style={{ color: colors.textInverse }}>Save</ThemedText>
+                <ThemedText style={{ color: isValid ? colors.textInverse : colors.textSecondary }}>
+                  Save
+                </ThemedText>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -383,6 +440,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...getMinTouchTargetStyle(),
   },
+  minusSign: {
+    fontSize: 24,
+    fontWeight: '600',
+    lineHeight: 24,
+  },
   input: {
     flex: 1,
     padding: Spacing.md,
@@ -395,6 +457,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: Spacing.md,
+    alignItems: 'center',
   },
   button: {
     flex: 1,
@@ -404,7 +467,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...getMinTouchTargetStyle(),
   },
-  clearButton: {
+  trashButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  cancelButton: {
     borderWidth: 1,
     backgroundColor: 'transparent',
   },

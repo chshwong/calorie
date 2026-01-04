@@ -18,11 +18,16 @@ import {
   getFocusStyle,
 } from '@/utils/accessibility';
 
+// Import i18n for locale detection
+import i18n from '@/i18n';
+
 type CloneDayModalProps = {
   visible: boolean;
   onClose: () => void;
   onConfirm: (targetDate: Date) => void;
   sourceDate: Date;
+  minimumDate?: Date;
+  maximumDate?: Date;
   isLoading?: boolean;
   title?: string;
   subtitle?: string;
@@ -37,6 +42,8 @@ export function CloneDayModal({
   onClose,
   onConfirm,
   sourceDate,
+  minimumDate,
+  maximumDate,
   isLoading = false,
   title,
   subtitle,
@@ -46,25 +53,44 @@ export function CloneDayModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  // Default target date to tomorrow
+  // Default target date to tomorrow (or minimum date if tomorrow is before minimum date, or maximum date if tomorrow is after maximum date)
   const getDefaultTargetDate = () => {
     const tomorrow = new Date(sourceDate);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
+    
+    // If minimumDate is set and tomorrow is before it, use minimumDate instead
+    if (minimumDate) {
+      const minDateNormalized = new Date(minimumDate);
+      minDateNormalized.setHours(0, 0, 0, 0);
+      if (tomorrow.getTime() < minDateNormalized.getTime()) {
+        return minDateNormalized;
+      }
+    }
+    
+    // If maximumDate is set and tomorrow is after it, use maximumDate instead
+    if (maximumDate) {
+      const maxDateNormalized = new Date(maximumDate);
+      maxDateNormalized.setHours(0, 0, 0, 0);
+      if (tomorrow.getTime() > maxDateNormalized.getTime()) {
+        return maxDateNormalized;
+      }
+    }
+    
     return tomorrow;
   };
 
   const [targetDate, setTargetDate] = useState<Date>(getDefaultTargetDate());
   const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => new Date(targetDate));
 
-  // Update target date when source date changes
+  // Update target date when source date, minimum date, or maximum date changes
   useEffect(() => {
     if (visible) {
       const defaultDate = getDefaultTargetDate();
       setTargetDate(defaultDate);
       setCalendarViewMonth(new Date(defaultDate));
     }
-  }, [visible, sourceDate]);
+  }, [visible, sourceDate, minimumDate, maximumDate]);
 
   // Calendar helper functions
   const generateCalendarDays = (viewMonth: Date) => {
@@ -91,12 +117,24 @@ export function CloneDayModal({
   const handlePreviousMonth = () => {
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() - 1);
+    // Prevent navigating to months before minimum date
+    if (minimumDate) {
+      const newMonthFirst = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      const minMonthFirst = new Date(minimumDate.getFullYear(), minimumDate.getMonth(), 1);
+      if (newMonthFirst < minMonthFirst) return;
+    }
     setCalendarViewMonth(newMonth);
   };
 
   const handleNextMonth = () => {
     const newMonth = new Date(calendarViewMonth);
     newMonth.setMonth(newMonth.getMonth() + 1);
+    // Prevent navigating to months after maximum date
+    if (maximumDate) {
+      const newMonthFirst = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      const maxMonthFirst = new Date(maximumDate.getFullYear(), maximumDate.getMonth(), 1);
+      if (newMonthFirst > maxMonthFirst) return;
+    }
     setCalendarViewMonth(newMonth);
   };
 
@@ -170,7 +208,7 @@ export function CloneDayModal({
             {/* Selected Date Display */}
             <View style={[styles.selectedDateContainer, { borderBottomColor: colors.separator }]}>
               <ThemedText style={[styles.selectedDateText, { color: colors.text }]}>
-                {targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {targetDate.toLocaleDateString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </ThemedText>
             </View>
 
@@ -187,13 +225,20 @@ export function CloneDayModal({
                     Platform.OS === 'web' && getFocusStyle(colors.tint),
                   ]}
                   activeOpacity={0.7}
+                  disabled={minimumDate ? (() => {
+                    const prevMonth = new Date(calendarViewMonth);
+                    prevMonth.setMonth(prevMonth.getMonth() - 1);
+                    const prevMonthFirst = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+                    const minMonthFirst = new Date(minimumDate.getFullYear(), minimumDate.getMonth(), 1);
+                    return prevMonthFirst < minMonthFirst;
+                  })() : false}
                   {...getButtonAccessibilityProps(t('home.date_picker.previous_month'))}
                 >
                   <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>←</ThemedText>
                 </TouchableOpacity>
                 <View style={styles.calendarMonthYear}>
                   <ThemedText style={[styles.calendarMonthYearText, { color: colors.text }]}>
-                    {calendarViewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {calendarViewMonth.toLocaleDateString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', { month: 'long', year: 'numeric' })}
                   </ThemedText>
                 </View>
                 <TouchableOpacity
@@ -204,6 +249,13 @@ export function CloneDayModal({
                     Platform.OS === 'web' && getFocusStyle(colors.tint),
                   ]}
                   activeOpacity={0.7}
+                  disabled={maximumDate ? (() => {
+                    const nextMonth = new Date(calendarViewMonth);
+                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                    const nextMonthFirst = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1);
+                    const maxMonthFirst = new Date(maximumDate.getFullYear(), maximumDate.getMonth(), 1);
+                    return nextMonthFirst > maxMonthFirst;
+                  })() : false}
                   {...getButtonAccessibilityProps(t('home.date_picker.next_month'))}
                 >
                   <ThemedText style={[styles.calendarNavArrow, { color: colors.text }]}>→</ThemedText>
@@ -236,6 +288,22 @@ export function CloneDayModal({
                   const sourceDateNormalized = new Date(sourceDate);
                   sourceDateNormalized.setHours(0, 0, 0, 0);
                   const isSameAsSource = dayDate.getTime() === sourceDateNormalized.getTime();
+                  
+                  // Check if this date is before the minimum allowed date (should be disabled)
+                  const isBeforeMinDate = minimumDate ? (() => {
+                    const minDateNormalized = new Date(minimumDate);
+                    minDateNormalized.setHours(0, 0, 0, 0);
+                    return dayDate.getTime() < minDateNormalized.getTime();
+                  })() : false;
+                  
+                  // Check if this date is after the maximum allowed date (should be disabled)
+                  const isAfterMaxDate = maximumDate ? (() => {
+                    const maxDateNormalized = new Date(maximumDate);
+                    maxDateNormalized.setHours(0, 0, 0, 0);
+                    return dayDate.getTime() > maxDateNormalized.getTime();
+                  })() : false;
+                  
+                  const isDisabled = isSameAsSource || isBeforeMinDate || isAfterMaxDate;
 
                   return (
                     <TouchableOpacity
@@ -243,17 +311,17 @@ export function CloneDayModal({
                       style={[
                         styles.calendarDay,
                         isSelectedDay && { backgroundColor: colors.tint },
-                        isSameAsSource && { opacity: 0.3 },
+                        isDisabled && { opacity: 0.3 },
                       ]}
-                      onPress={() => !isSameAsSource && handleDateSelect(day)}
-                      disabled={isSameAsSource}
+                      onPress={() => !isDisabled && handleDateSelect(day)}
+                      disabled={isDisabled}
                       activeOpacity={0.7}
                       {...getButtonAccessibilityProps(`Select ${day}`)}
                     >
                       <ThemedText
                         style={[
                           styles.calendarDayText,
-                          { color: isSelectedDay ? '#fff' : colors.text },
+                          { color: isSelectedDay ? colors.textInverse : colors.text },
                           isSelectedDay && styles.calendarDayTextSelected,
                         ]}
                       >
@@ -294,7 +362,7 @@ export function CloneDayModal({
                   styles.confirmButton,
                   { backgroundColor: colors.tint },
                   getMinTouchTargetStyle(),
-                  Platform.OS === 'web' && getFocusStyle('#fff'),
+                  Platform.OS === 'web' && getFocusStyle(colors.textInverse),
                 ]}
                 onPress={handleConfirm}
                 disabled={isLoading}
@@ -302,9 +370,9 @@ export function CloneDayModal({
                 {...getButtonAccessibilityProps(confirmButtonText || t('meds.clone.confirm'))}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.textInverse} />
                 ) : (
-                  <Text style={styles.confirmButtonText}>
+                  <Text style={[styles.confirmButtonText, { color: colors.textInverse }]}>
                     {confirmButtonText || t('meds.clone.confirm')}
                   </Text>
                 )}
@@ -443,7 +511,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   calendarDayTextSelected: {
-    color: '#fff',
+    // Color is set inline via colors.textInverse
     fontWeight: '600',
   },
   modalFooter: {
@@ -474,9 +542,9 @@ const styles = StyleSheet.create({
     // backgroundColor set inline
   },
   confirmButtonText: {
-    color: '#fff',
     fontSize: FontSize.base,
     fontWeight: '600',
+    // Color is set inline via colors.textInverse
   },
 });
 

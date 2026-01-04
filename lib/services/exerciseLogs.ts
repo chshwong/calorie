@@ -89,18 +89,20 @@ export async function getExerciseLogsForDate(
 }
 
 /**
- * Fetch exercise summary for recent days
+ * Fetch exercise summary for recent days from daily_sum_exercises table
  * 
  * @param userId - The user's ID
  * @param days - Number of recent days to fetch (default: 7)
- * @returns Array of objects with date, total_minutes, and activity_count
+ * @param userCreatedAt - User's signup timestamp (ISO string) to filter dates before signup
+ * @returns Array of objects with date, total_minutes, activity_count, cardio_count, cardio_distance_km, strength_count
  * 
- * Required index: exercise_log_user_date_idx ON exercise_log(user_id, date)
+ * Required index: daily_sum_exercises_user_date_desc_idx ON daily_sum_exercises(user_id, date DESC)
  */
 export async function getExerciseSummaryForRecentDays(
   userId: string,
-  days: number = 7
-): Promise<Array<{ date: string; total_minutes: number; activity_count: number }>> {
+  days: number = 7,
+  userCreatedAt?: string | null
+): Promise<Array<{ date: string; total_minutes: number; activity_count: number; cardio_count: number; cardio_distance_km: number; strength_count: number }>> {
   if (!userId) {
     return [];
   }
@@ -112,12 +114,20 @@ export async function getExerciseSummaryForRecentDays(
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - (days - 1));
 
+    // Calculate minimum allowed date from user signup
+    let minDateKey: string | null = null;
+    if (userCreatedAt) {
+      const { getMinAllowedDateKeyFromSignupAt } = await import('@/lib/date-guard');
+      minDateKey = getMinAllowedDateKeyFromSignupAt(userCreatedAt);
+    }
+
     const startDateString = getLocalDateKey(startDate);
     const endDateString = getLocalDateKey(endDate);
 
+    // Query daily_sum_exercises table
     const { data, error } = await supabase
-      .from('exercise_log')
-      .select('date, minutes, category')
+      .from('daily_sum_exercises')
+      .select('date, activity_count, cardio_minutes, cardio_count, cardio_distance_km, strength_count')
       .eq('user_id', userId)
       .gte('date', startDateString)
       .lte('date', endDateString)
@@ -128,35 +138,54 @@ export async function getExerciseSummaryForRecentDays(
       return [];
     }
 
-    // Aggregate by date
-    // Total minutes only counts cardio/mind-body exercises (strength uses sets/reps)
-    // Activity count includes all exercises regardless of category
-    const summaryMap = new Map<string, { total_minutes: number; activity_count: number }>();
+    // Map to UI shape and convert numeric string to number for cardio_distance_km
+    let summaryArray = (data || []).map((row) => ({
+      date: row.date,
+      total_minutes: row.cardio_minutes || 0,
+      activity_count: row.activity_count || 0,
+      cardio_count: row.cardio_count || 0,
+      cardio_distance_km: typeof row.cardio_distance_km === 'string' 
+        ? parseFloat(row.cardio_distance_km) 
+        : (row.cardio_distance_km || 0),
+      strength_count: row.strength_count || 0,
+    }));
 
-    (data || []).forEach((log) => {
-      const date = log.date;
-      // Only count minutes for cardio/mind-body exercises
-      const minutes = (log.category === 'cardio_mind_body' && log.minutes) ? log.minutes : 0;
+    // Filter out dates before user signup
+    if (minDateKey) {
+      summaryArray = summaryArray.filter(item => item.date >= minDateKey!);
+    }
 
-      if (!summaryMap.has(date)) {
-        summaryMap.set(date, { total_minutes: 0, activity_count: 0 });
+    // Fill missing days with empty entries for consistent UI, but only for dates >= signup date
+    const dateMap = new Map(summaryArray.map(item => [item.date, item]));
+    const allDates: string[] = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(endDate);
+      date.setDate(date.getDate() - i);
+      const dateKey = getLocalDateKey(date);
+      // Only include dates that are >= signup date
+      if (!minDateKey || dateKey >= minDateKey) {
+        allDates.push(dateKey);
       }
+    }
+    allDates.reverse(); // Start with oldest, end with today
 
-      const summary = summaryMap.get(date)!;
-      summary.total_minutes += minutes;
-      summary.activity_count += 1;
+    const filledArray = allDates.map((date) => {
+      if (dateMap.has(date)) {
+        return dateMap.get(date)!;
+      }
+      // Missing day - return empty entry
+      return {
+        date,
+        total_minutes: 0,
+        activity_count: 0,
+        cardio_count: 0,
+        cardio_distance_km: 0,
+        strength_count: 0,
+      };
     });
 
-    // Convert to array and sort by date descending
-    const summaryArray = Array.from(summaryMap.entries())
-      .map(([date, summary]) => ({
-        date,
-        total_minutes: summary.total_minutes,
-        activity_count: summary.activity_count,
-      }))
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    return summaryArray;
+    // Sort by date descending (newest first)
+    return filledArray.sort((a, b) => b.date.localeCompare(a.date));
   } catch (error) {
     console.error('Exception fetching exercise summary:', error);
     return [];

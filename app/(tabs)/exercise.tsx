@@ -79,6 +79,22 @@ const formatDistanceForDisplay = (value: number): number => {
   return rounded;
 };
 
+/**
+ * Format minutes as "#h#m" (e.g., 522 minutes -> "8h42m", 42 minutes -> "42m", 8 hours -> "8h")
+ */
+const formatMinutesAsHoursMinutes = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h${minutes}m`;
+  } else if (hours > 0) {
+    return `${hours}h`;
+  } else {
+    return `${minutes}m`;
+  }
+};
+
 // Preset exercises with category
 type ExercisePreset = {
   label: string; // Display label with emoji (stored in DB)
@@ -169,6 +185,14 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isNarrow = width < NARROW_SCREEN_BREAKPOINT;
+  const colorScheme = useColorScheme();
+  
+  // Exercise module orange theme colors for chips
+  // Use darker orange for light mode for better contrast, brighter for dark mode
+  const exerciseOrange = colorScheme === 'dark' 
+    ? ModuleThemes.exercise.accent // #F59E0B for dark mode
+    : '#D97706'; // Darker orange-600 for light mode (better contrast on light backgrounds)
+  const exerciseOrangeLight = exerciseOrange + '20'; // Light variant with opacity
   
   const rowStyle = animationValue
     ? {
@@ -186,13 +210,17 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
 
   const categoryIcon = log.category === 'cardio_mind_body' ? 'figure.run' : 'dumbbell.fill';
   const repsDisplay = log.reps_min !== null && log.reps_max !== null 
-    ? `${log.reps_min}–${log.reps_max}` 
+    ? log.reps_min === log.reps_max 
+      ? `${log.reps_min}` 
+      : `${log.reps_min}–${log.reps_max}` 
     : null;
+  // NOTE: Hardcoded per user request - exact emoji labels required (🟢Low, 🟡Med, 🟠Hi, 🔴Max)
+  // Future: Consider moving to i18n if internationalization needed
   const intensityLabels: Record<'low' | 'medium' | 'high' | 'max', string> = {
-    low: 'Low',
-    medium: 'Med',
-    high: 'High',
-    max: 'Max',
+    low: '🟢Low',
+    medium: '🟡Med',
+    high: '🟠Hi',
+    max: '🔴Max',
   };
   const intensityDisplay = log.intensity ? intensityLabels[log.intensity] : null;
 
@@ -261,11 +289,12 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                 allowNull
                 disabled={disabled}
                 colors={colors}
-                badgeBackgroundColor={colors.infoLight}
-                badgeBorderColor={colors.info}
-                badgeTextColor={colors.info}
+                badgeBackgroundColor={exerciseOrangeLight}
+                badgeBorderColor={exerciseOrange}
+                badgeTextColor={exerciseOrange}
                 accessibilityLabel={t('exercise.chip.edit_minutes')}
                 commitOnBlur
+                chipPaddingHorizontal={Spacing.xs}
               />
               <InlineEditableNumberChip
                 value={
@@ -295,11 +324,13 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                 allowNull
                 disabled={disabled}
                 colors={colors}
-                badgeBackgroundColor={colors.infoLight}
-                badgeBorderColor={colors.info}
-                badgeTextColor={colors.info}
+                badgeBackgroundColor={exerciseOrangeLight}
+                badgeBorderColor={exerciseOrange}
+                badgeTextColor={exerciseOrange}
                 accessibilityLabel={t('exercise.chip.edit_distance', { unit: distanceUnit })}
                 commitOnBlur
+                chipPaddingHorizontal={Spacing.xs}
+                allowDecimal={true}
               />
               <TouchableOpacity
                 onPress={() => onIntensityUpdate(log.id)}
@@ -307,16 +338,16 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                 style={[
                   styles.repsIntensityChip,
                   {
-                    backgroundColor: intensityDisplay ? colors.infoLight : colors.backgroundSecondary,
-                    borderColor: intensityDisplay ? colors.info : colors.separator,
+                    backgroundColor: intensityDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
+                    borderColor: intensityDisplay ? exerciseOrange : colors.separator,
                   },
                   disabled && { opacity: 0.6 },
                 ]}
                 activeOpacity={0.7}
-                {...(Platform.OS === 'web' && getFocusStyle(colors.info))}
+                {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
                 {...getButtonAccessibilityProps(intensityDisplay ? t('exercise.chip.edit_intensity_with_value', { value: intensityDisplay }) : t('exercise.chip.add_intensity'))}
               >
-                <ThemedText style={[styles.repsIntensityText, { color: intensityDisplay ? colors.info : colors.textSecondary }]}>
+                <ThemedText style={[styles.repsIntensityText, { color: intensityDisplay ? exerciseOrange : colors.textSecondary }]}>
                   {intensityDisplay || t('exercise.chip.add_intensity')}
                 </ThemedText>
               </TouchableOpacity>
@@ -328,18 +359,19 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                 <InlineEditableNumberChip
                   value={log.sets}
                   onCommit={(next) => onSetsUpdate(log.id, next)}
-                  unitSuffix="sets"
+                  unitSuffix="x"
                   placeholder={t('exercise.chip.add_sets')}
                   min={RANGES.EXERCISE_SETS.MIN}
                   max={RANGES.EXERCISE_SETS.MAX}
                   allowNull
                   disabled={disabled}
                   colors={colors}
-                  badgeBackgroundColor={colors.infoLight}
-                  badgeBorderColor={colors.info}
-                  badgeTextColor={colors.info}
+                  badgeBackgroundColor={exerciseOrangeLight}
+                  badgeBorderColor={exerciseOrange}
+                  badgeTextColor={exerciseOrange}
                   accessibilityLabel={t('exercise.chip.edit_sets')}
                   commitOnBlur
+                  chipPaddingHorizontal={Spacing.xs}
                 />
                 <TouchableOpacity
                   onPress={() => onRepsUpdate(log.id)}
@@ -347,16 +379,16 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                   style={[
                     styles.repsIntensityChip,
                     {
-                      backgroundColor: repsDisplay ? colors.infoLight : colors.backgroundSecondary,
-                      borderColor: repsDisplay ? colors.info : colors.separator,
+                      backgroundColor: repsDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
+                      borderColor: repsDisplay ? exerciseOrange : colors.separator,
                     },
                     disabled && { opacity: 0.6 },
                   ]}
                   activeOpacity={0.7}
-                  {...(Platform.OS === 'web' && getFocusStyle(colors.info))}
+                  {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
                   {...getButtonAccessibilityProps(repsDisplay ? t('exercise.chip.edit_reps_with_value', { value: repsDisplay }) : t('exercise.chip.add_reps'))}
                 >
-                  <ThemedText style={[styles.repsIntensityText, { color: repsDisplay ? colors.info : colors.textSecondary }]}>
+                  <ThemedText style={[styles.repsIntensityText, { color: repsDisplay ? exerciseOrange : colors.textSecondary }]}>
                     {repsDisplay || t('exercise.chip.add_reps')}
                   </ThemedText>
                 </TouchableOpacity>
@@ -368,16 +400,16 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                   style={[
                     styles.repsIntensityChip,
                     {
-                      backgroundColor: intensityDisplay ? colors.infoLight : colors.backgroundSecondary,
-                      borderColor: intensityDisplay ? colors.info : colors.separator,
+                      backgroundColor: intensityDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
+                      borderColor: intensityDisplay ? exerciseOrange : colors.separator,
                     },
                     disabled && { opacity: 0.6 },
                   ]}
                   activeOpacity={0.7}
-                  {...(Platform.OS === 'web' && getFocusStyle(colors.info))}
+                  {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
                   {...getButtonAccessibilityProps(intensityDisplay ? t('exercise.chip.edit_intensity_with_value', { value: intensityDisplay }) : t('exercise.chip.add_intensity'))}
                 >
-                  <ThemedText style={[styles.repsIntensityText, { color: intensityDisplay ? colors.info : colors.textSecondary }]}>
+                  <ThemedText style={[styles.repsIntensityText, { color: intensityDisplay ? exerciseOrange : colors.textSecondary }]}>
                     {intensityDisplay || t('exercise.chip.add_intensity')}
                   </ThemedText>
                 </TouchableOpacity>
@@ -449,7 +481,7 @@ export default function ExerciseHomeScreen() {
     });
   };
 
-  // Format date for display with full weekday (used in Recent Days section)
+  // Format date for display with short weekday (used in Recent Days section)
   const formatDateForDisplay = (date: Date): string => {
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
@@ -462,7 +494,7 @@ export default function ExerciseHomeScreen() {
       return t('common.yesterday');
     } else {
       return date.toLocaleDateString('en-US', {
-        weekday: 'long',
+        weekday: 'short',
         month: 'short',
         day: 'numeric',
       });
@@ -522,6 +554,14 @@ export default function ExerciseHomeScreen() {
   
   // Exercise settings modal state
   const [showExerciseSettings, setShowExerciseSettings] = useState(false);
+  const [settingsDistanceUnit, setSettingsDistanceUnit] = useState<'km' | 'mi'>('km');
+
+  // Initialize settings when modal opens
+  useEffect(() => {
+    if (showExerciseSettings) {
+      setSettingsDistanceUnit((userConfig?.distance_unit as 'km' | 'mi') ?? 'km');
+    }
+  }, [showExerciseSettings, userConfig?.distance_unit]);
   
   // Shared edit mode state (for both clone and delete)
   const [editMode, setEditMode] = useState(false);
@@ -655,6 +695,18 @@ export default function ExerciseHomeScreen() {
     return sum;
   }, 0);
   const activityCount = exerciseLogs.length;
+  
+  // Calculate cardio and strength counts
+  const cardioCount = exerciseLogs.filter(log => log.category === 'cardio_mind_body').length;
+  const strengthCount = exerciseLogs.filter(log => log.category === 'strength').length;
+  
+  // Calculate total distance from cardio exercises
+  const totalDistanceKm = exerciseLogs.reduce((sum, log) => {
+    if (log.category === 'cardio_mind_body' && log.distance_km !== null) {
+      return sum + log.distance_km;
+    }
+    return sum;
+  }, 0);
 
   // Animate newly added exercise
   useEffect(() => {
@@ -673,7 +725,7 @@ export default function ExerciseHomeScreen() {
   }, [exerciseLogs]);
 
   // Handle quick add (from chips)
-  const chipTextStyle = { fontSize: FontSize.base + 2 };
+  const chipTextStyle = { fontSize: FontSize.sm };
   const handleQuickAdd = useCallback((name: string, minutes: number | null, category?: 'cardio_mind_body' | 'strength') => {
     if (!user?.id) return;
 
@@ -1085,23 +1137,45 @@ export default function ExerciseHomeScreen() {
     }
   };
 
-  // Format recent days summary
-  const formatRecentDay = (summary: { date: string; total_minutes: number; activity_count: number }) => {
+  // Format recent days summary (for accessibility)
+  const formatRecentDay = (summary: { date: string; total_minutes: number; activity_count: number; cardio_count: number; cardio_distance_km: number; strength_count: number }) => {
     const date = new Date(summary.date + 'T00:00:00');
     const dayLabel = formatDateForDisplay(date);
-    const minutes = summary.total_minutes;
-    const count = summary.activity_count;
+    const minutes = Math.round(summary.total_minutes);
+    const distanceKm = summary.cardio_distance_km || 0;
+    const distanceUnit = userConfig?.distance_unit ?? 'km';
+    const distanceValue = distanceUnit === 'mi' && distanceKm > 0 
+      ? formatDistanceForDisplay(distanceKm / KM_TO_MILES_CONVERSION)
+      : formatDistanceForDisplay(distanceKm);
+    const cardioCount = summary.cardio_count || 0;
+    const strengthCount = summary.strength_count || 0;
 
-    if (count === 0) {
-      return t('exercise.recent_days.format_no_exercises', { day: dayLabel });
+    // Build accessibility string: day - duration, distance, cardio count, strength count
+    const parts: string[] = [];
+    
+    if (minutes > 0) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      if (hours > 0 && mins > 0) {
+        parts.push(`${hours} hour${hours > 1 ? 's' : ''} and ${mins} minute${mins > 1 ? 's' : ''}`);
+      } else if (hours > 0) {
+        parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+      } else {
+        parts.push(`${mins} minute${mins > 1 ? 's' : ''}`);
+      }
     }
+    
+    if (distanceValue > 0) {
+      const formattedDistance = distanceValue % 1 === 0 
+        ? distanceValue.toString() 
+        : parseFloat(distanceValue.toFixed(2)).toString();
+      parts.push(`${formattedDistance} ${distanceUnit === 'mi' ? 'miles' : 'kilometers'}`);
+    }
+    
+    parts.push(`${cardioCount} cardio activities`);
+    parts.push(`${strengthCount} strength activities`);
 
-    return t('exercise.recent_days.format', {
-      day: dayLabel,
-      minutes,
-      count,
-      activities: count === 1 ? t('exercise.recent_days.activity_one') : t('exercise.recent_days.activity_other'),
-    });
+    return `${dayLabel} - ${parts.join(', ')}`;
   };
 
   if (!user) {
@@ -1189,11 +1263,30 @@ export default function ExerciseHomeScreen() {
                 }}
                 subtitle={
                   !logsLoading && activityCount > 0
-                    ? t('exercise.summary.total', {
-                        minutes: totalMinutes,
-                        count: activityCount,
-                        activities: activityCount === 1 ? t('exercise.summary.activity_one') : t('exercise.summary.activity_other'),
-                      })
+                    ? (() => {
+                        const distanceUnit = userConfig?.distance_unit ?? 'km';
+                        const distanceValue = distanceUnit === 'mi' && totalDistanceKm > 0 
+                          ? formatDistanceForDisplay(totalDistanceKm / KM_TO_MILES_CONVERSION)
+                          : formatDistanceForDisplay(totalDistanceKm);
+                        
+                        const parts: string[] = [];
+                        
+                        if (totalMinutes > 0) {
+                          parts.push(`🕒${totalMinutes} min`);
+                        }
+                        
+                        if (distanceValue > 0) {
+                          const formattedDistance = distanceValue % 1 === 0 
+                            ? distanceValue.toString() 
+                            : parseFloat(distanceValue.toFixed(2)).toString();
+                          parts.push(`📏${formattedDistance} ${distanceUnit === 'mi' ? 'mi' : 'km'}`);
+                        }
+                        
+                        parts.push(`🏃${cardioCount}`);
+                        parts.push(`🏋️${strengthCount}`);
+                        
+                        return parts.join('   '); // Two spaces between sections
+                      })()
                     : undefined
                 }
                 rightContent={
@@ -1494,6 +1587,7 @@ export default function ExerciseHomeScreen() {
                       textStyle={chipTextStyle}
                       onPress={() => handleQuickAdd(exercise.name, exercise.minutes, exercise.category)}
                       disabled={disabledChips.has(chipKey)}
+                      chipStyle={{ paddingHorizontal: Spacing.xs }}
                     />
                   );
                 })}
@@ -1536,6 +1630,7 @@ export default function ExerciseHomeScreen() {
                       textStyle={chipTextStyle}
                       onPress={() => handleQuickAdd(exercise.label, null, exercise.category)}
                       disabled={disabledChips.has(chipKey)}
+                      chipStyle={{ paddingHorizontal: Spacing.xs }}
                     />
               );
             })}
@@ -1563,6 +1658,7 @@ export default function ExerciseHomeScreen() {
                   textStyle={chipTextStyle}
                   onPress={() => handleQuickAdd(exercise.label, null, exercise.category)}
                   disabled={disabledChips.has(chipKey)}
+                  chipStyle={{ paddingHorizontal: Spacing.xs }}
                 />
               );
             })}
@@ -1599,7 +1695,36 @@ export default function ExerciseHomeScreen() {
                     {formatDateForDisplay(new Date(summary.date + 'T00:00:00'))}
                   </ThemedText>
                   <ThemedText style={[styles.recentDayStats, { color: colors.textSecondary }]}>
-                    {summary.total_minutes} min ({summary.activity_count} {summary.activity_count === 1 ? t('exercise.recent_days.activity_one') : t('exercise.recent_days.activity_other')})
+                    {(() => {
+                      const minutes = Math.round(summary.total_minutes);
+                      const distanceKm = summary.cardio_distance_km || 0;
+                      const distanceUnit = userConfig?.distance_unit ?? 'km';
+                      const distanceValue = distanceUnit === 'mi' && distanceKm > 0 
+                        ? formatDistanceForDisplay(distanceKm / KM_TO_MILES_CONVERSION)
+                        : formatDistanceForDisplay(distanceKm);
+                      const cardioCount = summary.cardio_count || 0;
+                      const strengthCount = summary.strength_count || 0;
+
+                      // Build stats string with emojis: 🕒{hours}m  📏{distance}{unit}   🏃{cardio}   🏋️{strength}
+                      const parts: string[] = [];
+                      
+                      if (minutes > 0) {
+                        parts.push(`🕒${formatMinutesAsHoursMinutes(minutes)}`);
+                      }
+                      
+                      if (distanceValue > 0) {
+                        // Format distance with max 2 decimals, trimming trailing zeros
+                        const formattedDistance = distanceValue % 1 === 0 
+                          ? distanceValue.toString() 
+                          : parseFloat(distanceValue.toFixed(2)).toString();
+                        parts.push(`📏${formattedDistance} ${distanceUnit === 'mi' ? 'mi' : 'km'}`);
+                      }
+                      
+                      parts.push(`🏃${cardioCount}`);
+                      parts.push(`🏋️${strengthCount}`);
+                      
+                      return parts.join('   '); // Two spaces between sections
+                    })()}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -1683,7 +1808,8 @@ export default function ExerciseHomeScreen() {
                     style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                     value={formName}
                     onChangeText={setFormName}
-                    placeholder={t('exercise.form.name_placeholder')}
+                    // NOTE: Hardcoded per user request - exact placeholder text required
+                    placeholder="e.g., Mid delts, Sauna, Rock Climbing"
                     placeholderTextColor={colors.textSecondary}
                     maxLength={TEXT_LIMITS.EXERCISE_NAME_MAX_LEN}
                     autoFocus
@@ -1730,47 +1856,6 @@ export default function ExerciseHomeScreen() {
                         </ThemedText>
                       </TouchableOpacity>
                     </View>
-                  </View>
-                )}
-
-                {/* Conditional fields based on category */}
-                {(editingLog ? editingLog.category : formCategory) === 'cardio_mind_body' && (
-                  <View>
-                    <ThemedText style={[styles.formLabel, { color: colors.text }]}>
-                      {t('exercise.form.minutes_label')}
-                    </ThemedText>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                      value={formMinutes}
-                      onChangeText={handleMinutesChange}
-                      placeholder={t('exercise.form.minutes_placeholder')}
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="number-pad"
-                      maxLength={RANGES.EXERCISE_MINUTES.MAX.toString().length}
-                    />
-                    <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
-                      {t('exercise.form.minutes_range')}
-                    </ThemedText>
-                  </View>
-                )}
-
-                {(editingLog ? editingLog.category : formCategory) === 'strength' && (
-                  <View>
-                    <ThemedText style={[styles.formLabel, { color: colors.text }]}>
-                      Sets
-                    </ThemedText>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                      value={formSets}
-                      onChangeText={handleSetsChange}
-                      placeholder="Optional"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="number-pad"
-                      maxLength={RANGES.EXERCISE_SETS.MAX.toString().length}
-                    />
-                    <ThemedText style={[styles.formHelper, { color: colors.textSecondary }]}>
-                      {`Sets: ${RANGES.EXERCISE_SETS.MIN}-${RANGES.EXERCISE_SETS.MAX}`}
-                    </ThemedText>
                   </View>
                 )}
 
@@ -1828,6 +1913,8 @@ export default function ExerciseHomeScreen() {
         visible={showCloneModal}
         onClose={() => setShowCloneModal(false)}
         sourceDate={selectedDate}
+        minimumDate={minDate}
+        maximumDate={today}
         onConfirm={(targetDate) => {
           // Get selected entry IDs if in edit mode, otherwise clone all
           const entryIdsToClone = editMode ? Array.from(selectedEntryIds) : undefined;
@@ -1959,90 +2046,23 @@ export default function ExerciseHomeScreen() {
             <View style={styles.modalBody}>
               {/* Distance Unit Setting */}
               <View style={styles.settingsRow}>
+                {/* NOTE: Hardcoded per user request - exact label "Distance Unit" required */}
                 <ThemedText style={[styles.formLabel, { color: colors.text }]}>
-                  {t('exercise.settings.distance_unit')}
+                  Distance Unit
                 </ThemedText>
-                <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
-                  {t('exercise.settings.distance_unit_description')}
-                </ThemedText>
-                
-                <View style={styles.optionsContainer}>
+                <View style={styles.dropdownContainer}>
                   <TouchableOpacity
-                    style={[
-                      styles.optionButton,
-                      {
-                        backgroundColor: (userConfig?.distance_unit ?? 'km') === 'km' ? colors.tintLight : colors.backgroundSecondary,
-                        borderColor: (userConfig?.distance_unit ?? 'km') === 'km' ? colors.tint : colors.border,
-                      },
-                    ]}
+                    style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}
                     onPress={() => {
-                      const currentUnit = userConfig?.distance_unit ?? 'km';
-                      if (currentUnit !== 'km') {
-                        updateProfileMutation.mutate({ distance_unit: 'km' }, {
-                          onSuccess: () => {
-                            showAppToast(t('exercise.settings.save'));
-                            setShowExerciseSettings(false);
-                          },
-                        });
-                      }
+                      const newUnit = settingsDistanceUnit === 'km' ? 'mi' : 'km';
+                      setSettingsDistanceUnit(newUnit);
                     }}
-                    activeOpacity={0.7}
-                    {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-                    {...getButtonAccessibilityProps(t('exercise.settings.kilometers'))}
+                    {...getButtonAccessibilityProps('Distance Unit')}
                   >
-                    <ThemedText
-                      style={[
-                        styles.optionText,
-                        {
-                          color: (userConfig?.distance_unit ?? 'km') === 'km' ? colors.tint : colors.text,
-                          fontWeight: (userConfig?.distance_unit ?? 'km') === 'km' ? '700' : '600',
-                        },
-                      ]}
-                    >
-                      {t('exercise.settings.kilometers')}
+                    <ThemedText style={[styles.dropdownText, { color: colors.text }]}>
+                      {settingsDistanceUnit === 'km' ? t('exercise.settings.kilometers') : t('exercise.settings.miles')}
                     </ThemedText>
-                    {(userConfig?.distance_unit ?? 'km') === 'km' && (
-                      <IconSymbol name="checkmark" size={20} color={colors.tint} />
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.optionButton,
-                      {
-                        backgroundColor: (userConfig?.distance_unit ?? 'km') === 'mi' ? colors.tintLight : colors.backgroundSecondary,
-                        borderColor: (userConfig?.distance_unit ?? 'km') === 'mi' ? colors.tint : colors.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      const currentUnit = userConfig?.distance_unit ?? 'km';
-                      if (currentUnit !== 'mi') {
-                        updateProfileMutation.mutate({ distance_unit: 'mi' }, {
-                          onSuccess: () => {
-                            showAppToast(t('exercise.settings.save'));
-                            setShowExerciseSettings(false);
-                          },
-                        });
-                      }
-                    }}
-                    activeOpacity={0.7}
-                    {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-                    {...getButtonAccessibilityProps(t('exercise.settings.miles'))}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.optionText,
-                        {
-                          color: (userConfig?.distance_unit ?? 'km') === 'mi' ? colors.tint : colors.text,
-                          fontWeight: (userConfig?.distance_unit ?? 'km') === 'mi' ? '700' : '600',
-                        },
-                      ]}
-                    >
-                      {t('exercise.settings.miles')}
-                    </ThemedText>
-                    {(userConfig?.distance_unit ?? 'km') === 'mi' && (
-                      <IconSymbol name="checkmark" size={20} color={colors.tint} />
-                    )}
+                    <IconSymbol name="chevron.down" size={16} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2055,6 +2075,25 @@ export default function ExerciseHomeScreen() {
                 {...getButtonAccessibilityProps(t('exercise.settings.cancel'))}
               >
                 <ThemedText style={{ color: colors.text }}>{t('exercise.settings.cancel')}</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                onPress={() => {
+                  updateProfileMutation.mutate({ distance_unit: settingsDistanceUnit }, {
+                    onSuccess: () => {
+                      showAppToast(t('exercise.settings.save'));
+                      setShowExerciseSettings(false);
+                    },
+                  });
+                }}
+                disabled={updateProfileMutation.isPending}
+                {...getButtonAccessibilityProps(t('exercise.settings.save'))}
+              >
+                {updateProfileMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.textInverse} />
+                ) : (
+                  <ThemedText style={{ color: colors.textInverse }}>{t('exercise.settings.save')}</ThemedText>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -2193,7 +2232,7 @@ const styles = StyleSheet.create({
   },
   // Category separator between cardio_mind_body and strength sections
   categorySeparator: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 2,
     marginVertical: 0,
     marginHorizontal: 0,
   },
@@ -2228,8 +2267,8 @@ const styles = StyleSheet.create({
     columnGap: Spacing.sm,
   },
   exerciseName: {
-    fontSize: FontSize.md,
-    fontWeight: '600',
+    fontSize: FontSize.base,
+    fontWeight: '400',
     marginBottom: Spacing.xs,
   },
   exerciseNotes: {
@@ -2243,7 +2282,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   repsIntensityChip: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.xs,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
@@ -2256,7 +2295,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   minutesBadge: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.xs,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
@@ -2391,7 +2430,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   recentDayStats: {
-    fontSize: FontSize.base,
+    fontSize: FontSize.gaugeLabelMd,
   },
   // Modal styles
   modalOverlay: {
@@ -2440,6 +2479,22 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: FontSize.base,
+  },
+  dropdownContainer: {
+    marginTop: Spacing.xs,
+  },
+  dropdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    ...getMinTouchTargetStyle(),
+  },
+  dropdownText: {
+    fontSize: FontSize.base,
+    fontWeight: '500',
   },
   modalButtons: {
     flexDirection: 'row',

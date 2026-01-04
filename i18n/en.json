@@ -1785,7 +1785,7 @@
     "title": "Exercise",
     "today_title": "Today's Exercise",
     "quick_add_title": "Quick Add",
-    "recent_days_title": "Recent Days",
+    "recent_days_title": "Last 7 days",
     "summary": {
       "total": "Total: {{minutes}} min ({{count}} {{activities}})",
       "activity_one": "activity",

@@ -1625,6 +1625,7 @@ export default function FoodLogHomeScreen() {
           )}
           sourceDate={selectedDate}
           minimumDate={minDate}
+          maximumDate={today}
           sourceMealType={transferMealtypeModal.mealType}
           isLoading={transferMealtypeMutation.isPending}
           mode={transferMealtypeModal.mode}

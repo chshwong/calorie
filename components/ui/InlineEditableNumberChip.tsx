@@ -29,6 +29,8 @@ export type InlineEditableNumberChipProps = {
   badgeBorderColor?: string;
   badgeTextColor?: string;
   accessibilityLabel?: string;
+  chipPaddingHorizontal?: number;
+  allowDecimal?: boolean;
 };
 
 export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
@@ -53,6 +55,8 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
     badgeBorderColor = colors.info,
     badgeTextColor = colors.info,
     accessibilityLabel,
+    chipPaddingHorizontal,
+    allowDecimal = false,
   } = props;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -134,7 +138,7 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
       return;
     }
 
-    const parsed = parseInt(trimmed, 10);
+    const parsed = allowDecimal ? parseFloat(trimmed) : parseInt(trimmed, 10);
     if (!Number.isFinite(parsed)) {
       setHasError(true);
       return;
@@ -152,6 +156,19 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
   };
 
   const handleInputChange = (text: string) => {
+    if (allowDecimal) {
+      // Allow decimal input: digits, one decimal point, up to 2 decimal places
+      // Match: digits, optional decimal point, optional 1-2 digits after decimal (no negatives)
+      const decimalRegex = /^\d*\.?\d{0,2}$/;
+      // Also allow empty string
+      if (text === '' || decimalRegex.test(text)) {
+        setInput(text);
+        setHasError(false);
+      }
+      return;
+    }
+
+    // Integer-only input (original behavior)
     const numericOnly = text.replace(/[^0-9]/g, '');
     if (numericOnly === '') {
       setInput('');
@@ -201,8 +218,14 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
             onChangeText={handleInputChange}
             onBlur={commitOnBlur ? commit : undefined}
             onSubmitEditing={commit}
-            keyboardType={Platform.OS === 'web' ? 'default' : 'number-pad'}
-            maxLength={typeof max === 'number' ? String(max).length : undefined}
+            keyboardType={allowDecimal ? (Platform.OS === 'web' ? 'decimal' : 'decimal-pad') : (Platform.OS === 'web' ? 'default' : 'number-pad')}
+            maxLength={
+              typeof max === 'number'
+                ? allowDecimal
+                  ? String(max).length + 1 + 2 // integer digits + decimal point + 2 decimal places (e.g., "999.99" = 6)
+                  : String(max).length
+                : undefined
+            }
             selectTextOnFocus
           />
           <TouchableOpacity
@@ -236,6 +259,7 @@ export function InlineEditableNumberChip(props: InlineEditableNumberChipProps) {
               backgroundColor: badgeBackgroundColor,
               borderColor: badgeBorderColor,
               opacity: disabled ? 0.6 : 1,
+              paddingHorizontal: chipPaddingHorizontal ?? Spacing.md,
             },
             Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
           ]}

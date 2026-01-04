@@ -1840,6 +1840,8 @@ export default function MedsHomeScreen() {
         visible={showCloneModal}
         onClose={() => setShowCloneModal(false)}
         sourceDate={selectedDate}
+        minimumDate={minDate}
+        maximumDate={today}
         title={t('meds.clone.title')}
         subtitle={t('meds.clone.subtitle')}
         onConfirm={(targetDate) => {

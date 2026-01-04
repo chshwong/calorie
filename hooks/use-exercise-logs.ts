@@ -89,27 +89,31 @@ export function useExerciseLogsForDate(dateString: string | Date) {
 
 
 /**
- * Hook to fetch exercise summary for recent days
+ * Hook to fetch exercise summary for recent days from daily_sum_exercises table
+ * Uses persistent cache with 180 days TTL
  */
 export function useExerciseSummaryForRecentDays(days: number = 7) {
   const { user } = useAuth();
   const userId = user?.id;
+  const userCreatedAt = user?.created_at;
   const queryClient = useQueryClient();
 
-  const cacheKey = exerciseSummaryCacheKey(userId, days);
+  const cacheKey = exerciseSummaryRecentDaysCacheKey(userId, days);
 
+  // 180 days persistent cache
+  const CACHE_TTL_180_DAYS_MS = 180 * 24 * 60 * 60 * 1000;
   const snapshot =
     cacheKey !== null
-      ? getPersistentCache<any>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      ? getPersistentCache<any>(cacheKey, CACHE_TTL_180_DAYS_MS)
       : null;
 
   return useQuery({
-    queryKey: ['exerciseSummary', userId, days],
+    queryKey: ['exerciseSummaryRecentDays', userId, days],
     queryFn: async () => {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      const data = await getExerciseSummaryForRecentDays(userId, days);
+      const data = await getExerciseSummaryForRecentDays(userId, days, userCreatedAt);
 
       if (cacheKey !== null) {
         setPersistentCache(cacheKey, data);
@@ -119,14 +123,14 @@ export function useExerciseSummaryForRecentDays(days: number = 7) {
     },
     enabled: !!userId,
     staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes,
+    gcTime: 5 * 60 * 1000, // 5 minutes
     placeholderData: (previousData) => {
       if (previousData !== undefined) {
         return previousData;
       }
 
       const cachedData = queryClient.getQueryData([
-        'exerciseSummary',
+        'exerciseSummaryRecentDays',
         userId,
         days,
       ]);
@@ -220,9 +224,9 @@ function exerciseLogsCacheKey(userId: string | undefined, date: string) {
   return `exerciseLogs:${userId}:${date}`;
 }
 
-function exerciseSummaryCacheKey(userId: string | undefined, days: number) {
+function exerciseSummaryRecentDaysCacheKey(userId: string | undefined, days: number) {
   if (!userId) return null;
-  return `exerciseSummary:${userId}:${days}`;
+  return `exerciseSummaryRecentDays:${userId}:${days}`;
 }
 
 function recentAndFrequentExercisesCacheKey(userId: string | undefined, days: number) {
@@ -251,7 +255,7 @@ export function useCreateExerciseLog() {
       if (data) {
         // Invalidate and refetch relevant queries
         queryClient.invalidateQueries({ queryKey: ['exerciseLogs', userId] });
-        queryClient.invalidateQueries({ queryKey: ['exerciseSummary', userId] });
+        queryClient.invalidateQueries({ queryKey: ['exerciseSummaryRecentDays', userId] });
         queryClient.invalidateQueries({ queryKey: ['recentFrequentExercises', userId] });
         queryClient.invalidateQueries({ queryKey: ['recentAndFrequentExercises', userId] });
       }
@@ -278,7 +282,7 @@ export function useUpdateExerciseLog() {
       if (data) {
         // Invalidate and refetch relevant queries
         queryClient.invalidateQueries({ queryKey: ['exerciseLogs', userId] });
-        queryClient.invalidateQueries({ queryKey: ['exerciseSummary', userId] });
+        queryClient.invalidateQueries({ queryKey: ['exerciseSummaryRecentDays', userId] });
         queryClient.invalidateQueries({ queryKey: ['recentFrequentExercises', userId] });
         queryClient.invalidateQueries({ queryKey: ['recentAndFrequentExercises', userId] });
       }
@@ -304,7 +308,7 @@ export function useDeleteExerciseLog() {
     onSuccess: () => {
       // Invalidate and refetch relevant queries
       queryClient.invalidateQueries({ queryKey: ['exerciseLogs', userId] });
-      queryClient.invalidateQueries({ queryKey: ['exerciseSummary', userId] });
+      queryClient.invalidateQueries({ queryKey: ['exerciseSummaryRecentDays', userId] });
       queryClient.invalidateQueries({ queryKey: ['recentFrequentExercises', userId] });
     },
   });
