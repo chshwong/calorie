@@ -1409,6 +1409,14 @@ export default function LogFoodScreen() {
   // Ref guard to prevent double navigation to food-edit
   const hasNavigatedToFoodEditRef = useRef<string | null>(null);
 
+  // Reset ref on every focus so repeated taps work even if already navigated once
+  useFocusEffect(
+    useCallback(() => {
+      // Every time screen focuses, allow a new navigation if the same food is clicked again
+      hasNavigatedToFoodEditRef.current = null;
+    }, [])
+  );
+
   const handleFoodSelect = async (food: FoodMaster | EnhancedFoodItem) => {
     // Prevent double navigation - check if we've already navigated for this food
     const foodId = food.id || '';
