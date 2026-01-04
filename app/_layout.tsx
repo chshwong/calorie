@@ -21,6 +21,8 @@ import { ToastProvider } from '@/components/ui/app-toast';
 import { DebugOverlay } from '@/components/DebugOverlay';
 import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { TourProvider } from '@/features/tour/TourProvider';
+import { TourOverlay } from '@/features/tour/TourOverlay';
 
 // Import QueryClient from separate module to avoid circular dependency with AuthContext
 import { queryClient } from '@/lib/query-client';
@@ -190,31 +192,34 @@ function ThemeProviderWrapper() {
 
   return (
     <AuthProvider>
-      <ToastProvider>
-        <GlobalAuthGuard />
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="(minimal)" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="quick-log" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="scanned-item" options={{ title: 'Scanned Item', presentation: 'modal' }} />
-          <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-          <Stack.Screen name="my-goals" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/my-goal" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/my-goal/edit-goal" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="settings/my-goal/edit-calories" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="settings/my-goal/edit-targets" options={{ headerShown: false, presentation: 'modal' }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-      </ToastProvider>
+      <TourProvider>
+        <ToastProvider>
+          <GlobalAuthGuard />
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(minimal)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="quick-log" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="scanned-item" options={{ title: 'Scanned Item', presentation: 'modal' }} />
+            <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
+            <Stack.Screen name="my-goals" options={{ headerShown: false }} />
+            <Stack.Screen name="settings/my-goal" options={{ headerShown: false }} />
+            <Stack.Screen name="settings/my-goal/edit-goal" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="settings/my-goal/edit-calories" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="settings/my-goal/edit-targets" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <TourOverlay />
+          <StatusBar style="auto" />
+        </ThemeProvider>
+        </ToastProvider>
+      </TourProvider>
     </AuthProvider>
   );
 }

@@ -18,18 +18,11 @@ import {
   FontWeight,
   Nudge,
   Spacing,
-  brandBlueColorDark,
-  brandBlueColorLight,
-  brandVioletColorDark,
-  brandVioletColorLight,
-  salmonColorDark,
-  salmonColorLight,
-  brandGreenColorDark,
-  brandGreencolorLight,
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTranslation } from 'react-i18next';
 import type { AvoScoreGrade } from '@/utils/avoScore';
+import { getMacroColors } from '@/utils/macroColors';
 
 type MacroCompositionDonutChartProps = {
   gramsCarbTotal: number;
@@ -147,7 +140,6 @@ export function MacroCompositionDonutChart({
   };
   const scheme = useColorScheme();
   const modeKey = (scheme ?? 'light') as 'light' | 'dark';
-  const isDark = scheme === 'dark';
   const colors = Colors[modeKey];
   const centerLabelText = translateMaybe(centerLabel ?? 'avo_score.label');
   const reasons = (centerReasons ?? []).filter(Boolean).slice(0, 2).map(translateMaybe);
@@ -165,11 +157,12 @@ export function MacroCompositionDonutChart({
   const kcalCarbsTotal = kcalNetCarb + kcalFiber;
   const totalKcal = kcalCarbsTotal + kcalProtein + kcalFat;
 
-  // Color mapping
-  const netCarbColor = isDark ? salmonColorDark : salmonColorLight;
-  const fiberColor = isDark ? brandGreenColorDark : brandGreencolorLight;
-  const proteinColor = isDark ? brandBlueColorDark : brandBlueColorLight;
-  const fatColor = isDark ? brandVioletColorDark : brandVioletColorLight;
+  // Color mapping (shared with Nutrition table)
+  const macroColors = getMacroColors(colors);
+  const netCarbColor = macroColors.netCarb;
+  const fiberColor = macroColors.fiber;
+  const proteinColor = macroColors.protein;
+  const fatColor = macroColors.fat;
 
   // Calculate percentages
   const percentCarbs = totalKcal > 0 ? (kcalCarbsTotal / totalKcal) * 100 : 0;

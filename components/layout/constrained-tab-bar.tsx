@@ -15,7 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Layout } from '@/constants/theme';
 
-export function ConstrainedTabBar(props: BottomTabBarProps) {
+export function ConstrainedTabBar(props: BottomTabBarProps & { tourAnchorRef?: React.Ref<any> }) {
+  const { tourAnchorRef, ...tabBarProps } = props;
   const [screenWidth, setScreenWidth] = React.useState(
     Dimensions.get('window').width
   );
@@ -37,8 +38,8 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
 
   // Extract background and border colors from the first route's tabBarStyle
   // This matches what we set in screenOptions
-  const firstRouteKey = props.state?.routes[0]?.key;
-  const firstDescriptor = firstRouteKey ? props.descriptors[firstRouteKey] : undefined;
+  const firstRouteKey = tabBarProps.state?.routes[0]?.key;
+  const firstDescriptor = firstRouteKey ? tabBarProps.descriptors[firstRouteKey] : undefined;
   const tabBarStyle = firstDescriptor?.options?.tabBarStyle;
   
   // Extract colors from tabBarStyle, fallback to theme colors
@@ -52,12 +53,24 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
   // On web, always wrap the tab bar content in a fixed container to prevent jump
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.fullWidthContainer, { backgroundColor, borderTopColor }]}>
+      <View
+        ref={tourAnchorRef}
+        style={[
+          styles.fullWidthContainer,
+          {
+            backgroundColor,
+            borderTopColor,
+            // Ensure the anchor measures the full footer height (tour spotlight).
+            height: Layout.bottomTabBarHeight + bottomInset,
+            paddingBottom: bottomInset,
+          },
+        ]}
+      >
         <View style={[styles.footerInner, screenWidth < 1024 && styles.footerInnerMobile]}>
           <BottomTabBar 
-            {...props} 
+            {...tabBarProps} 
             style={[
-              props.style,
+              tabBarProps.style,
               {
                 height: Layout.bottomTabBarHeight,
                 paddingBottom: 0,
@@ -75,9 +88,9 @@ export function ConstrainedTabBar(props: BottomTabBarProps) {
   // On native platforms (iOS/Android), use the default tab bar without constraints
   return (
     <BottomTabBar 
-      {...props}
+      {...tabBarProps}
       style={[
-        props.style,
+        tabBarProps.style,
         Platform.OS === 'web' && {
           height: Layout.bottomTabBarHeight,
           paddingBottom: 0,

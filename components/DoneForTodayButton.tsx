@@ -40,6 +40,8 @@ type Props = {
   yesterdayKey: string;
   /** e.g. "Jan 2" or "Fri, Jan 2" (already formatted by Home) */
   formattedSelectedDate: string;
+  /** Optional tour anchor ref (Home tour) */
+  tourAnchorRef?: React.RefObject<any>;
 };
 
 type ModalState = 'none' | 'completionConfirm' | 'fastedSecondaryConfirm' | 'changeStatus';
@@ -71,7 +73,13 @@ function normalizeStatus(input: string | null | undefined): DailyLogStatus {
   return 'unknown';
 }
 
-export function DoneForTodayButton({ selectedDateKey, todayKey, yesterdayKey, formattedSelectedDate }: Props) {
+export function DoneForTodayButton({
+  selectedDateKey,
+  todayKey,
+  yesterdayKey,
+  formattedSelectedDate,
+  tourAnchorRef,
+}: Props) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -477,6 +485,7 @@ export function DoneForTodayButton({ selectedDateKey, todayKey, yesterdayKey, fo
       {/* Keep the CTA visible above the fixed tab bar, but avoid extra blank space. */}
       <View style={[styles.wrap, { marginBottom: 4 }]}>
         <TouchableOpacity
+          ref={tourAnchorRef as any}
           onPress={open}
           activeOpacity={0.85}
           style={[

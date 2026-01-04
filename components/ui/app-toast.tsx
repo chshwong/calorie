@@ -56,11 +56,13 @@ export function useAppToast() {
  * import { showAppToast } from '@/components/ui/app-toast';
  * showAppToast("Cloning…");
  */
-let showToastRef: ((message: string) => void) | null = null;
+type ToastItem = { message: string; durationMs?: number };
 
-export function showAppToast(message: string) {
+let showToastRef: ((item: ToastItem) => void) | null = null;
+
+export function showAppToast(message: string, options?: { durationMs?: number }) {
   if (showToastRef) {
-    showToastRef(message);
+    showToastRef({ message, durationMs: options?.durationMs });
   } else {
     console.warn('ToastProvider not mounted. Toast message:', message);
   }
@@ -74,7 +76,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const queueRef = useRef<string[]>([]);
+  const queueRef = useRef<ToastItem[]>([]);
   const isShowingRef = useRef(false);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -87,14 +89,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const nextMessage = queueRef.current.shift();
-    if (!nextMessage) {
+    const nextItem = queueRef.current.shift();
+    if (!nextItem) {
       isShowingRef.current = false;
       return;
     }
 
     isShowingRef.current = true;
-    setMessage(nextMessage);
+    setMessage(nextItem.message);
+    const effectiveDurationMs =
+      typeof nextItem.durationMs === 'number' && nextItem.durationMs > 0 ? nextItem.durationMs : TOAST_DURATION;
 
     // Fade in
     Animated.timing(fadeAnim, {
@@ -117,14 +121,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           processNextToast();
         }, 50); // Small delay to ensure clean transition
       });
-    }, TOAST_DURATION);
+    }, effectiveDurationMs);
   }, [fadeAnim]);
 
   // Expose showToast function globally
   useEffect(() => {
-    showToastRef = (msg: string) => {
+    showToastRef = (item: ToastItem) => {
       // Add to queue
-      queueRef.current.push(msg);
+      queueRef.current.push(item);
 
       // If no toast is currently showing, process immediately
       if (!isShowingRef.current) {

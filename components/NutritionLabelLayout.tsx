@@ -22,13 +22,15 @@ import { View, Text, StyleSheet, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { DashboardAccents, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getMacroColors } from '@/utils/macroColors';
 
 type NutrientValueProps = {
   value: React.ReactNode;
   unit?: 'g' | 'mg';
+  color?: string;
 };
 
-function NutrientValue({ value, unit }: NutrientValueProps) {
+function NutrientValue({ value, unit, color }: NutrientValueProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
@@ -39,8 +41,8 @@ function NutrientValue({ value, unit }: NutrientValueProps) {
       {unit ? (
         <ThemedText
           style={styles.unitText}
-          lightColor="#000000"
-          darkColor={colors.textPanelValueDark}
+          lightColor={color ?? '#000000'}
+          darkColor={color ?? colors.textPanelValueDark}
         >
           {` ${unit}`}
         </ThemedText>
@@ -78,6 +80,7 @@ type NutritionLabelRowProps = {
   value: React.ReactNode;
   bold?: boolean;
   indentLevel?: 0 | 1;
+  labelColorOverride?: string;
 };
 
 function NutritionLabelRow({
@@ -85,15 +88,16 @@ function NutritionLabelRow({
   value,
   bold = false,
   indentLevel = 0,
+  labelColorOverride,
 }: NutritionLabelRowProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
   
   // Section headers (bold) use textPanelHeaderDark, sub-labels use textPanelLabelDark
-  const labelColor = isDark 
+  const labelColor = labelColorOverride ?? (isDark 
     ? (bold ? colors.textPanelHeaderDark : colors.textPanelLabelDark)
-    : '#000000';
+    : '#000000');
   
   return (
     <View style={[styles.row, isDark && { opacity: 1 }]}>
@@ -158,6 +162,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
+  const macroColors = getMacroColors(colors);
   
   // Format numeric-like nodes without mutating inputs (TextInput is left intact)
   const formatNode = (node: React.ReactNode, decimals: 0 | 1): React.ReactNode => {
@@ -189,9 +194,10 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
     });
   };
 
-  // Apply value color for dark mode (for nutrition values below Calories)
-  const applyValueColor = (node: React.ReactNode): React.ReactNode => {
-    if (!isDark || !React.isValidElement(node)) return node;
+  // Apply value color for dark mode (for nutrition values below Calories),
+  // optionally overriding with a specific color (used for macro rows).
+  const applyValueColor = (node: React.ReactNode, overrideColor?: string): React.ReactNode => {
+    if (!React.isValidElement(node)) return node;
 
     const normalizeStyle = (styleProp: any) => {
       if (Array.isArray(styleProp)) return styleProp.filter(Boolean);
@@ -202,7 +208,9 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 
     const mergedStyle = [
       ...normalizeStyle((node.props as any)?.style),
-      { color: colors.textPanelValueDark },
+      // In light mode, leave values as-is unless explicitly overridden.
+      // In dark mode, default to panel value color unless explicitly overridden.
+      ...(overrideColor ? [{ color: overrideColor }] : isDark ? [{ color: colors.textPanelValueDark }] : []),
     ];
 
     const clonedProps: any = {
@@ -211,9 +219,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
     };
 
     if (propsAny && propsAny.children !== undefined) {
-      clonedProps.children = React.Children.map(propsAny.children, (child) =>
-        applyValueColor(child)
-      );
+      clonedProps.children = React.Children.map(propsAny.children, (child) => applyValueColor(child, overrideColor));
     }
 
     return React.cloneElement(node as any, clonedProps);
@@ -251,13 +257,13 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
   };
 
   const caloriesValueNode = applyCaloriesColor(formatNode(props.caloriesInput, 0));
-  const fatValueNode = applyValueColor(formatNode(props.fatInput, 1));
+  const fatValueNode = applyValueColor(formatNode(props.fatInput, 1), macroColors.fat);
   const satFatValueNode = applyValueColor(formatNode(props.satFatInput, 1));
   const transFatValueNode = applyValueColor(formatNode(props.transFatInput, 1));
-  const carbsValueNode = applyValueColor(formatNode(props.carbsInput, 0));
-  const fiberValueNode = applyValueColor(formatNode(props.fiberInput, 1));
+  const carbsValueNode = applyValueColor(formatNode(props.carbsInput, 0), macroColors.netCarb);
+  const fiberValueNode = applyValueColor(formatNode(props.fiberInput, 1), macroColors.fiber);
   const sugarValueNode = applyValueColor(formatNode(props.sugarInput, 1));
-  const proteinValueNode = applyValueColor(formatNode(props.proteinInput, 0));
+  const proteinValueNode = applyValueColor(formatNode(props.proteinInput, 0), macroColors.protein);
   const sodiumValueNode = applyValueColor(formatNode(props.sodiumInput, 0));
 
   return (
@@ -358,8 +364,9 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Fat block */}
       <NutritionLabelRow
         label="Fat"
-        value={<NutrientValue value={fatValueNode} unit="g" />}
+        value={<NutrientValue value={fatValueNode} unit="g" color={macroColors.fat} />}
         bold
+        labelColorOverride={macroColors.fat}
       />
       <NutritionLabelRow
         label="Saturated"
@@ -376,13 +383,15 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Carbohydrate block */}
       <NutritionLabelRow
         label="Carbohydrate"
-        value={<NutrientValue value={carbsValueNode} unit="g" />}
+        value={<NutrientValue value={carbsValueNode} unit="g" color={macroColors.netCarb} />}
         bold
+        labelColorOverride={macroColors.netCarb}
       />
       <NutritionLabelRow
         label="Fibre"
-        value={<NutrientValue value={fiberValueNode} unit="g" />}
+        value={<NutrientValue value={fiberValueNode} unit="g" color={macroColors.fiber} />}
         indentLevel={1}
+        labelColorOverride={macroColors.fiber}
       />
       <NutritionLabelRow
         label="Sugars"
@@ -394,8 +403,9 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
       {/* Protein */}
       <NutritionLabelRow
         label="Protein"
-        value={<NutrientValue value={proteinValueNode} unit="g" />}
+        value={<NutrientValue value={proteinValueNode} unit="g" color={macroColors.protein} />}
         bold
+        labelColorOverride={macroColors.protein}
       />
       <NutritionLabelDivider variant="thin" />
 

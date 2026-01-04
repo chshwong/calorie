@@ -18,7 +18,11 @@ import PitLightPng from '@/assets/brand/Logo_LightMode_PitwithPLUS.png';
 
 const FAB_SIZE = 52;
 
-export function PlusButtonTab(props: BottomTabBarButtonProps) {
+type Props = BottomTabBarButtonProps & {
+  tourAnchorRef?: React.Ref<any>;
+};
+
+export function PlusButtonTab(props: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const activeColor = colors.tint;
@@ -35,6 +39,7 @@ export function PlusButtonTab(props: BottomTabBarButtonProps) {
   return (
     <Pressable
       onPress={() => setQuickAddVisible(true)}
+      ref={props.tourAnchorRef}
       style={({ pressed }) => [
         styles.plusButtonContainer,
         pressed && styles.plusButtonPressed,

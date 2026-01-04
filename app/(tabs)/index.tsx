@@ -10,6 +10,7 @@ import { NoteEditor } from '@/components/note-editor';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
 import { DoneForTodayButton } from '@/components/DoneForTodayButton';
+import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -54,8 +55,13 @@ import { compareDateKeys } from '@/lib/date-guard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ScrollView } from 'react-native';
 import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FOOD_LOG } from '@/constants/constraints';
+import { useTour } from '@/features/tour/TourProvider';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import { V1_HOMEPAGE_TOUR_STEPS } from '@/features/tour/tourSteps';
+import { isTourCompleted, isTourWelcomeShown, setTourWelcomeShown } from '@/features/tour/storage';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -220,8 +226,10 @@ function EnergyBalanceBlock(props: {
   colors: typeof Colors.light | typeof Colors.dark;
   t: (key: string, options?: any) => string;
   onEditBurned?: () => void;
+  tourContainerRef?: React.RefObject<any>;
+  tourBurnedPencilRef?: React.RefObject<any>;
 }) {
-  const { burnedCal, eatenCal, goalType, colors, t, onEditBurned } = props;
+  const { burnedCal, eatenCal, goalType, colors, t, onEditBurned, tourContainerRef, tourBurnedPencilRef } = props;
   const [isBurnedHover, setIsBurnedHover] = useState(false);
   const scheme = useColorScheme();
   const modeKey = (scheme ?? 'light') as 'light' | 'dark';
@@ -261,11 +269,15 @@ function EnergyBalanceBlock(props: {
     : {};
 
   return (
-    <View style={[styles.energyBalanceWrap, { borderTopColor: colors.separator, borderBottomColor: colors.separator }]}>
+    <View
+      ref={tourContainerRef as any}
+      style={[styles.energyBalanceWrap, { borderTopColor: colors.separator, borderBottomColor: colors.separator }]}
+    >
       {/* Row 1: Equation */}
       <View style={styles.energyBalanceRowNumbers}>
         <View style={styles.energyBalanceCol}>
           <TouchableOpacity
+            ref={tourBurnedPencilRef as any}
             style={[
               styles.energyBalanceBurnedTapTarget,
               Platform.OS === 'web' && onEditBurned ? ({ cursor: 'pointer' } as any) : null,
@@ -376,6 +388,23 @@ export default function FoodLogHomeScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [refreshing, setRefreshing] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+
+  // Tour wiring (Home tour)
+  const { startTour, registerScrollContainer, activeTourId } = useTour();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
+  const didInitTourScrollRef = useRef(false);
+
+  const tourCurvyGaugeRef = useTourAnchor('home.curvyGauge');
+  const tourBurnedEatenNetRef = useTourAnchor('home.burnedEatenNet');
+  const tourBurnedPencilRef = useTourAnchor('home.burnedPencil');
+  const tourMealLogRef = useTourAnchor('home.mealLog');
+  const tourMealSnackRef = useTourAnchor('home.mealSnack');
+  const tourCallItADayRef = useTourAnchor('home.callItADay');
+
+  const [welcomeConfettiVisible, setWelcomeConfettiVisible] = useState(false);
+  const isCheckingTourRef = useRef(false);
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Menu state for meal type options
   const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
@@ -652,6 +681,19 @@ export default function FoodLogHomeScreen() {
     }
   }, [refreshing, isPulling, onRefresh]);
 
+  // Register scroll container for tour scrolling/measurement once.
+  useEffect(() => {
+    if (didInitTourScrollRef.current) return;
+    didInitTourScrollRef.current = true;
+    registerScrollContainer({
+      ref: scrollViewRef,
+      getScrollOffset: () => scrollOffsetRef.current,
+    });
+    return () => {
+      registerScrollContainer(null);
+    };
+  }, [registerScrollContainer]);
+
 
   // Load summary expanded preference from storage (uses adapter per guideline 7)
   useEffect(() => {
@@ -926,8 +968,59 @@ export default function FoodLogHomeScreen() {
   const shouldShowDoneCta =
     compareDateKeys(selectedDateString, minDoneCtaKey) >= 0 && compareDateKeys(selectedDateString, todayKey) <= 0;
 
+  const maybeStartHomeTour = useCallback(async () => {
+    const userId = user?.id;
+    const onboardingComplete = (effectiveProfile?.onboarding_complete ?? false) === true;
+    if (!userId || !onboardingComplete) return;
+    if (activeTourId) return; // already running
+    if (isCheckingTourRef.current) return;
+
+    isCheckingTourRef.current = true;
+    try {
+      const completed = await isTourCompleted('V1_HomePageTour', userId);
+      if (completed) return;
+
+      const welcomeShown = await isTourWelcomeShown('V1_HomePageTour', userId);
+      if (!welcomeShown) {
+        setWelcomeConfettiVisible(true);
+        showAppToast('Congratz on starting your fitness journey on AvoVibe!', { durationMs: 4000 });
+        await setTourWelcomeShown('V1_HomePageTour', userId);
+
+        if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = setTimeout(() => {
+          void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
+        }, 4100);
+        return;
+      }
+
+      void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
+    } finally {
+      isCheckingTourRef.current = false;
+    }
+  }, [activeTourId, effectiveProfile?.onboarding_complete, startTour, user?.id]);
+
+  // First-run welcome + tour start (per account on this device)
+  useEffect(() => {
+    void maybeStartHomeTour();
+    return () => {
+      if (startTimeoutRef.current) {
+        clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = null;
+      }
+    };
+  }, [maybeStartHomeTour]);
+
+  // Re-check on focus so resetting flags in Settings takes effect immediately.
+  useFocusEffect(
+    useCallback(() => {
+      void maybeStartHomeTour();
+      return () => {};
+    }, [maybeStartHomeTour])
+  );
+
   return (
     <ThemedView style={styles.container}>
+      <ConfettiBurst visible={welcomeConfettiVisible} onDone={() => setWelcomeConfettiVisible(false)} />
       <OfflineBanner />
       <CollapsibleModuleHeader
         greetingText={greetingText}
@@ -960,6 +1053,7 @@ export default function FoodLogHomeScreen() {
         }}
         isToday={isToday}
         module="food"
+        scrollViewRef={scrollViewRef}
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl
@@ -971,8 +1065,11 @@ export default function FoodLogHomeScreen() {
             />
           ) : undefined
         }
-        onScroll={Platform.OS === 'web' ? handleWebScroll : undefined}
-        scrollEventThrottle={Platform.OS === 'web' ? 16 : undefined}
+        onScroll={(e) => {
+          scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+          if (Platform.OS === 'web') handleWebScroll(e);
+        }}
+        scrollEventThrottle={16}
       >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
@@ -991,7 +1088,7 @@ export default function FoodLogHomeScreen() {
                 }}
               />
 
-              <View style={styles.calorieGaugeWrap}>
+              <View ref={tourCurvyGaugeRef as any} style={styles.calorieGaugeWrap}>
                 <CalorieCurvyGauge consumed={calorieConsumed} target={calorieTarget} goalType={goalType} />
 
                 <TouchableOpacity
@@ -1021,6 +1118,8 @@ export default function FoodLogHomeScreen() {
                   colors={colors}
                   t={t}
                   onEditBurned={() => setBurnedModalVisible(true)}
+                  tourContainerRef={tourBurnedEatenNetRef}
+                  tourBurnedPencilRef={tourBurnedPencilRef}
                 />
 
                 {/* Macro Gauges Row */}
@@ -1152,7 +1251,7 @@ export default function FoodLogHomeScreen() {
           </View>
 
           {/* Today's Calorie Entries */}
-          <View style={[styles.entriesSectionCard, { backgroundColor: colors.card }]}>
+          <View ref={tourMealLogRef as any} style={[styles.entriesSectionCard, { backgroundColor: colors.card }]}>
             <View style={styles.entriesSection}>
               {showLoadingSpinner ? (
                 <View style={[styles.emptyState, { backgroundColor: 'transparent' }]}>
@@ -1176,6 +1275,7 @@ export default function FoodLogHomeScreen() {
                   return (
                     <View key={mealType}>
                       <View 
+                        ref={mealType === 'afternoon_snack' ? (tourMealSnackRef as any) : undefined}
                         style={styles.mealGroupContainer}
                       >
                       {/* Meal Type Header with Totals and Log Food Button */}
@@ -1432,6 +1532,7 @@ export default function FoodLogHomeScreen() {
                 todayKey={todayKey}
                 yesterdayKey={yesterdayKey}
                 formattedSelectedDate={formattedDate}
+                tourAnchorRef={tourCallItADayRef}
               />
             )}
           </View>

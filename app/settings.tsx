@@ -31,6 +31,8 @@ import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
 import { openWeightEntryForToday } from '@/lib/navigation/weight';
 import { openMyGoalEdit } from '@/lib/navigation/my-goal';
 import { deleteUserAccountData } from '@/lib/services/accountDeletion';
+import { showAppToast } from '@/components/ui/app-toast';
+import { resetTour } from '@/features/tour/storage';
 import {
   loadSettingsPreferences,
   saveSettingsPreferences,
@@ -121,6 +123,8 @@ export default function SettingsScreen() {
   const [showDeleteSecondConfirm, setShowDeleteSecondConfirm] = useState(false);
   const [showDeleteThirdConfirm, setShowDeleteThirdConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showRestartTourConfirm, setShowRestartTourConfirm] = useState(false);
+  const [restartTourLoading, setRestartTourLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   // Always reset scroll position when returning to Settings
@@ -151,6 +155,34 @@ export default function SettingsScreen() {
       await saveSettingsPreferences(newSettings);
     } catch {
       Alert.alert(t('alerts.error_title'), t('settings.errors.save_preference_failed'));
+    }
+  };
+
+  const handleRestartTourGuide = () => {
+    if (!user?.id) {
+      Alert.alert(t('alerts.error_title'), t('edit_profile.error_user_not_authenticated'));
+      return;
+    }
+
+    setShowRestartTourConfirm(true);
+  };
+
+  const confirmRestartTourGuide = async () => {
+    if (!user?.id) return;
+    if (restartTourLoading) return;
+
+    setRestartTourLoading(true);
+    try {
+      await resetTour('V1_HomePageTour', user.id);
+      showAppToast('Tour guide reset. Go to Food Diary to start again.');
+      setShowRestartTourConfirm(false);
+    } catch (e) {
+      Alert.alert(
+        t('alerts.error_title'),
+        t('common.unexpected_error', { defaultValue: 'Something went wrong.' })
+      );
+    } finally {
+      setRestartTourLoading(false);
     }
   };
 
@@ -367,6 +399,12 @@ export default function SettingsScreen() {
             onPress={() => {
               openWeightEntryForToday(appRouter);
             }}
+          />
+          <SettingItem
+            icon="arrow.clockwise"
+            title="Restart Tour Guide"
+            subtitle="Guidance will be re-enabled"
+            onPress={handleRestartTourGuide}
           />
         </SettingSection>
 
@@ -597,6 +635,22 @@ export default function SettingsScreen() {
         cancelTextStyle={{ color: colors.text }}
         confirmDisabled={false}
         animationType="fade"
+      />
+
+      <ConfirmModal
+        visible={showRestartTourConfirm}
+        title="Restart Tour Guide"
+        message="Guidance will be re-enabled. Replay the Home tour from the beginning?"
+        confirmText="Restart"
+        cancelText={t('common.cancel', { defaultValue: 'Cancel' })}
+        onConfirm={confirmRestartTourGuide}
+        onCancel={() => setShowRestartTourConfirm(false)}
+        confirmButtonStyle={{ backgroundColor: colors.tint }}
+        cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
+        cancelTextStyle={{ color: colors.text }}
+        confirmDisabled={restartTourLoading}
+        animationType="fade"
+        loading={restartTourLoading}
       />
     </ThemedView>
   );

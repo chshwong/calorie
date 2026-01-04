@@ -23,6 +23,7 @@ import { getLocalDateString } from '@/utils/calculations';
 import { useAuth } from '@/contexts/AuthContext';
 import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/navigation/weight';
 import { getBigCircleMenuColors } from '@/theme/getBigCircleMenuColors';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
@@ -49,6 +50,10 @@ function TabLayoutContent() {
   const moreDragY = useRef(new Animated.Value(0)).current;
   const moreIsDismissingRef = useRef(false);
   const moreSheetHeightRef = useRef(0);
+
+  // Tour anchors (Home tour)
+  const globalFooterRef = useTourAnchor('home.globalFooter');
+  const quickAddPlusRef = useTourAnchor('home.quickAddPlus');
   
   // Get user config for focus module preferences
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
@@ -635,7 +640,9 @@ function TabLayoutContent() {
   return (
     <View style={styles.container}>
         <Tabs
-          tabBar={(props: BottomTabBarProps) => <ConstrainedTabBar {...props} />}
+          tabBar={(props: BottomTabBarProps) => (
+            <ConstrainedTabBar {...props} tourAnchorRef={Platform.OS === 'web' ? globalFooterRef : undefined} />
+          )}
           screenOptions={{
             tabBarActiveTintColor: colors.tint,
             headerShown: false,
@@ -695,7 +702,7 @@ function TabLayoutContent() {
           name="meds"
           options={{
             title: '',
-            tabBarButton: (props) => <PlusButtonTab {...props} />,
+            tabBarButton: (props) => <PlusButtonTab {...props} tourAnchorRef={quickAddPlusRef} />,
             tabBarIcon: () => null,
           }}
         />
@@ -775,6 +782,22 @@ function TabLayoutContent() {
           }}
         />
         </Tabs>
+
+        {/* Tour anchor overlay for bottom navigation bar (native) */}
+        {Platform.OS !== 'web' ? (
+          <View
+            ref={globalFooterRef as any}
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: Layout.bottomTabBarHeight + tabBarBottomInset,
+              zIndex: 9998,
+            }}
+          />
+        ) : null}
         <Modal
           visible={isQuickAddVisible}
           transparent

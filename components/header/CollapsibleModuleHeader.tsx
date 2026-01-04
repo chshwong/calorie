@@ -23,6 +23,7 @@ type Props = {
   refreshControl?: React.ReactElement | undefined;
   onScroll?: (event: any) => void; // Event handler type from React Native ScrollView
   scrollEventThrottle?: number;
+  scrollViewRef?: React.RefObject<ScrollView | null>;
   // Date navigation props
   goBackOneDay?: () => void;
   goForwardOneDay?: () => void;
@@ -45,6 +46,7 @@ export function CollapsibleModuleHeader({
   refreshControl,
   onScroll,
   scrollEventThrottle = 16,
+  scrollViewRef,
   goBackOneDay,
   goForwardOneDay,
   isToday = false,
@@ -95,6 +97,7 @@ export function CollapsibleModuleHeader({
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       stickyHeaderIndices={[1]}
