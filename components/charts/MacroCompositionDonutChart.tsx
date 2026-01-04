@@ -179,12 +179,15 @@ export function MacroCompositionDonutChart({
   const percentFat = totalKcal > 0 ? (kcalFat / totalKcal) * 100 : 0;
 
   // Geometry
-  const PAD = 70;
-  const svgSize = size + PAD * 2;
-  const cx = svgSize / 2;
-  const cy = svgSize / 2;
+  // Label geometry (chart-specific, not theme-driven).
+  // Used for viewBox tightening and label sizing heuristics.
+  const LABEL_BOX_MIN_W = 72;
+  const LABEL_BOX_H = 38; // two lines: (name + percent)
 
-  // Radii are based on the requested chart `size` (core size), not the padded svgSize
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Radii are based on the requested chart `size` (core size).
   const chartRadius = size / 2;
   const innerOuterR = chartRadius - 8;
   const innerInnerR = innerOuterR - strokeWidthInner;
@@ -331,8 +334,9 @@ export function MacroCompositionDonutChart({
 
     outerSegments.forEach((s) => allSegments.push({ ...s, isOuter: true }));
 
-    // Keep labels close to the ring (overlap is OK), but never allow them to drift into the center.
-    const labelMargin = 18;
+    // Keep labels close to their slice (overlap is OK), but never allow them to drift into the center.
+    // Small offset from the ring edge so labels sit "on top" of their slice rather than orbiting far away.
+    const labelOffset = 10;
     const minVerticalSpacing = 8;
     const positions: Array<{
       segment: MacroSegment;
@@ -358,10 +362,9 @@ export function MacroCompositionDonutChart({
       // Anchor point at ring edge
       const anchor = polar(cx, cy, radius, midAngle);
 
-      // Label position
-      const labelDistance = chartRadius + labelMargin;
-      let labelX = cx + labelDistance * Math.cos(midRad);
-      let labelY = cy + labelDistance * Math.sin(midRad);
+      // Label position (relative to the anchor point on the slice edge)
+      let labelX = anchor.x + labelOffset * Math.cos(midRad);
+      let labelY = anchor.y + labelOffset * Math.sin(midRad);
 
       // Radial floor: if a label gets clamped inward later, ensure it stays outside the donut.
       const minLabelRadius = outerOuterR + 10;
@@ -407,14 +410,27 @@ export function MacroCompositionDonutChart({
 
     return [...left, ...right];
 
-  }, [innerSegments, outerSegments, minLabelPercent, cx, cy, chartRadius, innerOuterR, outerOuterR]);
+  }, [innerSegments, outerSegments, minLabelPercent, cx, cy, innerOuterR, outerOuterR]);
+
+  const computeLabelBox = (labelText: string, percentText: string) => {
+    // Labels should match the score chip text size (stable, not affected by SVG scaling).
+    const fontSize = FontSize.gaugeLabelMd;
+    const lineHeight = FontSize.gaugeLabelMd + Spacing.xs; // ~17
+    // NOTE: chart-geometry heuristic; not a theme token. If we need to theme this,
+    // we should move it to a shared chart typography helper.
+    const CHAR_W = 8.5;
+    const longest = Math.max(labelText.length, percentText.length);
+    const labelWidth = Math.max(longest * CHAR_W, LABEL_BOX_MIN_W);
+    const labelHeight = LABEL_BOX_H;
+    return { fontSize, lineHeight, labelWidth, labelHeight };
+  };
 
   // Empty state - check AFTER all hooks are called
   if (totalKcal === 0) {
     return (
       // Important: disable pointer events so the surrounding ScrollView can scroll.
       <View pointerEvents="none" style={[styles.container, style]}>
-        <Svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <Circle
             cx={cx}
             cy={cy}
@@ -441,7 +457,7 @@ export function MacroCompositionDonutChart({
   return (
     // Important: disable pointer events so the surrounding ScrollView can scroll.
     <View pointerEvents="none" style={[styles.container, style]}>
-      <Svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {/* Inner ring segments */}
         {innerSegments.map((segment, idx) => {
           return (
@@ -476,122 +492,100 @@ export function MacroCompositionDonutChart({
           />
         )}
 
-        {/* Labels with leader lines */}
+        {/* Leader lines only (label text is rendered in an overlay so it doesn't scale with SVG) */}
         {labelPositions.map((pos, idx) => {
           const labelText = macroLabel(pos.segment.name);
           const percentText = formatPercent(pos.segment.percent);
-          const fontSize = FontSize.sm;
-          const lineHeight = FontSize.sm + Spacing.xs; // 16
-          const paddingH = Spacing.xs + Nudge.px2; // 6
-          const paddingV = Spacing.xs; // 4
+          const { labelWidth, labelHeight } = computeLabelBox(labelText, percentText);
 
-          // More generous label width estimate to avoid truncation (e.g. "Net C").
-          // NOTE: chart-geometry heuristic; not a theme token. If we need to theme this,
-          // we should move it to a shared chart typography helper.
-          const CHAR_W = 8.5;
-          const longest = Math.max(labelText.length, percentText.length);
-          // NOTE: 56 is a chart-geometry minimum width (not a theme token).
-          const labelWidth = Math.max(longest * CHAR_W + paddingH * 2, 56);
-          const labelHeight = lineHeight * 2 + paddingV * 2;
-
-          // Clamp label placement within the FULL padded SVG viewBox (not inside the PAD region),
-          // so labels can live in the padding area instead of being pulled inward over the donut.
-          const boundsLeft = 4;
-          const boundsRight = svgSize - 4;
-
-          const rectXRaw = pos.side === 'right' ? pos.x : pos.x - labelWidth;
-          const rectX = Math.max(boundsLeft, Math.min(rectXRaw, boundsRight - labelWidth));
+          const rectX = pos.side === 'right' ? pos.x : pos.x - labelWidth;
           const rectY = pos.y - labelHeight / 2;
 
-          // Text X respects padding inside the pill.
-          const textX =
-            pos.side === 'right' ? rectX + paddingH : rectX + labelWidth - paddingH;
-
-          // SvgText y is baseline; use dominantBaseline="middle" so these are true centers.
-          const centerY = pos.y;
-          const textY1 = centerY - lineHeight / 2;
-          const textY2 = centerY + lineHeight / 2;
-
-          // Leader line should connect to the pill edge closest to the donut.
+          // Connect to the label box edge closest to the donut.
           const lineEndX = pos.side === 'right' ? rectX : rectX + labelWidth;
-          const lineEndY = centerY;
+          const lineEndY = rectY + labelHeight / 2;
 
-          const haloColor = colors.background;
-          const haloStrokeWidth = Spacing.xs + Nudge.px2; // 6
-          
           return (
-            <React.Fragment key={`label-${idx}`}>
-              {/* Leader line */}
-              <Line
-                x1={pos.anchorX}
-                y1={pos.anchorY}
-                x2={lineEndX}
-                y2={lineEndY}
-                stroke={colors.separator}
-                strokeWidth={1}
-                opacity={0.5}
-              />
-
-              {/* Label text (halo outline) */}
-              <SvgText
-                x={textX}
-                y={textY1}
-                fontSize={fontSize}
-                fill="none"
-                stroke={haloColor}
-                strokeWidth={haloStrokeWidth}
-                strokeLinejoin="round"
-                textAnchor={pos.side === 'right' ? 'start' : 'end'}
-                alignmentBaseline="middle"
-                fontWeight={FontWeight.bold}
-              >
-                {labelText}
-              </SvgText>
-              <SvgText
-                x={textX}
-                y={textY1}
-                fontSize={fontSize}
-                fill={colors.text}
-                textAnchor={pos.side === 'right' ? 'start' : 'end'}
-                alignmentBaseline="middle"
-                fontWeight={FontWeight.semibold}
-              >
-                {labelText}
-              </SvgText>
-
-              <SvgText
-                x={textX}
-                y={textY2}
-                fontSize={fontSize}
-                fill="none"
-                stroke={haloColor}
-                strokeWidth={haloStrokeWidth}
-                strokeLinejoin="round"
-                textAnchor={pos.side === 'right' ? 'start' : 'end'}
-                alignmentBaseline="middle"
-                fontWeight={FontWeight.bold}
-              >
-                {percentText}
-              </SvgText>
-              <SvgText
-                x={textX}
-                y={textY2}
-                fontSize={fontSize}
-                fill={colors.text}
-                textAnchor={pos.side === 'right' ? 'start' : 'end'}
-                alignmentBaseline="middle"
-                fontWeight={FontWeight.regular}
-              >
-                {percentText}
-              </SvgText>
-            </React.Fragment>
+            <Line
+              key={`leader-${idx}`}
+              x1={pos.anchorX}
+              y1={pos.anchorY}
+              x2={lineEndX}
+              y2={lineEndY}
+              stroke={colors.separator}
+              strokeWidth={1}
+              opacity={0.5}
+            />
           );
         })}
       </Svg>
 
+      {/* External labels as overlay (stable font size, matches chip text) */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.labelsOverlay]}>
+        {labelPositions.map((pos, idx) => {
+          const labelText = macroLabel(pos.segment.name);
+          const percentText = formatPercent(pos.segment.percent);
+          const { fontSize, lineHeight, labelWidth, labelHeight } = computeLabelBox(labelText, percentText);
+
+          const rectX = pos.side === 'right' ? pos.x : pos.x - labelWidth;
+          const rectY = pos.y - labelHeight / 2;
+
+          return (
+            <View
+              key={`overlay-label-${idx}`}
+              style={[
+                styles.sliceLabelBox,
+                {
+                  left: rectX,
+                  top: rectY,
+                  width: labelWidth,
+                  height: labelHeight,
+                  alignItems: pos.side === 'right' ? 'flex-start' : 'flex-end',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sliceLabelText,
+                  {
+                    color: colors.text,
+                    fontSize,
+                    lineHeight,
+                    fontWeight: FontWeight.semibold,
+                    textAlign: pos.side === 'right' ? 'left' : 'right',
+                    textShadowColor: colors.background,
+                    textShadowOffset: { width: 0, height: 0 },
+                    textShadowRadius: Spacing.xs,
+                  },
+                ]}
+              >
+                {labelText}
+              </Text>
+              <Text
+                style={[
+                  styles.sliceLabelText,
+                  {
+                    color: colors.text,
+                    fontSize,
+                    lineHeight,
+                    fontWeight: FontWeight.regular,
+                    textAlign: pos.side === 'right' ? 'left' : 'right',
+                    textShadowColor: colors.background,
+                    textShadowOffset: { width: 0, height: 0 },
+                    textShadowRadius: Spacing.xs,
+                  },
+                ]}
+              >
+                {percentText}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
       {/* Center overlay (always on top of the SVG) */}
       {centerGrade ? (
-        <View style={[styles.centerOverlay, { width: svgSize, height: svgSize }]}>
+        <View style={[styles.centerOverlay, { width: size, height: size }]}>
           <View style={[styles.centerInner, { maxWidth: innerInnerR * 2 - 12 }]}>
             <Text style={[styles.centerGradeText, { color: gradeColor }]}>{centerGrade}</Text>
             <Text style={[styles.centerLabelText, { color: colors.text }]}>{centerLabelText}</Text>
@@ -624,6 +618,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'visible',
+  },
+  labelsOverlay: {
+    overflow: 'visible',
+  },
+  sliceLabelBox: {
+    position: 'absolute',
+    justifyContent: 'center',
+  },
+  sliceLabelText: {
+    // Dynamic font sizing + halo set inline.
   },
   centerOverlay: {
     position: 'absolute',

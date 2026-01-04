@@ -977,7 +977,7 @@ export default function FoodEditScreen() {
             styles.scrollContent,
             // Keep this tight so we don't allow scrolling into a large blank region.
             // Just enough to clear the safe area + a small buffer.
-            { paddingHorizontal: Spacing.md, paddingBottom: Spacing.lg + Math.max(insets.bottom, 0) + 8 },
+            { paddingHorizontal: Spacing.md, paddingBottom: Math.max(insets.bottom, 0) + 8 },
           ]}
           keyboardShouldPersistTaps="handled"
         >
@@ -1248,8 +1248,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    flexGrow: 1,
     alignItems: 'center',
+    justifyContent: 'flex-start',
     paddingTop: 4,
   },
   centeredContainer: {
@@ -1264,7 +1264,7 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     // Keep the chart close to the action row; avoid huge white gaps on small screens.
-    marginTop: 4,
+    marginTop: 6,
     marginBottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1272,7 +1272,7 @@ const styles = StyleSheet.create({
   formActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 12,
+    marginTop: 8,
   },
   cancelButton: {
     flex: 1,
