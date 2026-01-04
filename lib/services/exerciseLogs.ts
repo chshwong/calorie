@@ -19,6 +19,12 @@ export type ExerciseLog = {
   name: string;
   minutes: number | null;
   notes: string | null;
+  category: 'cardio_mind_body' | 'strength';
+  intensity: 'low' | 'medium' | 'high' | 'max' | null;
+  distance_km: number | null;
+  sets: number | null;
+  reps_min: number | null;
+  reps_max: number | null;
   created_at: string;
 };
 
@@ -30,6 +36,12 @@ const EXERCISE_LOG_COLUMNS = `
   name,
   minutes,
   notes,
+  category,
+  intensity,
+  distance_km,
+  sets,
+  reps_min,
+  reps_max,
   created_at
 `;
 
@@ -105,7 +117,7 @@ export async function getExerciseSummaryForRecentDays(
 
     const { data, error } = await supabase
       .from('exercise_log')
-      .select('date, minutes')
+      .select('date, minutes, category')
       .eq('user_id', userId)
       .gte('date', startDateString)
       .lte('date', endDateString)
@@ -117,11 +129,14 @@ export async function getExerciseSummaryForRecentDays(
     }
 
     // Aggregate by date
+    // Total minutes only counts cardio/mind-body exercises (strength uses sets/reps)
+    // Activity count includes all exercises regardless of category
     const summaryMap = new Map<string, { total_minutes: number; activity_count: number }>();
 
     (data || []).forEach((log) => {
       const date = log.date;
-      const minutes = log.minutes || 0;
+      // Only count minutes for cardio/mind-body exercises
+      const minutes = (log.category === 'cardio_mind_body' && log.minutes) ? log.minutes : 0;
 
       if (!summaryMap.has(date)) {
         summaryMap.set(date, { total_minutes: 0, activity_count: 0 });
@@ -166,7 +181,7 @@ export async function getExerciseSummaryForRecentDays(
 export async function getRecentAndFrequentExercises(
   userId: string,
   days: number = RecentFrequentDayRange
-): Promise<Array<{ name: string; minutes: number | null }>> {
+): Promise<Array<{ name: string; minutes: number | null; category?: 'cardio_mind_body' | 'strength' }>> {
   if (!userId) {
     return [];
   }
@@ -183,7 +198,7 @@ export async function getRecentAndFrequentExercises(
     // Fetch all logs in the time window
     const { data, error } = await supabase
       .from('exercise_log')
-      .select('name, minutes, date, created_at')
+      .select('name, minutes, date, created_at, category')
       .eq('user_id', userId)
       .gte('date', startDateString)
       .order('date', { ascending: false })
@@ -199,7 +214,7 @@ export async function getRecentAndFrequentExercises(
     }
 
     // Group by name only (not name+minutes)
-    // For each name, track: frequency, most recent date+created_at, latest minutes
+    // For each name, track: frequency, most recent date+created_at, latest minutes, latest category
     // Since data is sorted by date DESC, created_at DESC:
     // - The first log for each name has the most recent timestamp (last_at)
     // - We need to find the most recent log with non-null minutes for each name
@@ -209,6 +224,7 @@ export async function getRecentAndFrequentExercises(
       last_at: string; // Combined date + created_at for sorting (most recent timestamp)
       last_minutes: number | null; // Latest non-null minutes for this name
       last_minutes_at: string | null; // Timestamp of the log with last_minutes (for comparison)
+      last_category: 'cardio_mind_body' | 'strength' | undefined; // Latest category for this name
     }>();
 
     // Group by name and track frequency, most recent timestamp, and latest minutes
@@ -225,6 +241,8 @@ export async function getRecentAndFrequentExercises(
         // Since data is sorted DESC, the first occurrence is the most recent
         if (sortableTime > existing.last_at) {
           existing.last_at = sortableTime;
+          // Also update category when we have a more recent log
+          existing.last_category = (log as any).category as 'cardio_mind_body' | 'strength' | undefined;
         }
         // Update last_minutes if this log has non-null minutes and is more recent than current last_minutes
         // Since data is sorted DESC, we compare timestamps to find the most recent non-null minutes
@@ -242,6 +260,7 @@ export async function getRecentAndFrequentExercises(
           last_at: sortableTime,
           last_minutes: log.minutes !== null ? log.minutes : null,
           last_minutes_at: log.minutes !== null ? sortableTime : null,
+          last_category: (log as any).category as 'cardio_mind_body' | 'strength' | undefined,
         });
       }
     });
@@ -257,7 +276,7 @@ export async function getRecentAndFrequentExercises(
         return b.last_at.localeCompare(a.last_at); // More recent first
       })
       .slice(0, FrequentChipMax)
-      .map(({ name, last_minutes }) => ({ name, minutes: last_minutes }));
+      .map(({ name, last_minutes, last_category }) => ({ name, minutes: last_minutes, category: last_category }));
 
     // 2. Recent list: top 8 by recency, excluding frequent items
     const frequentNames = new Set(frequent.map((e) => e.name));
@@ -265,7 +284,7 @@ export async function getRecentAndFrequentExercises(
       .filter((e) => !frequentNames.has(e.name))
       .sort((a, b) => b.last_at.localeCompare(a.last_at)) // Most recent first
       .slice(0, RecentChipMax)
-      .map(({ name, last_minutes }) => ({ name, minutes: last_minutes }));
+      .map(({ name, last_minutes, last_category }) => ({ name, minutes: last_minutes, category: last_category }));
 
     // 3. Combine: frequent first, then recent, max 10 total
     const combined = [...frequent, ...recent].slice(0, FrequentRecentChipMax);
@@ -382,7 +401,7 @@ export async function createExerciseLog(
  */
 export async function updateExerciseLog(
   logId: string,
-  updates: Partial<Pick<ExerciseLog, 'name' | 'minutes' | 'date' | 'notes'>>
+  updates: Partial<Pick<ExerciseLog, 'name' | 'minutes' | 'date' | 'notes' | 'category' | 'intensity' | 'distance_km' | 'sets' | 'reps_min' | 'reps_max'>>
 ): Promise<ExerciseLog | null> {
   try {
     const { data, error } = await supabase

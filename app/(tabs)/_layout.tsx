@@ -747,6 +747,12 @@ function TabLayoutContent() {
           }}
         />
         <Tabs.Screen
+          name="exercise/settings"
+          options={{
+            href: null, // Hide from tab bar
+          }}
+        />
+        <Tabs.Screen
           name="more"
           options={{
             title: t('tabs.more'),

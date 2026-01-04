@@ -35,6 +35,10 @@ export const PROFILES = {
   export const RANGES = {
     CALORIES_KCAL: { MIN: 0, MAX: 5000 },       // DB: calorie_entries_calories_kcal_check
     EXERCISE_MINUTES: { MIN: 0, MAX: 999 },     // DB: minutes_range (nullable)
+    EXERCISE_SETS: { MIN: 0, MAX: 999 },        // DB: exercise_log_sets_check (nullable)
+    EXERCISE_REPS_MIN: { MIN: 1, MAX: 100 },    // DB: exercise_log_reps_range_check (nullable)
+    EXERCISE_REPS_MAX: { MIN: 1, MAX: 100 },    // DB: exercise_log_reps_range_check (nullable)
+    EXERCISE_DISTANCE_KM: { MIN: 0, MAX: 999 }, // DB: exercise_log_distance_km_check (nullable, future use)
     MED_DOSE_AMOUNT: { MIN: 0, MAX: 9999 },     // DB: med_log_dose_amount_range (nullable)
     WATER_PRESET_SLOT: { MIN: 1, MAX: 5 },      // DB: water_quick_presets_slot_check
   } as const;

@@ -1628,6 +1628,7 @@
       "notes_placeholder": "Ajoutez des notes sur cet exercice...",
       "notes_helper": "Notes optionnelles (max 200 caractères)",
       "notes_max_length": "Les notes doivent contenir 200 caractères ou moins",
+      "select_category": "Veuillez sélectionner une catégorie",
       "save": "Enregistrer",
       "cancel": "Annuler",
       "saving": "Enregistrement...",
@@ -1638,6 +1639,8 @@
       "add_custom_hint": "Double appui pour ajouter un exercice personnalisé",
       "your_recent_frequent": "Vos exercices récents et fréquents",
       "common_exercises": "Exercices courants",
+      "common_cardio_mind_body": "Cardio & Bien-être courants",
+      "common_strength": "Exercices de force courants",
       "common_exercises_list": {
         "walking": "Marche",
         "running": "Course",
@@ -1673,6 +1676,29 @@
     },
     "delete_button": {
       "hint": "Double appui pour supprimer cet exercice"
+    },
+    "chip": {
+      "add_min": "+min",
+      "add_sets": "+séries",
+      "add_reps": "+répétitions",
+      "add_intensity": "+Effort",
+      "add_km": "+km",
+      "add_mi": "+mi",
+      "edit_minutes": "Modifier les minutes",
+      "edit_sets": "Modifier les séries",
+      "edit_reps_with_value": "Modifier répétitions: {{value}}",
+      "edit_intensity_with_value": "Modifier intensité: {{value}}",
+      "edit_distance": "Modifier distance ({{unit}})",
+      "delete_exercise": "Supprimer l'exercice"
+    },
+    "settings": {
+      "title": "Paramètres d'exercice",
+      "distance_unit": "Unité de distance",
+      "distance_unit_description": "Choisissez comment la distance est affichée pour les exercices cardio",
+      "kilometers": "Kilomètres (km)",
+      "miles": "Miles (mi)",
+      "cancel": "Annuler",
+      "save": "Enregistrer"
     },
     "loading": "Chargement des exercices...",
     "error": "Échec du chargement des exercices"

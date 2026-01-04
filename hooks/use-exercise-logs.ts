@@ -268,7 +268,7 @@ export function useUpdateExerciseLog() {
   const userId = user?.id;
 
   return useMutation({
-    mutationFn: ({ logId, updates }: { logId: string; updates: Partial<Pick<ExerciseLog, 'name' | 'minutes' | 'date' | 'notes'>> }) => {
+    mutationFn: ({ logId, updates }: { logId: string; updates: Partial<Pick<ExerciseLog, 'name' | 'minutes' | 'date' | 'notes' | 'category' | 'intensity' | 'distance_km' | 'sets' | 'reps_min' | 'reps_max'>> }) => {
       if (!userId) {
         throw new Error('User not authenticated');
       }

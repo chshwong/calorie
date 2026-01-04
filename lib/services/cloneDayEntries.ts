@@ -259,6 +259,12 @@ async function cloneExerciseLogForDate(
         name: entry.name,
         minutes: entry.minutes,
         notes: entry.notes,
+        category: entry.category,
+        intensity: entry.intensity,
+        distance_km: entry.distance_km,
+        sets: entry.sets,
+        reps_min: entry.reps_min,
+        reps_max: entry.reps_max,
       };
 
       const created = await createExerciseLog(newEntry);

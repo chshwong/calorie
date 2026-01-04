@@ -1816,6 +1816,7 @@
       "notes_placeholder": "Add any notes about this exercise...",
       "notes_helper": "Optional notes (max 200 characters)",
       "notes_max_length": "Notes must be 200 characters or less",
+      "select_category": "Please select a category",
       "save": "Save",
       "cancel": "Cancel",
       "saving": "Saving...",
@@ -1826,6 +1827,8 @@
       "add_custom_hint": "Double tap to add a custom exercise",
       "your_recent_frequent": "Your recent & frequent",
       "common_exercises": "Common exercises",
+      "common_cardio_mind_body": "Common Cardio & Mind-Body",
+      "common_strength": "Common Strength Workouts",
       "common_exercises_list": {
         "walking": "🚶‍♂️ Walking",
         "running": "🏃‍♂️ Running",
@@ -1862,6 +1865,29 @@
     },
     "delete_button": {
       "hint": "Double tap to delete this exercise"
+    },
+    "chip": {
+      "add_min": "+min",
+      "add_sets": "+sets",
+      "add_reps": "+reps",
+      "add_intensity": "+Effort",
+      "add_km": "+km",
+      "add_mi": "+mi",
+      "edit_minutes": "Edit minutes",
+      "edit_sets": "Edit sets",
+      "edit_reps_with_value": "Edit reps: {{value}}",
+      "edit_intensity_with_value": "Edit intensity: {{value}}",
+      "edit_distance": "Edit distance ({{unit}})",
+      "delete_exercise": "Delete exercise"
+    },
+    "settings": {
+      "title": "Exercise Settings",
+      "distance_unit": "Distance Unit",
+      "distance_unit_description": "Choose how distance is displayed for cardio exercises",
+      "kilometers": "Kilometers (km)",
+      "miles": "Miles (mi)",
+      "cancel": "Cancel",
+      "save": "Save"
     },
     "loading": "Loading exercises...",
     "error": "Failed to load exercises",

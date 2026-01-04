@@ -32,6 +32,7 @@ export type UserConfig = {
   weight_unit: 'kg' | 'lb' | null;
   water_unit_preference: 'metric' | 'imperial' | null;
   water_unit: string | null;
+  distance_unit: 'km' | 'mi' | null;
   
   // Daily Goals/Targets
   daily_calorie_goal: number | null;
