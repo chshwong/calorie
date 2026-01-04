@@ -1000,7 +1000,7 @@ export default function FoodLogHomeScreen() {
                     getMinTouchTargetStyle(),
                     Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
                   ]}
-                  onPress={() => router.push('/settings/my-goal/edit-calories')}
+                  onPress={() => router.push('/settings/my-goal/edit-calories?from=home')}
                   activeOpacity={0.7}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   {...getButtonAccessibilityProps(
@@ -1058,7 +1058,7 @@ export default function FoodLogHomeScreen() {
                       getMinTouchTargetStyle(),
                       Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
                     ]}
-                    onPress={() => router.push('/settings/my-goal/edit-targets')}
+                    onPress={() => router.push('/settings/my-goal/edit-targets?from=home')}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     {...getButtonAccessibilityProps(

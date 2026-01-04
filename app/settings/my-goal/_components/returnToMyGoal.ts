@@ -1,10 +1,29 @@
 import { Router } from 'expo-router';
 
 /**
- * Navigate back to /settings/my-goal from any My-Goal edit modal.
+ * Navigate back from any My-Goal edit modal.
+ * - If coming from home: navigates back to home page
+ * - Otherwise: navigates to /settings/my-goal (default behavior for settings/onboarding)
  * Uses router.dismiss() if available, otherwise falls back to router.replace().
  */
-export function returnToMyGoal(router: Router): void {
+export function returnToMyGoal(router: Router, source?: string): void {
+  // If coming from home, navigate back to home
+  if (source === 'home') {
+    try {
+      // Try dismiss first (works for modals)
+      if (typeof router.dismiss === 'function') {
+        router.dismiss();
+        return;
+      }
+    } catch {
+      // If dismiss fails, fall through to replace
+    }
+    // Fallback: navigate to home tabs
+    router.replace('/(tabs)');
+    return;
+  }
+  
+  // Default behavior: navigate to /settings/my-goal
   try {
     // Try dismiss first (works for modals)
     if (typeof router.dismiss === 'function') {

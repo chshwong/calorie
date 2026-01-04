@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { Colors, Spacing } from '@/constants/theme';
@@ -16,6 +16,8 @@ import { useTranslation } from 'react-i18next';
 export default function EditTargetsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const source = params.from as string | undefined;
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { data: profile } = useUserConfig();
@@ -53,7 +55,7 @@ export default function EditTargetsScreen() {
       });
 
       showAppToast(t('settings.my_goal.edit_targets.toast_updated'));
-      returnToMyGoal(router);
+      returnToMyGoal(router, source);
     } catch (error) {
       console.error('Error saving targets:', error);
       showAppToast(t('settings.my_goal.edit_targets.toast_update_failed'));
@@ -68,7 +70,7 @@ export default function EditTargetsScreen() {
         <EditSheet
           title={t('settings.my_goal.edit_targets.sheet_title')}
           hideHeader={true}
-          onCancel={() => returnToMyGoal(router)}
+          onCancel={() => returnToMyGoal(router, source)}
           onSave={handleSave}
           saving={updateProfileMutation.isPending}
         >
