@@ -64,9 +64,18 @@ export const FOOD_LOG = {
   DONE_MODAL: {
     LOW_CAL_MAX_INCLUSIVE: 499,
     OK_CAL_MIN_INCLUSIVE: 500,
-    // Above this, we require a secondary confirmation before allowing “Mark as Fasted”.
+    // Above this, we require a secondary confirmation before allowing "Mark as Fasted".
     FASTED_PRIMARY_MAX_CAL_EXCLUSIVE: 1000,
+    // Threshold for showing weekly loss projection in celebration messages
+    HIGH_DEFICIT_THRESHOLD_CAL: 350,
   },
+} as const;
+
+// Food entry/edit screen input limits (UI + validation policy).
+// Keep centralized to avoid hardcoding min/max in screens (engineering-guidelines.md §7).
+export const FOOD_ENTRY = {
+  QUANTITY: { MIN_EXCLUSIVE: 0, MAX: 100000 },
+  MACRO_G: { MIN: 0, MAX: 9999.99 },
 } as const;
 
   // Daily nutrient target ranges (for onboarding and daily focus targets)

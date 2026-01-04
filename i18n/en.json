@@ -26,14 +26,33 @@
     "add": "Add",
     "go_back": "Go Back",
     "not_set": "Not set",
-    "no_target": "No target"
+    "no_target": "No target",
+    "less_than_one_percent": "<1%"
   },
 
   "nutrition": {
     "calories": "Calories",
     "protein": "Protein",
     "carbs": "Carbs",
-    "fat": "Fat"
+    "fat": "Fat",
+    "fiber": "Fiber",
+    "net_carb": "Net Carb"
+  },
+
+  "avo_score": {
+    "label": "AvoScore",
+    "reasons": {
+      "high_protein": "✅High protein",
+      "high_fiber": "✅High fiber",
+      "high_unsat_fat": "✅High unsat. fat",
+      "high_sugar": "⚠️High sugar",
+      "high_sodium": "⚠️High sodium",
+      "high_sat_fat": "⚠️High sat. fat",
+      "trans_fat": "⚠️Trans fat",
+      "high_fat": "⚠️High fat",
+      "balanced": "Balanced macros",
+      "no_macro_data": "No macro data"
+    }
   },
 
   "date_guard": {
@@ -795,7 +814,7 @@
       "secondary_targets": "Secondary Targets (Optional)",
       "protein": "Protein Goal",
       "fiber": "Fiber Goal",
-      "carbs": "Carbs Limit",
+      "carbs": "Total Carbs Limit",
       "sugar": "Sugar Limit",
       "sodium": "Sodium Limit",
       "water": "Daily Water Target",

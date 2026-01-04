@@ -212,6 +212,40 @@ export async function updateEntry(
 }
 
 /**
+ * Update an existing calorie entry, scoped to a user.
+ *
+ * Per engineering guidelines, components should not call Supabase directly. This helper
+ * also avoids trusting a client-provided user_id by filtering on user_id server-side (RLS still applies).
+ */
+export async function updateEntryForUser(
+  entryId: string,
+  userId: string,
+  updates: Partial<CalorieEntry>
+): Promise<CalorieEntry | null> {
+  if (!userId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('calorie_entries')
+      .update(updates)
+      .eq('id', entryId)
+      .eq('user_id', userId)
+      .select(ENTRY_COLUMNS)
+      .single();
+
+    if (error) {
+      console.error('Error updating entry for user:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Exception updating entry for user:', error);
+    return null;
+  }
+}
+
+/**
  * Delete a calorie entry
  * 
  * @param entryId - The entry ID to delete

@@ -8,12 +8,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
+import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
+import {
+  pickRandomDayCompletionMessage,
+  pickRandomWeightLossOnTargetMessage,
+} from '@/constants/dayCompletionMessages';
+import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
+import { useUserConfig } from '@/hooks/use-user-config';
+import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import type { DailyLogStatus, DailySumConsumed } from '@/utils/types';
 import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
 import { useSetDailyConsumedStatus } from '@/hooks/use-set-daily-consumed-status';
 import { compareDateKeys } from '@/lib/date-guard';
 import { addDays } from '@/utils/dateKey';
 import { FOOD_LOG } from '@/constants/constraints';
+import { formatWeeklyLossProjection } from '@/utils/weeklyLossProjection';
 import {
   getButtonAccessibilityProps,
   getFocusStyle,
@@ -78,7 +87,18 @@ export function DoneForTodayButton({ selectedDateKey, todayKey, yesterdayKey, fo
   const logStatus = normalizeStatus(todayRow?.log_status);
   const calories = typeof todayRow?.calories === 'number' ? todayRow.calories : 0;
 
+  // Get user config for goal and target calories
+  const { data: userConfig } = useUserConfig();
+  const goalType = (userConfig?.goal_type ?? 'maintain') as 'lose' | 'maintain' | 'recomp' | 'gain';
+  const targetCalories = Number(userConfig?.daily_calorie_target ?? 0);
+
+  // Get burned calories for deficit calculation
+  const { data: dailyBurned } = useDailySumBurned(selectedDateKey, { enabled: !!userId });
+  const burnedCalories = dailyBurned?.tdee_cal ?? null;
+
   const setStatusMutation = useSetDailyConsumedStatus();
+
+  const { show, props: confettiProps } = useConfettiToastMessage();
 
   const [modal, setModal] = useState<ModalState>('none');
   const [frozenModalRender, setFrozenModalRender] = useState<FrozenModalRender | null>(null);
@@ -147,6 +167,9 @@ export function DoneForTodayButton({ selectedDateKey, todayKey, yesterdayKey, fo
   const applyStatus = (next: DailyLogStatus, toastKey: 'completed' | 'fasted' | 'unknown') => {
     if (!userId) return;
 
+    // Capture previous status before mutation
+    const prevStatus = logStatus;
+
     // Dismiss immediately to avoid the modal briefly re-rendering to the new status
     // due to optimistic cache updates.
     close();
@@ -154,6 +177,42 @@ export function DoneForTodayButton({ selectedDateKey, todayKey, yesterdayKey, fo
     setStatusMutation
       .mutateAsync({ entryDate: selectedDateKey, status: next })
       .then(() => {
+        // Trigger celebration only on unknown -> completed/fasted transitions
+        console.log('[celebrate] prev=', prevStatus, 'next=', next, 'Platform=', Platform.OS);
+        if (prevStatus === 'unknown' && (next === 'completed' || next === 'fasted')) {
+          // Calculate conditions for weight-loss-specific messages
+          const eaten = calories;
+          const burned = burnedCalories ?? 0;
+          const deficit = burned - eaten; // positive = deficit, negative = surplus
+          const isWithinTarget = eaten <= targetCalories;
+          const isWeightLoss = goalType === 'lose';
+          const isHighDeficit = deficit > FOOD_LOG.DONE_MODAL.HIGH_DEFICIT_THRESHOLD_CAL;
+
+          // Get weight unit from userConfig
+          const weightUnit = (userConfig?.weight_unit ?? 'lb') as 'lb' | 'kg';
+
+          // Choose message based on conditions
+          let message: string;
+          // Weight loss + on target ALWAYS uses the weight-loss on-target pool
+          if (isWeightLoss && isWithinTarget) {
+            message = pickRandomWeightLossOnTargetMessage();
+            if (isHighDeficit) {
+              message += `\n\n${formatWeeklyLossProjection(deficit, weightUnit, t)}`;
+            }
+          } else {
+            message = pickRandomDayCompletionMessage();
+          }
+
+          const title = next === 'completed' ? '✅ Day Complete' : '✅ Fasted Day';
+          show({
+            title,
+            message,
+            confirmText: 'Got it',
+            withConfetti: true,
+          });
+        }
+
+        // Keep existing toast messages (optional)
         if (toastKey === 'completed') {
           showAppToast(t('home.done_for_today.toast_completed', { defaultValue: 'Marked done for today.' }));
         } else if (toastKey === 'fasted') {
@@ -460,6 +519,8 @@ export function DoneForTodayButton({ selectedDateKey, todayKey, yesterdayKey, fo
         tintOnTintColor={tintOnTintColor}
         loading={setStatusMutation.isPending || isDismissing}
       />
+
+      <ConfettiCelebrationModal {...confettiProps} />
     </>
   );
 }

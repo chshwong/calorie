@@ -2,16 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
+import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
+import { computeAvoScore } from '@/utils/avoScore';
 import { Colors, Spacing } from '@/constants/theme';
-import { RANGES } from '@/constants/constraints';
+import { FOOD_ENTRY, RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CalorieEntry } from '@/utils/types';
 import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
 import {
@@ -26,7 +28,7 @@ import {
 } from '@/utils/nutritionMath';
 import { getServingsForFood } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { getEntriesForDate } from '@/lib/services/calorieEntries';
+import { createEntry, getEntriesForDate, updateEntryForUser } from '@/lib/services/calorieEntries';
 import { getFoodMasterById } from '@/lib/services/foodMaster';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
 import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
@@ -47,8 +49,6 @@ type FoodEditRouteParams = {
   entryPayload?: string;
 };
 
-const MAX_QUANTITY = 100000;
-const MAX_MACRO = 9999.99;
 const ENTRY_STALE_MS = 15 * 60 * 1000; // 15 minutes
 const LONG_CACHE_MS = 180 * 24 * 60 * 60 * 1000; // ~180 days for stable by-id data
 
@@ -57,6 +57,7 @@ export default function FoodEditScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
@@ -319,7 +320,7 @@ export default function FoodEditScreen() {
 
     if (entryId && entriesLoaded && !hydratedEntry) {
       Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.entry_not_exists'));
-      router.back();
+      goBackSafely({ entryDate: entryDateFallback, mealType: mealTypeFallback });
       return;
     }
 
@@ -425,7 +426,7 @@ export default function FoodEditScreen() {
 
         if (!foodData) {
           Alert.alert(t('alerts.error_title'), t('mealtype_log.errors.food_not_found'));
-          router.back();
+          goBackSafely({ entryDate: entryDateFallback, mealType: mealTypeFallback });
           return;
         }
 
@@ -582,6 +583,89 @@ export default function FoodEditScreen() {
 
   const isSaveDisabled = loading || !isFormValid() || isCaloriesOverLimit;
 
+  const avo = useMemo(() => {
+    const carbG = parseFloat(carbs) || 0;
+    const fiberG = parseFloat(fiber) || 0;
+    const proteinG = parseFloat(protein) || 0;
+    const fatG = parseFloat(fat) || 0;
+    const sugarG = parseFloat(sugar) || 0;
+    const sodiumMg = parseFloat(sodium) || 0;
+    const satFatG = parseFloat(saturatedFat) || 0;
+    const transFatG = parseFloat(transFat) || 0;
+
+    return computeAvoScore({
+      calories: totalCalories,
+      carbG,
+      fiberG,
+      proteinG,
+      fatG,
+      sugarG,
+      sodiumMg,
+      satFatG,
+      transFatG,
+    });
+  }, [carbs, fiber, protein, fat, sugar, sodium, saturatedFat, transFat, totalCalories]);
+
+  const saveEntryMutation = useMutation({
+    mutationFn: async (params: {
+      mode: 'edit' | 'create';
+      userId: string;
+      entryId?: string;
+      previousDateKey?: string;
+      entryForCreate?: Omit<CalorieEntry, 'id' | 'created_at' | 'updated_at'>;
+      updatesForEdit?: Partial<CalorieEntry>;
+    }) => {
+      if (params.mode === 'edit') {
+        if (!params.entryId || !params.updatesForEdit) {
+          throw new Error('Missing entryId/updates for edit mutation');
+        }
+        const updated = await updateEntryForUser(params.entryId, params.userId, params.updatesForEdit);
+        if (!updated) throw new Error('Failed to update entry');
+        return updated;
+      }
+
+      if (!params.entryForCreate) {
+        throw new Error('Missing entry payload for create mutation');
+      }
+      const created = await createEntry(params.entryForCreate);
+      if (!created) throw new Error('Failed to create entry');
+      return created;
+    },
+    onSuccess: (saved, vars) => {
+      // Update the cache immediately, then invalidate for server truth.
+      // (engineering-guidelines.md §4.2)
+      const savedKey = ['entries', vars.userId, saved.entry_date] as const;
+
+      queryClient.setQueryData<CalorieEntry[]>(savedKey, (prev) => {
+        const list = prev ?? [];
+        const idx = list.findIndex((e) => e.id === saved.id);
+        if (idx >= 0) {
+          const next = list.slice();
+          next[idx] = saved;
+          return next;
+        }
+        return [...list, saved];
+      });
+
+      if (vars.previousDateKey && vars.previousDateKey !== saved.entry_date) {
+        const prevKey = ['entries', vars.userId, vars.previousDateKey] as const;
+        queryClient.setQueryData<CalorieEntry[]>(prevKey, (prev) =>
+          (prev ?? []).filter((e) => e.id !== saved.id)
+        );
+      }
+
+      queryClient.invalidateQueries({ queryKey: savedKey });
+      invalidateDailySumConsumedRangesForDate(queryClient, vars.userId, saved.entry_date);
+
+      if (vars.previousDateKey && vars.previousDateKey !== saved.entry_date) {
+        queryClient.invalidateQueries({
+          queryKey: ['entries', vars.userId, vars.previousDateKey],
+        });
+        invalidateDailySumConsumedRangesForDate(queryClient, vars.userId, vars.previousDateKey);
+      }
+    },
+  });
+
   // Safe navigation helper: go back if possible, else navigate to mealtype-log
   const goBackSafely = useCallback((fallbackParams?: { entryDate?: string; mealType?: string }) => {
     if (router.canGoBack()) {
@@ -663,23 +747,37 @@ export default function FoodEditScreen() {
       return;
     }
 
-    if (parsedQuantity > MAX_QUANTITY) {
-      const errorMsg = `Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}.`;
-      setQuantityError(errorMsg);
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: MAX_QUANTITY.toLocaleString() }));
+    if (parsedQuantity > FOOD_ENTRY.QUANTITY.MAX) {
+      setQuantityError(t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: FOOD_ENTRY.QUANTITY.MAX.toLocaleString() }));
+      Alert.alert(
+        t('alerts.validation_error'),
+        t('mealtype_log.errors.serving_too_large', {
+          value: parsedQuantity.toLocaleString(),
+          max: FOOD_ENTRY.QUANTITY.MAX.toLocaleString(),
+        })
+      );
       return;
     }
 
-    if (protein && parseFloat(protein) > MAX_MACRO) {
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.protein_too_large', { max: MAX_MACRO.toLocaleString() }));
+    if (protein && parseFloat(protein) > FOOD_ENTRY.MACRO_G.MAX) {
+      Alert.alert(
+        t('alerts.validation_error'),
+        t('mealtype_log.errors.protein_too_large', { max: FOOD_ENTRY.MACRO_G.MAX.toLocaleString() })
+      );
       return;
     }
-    if (carbs && parseFloat(carbs) > MAX_MACRO) {
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.carbs_too_large', { max: MAX_MACRO.toLocaleString() }));
+    if (carbs && parseFloat(carbs) > FOOD_ENTRY.MACRO_G.MAX) {
+      Alert.alert(
+        t('alerts.validation_error'),
+        t('mealtype_log.errors.carbs_too_large', { max: FOOD_ENTRY.MACRO_G.MAX.toLocaleString() })
+      );
       return;
     }
-    if (fat && parseFloat(fat) > MAX_MACRO) {
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fat_too_large', { max: MAX_MACRO.toLocaleString() }));
+    if (fat && parseFloat(fat) > FOOD_ENTRY.MACRO_G.MAX) {
+      Alert.alert(
+        t('alerts.validation_error'),
+        t('mealtype_log.errors.fat_too_large', { max: FOOD_ENTRY.MACRO_G.MAX.toLocaleString() })
+      );
       return;
     }
 
@@ -688,7 +786,7 @@ export default function FoodEditScreen() {
       const dateString = entryDate || entryDateParam || '';
       const eatenAt = getCurrentDateTimeUTC();
 
-      const entryData: Record<string, any> = {
+      const updatesForEdit: Partial<CalorieEntry> = {
         entry_date: dateString,
         meal_type: (mealType || mealTypeParam || '').toLowerCase(),
         item_name: itemName.trim(),
@@ -703,111 +801,91 @@ export default function FoodEditScreen() {
       };
 
       if (selectedFood) {
-        entryData.food_id = selectedFood.id;
+        updatesForEdit.food_id = selectedFood.id;
       }
       if (selectedServing && selectedServing.kind === 'saved') {
-        entryData.serving_id = selectedServing.serving.id;
+        updatesForEdit.serving_id = selectedServing.serving.id;
       }
 
       if (saturatedFat && saturatedFat.trim() !== '') {
         const parsed = parseFloat(saturatedFat);
         if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
-          entryData.saturated_fat_g = Math.round(parsed * 100) / 100;
+          updatesForEdit.saturated_fat_g = Math.round(parsed * 100) / 100;
         }
       }
       if (transFat && transFat.trim() !== '') {
         const parsed = parseFloat(transFat);
         if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
-          entryData.trans_fat_g = Math.round(parsed * 100) / 100;
+          updatesForEdit.trans_fat_g = Math.round(parsed * 100) / 100;
         }
       }
       if (sugar && sugar.trim() !== '') {
         const parsed = parseFloat(sugar);
         if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
-          entryData.sugar_g = Math.round(parsed * 100) / 100;
+          updatesForEdit.sugar_g = Math.round(parsed * 100) / 100;
         }
       }
       if (sodium && sodium.trim() !== '') {
         const parsed = parseFloat(sodium);
         if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
-          entryData.sodium_mg = Math.round(parsed * 100) / 100;
+          updatesForEdit.sodium_mg = Math.round(parsed * 100) / 100;
         }
       }
 
-    const cleanedEntryData: Record<string, any> = {};
-      const allowedFields = [
-        'entry_date',
-        'meal_type',
-        'item_name',
-        'quantity',
-        'unit',
-        'calories_kcal',
-        'protein_g',
-        'carbs_g',
-        'fat_g',
-        'fiber_g',
-        'saturated_fat_g',
-        'trans_fat_g',
-        'sugar_g',
-        'sodium_mg',
-        'food_id',
-        'serving_id',
-        'eaten_at',
-      ];
+      const isEdit = mode === 'edit' && !!entryId;
+      const isCreate = mode === 'create' && !!foodId;
 
-      for (const key of allowedFields) {
-        if (entryData.hasOwnProperty(key) && entryData[key] !== undefined) {
-          cleanedEntryData[key] = entryData[key];
-        }
+      if (!isEdit && !isCreate) {
+        Alert.alert(t('alerts.error_title'), t('common.unexpected_error'));
+        return;
       }
 
-    let error;
-    if (mode === 'edit' && entryId) {
-      const updateResult = await supabase
-        .from('calorie_entries')
-        .update(cleanedEntryData)
-        .eq('id', entryId)
-        .eq('user_id', user.id);
-      error = updateResult.error;
-    } else if (mode === 'create' && foodId) {
-      const insertResult = await supabase
-        .from('calorie_entries')
-        .insert({ ...cleanedEntryData, user_id: user.id })
-        .select('id')
-        .single();
-      error = insertResult.error;
-    }
+      if (isEdit) {
+        await saveEntryMutation.mutateAsync({
+          mode: 'edit',
+          userId: user.id,
+          entryId: entryId!,
+          previousDateKey: entryDateParam,
+          updatesForEdit,
+        });
+      } else {
+        const entryForCreate: Omit<CalorieEntry, 'id' | 'created_at' | 'updated_at'> = {
+          user_id: user.id,
+          entry_date: updatesForEdit.entry_date ?? dateString,
+          eaten_at: updatesForEdit.eaten_at ?? eatenAt,
+          meal_type: updatesForEdit.meal_type ?? (mealType || mealTypeParam || '').toLowerCase(),
+          item_name: updatesForEdit.item_name ?? itemName.trim(),
+          food_id: updatesForEdit.food_id ?? null,
+          serving_id: updatesForEdit.serving_id ?? null,
+          quantity: updatesForEdit.quantity ?? parsedQuantity,
+          unit: updatesForEdit.unit ?? (selectedServing?.label || unit),
+          calories_kcal: updatesForEdit.calories_kcal ?? parsedCalories,
+          protein_g: updatesForEdit.protein_g ?? null,
+          carbs_g: updatesForEdit.carbs_g ?? null,
+          fat_g: updatesForEdit.fat_g ?? null,
+          fiber_g: updatesForEdit.fiber_g ?? null,
+          saturated_fat_g: updatesForEdit.saturated_fat_g ?? null,
+          trans_fat_g: updatesForEdit.trans_fat_g ?? null,
+          sugar_g: updatesForEdit.sugar_g ?? null,
+          sodium_mg: updatesForEdit.sodium_mg ?? null,
+          notes: null,
+        };
 
-    if (error) {
-      console.error('Food edit save error', error);
-      Alert.alert(t('alerts.error_title'), error.message || t('common.unexpected_error'));
-      isSavingRef.current = false; // Reset on error
-      setLoading(false);
-      return;
-    }
+        await saveEntryMutation.mutateAsync({
+          mode: 'create',
+          userId: user.id,
+          entryForCreate,
+        });
+      }
 
-    const savedDateKey = (cleanedEntryData.entry_date ?? entryDate ?? entryDateParam) as string | undefined;
-
-    if (savedDateKey) {
-      queryClient.invalidateQueries({
-        queryKey: ['entries', user.id, savedDateKey],
-      });
-      invalidateDailySumConsumedRangesForDate(queryClient, user.id, savedDateKey);
-    }
-
-    // If the entry moved dates (edit mode), invalidate the original day too.
-    if (mode === 'edit' && entryDateParam && savedDateKey && entryDateParam !== savedDateKey) {
-      queryClient.invalidateQueries({
-        queryKey: ['entries', user.id, entryDateParam],
-      });
-      invalidateDailySumConsumedRangesForDate(queryClient, user.id, entryDateParam);
-    }
+      const savedDateKey = (updatesForEdit.entry_date ?? entryDate ?? entryDateParam) as string | undefined;
 
     // Use safe navigation: go back if possible, else navigate to mealtype-log
     goBackSafely({ entryDate: entryDate || entryDateParam, mealType: mealType || mealTypeParam });
     // Note: Don't reset isSavingRef here since we're navigating away
-    } catch (error: any) {
-      Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : undefined;
+      Alert.alert(t('alerts.error_title'), message || t('common.unexpected_error'));
     } finally {
       setLoading(false);
     }
@@ -859,12 +937,13 @@ export default function FoodEditScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <DesktopPageContainer>
+      {/* Ensure the screen wrapper fills the viewport so the ScrollView can scroll. */}
+      <DesktopPageContainer style={{ flex: 1 }}>
       <ThemedView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => goBackSafely({ entryDate, mealType })}
             activeOpacity={0.7}
           >
             <ThemedText style={[styles.backButtonText, { color: colors.tint }]}>←</ThemedText>
@@ -892,7 +971,14 @@ export default function FoodEditScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: Spacing.md, paddingBottom: Spacing.lg }]}
+          // Extra bottom padding so the final action row can always scroll fully into view
+          // even with large content above (e.g., the macro chart).
+          contentContainerStyle={[
+            styles.scrollContent,
+            // Keep this tight so we don't allow scrolling into a large blank region.
+            // Just enough to clear the safe area + a small buffer.
+            { paddingHorizontal: Spacing.md, paddingBottom: Spacing.lg + Math.max(insets.bottom, 0) + 8 },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           <View style={[styles.centeredContainer, { maxWidth: isDesktop ? 520 : '100%' }]}>
@@ -1027,10 +1113,24 @@ export default function FoodEditScreen() {
               }
             />
 
+            {/* Macro Composition Chart (placed under nutrition label, above actions) */}
+            <View style={styles.chartContainer}>
+              <MacroCompositionDonutChart
+                gramsCarbTotal={parseFloat(carbs) || 0}
+                gramsFiber={parseFloat(fiber) || 0}
+                gramsProtein={parseFloat(protein) || 0}
+                gramsFat={parseFloat(fat) || 0}
+                size={220}
+                centerGrade={avo.grade}
+                centerLabel="avo_score.label"
+                centerReasons={avo.reasons}
+              />
+            </View>
+
             <View style={styles.formActions}>
               <TouchableOpacity
                 style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
-                onPress={() => router.back()}
+                onPress={() => goBackSafely({ entryDate, mealType })}
                 activeOpacity={0.7}
               >
                 <ThemedText style={[styles.cancelButtonText, { color: colors.text }]}>
@@ -1050,7 +1150,7 @@ export default function FoodEditScreen() {
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={colors.textOnTint} />
                 ) : (
                   <ThemedText style={styles.saveButtonText}>
                     {isCreateMode ? 'Log New' : t('mealtype_log.buttons.update_log')}
@@ -1162,10 +1262,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
   },
+  chartContainer: {
+    // Keep the chart close to the action row; avoid huge white gaps on small screens.
+    marginTop: 4,
+    marginBottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   formActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+    marginTop: 12,
   },
   cancelButton: {
     flex: 1,

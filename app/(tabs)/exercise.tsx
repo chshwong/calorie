@@ -48,6 +48,11 @@ import {
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { RepsRangeBottomSheet } from '@/components/exercise/RepsRangeBottomSheet';
 import { IntensityBottomSheet } from '@/components/exercise/IntensityBottomSheet';
+import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
+import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessages';
+import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
+import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
+import type { DailyLogStatus } from '@/utils/types';
 
 // Constants for responsive breakpoints and conversion factors
 // These are UI layout constants, not spacing tokens, so they live here per guideline 11
@@ -505,6 +510,51 @@ export default function ExerciseHomeScreen() {
   const { data: exerciseLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useExerciseLogsForDate(selectedDateString);
   const { data: recentDaysSummary = [] } = useExerciseSummaryForRecentDays(7);
   const { data: recentAndFrequentExercises = [], isLoading: isLoadingRecentFrequent } = useRecentAndFrequentExercises(RecentFrequentDayRange);
+
+  // Celebration toast hook
+  const { show, props: confettiToastProps } = useConfettiToastMessage();
+
+  // Day status tracking for celebration
+  const userId = user?.id;
+  const { data: dayStatusRows = [] } = useDailySumConsumedRange(userId, selectedDateString, selectedDateString);
+  const todayRow = dayStatusRows[0];
+  
+  // Normalize status function (same as DoneForTodayButton)
+  const normalizeStatus = (input: string | null | undefined): DailyLogStatus => {
+    if (input === 'completed' || input === 'fasted' || input === 'unknown') return input;
+    return 'unknown';
+  };
+  
+  const dayStatus = normalizeStatus(todayRow?.log_status);
+  const prevStatusRef = useRef<string | null>(null);
+
+  // Track status transitions and trigger celebration
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    if (prev === null) {
+      prevStatusRef.current = dayStatus;
+      return; // first load: do nothing
+    }
+    if (prev === 'unknown' && dayStatus === 'completed') {
+      const msg = pickRandomDayCompletionMessage();
+      show({ 
+        title: '✅ Day Complete',
+        message: msg,
+        confirmText: 'Got it',
+        withConfetti: true 
+      });
+    }
+    if (prev === 'unknown' && dayStatus === 'fasted') {
+      const msg = pickRandomDayCompletionMessage();
+      show({ 
+        title: '✅ Fasted Day',
+        message: msg,
+        confirmText: 'Got it',
+        withConfetti: true 
+      });
+    }
+    prevStatusRef.current = dayStatus;
+  }, [dayStatus, show]);
 
   // Mutations
   const createMutation = useCreateExerciseLog();
@@ -2099,6 +2149,9 @@ export default function ExerciseHomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Celebration Toast */}
+      <ConfettiCelebrationModal {...confettiToastProps} />
     </ThemedView>
   );
 }

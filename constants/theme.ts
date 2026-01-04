@@ -26,6 +26,10 @@ export const salmonColorDark ='#E9876F';
 export const salmonColorLight ='#B8553F';
 export const brandGreenColorDark ='#DCF048';
 export const brandGreencolorLight ='#526C19';
+export const brandBlueColorDark ='#60A5FA'; // Blue for protein (light blue for dark mode)
+export const brandBlueColorLight ='#3B82F6'; // Blue for protein (darker blue for light mode)
+export const brandVioletColorDark ='#A78BFA'; // Violet for fat (lighter violet for dark mode)
+export const brandVioletColorLight ='#8B5CF6'; // Violet for fat (darker violet for light mode)
 
 
 // Standardized grey color used across the entire app
@@ -169,6 +173,13 @@ export const Colors = {
     chartOrange: '#FFA500', // chartOrange (shared)
     chartPink: '#FF5FA2', // chartPink (shared)
     chartRed: '#FF3B30', // chartRed (shared)
+
+    // AvoScore grade colors (theme-aware). Prefer existing semantic/chart tokens.
+    gradeA: '#2ECC71', // chartGreen
+    gradeB: '#2FA4A9', // appTeal
+    gradeC: '#FFA500', // chartOrange
+    gradeD: '#FF5FA2', // chartPink
+    gradeF: '#FF3B30', // chartRed
     
     // UI Elements
     icon: StandardGrey.light,
@@ -257,6 +268,13 @@ export const Colors = {
     chartOrange: '#FFA500', // chartOrange (shared)
     chartPink: '#FF5FA2', // chartPink (shared)
     chartRed: '#FF3B30', // chartRed (shared)
+
+    // AvoScore grade colors (theme-aware). Prefer existing semantic/chart tokens.
+    gradeA: '#2ECC71', // chartGreen
+    gradeB: '#5BC2C6', // appTeal (dark)
+    gradeC: '#FFA500', // chartOrange
+    gradeD: '#FF5FA2', // chartPink
+    gradeF: '#FF3B30', // chartRed
     
     // UI Elements
     icon: StandardGrey.dark,
