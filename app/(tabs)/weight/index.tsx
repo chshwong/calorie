@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Pressable, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -8,12 +8,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
 import {
-  useWeightHomeData,
   useWeightLogs366d,
   getLatestWeightEntry,
   getLatestBodyFatEntry,
 } from '@/hooks/use-weight-logs';
 import { deriveDailyLatestWeight } from '@/lib/derive/daily-latest-weight';
+import { WeightChartCarousel } from '@/components/weight/WeightChartCarousel';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,7 +22,6 @@ import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } 
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
-import Svg, { Path, Circle } from 'react-native-svg';
 import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
@@ -52,14 +51,16 @@ export default function WeightHomeScreen() {
     if (!hasDateParam) return;
     setSelectedDate(dateKeyToLocalStartOfDay(routeDateKey));
   }, [hasDateParam, routeDateKey]);
-  const [chartWidth, setChartWidth] = useState<number>(0);
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
   const effectiveProfile = userConfig || authProfile; // For avatar
   const updateProfile = useUpdateProfile();
   const [showMenu, setShowMenu] = useState(false);
-  const { days, isLoading, isFetching } = useWeightHomeData(7, selectedDate);
   const weight366Query = useWeightLogs366d();
+  const rawLogs = weight366Query.data ?? [];
+  const dailyLatest = useMemo(() => deriveDailyLatestWeight(rawLogs), [rawLogs]);
+  const isLoading = weight366Query.isLoading;
+  const isFetching = weight366Query.isFetching;
   const todayKey = getLocalDateKey(todayLocal);
   const isToday = getLocalDateKey(selectedDate) === getLocalDateKey(todayLocal);
   const minDateKey = useMemo(() => {
@@ -92,75 +93,17 @@ export default function WeightHomeScreen() {
       : '—';
   const latestTimestamp = latestEntry ? new Date(latestEntry.weighed_at) : null;
 
-  const { chartLabels, chartData, hasSufficientPoints, chartPadding } = useMemo(() => {
-    const DOT_R = 5;
-    const PAD_X = DOT_R + 2;
-    const PAD_Y_TOP = DOT_R + 2;
-    const PAD_Y_BOTTOM = DOT_R + 10;
-
-    const end = new Date(selectedDate);
-    end.setHours(0, 0, 0, 0);
-    const start = new Date(end);
-    start.setDate(start.getDate() - 6);
-
-    const rawLogs = weight366Query.data ?? [];
-    const dailyLatest = deriveDailyLatestWeight(rawLogs);
-
-    // Find earliest date key in dailyLatest for window adjustment
-    const startKey = getLocalDateKey(start);
-    const endKey = getLocalDateKey(end);
-    let earliestKeyInData: string | null = null;
-    if (dailyLatest.length > 0) {
-      earliestKeyInData = dailyLatest[0].date_key;
-    }
-    const effectiveStartKey =
-      earliestKeyInData && compareDateKeys(earliestKeyInData, startKey) > 0
-        ? earliestKeyInData
-        : startKey;
-    const effectiveStart = dateKeyToLocalStartOfDay(effectiveStartKey);
-
-    // Build date keys and labels for the 7-day window
-    const keys: string[] = [];
-    const labels: string[] = [];
-    const dayCount = Math.max(1, 1 + Math.round((end.getTime() - effectiveStart.getTime()) / (24 * 60 * 60 * 1000)));
-    for (let i = 0; i < dayCount; i++) {
-      const d = new Date(effectiveStart);
-      d.setDate(effectiveStart.getDate() + i);
-      const key = getLocalDateKey(d);
-      keys.push(key);
-      labels.push(
-        d.toLocaleDateString('en-US', {
-          weekday: 'short',
-        })[0]
-      );
-    }
-
-    // Create map from date_key to daily latest weight for quick lookup
-    const dailyMap = new Map<string, typeof dailyLatest[0]>();
-    dailyLatest.forEach((day) => {
-      dailyMap.set(day.date_key, day);
+  const days = useMemo(() => {
+    return deriveWeightHomeDaysFromLogs({
+      rawLogs,
+      selectedDate,
+      rangeDays: 7,
+      fetchWindowDays: 14,
+      moduleStartMinDateKey: minDateKey,
+      moduleStartUserCreatedAtISO: user?.created_at ?? null,
+      todayLocal,
     });
-
-    // Map keys to values: use dailyLatest weight if available, otherwise null (gaps)
-    const values: Array<number | null> = keys.map((key) => {
-      const day = dailyMap.get(key);
-      if (day && day.weight_lb !== null && day.weight_lb !== undefined) {
-        const weightLb = day.weight_lb;
-        return unit === 'kg' ? roundTo1(lbToKg(weightLb)) : roundTo1(weightLb);
-      }
-      return null;
-    });
-
-    const numericValues = values.filter((v): v is number => v !== null && Number.isFinite(v));
-    const hasSufficient = numericValues.length >= 2;
-
-    return {
-      chartLabels: labels,
-      chartData: values.map((v) => (v !== null && Number.isFinite(v) ? v : NaN)),
-      hasSufficientPoints: hasSufficient,
-      chartPadding: { DOT_R, PAD_X, PAD_Y_TOP, PAD_Y_BOTTOM },
-    };
-  }, [unit, weight366Query.data, selectedDate]);
+  }, [minDateKey, rawLogs, selectedDate, todayLocal, user?.created_at]);
 
   const renderWeight = (weightLb: number | null) => {
     if (weightLb === null) return 'No data yet';
@@ -237,110 +180,7 @@ export default function WeightHomeScreen() {
         module="weight"
       >
         <DesktopPageContainer>
-          <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
-            <View style={{ marginBottom: Spacing.sm, gap: Spacing.xs }}>
-              <ThemedText style={{ color: colors.text, fontWeight: '600' }}>
-                Weight – Last 7 Days
-              </ThemedText>
-              <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>
-                Avg per day
-              </ThemedText>
-            </View>
-
-            {hasSufficientPoints ? (
-              <View
-                style={styles.chartWrap}
-                onLayout={(e) => {
-                  const w = e.nativeEvent.layout.width;
-                  if (w && Number.isFinite(w)) {
-                    setChartWidth(w);
-                  }
-                }}
-              >
-                {chartWidth > 0 && (
-                  <>
-                    <Svg
-                      width={chartWidth}
-                      height={200}
-                      viewBox={`0 0 ${chartWidth} 200`}
-                      preserveAspectRatio="none"
-                    >
-                      {(() => {
-                        const h = 200;
-                        const n = chartData.length;
-                        const denom = Math.max(1, n - 1);
-                        const { PAD_X, PAD_Y_TOP, PAD_Y_BOTTOM, DOT_R } = chartPadding;
-                        const usableWidth = Math.max(0, chartWidth - PAD_X * 2);
-                        
-                        // Filter out NaN values for min/max calculation
-                        const finiteValues = chartData.filter((v) => Number.isFinite(v));
-                        if (finiteValues.length === 0) {
-                          return null;
-                        }
-                        const minY = Math.min(...finiteValues);
-                        const maxY = Math.max(...finiteValues);
-                        const span = Math.max(1e-6, maxY - minY);
-                        const usableHeight = Math.max(0, h - PAD_Y_TOP - PAD_Y_BOTTOM);
-                        
-                        // Build points, filtering out NaN values
-                        const points = chartData
-                          .map((v, i) => {
-                            if (!Number.isFinite(v)) return null;
-                            const x = PAD_X + (i / denom) * usableWidth;
-                            const y = PAD_Y_TOP + ((maxY - v) / span) * usableHeight;
-                            return { x, y, v };
-                          })
-                          .filter((p): p is { x: number; y: number; v: number } => p !== null);
-                        
-                        // Build path only from valid points
-                        const pathD =
-                          points.length > 0
-                            ? points
-                                .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
-                                .join(' ')
-                            : '';
-                        return (
-                          <>
-                            <Path
-                              d={pathD}
-                              fill="none"
-                              stroke={colors.tint}
-                              strokeWidth={2}
-                            />
-                            {points.map((p, idx) => (
-                              <Circle
-                                key={idx}
-                                cx={p.x}
-                                cy={p.y}
-                                r={DOT_R}
-                                stroke={colors.tint}
-                                strokeWidth={2}
-                                fill={colors.tint}
-                              />
-                            ))}
-                          </>
-                        );
-                      })()}
-                    </Svg>
-                    <View style={[styles.chartLabels, { width: chartWidth }]}>
-                      {chartLabels.map((lbl, idx) => (
-                        <ThemedText
-                          key={idx}
-                          style={{ color: colors.textSecondary, fontSize: FontSize.sm }}
-                        >
-                          {lbl}
-                        </ThemedText>
-                      ))}
-                    </View>
-                  </>
-                )}
-              </View>
-            ) : (
-              <ThemedText style={{ color: colors.textSecondary }}>
-                Add at least 2 weigh-ins to see a trend.
-              </ThemedText>
-            )}
-          </View>
+          <WeightChartCarousel dailyLatest={dailyLatest} selectedDate={selectedDate} todayLocal={todayLocal} unit={unit} />
 
             <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
               {isLoading ? (
@@ -525,6 +365,119 @@ function formatDateLabel(dateStr: string, today: Date) {
     return `Yesterday · ${baseLabel}`;
   }
   return baseLabel;
+}
+
+type WeightDay = {
+  entryId: string | null;
+  date: string;
+  weightLb: number | null;
+  bodyFatPercent: number | null;
+  weighedAt?: string | null;
+  carriedForward: boolean;
+  hasEntry: boolean;
+  entryCount: number;
+};
+
+function deriveWeightHomeDaysFromLogs(input: {
+  rawLogs: Array<{ id: string; weighed_at: string; weight_lb: number; body_fat_percent: number | null }>;
+  selectedDate: Date;
+  rangeDays: number;
+  fetchWindowDays: number;
+  moduleStartMinDateKey: string;
+  moduleStartUserCreatedAtISO: string | null;
+  todayLocal: Date;
+}): WeightDay[] {
+  const { rawLogs, selectedDate, rangeDays, fetchWindowDays, moduleStartMinDateKey, moduleStartUserCreatedAtISO, todayLocal } = input;
+
+  const today = new Date(selectedDate);
+  today.setHours(0, 0, 0, 0);
+
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - (fetchWindowDays - 1));
+  startDate.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(today);
+  endDate.setHours(23, 59, 59, 999);
+
+  // Filter logs to the same window the previous implementation fetched from the DB (14d minimum).
+  const windowLogs = rawLogs.filter((log) => {
+    const ms = new Date(log.weighed_at).getTime();
+    return ms >= startDate.getTime() && ms <= endDate.getTime();
+  });
+
+  // Count entries per local day (for multi-entry indicator + day view)
+  const countByDate = new Map<string, number>();
+  windowLogs.forEach((log) => {
+    const key = getLocalDateKey(new Date(log.weighed_at));
+    countByDate.set(key, (countByDate.get(key) ?? 0) + 1);
+  });
+
+  // Map latest entry per day
+  const latestByDate = new Map<string, (typeof windowLogs)[number]>();
+  windowLogs.forEach((log) => {
+    const key = getLocalDateKey(new Date(log.weighed_at));
+    const existing = latestByDate.get(key);
+    if (!existing || new Date(log.weighed_at).getTime() > new Date(existing.weighed_at).getTime()) {
+      latestByDate.set(key, log);
+    }
+  });
+
+  // Determine module start day for filtering/carry-forward:
+  // - If the account was created within our 366d fetch window, the earliest log we have is also the earliest possible log.
+  // - Otherwise, use the min allowed date key (signup clamp) so we don't incorrectly hide days for long-time users with older logs.
+  const startOfFetch = new Date(todayLocal);
+  startOfFetch.setDate(startOfFetch.getDate() - 365);
+  startOfFetch.setHours(0, 0, 0, 0);
+  const createdAtMs = moduleStartUserCreatedAtISO ? new Date(moduleStartUserCreatedAtISO).getTime() : null;
+  const canTrustWindowAsFullHistory = createdAtMs !== null && createdAtMs >= startOfFetch.getTime();
+  const earliestLogKey = rawLogs.length > 0 ? getLocalDateKey(new Date(rawLogs[0].weighed_at)) : null;
+  const firstEntryDateKey = canTrustWindowAsFullHistory && earliestLogKey ? earliestLogKey : moduleStartMinDateKey;
+
+  // Build date list ascending to compute carry-forward correctly
+  const allDateKeys: string[] = [];
+  for (let i = 0; i < fetchWindowDays; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    allDateKeys.push(getLocalDateKey(d));
+  }
+
+  let lastKnownWeight: number | null = null;
+  const timeline: WeightDay[] = allDateKeys.map((dateKey) => {
+    const entry = latestByDate.get(dateKey);
+    const hasEntry = !!entry;
+    const weightFromEntry = entry?.weight_lb ?? null;
+    const bodyFatFromEntry = entry?.body_fat_percent ?? null;
+    const entryId = entry?.id ?? null;
+    const entryCount = countByDate.get(dateKey) ?? 0;
+
+    if (hasEntry && weightFromEntry !== null) {
+      lastKnownWeight = weightFromEntry;
+    }
+
+    const shouldCarryForward = !hasEntry && lastKnownWeight !== null && dateKey >= firstEntryDateKey;
+
+    return {
+      date: dateKey,
+      entryId,
+      weightLb: hasEntry ? weightFromEntry : shouldCarryForward ? lastKnownWeight : null,
+      bodyFatPercent: hasEntry ? bodyFatFromEntry : null,
+      weighedAt: entry?.weighed_at ?? null,
+      carriedForward: shouldCarryForward && !hasEntry,
+      hasEntry,
+      entryCount,
+    };
+  });
+
+  const windowDays = timeline.slice(-rangeDays).reverse(); // Today first
+
+  // Hide days before the first-ever weigh-in day (module start day).
+  // NOTE: Without an extra DB call, we cannot know whether a long-time user has weight logs older than the 366d window.
+  // This strategy avoids incorrectly hiding days for those users while still hiding pre-first-entry days for new accounts.
+  if (canTrustWindowAsFullHistory && earliestLogKey) {
+    return windowDays.filter((d) => d.date >= earliestLogKey);
+  }
+
+  return windowDays;
 }
 
 const styles = StyleSheet.create({

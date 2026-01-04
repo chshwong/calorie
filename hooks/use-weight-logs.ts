@@ -104,7 +104,7 @@ export function useWeightLogs366d() {
   const cacheKey = userId ? `weightLogs366d:${userId}` : null;
   const snapshot =
     cacheKey !== null
-      ? getPersistentCache<WeightLogRow[]>(cacheKey, THREE_HUNDRED_SIXTY_SIX_DAYS_MS)
+      ? getPersistentCache<WeightLogRow[]>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
       : null;
 
   return useQuery<WeightLogRow[]>({
