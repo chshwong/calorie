@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -361,17 +362,9 @@ export default function ScannedItemScreen() {
   // Loading state
   if (isLoading) {
     return (
-      <ThemedView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
-          <ThemedText style={[styles.loadingText, { color: colors.text }]}>
-            {t('scanned_item.looking_up')}
-          </ThemedText>
-          <ThemedText style={[styles.barcodeSmall, { color: colors.textSecondary }]}>
-            {formatBarcodeForDisplay(barcode || '')}
-          </ThemedText>
-        </View>
-      </ThemedView>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 

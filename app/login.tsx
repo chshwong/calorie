@@ -28,6 +28,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
 import { useGeoCountry } from '@/hooks/use-geo-country';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -742,19 +743,12 @@ export default function LoginScreen() {
     }
   }, [authLoading, user, router]);
 
-  // Show brief spinner only while auth is initializing
-  if (authLoading) {
-    return (
-      <ThemedView style={[styles.page, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </ThemedView>
-    );
-  }
-
   // If user is logged in, return null (redirect is handled in useEffect)
   if (user) {
     return null;
   }
+
+  const isBlocking = authLoading;
 
   const handleScrollToAuth = () => {
     if (isMobileWeb && typeof document !== 'undefined') {
@@ -860,7 +854,10 @@ export default function LoginScreen() {
   const showHeroVisual = screenWidth >= 360;
 
   return (
-    <ThemedView style={[styles.page, { backgroundColor: pageBaseColor }]}>
+    <View style={{ flex: 1 }}>
+      <BlockingBrandedLoader enabled={isBlocking} timeoutMs={5000} />
+      {!isBlocking ? (
+        <ThemedView style={[styles.page, { backgroundColor: pageBaseColor }]}>
       {/* Premium background layers */}
       <View
         pointerEvents="none"
@@ -1417,7 +1414,9 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
-    </ThemedView>
+        </ThemedView>
+      ) : null}
+    </View>
   );
 }
 

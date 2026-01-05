@@ -10,6 +10,7 @@ import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import {
   clearPendingLinkState,
   getPendingLinkState,
@@ -188,38 +189,32 @@ export default function AuthCallbackScreen() {
   }, [code, oauthError, oauthErrorDescription, router]);
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <View style={styles.headerRow}>
-          <IconSymbol name="lock.fill" size={22} color={colors.tint} />
-          <ThemedText style={[styles.title, { color: colors.text }]}>{title}</ThemedText>
-        </View>
+    <View style={{ flex: 1 }}>
+      <BlockingBrandedLoader enabled={busy} timeoutMs={5000} />
+      {!busy ? (
+        <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
+            <View style={styles.headerRow}>
+              <IconSymbol name="lock.fill" size={22} color={colors.tint} />
+              <ThemedText style={[styles.title, { color: colors.text }]}>{title}</ThemedText>
+            </View>
 
-        {busy ? (
-          <View style={styles.busyRow}>
-            <ActivityIndicator size="small" color={colors.tint} />
-            <ThemedText style={[styles.detail, { color: colors.textSecondary }]}>
-              {t('auth.callback.please_wait')}
-            </ThemedText>
+            {detail ? (
+              <ThemedText style={[styles.detail, { color: colors.textSecondary }]}>{detail}</ThemedText>
+            ) : null}
+
+            <Pressable
+              onPress={() => router.replace('/login')}
+              style={[styles.button, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+            >
+              <ThemedText style={{ color: colors.text, fontWeight: FontWeight.bold }}>
+                {t('auth.callback.back_to_login')}
+              </ThemedText>
+            </Pressable>
           </View>
-        ) : null}
-
-        {detail ? (
-          <ThemedText style={[styles.detail, { color: colors.textSecondary }]}>{detail}</ThemedText>
-        ) : null}
-
-        {!busy ? (
-          <Pressable
-            onPress={() => router.replace('/login')}
-            style={[styles.button, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-          >
-            <ThemedText style={{ color: colors.text, fontWeight: FontWeight.bold }}>
-              {t('auth.callback.back_to_login')}
-            </ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
-    </ThemedView>
+        </ThemedView>
+      ) : null}
+    </View>
   );
 }
 

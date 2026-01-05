@@ -6,6 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SurfaceCard } from '@/components/common/surface-card';
 import { QuickAddHeading } from '@/components/common/quick-add-heading';
@@ -1439,9 +1440,9 @@ export default function ExerciseHomeScreen() {
 
   if (!user) {
     return (
-      <ThemedView style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </ThemedView>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 

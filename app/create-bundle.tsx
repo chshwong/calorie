@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { FoodSearchBar } from '@/components/food-search-bar';
@@ -551,14 +552,9 @@ export default function CreateBundleScreen() {
 
   if (loadingBundle) {
     return (
-      <ThemedView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
-          <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
-            {t('create_bundle.loading')}
-          </ThemedText>
-        </View>
-      </ThemedView>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 

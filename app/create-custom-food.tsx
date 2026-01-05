@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Colors } from '@/constants/theme';
@@ -833,14 +834,9 @@ export default function CreateCustomFoodScreen() {
   // Show loading state while loading food data for editing
   if (loadingFood) {
     return (
-      <ThemedView style={styles.container}>
-        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.tint} />
-          <ThemedText style={[styles.loadingText, { color: colors.text }]}>
-            {t('create_custom_food.loading')}
-          </ThemedText>
-        </View>
-      </ThemedView>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
@@ -1015,11 +1016,9 @@ export default function FoodEditScreen() {
 
   if (initializing) {
     return (
-      <DesktopPageContainer>
-        <ThemedView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={colors.tint} />
-        </ThemedView>
-      </DesktopPageContainer>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 

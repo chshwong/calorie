@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
 import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
@@ -305,12 +306,7 @@ export default function LegalAgreementScreen() {
         </View>
 
         {initializing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={colors.tint} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-              {t('legal.loading_docs')}
-            </Text>
-          </View>
+          <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
         ) : (
           <>
             <ScrollView

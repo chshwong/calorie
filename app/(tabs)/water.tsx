@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 
 // ============================================================================
 // QUICK ADD ICON LAYOUT CONSTANTS (theme-token based; no magic numbers)
@@ -470,9 +471,9 @@ export default function WaterScreen() {
 
   if (!user) {
     return (
-      <ThemedView style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </ThemedView>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 

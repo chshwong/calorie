@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -66,12 +67,9 @@ export default function MyGoalScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-        <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
-          {t('common.loading')}
-        </ThemedText>
-      </ThemedView>
+      <View style={{ flex: 1 }}>
+        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+      </View>
     );
   }
 
