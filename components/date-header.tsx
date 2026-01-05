@@ -195,7 +195,7 @@ export function DateHeader({
             'Double tap to go to the previous day'
           )}
         >
-          <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          <View style={styles.dateNavIconContainer}>
             <Text style={[styles.dateNavButtonText, { color: moduleAccent }]}>‹</Text>
           </View>
         </TouchableOpacity>
@@ -255,7 +255,7 @@ export function DateHeader({
               'Double tap to go to the next day'
             )}
           >
-            <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+            <View style={styles.dateNavIconContainer}>
               <Text style={[styles.dateNavButtonText, { color: moduleAccent }]}>›</Text>
             </View>
           </TouchableOpacity>

@@ -185,7 +185,7 @@ export function CollapsibleModuleHeader({
               t('accessibility.previous_day')
             )}
           >
-            <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+            <View style={styles.dateNavIconContainer}>
               <Text style={[styles.dateNavButtonText, { color: moduleAccent }]}>‹</Text>
             </View>
           </TouchableOpacity>
@@ -223,7 +223,7 @@ export function CollapsibleModuleHeader({
                 t('accessibility.next_day')
               )}
             >
-              <View style={[styles.dateNavIconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+              <View style={styles.dateNavIconContainer}>
                 <Text style={[styles.dateNavButtonText, { color: moduleAccent }]}>›</Text>
               </View>
             </TouchableOpacity>
