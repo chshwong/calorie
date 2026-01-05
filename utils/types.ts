@@ -203,6 +203,34 @@ export interface DailySumConsumed {
   updated_at: string;
 }
 
+/**
+ * Per-meal daily fact row for consumed totals.
+ * Maps to the 'daily_sum_consumed_meal' table.
+ *
+ * Row existence = meal has entries for that day.
+ * Missing row = meal has no entries (or was deleted).
+ * This is purely derived data maintained by the recompute pipeline.
+ */
+export interface DailySumConsumedMealRow {
+  user_id: string;
+  entry_date: string;
+  meal_type: MealType;
+
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fibre_g: number;
+  sugar_g: number;
+  saturated_fat_g: number;
+  trans_fat_g: number;
+  sodium_mg: number;
+
+  created_at: string;
+  last_recomputed_at: string | null;
+  updated_at: string;
+}
+
 // ============================================================================
 // USER PROFILE TYPES
 // ============================================================================

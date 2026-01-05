@@ -1,7 +1,8 @@
 -- ============================================================================
 -- daily_sum_consumed maintenance (functions + triggers)
 --
--- Maintains public.daily_sum_consumed from public.calorie_entries via triggers.
+-- Maintains public.daily_sum_consumed and public.daily_sum_consumed_meal
+-- from public.calorie_entries via triggers.
 -- - INSERT/UPDATE/DELETE on calorie_entries => recompute totals for affected day(s)
 -- - UPDATE trigger is conditional to avoid noisy recomputes
 --
@@ -12,6 +13,7 @@
 
 -- ----------------------------------------------------------------------------
 -- Internal recompute helper (trigger-only; do not expose)
+-- Maintains BOTH daily_sum_consumed (grand totals) and daily_sum_consumed_meal (per-meal totals)
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.recompute_daily_sum_consumed_for_date(
   p_user_id uuid,
@@ -34,7 +36,11 @@ DECLARE
   v_trans_fat_sum numeric;
   v_sodium_sum numeric;
   v_last_entry_activity_at timestamptz;
+  v_current_meal_types text[];
 BEGIN
+  -- ========================================================================
+  -- PART 1: Compute and upsert daily_sum_consumed (grand totals)
+  -- ========================================================================
   -- Aggregate per-entry nutrients (NULL => 0)
   SELECT
     COALESCE(SUM(COALESCE(calories_kcal, 0)), 0),
@@ -114,6 +120,81 @@ BEGIN
       WHEN p_touch THEN now()
       ELSE public.daily_sum_consumed.touched_at
     END;
+    -- NOTE: We NEVER touch log_status, status_updated_at, completed_at here
+
+  -- ========================================================================
+  -- PART 2: Compute and upsert daily_sum_consumed_meal (per-meal totals)
+  -- ========================================================================
+  -- Get current meal_types that have entries
+  SELECT ARRAY_AGG(DISTINCT meal_type ORDER BY meal_type)
+  INTO v_current_meal_types
+  FROM public.calorie_entries
+  WHERE user_id = p_user_id
+    AND entry_date = p_entry_date
+    AND meal_type IS NOT NULL;
+
+  -- If no entries, set to empty array (will delete all meal rows)
+  IF v_current_meal_types IS NULL THEN
+    v_current_meal_types := ARRAY[]::text[];
+  END IF;
+
+  -- Upsert per-meal totals for each meal_type that has entries
+  INSERT INTO public.daily_sum_consumed_meal (
+    user_id,
+    entry_date,
+    meal_type,
+    calories,
+    protein_g,
+    carbs_g,
+    fat_g,
+    fibre_g,
+    sugar_g,
+    saturated_fat_g,
+    trans_fat_g,
+    sodium_mg,
+    last_recomputed_at,
+    updated_at
+  )
+  SELECT
+    p_user_id,
+    p_entry_date,
+    ce.meal_type,
+    ROUND(COALESCE(SUM(COALESCE(ce.calories_kcal, 0)), 0))::int,
+    COALESCE(SUM(COALESCE(ce.protein_g, 0)), 0),
+    COALESCE(SUM(COALESCE(ce.carbs_g, 0)), 0),
+    COALESCE(SUM(COALESCE(ce.fat_g, 0)), 0),
+    COALESCE(SUM(COALESCE(ce.fiber_g, 0)), 0),
+    COALESCE(SUM(COALESCE(ce.sugar_g, 0)), 0),
+    COALESCE(SUM(COALESCE(ce.saturated_fat_g, 0)), 0),
+    COALESCE(SUM(COALESCE(ce.trans_fat_g, 0)), 0),
+    ROUND(COALESCE(SUM(COALESCE(ce.sodium_mg, 0)), 0))::int,
+    now(),
+    now()
+  FROM public.calorie_entries ce
+  WHERE ce.user_id = p_user_id
+    AND ce.entry_date = p_entry_date
+    AND ce.meal_type IS NOT NULL
+  GROUP BY ce.meal_type
+  ON CONFLICT (user_id, entry_date, meal_type)
+  DO UPDATE SET
+    calories = EXCLUDED.calories,
+    protein_g = EXCLUDED.protein_g,
+    carbs_g = EXCLUDED.carbs_g,
+    fat_g = EXCLUDED.fat_g,
+    fibre_g = EXCLUDED.fibre_g,
+    sugar_g = EXCLUDED.sugar_g,
+    saturated_fat_g = EXCLUDED.saturated_fat_g,
+    trans_fat_g = EXCLUDED.trans_fat_g,
+    sodium_mg = EXCLUDED.sodium_mg,
+    last_recomputed_at = EXCLUDED.last_recomputed_at,
+    updated_at = EXCLUDED.updated_at;
+
+  -- Delete rows for meal_types that no longer have entries
+  -- (cleanup policy: row existence = meal has entries)
+  DELETE FROM public.daily_sum_consumed_meal
+  WHERE user_id = p_user_id
+    AND entry_date = p_entry_date
+    AND (v_current_meal_types = ARRAY[]::text[] OR meal_type != ALL(v_current_meal_types));
 END;
 $$;
 

@@ -186,7 +186,8 @@ export function MacroCompositionDonutChart({
   const innerInnerR = innerOuterR - strokeWidthInner;
   const outerOuterR = chartRadius - 2;
   const outerInnerR = outerOuterR - strokeWidthOuter;
-  const startAngle = -90; // 12 o'clock
+  // Rotate the chart 50° clockwise from 12 o'clock (-90°).
+  const startAngle = -40;
 
   const gradeColor = useMemo(() => {
     if (!centerGrade) return colors.text;

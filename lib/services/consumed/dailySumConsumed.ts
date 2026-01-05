@@ -6,7 +6,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { DailyLogStatus, DailySumConsumed } from '@/utils/types';
+import type { DailyLogStatus, DailySumConsumed, DailySumConsumedMealRow } from '@/utils/types';
 
 // Columns to select - avoid select('*') per guidelines
 export const DAILY_SUM_CONSUMED_COLUMNS = `
@@ -54,6 +54,49 @@ export async function getDailySumConsumedForRange(
   }
 
   return (data as DailySumConsumed[]) ?? [];
+}
+
+// Columns to select for daily_sum_consumed_meal - avoid select('*') per guidelines
+export const DAILY_SUM_CONSUMED_MEAL_COLUMNS = `
+  user_id,
+  entry_date,
+  meal_type,
+  calories,
+  protein_g,
+  carbs_g,
+  fat_g,
+  fibre_g,
+  sugar_g,
+  saturated_fat_g,
+  trans_fat_g,
+  sodium_mg,
+  created_at,
+  last_recomputed_at,
+  updated_at
+`;
+
+export async function getDailySumConsumedMealForRange(
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<DailySumConsumedMealRow[]> {
+  if (!userId || !startDate || !endDate) return [];
+
+  const { data, error } = await supabase
+    .from('daily_sum_consumed_meal')
+    .select(DAILY_SUM_CONSUMED_MEAL_COLUMNS)
+    .eq('user_id', userId)
+    .gte('entry_date', startDate)
+    .lte('entry_date', endDate)
+    .order('entry_date', { ascending: true })
+    .order('meal_type', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching daily_sum_consumed_meal range:', error);
+    return [];
+  }
+
+  return (data as DailySumConsumedMealRow[]) ?? [];
 }
 
 export async function setDailyConsumedStatus(params: {

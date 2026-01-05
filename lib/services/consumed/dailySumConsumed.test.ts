@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DailyLogStatus, DailySumConsumed } from '@/utils/types';
+import type { DailyLogStatus, DailySumConsumed, DailySumConsumedMealRow } from '@/utils/types';
 
 // Mock Supabase client
 const mockSelect = vi.fn();
@@ -7,6 +7,7 @@ const mockEq = vi.fn();
 const mockGte = vi.fn();
 const mockLte = vi.fn();
 const mockOrder = vi.fn();
+const mockOrder2 = vi.fn(); // For second order() call (meal_type)
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
 
@@ -301,6 +302,139 @@ describe('dailySumConsumed service', () => {
       });
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getDailySumConsumedMealForRange', () => {
+    it('returns empty array when userId is missing', async () => {
+      const { getDailySumConsumedMealForRange } = await import('./dailySumConsumed');
+      const result = await getDailySumConsumedMealForRange('', '2026-01-01', '2026-01-07');
+      expect(result).toEqual([]);
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when startDate is missing', async () => {
+      const { getDailySumConsumedMealForRange } = await import('./dailySumConsumed');
+      const result = await getDailySumConsumedMealForRange('u1', '', '2026-01-07');
+      expect(result).toEqual([]);
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when endDate is missing', async () => {
+      const { getDailySumConsumedMealForRange } = await import('./dailySumConsumed');
+      const result = await getDailySumConsumedMealForRange('u1', '2026-01-01', '');
+      expect(result).toEqual([]);
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it('fetches daily sum consumed meal data for a date range', async () => {
+      const mockData: DailySumConsumedMealRow[] = [
+        {
+          user_id: 'u1',
+          entry_date: '2026-01-01',
+          meal_type: 'breakfast',
+          calories: 400,
+          protein_g: 20,
+          carbs_g: 50,
+          fat_g: 15,
+          fibre_g: 5,
+          sugar_g: 20,
+          saturated_fat_g: 5,
+          trans_fat_g: 0,
+          sodium_mg: 500,
+          created_at: '2026-01-01T00:00:00.000Z',
+          last_recomputed_at: '2026-01-01T12:00:00.000Z',
+          updated_at: '2026-01-01T12:00:00.000Z',
+        },
+        {
+          user_id: 'u1',
+          entry_date: '2026-01-01',
+          meal_type: 'lunch',
+          calories: 600,
+          protein_g: 40,
+          carbs_g: 70,
+          fat_g: 20,
+          fibre_g: 10,
+          sugar_g: 30,
+          saturated_fat_g: 8,
+          trans_fat_g: 0,
+          sodium_mg: 800,
+          created_at: '2026-01-01T00:00:00.000Z',
+          last_recomputed_at: '2026-01-01T12:00:00.000Z',
+          updated_at: '2026-01-01T12:00:00.000Z',
+        },
+        {
+          user_id: 'u1',
+          entry_date: '2026-01-02',
+          meal_type: 'breakfast',
+          calories: 450,
+          protein_g: 25,
+          carbs_g: 55,
+          fat_g: 18,
+          fibre_g: 6,
+          sugar_g: 25,
+          saturated_fat_g: 6,
+          trans_fat_g: 0,
+          sodium_mg: 600,
+          created_at: '2026-01-02T00:00:00.000Z',
+          last_recomputed_at: '2026-01-02T12:00:00.000Z',
+          updated_at: '2026-01-02T12:00:00.000Z',
+        },
+      ];
+
+      // Set up the chain: from().select().eq().gte().lte().order().order()
+      mockOrder2.mockResolvedValue({ data: mockData, error: null });
+      mockOrder.mockReturnValue({ order: mockOrder2 });
+      mockLte.mockReturnValue({ order: mockOrder });
+      mockGte.mockReturnValue({ lte: mockLte });
+      mockEq.mockReturnValue({ gte: mockGte });
+      mockSelect.mockReturnValue({ eq: mockEq });
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      const { getDailySumConsumedMealForRange } = await import('./dailySumConsumed');
+      const result = await getDailySumConsumedMealForRange('u1', '2026-01-01', '2026-01-07');
+
+      expect(result).toEqual(mockData);
+      expect(mockFrom).toHaveBeenCalledWith('daily_sum_consumed_meal');
+      expect(mockSelect).toHaveBeenCalled();
+      expect(mockEq).toHaveBeenCalledWith('user_id', 'u1');
+      expect(mockGte).toHaveBeenCalledWith('entry_date', '2026-01-01');
+      expect(mockLte).toHaveBeenCalledWith('entry_date', '2026-01-07');
+      expect(mockOrder).toHaveBeenCalledWith('entry_date', { ascending: true });
+      expect(mockOrder2).toHaveBeenCalledWith('meal_type', { ascending: true });
+    });
+
+    it('returns empty array on error', async () => {
+      mockOrder2.mockResolvedValue({
+        data: null,
+        error: { message: 'Database error', code: '500' },
+      });
+      mockOrder.mockReturnValue({ order: mockOrder2 });
+      mockLte.mockReturnValue({ order: mockOrder });
+      mockGte.mockReturnValue({ lte: mockLte });
+      mockEq.mockReturnValue({ gte: mockGte });
+      mockSelect.mockReturnValue({ eq: mockEq });
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      const { getDailySumConsumedMealForRange } = await import('./dailySumConsumed');
+      const result = await getDailySumConsumedMealForRange('u1', '2026-01-01', '2026-01-07');
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when data is null', async () => {
+      mockOrder2.mockResolvedValue({ data: null, error: null });
+      mockOrder.mockReturnValue({ order: mockOrder2 });
+      mockLte.mockReturnValue({ order: mockOrder });
+      mockGte.mockReturnValue({ lte: mockLte });
+      mockEq.mockReturnValue({ gte: mockGte });
+      mockSelect.mockReturnValue({ eq: mockEq });
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      const { getDailySumConsumedMealForRange } = await import('./dailySumConsumed');
+      const result = await getDailySumConsumedMealForRange('u1', '2026-01-01', '2026-01-07');
+
+      expect(result).toEqual([]);
     });
   });
 });
