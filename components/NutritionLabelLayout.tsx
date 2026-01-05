@@ -19,8 +19,9 @@
 
 import React from 'react';
 import { View, StyleSheet, TextInput } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Nudge, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getMacroColors } from '@/utils/macroColors';
 
@@ -39,9 +40,7 @@ function NutrientValue({ value, unit, color }: NutrientValueProps) {
       <View style={styles.valueInner}>{value}</View>
       {unit ? (
         <ThemedText
-          style={styles.unitText}
-          lightColor={color ?? '#000000'}
-          darkColor={color ?? colors.textPanelValueDark}
+          style={[styles.unitText, { color: color ?? colors.textPanelValueDark }]}
         >
           {` ${unit}`}
         </ThemedText>
@@ -57,9 +56,12 @@ type NutritionLabelDividerProps = {
 function NutritionLabelDivider({ variant }: NutritionLabelDividerProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const isDark = colorScheme === 'dark';
   const borderWidth =
-    variant === 'thick' ? 3 : variant === 'medium' ? 2 : 1;
+    variant === 'thick'
+      ? Nudge.px2 + Nudge.px1
+      : variant === 'medium'
+        ? Nudge.px2
+        : Nudge.px1;
 
   return (
     <View
@@ -67,7 +69,7 @@ function NutritionLabelDivider({ variant }: NutritionLabelDividerProps) {
         styles.divider,
         { 
           borderTopWidth: borderWidth, 
-          borderTopColor: isDark ? colors.surfacePanelDividerDark : '#000000' 
+          borderTopColor: colors.surfacePanelDividerDark,
         },
       ]}
     />
@@ -91,15 +93,12 @@ function NutritionLabelRow({
 }: NutritionLabelRowProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const isDark = colorScheme === 'dark';
   
   // Section headers (bold) use textPanelHeaderDark, sub-labels use textPanelLabelDark
-  const labelColor = labelColorOverride ?? (isDark 
-    ? (bold ? colors.textPanelHeaderDark : colors.textPanelLabelDark)
-    : '#000000');
+  const labelColor = labelColorOverride ?? (bold ? colors.textPanelHeaderDark : colors.textPanelLabelDark);
   
   return (
-    <View style={[styles.row, isDark && { opacity: 1 }]}>
+    <View style={styles.row}>
       <ThemedText
         style={[
           styles.rowLabel,
@@ -107,8 +106,6 @@ function NutritionLabelRow({
           indentLevel === 1 && styles.rowLabelIndented,
           { color: labelColor }, // Explicit inline color override
         ]}
-        lightColor="#000000"
-        darkColor={labelColor}
       >
         {label}
       </ThemedText>
@@ -158,9 +155,9 @@ export type NutritionLabelLayoutProps = {
  * only handles the visual layout and styling to match a nutrition label.
  */
 export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const isDark = colorScheme === 'dark';
   const macroColors = getMacroColors(colors);
   
   // Format numeric-like nodes without mutating inputs (TextInput is left intact)
@@ -207,9 +204,8 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 
     const mergedStyle = [
       ...normalizeStyle((node.props as any)?.style),
-      // In light mode, leave values as-is unless explicitly overridden.
-      // In dark mode, default to panel value color unless explicitly overridden.
-      ...(overrideColor ? [{ color: overrideColor }] : isDark ? [{ color: colors.textPanelValueDark }] : []),
+      // Default to panel value color unless explicitly overridden.
+      ...(overrideColor ? [{ color: overrideColor }] : [{ color: colors.textPanelValueDark }]),
     ];
 
     const clonedProps: any = {
@@ -227,7 +223,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
   // Calories value should match the label color (white in dark mode, black in light mode).
   const caloriesValueNode = applyValueColor(
     formatNode(props.caloriesInput, 0),
-    isDark ? colors.textPanelHeaderDark : '#000000'
+    colors.textPanelHeaderDark
   );
   const fatValueNode = applyValueColor(formatNode(props.fatInput, 1), macroColors.fat);
   const satFatValueNode = applyValueColor(formatNode(props.satFatInput, 1));
@@ -242,8 +238,8 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
     <View style={[
       styles.container,
       {
-        backgroundColor: isDark ? colors.surfacePanelDark : '#FFFFFF',
-        borderColor: isDark ? colors.surfacePanelDividerDark : '#000000',
+        backgroundColor: colors.surfacePanelDark,
+        borderColor: colors.surfacePanelDividerDark,
       }
     ]}>
       {/* Top thick bar */}
@@ -255,12 +251,10 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
           <ThemedText
             style={[
               styles.foodLabel,
-              { color: isDark ? colors.textPanelHeaderDark : '#000000' }, // Explicit inline color
+              { color: colors.textPanelHeaderDark }, // Explicit inline color
             ]}
-            lightColor="#000000"
-            darkColor={colors.textPanelHeaderDark}
           >
-            {props.titleLabel ?? 'Food *'}
+            {props.titleLabel ?? t('nutrition_label.food_required')}
           </ThemedText>
           <View style={styles.titleInputContainer}>
             {props.titleInput}
@@ -274,22 +268,18 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
           <ThemedText
             style={[
               styles.servingText,
-              { color: isDark ? colors.textPanelLabelDark : '#000000' }, // Explicit inline color
+              { color: colors.textPanelLabelDark }, // Explicit inline color
             ]}
-            lightColor="#000000"
-            darkColor={colors.textPanelLabelDark}
           >
-            Per{' '}
+            {t('nutrition_label.per')}{' '}
           </ThemedText>
           <ThemedText
             style={[
               styles.servingText,
-              { color: isDark ? colors.textPanelLabelDark : '#000000' }, // Explicit inline color
+              { color: colors.textPanelLabelDark }, // Explicit inline color
             ]}
-            lightColor="#000000"
-            darkColor={colors.textPanelLabelDark}
           >
-            Qty *{' '}
+            {t('nutrition_label.qty_required')}{' '}
           </ThemedText>
           <View style={styles.servingQuantityContainer}>
             {props.servingQuantityInput}
@@ -297,12 +287,10 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
           <ThemedText
             style={[
               styles.servingText,
-              { color: isDark ? colors.textPanelLabelDark : '#000000' }, // Explicit inline color
+              { color: colors.textPanelLabelDark }, // Explicit inline color
             ]}
-            lightColor="#000000"
-            darkColor={colors.textPanelLabelDark}
           >
-            {' '}Unit *{' '}
+            {' '}{t('nutrition_label.unit_required')}{' '}
           </ThemedText>
           <View style={styles.servingUnitContainer}>
             {props.servingUnitInput}
@@ -318,12 +306,10 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
         <ThemedText
           style={[
             styles.caloriesLabel,
-            { color: isDark ? colors.textPanelHeaderDark : '#000000' }, // Explicit inline color
+            { color: colors.textPanelHeaderDark }, // Explicit inline color
           ]}
-          lightColor="#000000"
-          darkColor={colors.textPanelHeaderDark}
         >
-        {props.caloriesLabel ?? 'Calories'}
+        {props.caloriesLabel ?? t('nutrition_label.calories')}
         </ThemedText>
         <View style={styles.caloriesValueContainer}>
           {caloriesValueNode}
@@ -335,18 +321,18 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 
       {/* Fat block */}
       <NutritionLabelRow
-        label="Fat"
+        label={t('nutrition_label.fat')}
         value={<NutrientValue value={fatValueNode} unit="g" color={macroColors.fat} />}
         bold
         labelColorOverride={macroColors.fat}
       />
       <NutritionLabelRow
-        label="Saturated"
+        label={t('nutrition_label.saturated')}
         value={<NutrientValue value={satFatValueNode} unit="g" />}
         indentLevel={1}
       />
       <NutritionLabelRow
-        label="+ Trans"
+        label={t('nutrition_label.trans_plus')}
         value={<NutrientValue value={transFatValueNode} unit="g" />}
         indentLevel={1}
       />
@@ -354,19 +340,19 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 
       {/* Carbohydrate block */}
       <NutritionLabelRow
-        label="Carbohydrate"
+        label={t('nutrition_label.carbohydrate')}
         value={<NutrientValue value={carbsValueNode} unit="g" color={macroColors.netCarb} />}
         bold
         labelColorOverride={macroColors.netCarb}
       />
       <NutritionLabelRow
-        label="Fibre"
+        label={t('nutrition_label.fibre')}
         value={<NutrientValue value={fiberValueNode} unit="g" color={macroColors.fiber} />}
         indentLevel={1}
         labelColorOverride={macroColors.fiber}
       />
       <NutritionLabelRow
-        label="Sugars"
+        label={t('nutrition_label.sugars')}
         value={<NutrientValue value={sugarValueNode} unit="g" />}
         indentLevel={1}
       />
@@ -374,7 +360,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 
       {/* Protein */}
       <NutritionLabelRow
-        label="Protein"
+        label={t('nutrition_label.protein')}
         value={<NutrientValue value={proteinValueNode} unit="g" color={macroColors.protein} />}
         bold
         labelColorOverride={macroColors.protein}
@@ -383,7 +369,7 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 
       {/* Sodium */}
       <NutritionLabelRow
-        label="Sodium"
+        label={t('nutrition_label.sodium')}
         value={<NutrientValue value={sodiumValueNode} unit="mg" />}
         bold
       />
@@ -394,27 +380,27 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
 const styles = StyleSheet.create({
   container: {
     // backgroundColor and borderColor set dynamically via inline styles
-    borderWidth: 1.5,
-    borderRadius: 0,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderWidth: Nudge.px1,
+    borderRadius: BorderRadius.none,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   divider: {
-    marginTop: 1,
+    marginTop: Nudge.px1,
     width: '100%',
   },
   titleContainer: {
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   foodLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
     // color set via inline style
-    marginRight: 8,
+    marginRight: Spacing.sm,
   },
   titleInputContainer: {
     flex: 1,
@@ -422,58 +408,57 @@ const styles = StyleSheet.create({
   servingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
   servingText: {
-    fontSize: 14,
+    fontSize: FontSize.base,
     // color set via inline style
   },
   servingQuantityContainer: {
-    width: 40,
+    width: Spacing['4xl'],
   },
   servingUnitContainer: {
     flex: 1,
-    minWidth: 60,
-    marginLeft: 8,
+    minWidth: Spacing['6xl'], // 64
+    marginLeft: Spacing.sm,
   },
   caloriesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: Spacing.xs,
   },
   caloriesLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
     // color set via inline style
   },
   caloriesValueContainer: {
     marginLeft: 'auto',
-    paddingRight: 12,
-    minWidth: 80,
+    paddingRight: Spacing.md,
+    minWidth: Spacing.lg * 5, // 80
     alignItems: 'flex-end',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 2,
-    // opacity set via inline style in dark mode to ensure no dimming
+    paddingVertical: Spacing.xxs,
   },
   rowLabel: {
-    fontSize: 14,
+    fontSize: FontSize.base,
     // color set via inline style
-    fontWeight: '400',
+    fontWeight: FontWeight.regular,
   },
   rowLabelBold: {
-    fontWeight: '700',
+    fontWeight: FontWeight.bold,
   },
   rowLabelIndented: {
-    paddingLeft: 16,
+    paddingLeft: Spacing.lg,
   },
   rowValueContainer: {
     marginLeft: 'auto',
-    paddingRight: 12,
-    minWidth: 80,
+    paddingRight: Spacing.md,
+    minWidth: Spacing.lg * 5, // 80
     alignItems: 'flex-end',
   },
   valueWithUnit: {
@@ -482,13 +467,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   valueInner: {
-    minWidth: 48,
+    minWidth: Spacing['5xl'],
     alignItems: 'flex-end',
   },
   unitText: {
-    fontSize: 12,
-    lineHeight: 14,
-    marginLeft: 2,
+    fontSize: FontSize.sm,
+    lineHeight: FontSize.sm + Nudge.px2,
+    marginLeft: Nudge.px2,
   },
 });
 

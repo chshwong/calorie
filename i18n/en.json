@@ -38,6 +38,21 @@
     "fiber": "Fiber",
     "net_carb": "Net Carb"
   },
+  "nutrition_label": {
+    "food_required": "Food *",
+    "per": "Per",
+    "qty_required": "Qty *",
+    "unit_required": "Unit *",
+    "calories": "Calories",
+    "fat": "Fat",
+    "saturated": "Saturated",
+    "trans_plus": "+ Trans",
+    "carbohydrate": "Carbohydrate",
+    "fibre": "Fibre",
+    "sugars": "Sugars",
+    "protein": "Protein",
+    "sodium": "Sodium"
+  },
 
   "avo_score": {
     "label": "AvoScore",
@@ -59,6 +74,35 @@
 
   "date_guard": {
     "tracking_starts_on": "Tracking starts on {{date}}."
+  },
+
+  "tour": {
+    "overlay": {
+      "title": "Quick Tour",
+      "skip": "Skip tour"
+    },
+    "reset_toast": "Tour guide reset. Go to Food Diary or Meal Log to start again.",
+    "home": {
+      "curvyGauge": "This is your daily calorie target. Click ⚙️ to adjust target.",
+      "burnedEatenNet": "Keep track of your calorie deficit/surplus here.",
+      "burnedPencil": "For best accuracy, always update this with numbers from your wearable⌚.",
+      "macrosAndOtherLimits": "Stay on track with your macros and goals. Tap ⚙️ to adjust targets.",
+      "mealLog": "Click on the meal you’ve eaten to log.",
+      "mealSnack": "Any quick bites can be logged as Snack.",
+      "callItADay": "Optional but helpful: Done logging for the day (including burned calories)? Call It a Day!",
+      "globalFooter": "You’re on Food Diary. Access your other modules here.",
+      "quickAddPlus": "Tap +Plus to log anything (food, weight, exercise, supplements, etc.), fast."
+    },
+    "mealtype": {
+      "intro": "View and log your meal items here.",
+      "search": "Search food to add (i.e., egg, pho, quinoa, skim milk).\n\nQuick tip: Perfection isn’t required. Chips, for example, are nutritionally similar across most flavors and brands. Labels are estimates. Log it, relax, and keep going.",
+      "barcode": "You may scan the barcode from a food package.",
+      "frequent": "Frequent and Recent help you add your common items faster.",
+      "custom": "Item not in the database? Create your own (e.g., local bakery keto bar).",
+      "bundles": "Bundles save frequent multi-item meals so you can log them in one tap. E.g., my protein berry shake, mom’s special lunch box.",
+      "quicklog": "Short on time? Use ⚡Quick Log.\nLess precise, but gives you a break—perfect after a big buffet.",
+      "foodlog": "Your logged items appear here. You can edit them anytime."
+    }
   },
 
   "home": {
@@ -899,7 +943,11 @@
       "adjust_activity_level": "Adjust Activity Level",
       "adjust_activity_level_subtitle": "Update your daily activity setting",
       "my_weight": "My Weight",
-      "my_weight_subtitle": "Log or review your weight entries"
+      "my_weight_subtitle": "Log or review your weight entries",
+      "restart_tour_guide_title": "Restart Tour Guide",
+      "restart_tour_guide_subtitle": "Guidance will be re-enabled",
+      "restart_tour_guide_confirm_message": "Guidance will be re-enabled. Replay the tours from the beginning?",
+      "restart_tour_guide_confirm_button": "Restart"
     },
     "my_goal": {
       "cards": {
