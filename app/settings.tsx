@@ -176,6 +176,7 @@ export default function SettingsScreen() {
       await Promise.all([
         resetTour('V1_HomePageTour', user.id),
         resetTour('V1_MealtypeLogTour', user.id),
+        resetTour('V1_ExercisesTour', user.id),
       ]);
       setShowRestartTourConfirm(false);
       // Redirect user to Food Diary home after re-enabling guidance
