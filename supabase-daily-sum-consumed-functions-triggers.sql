@@ -103,7 +103,7 @@ BEGIN
     END,
     now()
   )
-  ON CONFLICT (user_id, entry_date)
+  ON CONFLICT ON CONSTRAINT daily_sum_consumed_pkey
   DO UPDATE SET
     calories = EXCLUDED.calories,
     protein_g = EXCLUDED.protein_g,
@@ -175,7 +175,7 @@ BEGIN
     AND ce.entry_date = p_entry_date
     AND ce.meal_type IS NOT NULL
   GROUP BY ce.meal_type
-  ON CONFLICT (user_id, entry_date, meal_type)
+  ON CONFLICT ON CONSTRAINT daily_sum_consumed_meal_pkey
   DO UPDATE SET
     calories = EXCLUDED.calories,
     protein_g = EXCLUDED.protein_g,
@@ -239,7 +239,7 @@ BEGIN
     v_now,
     v_now
   )
-  ON CONFLICT (user_id, entry_date)
+  ON CONFLICT ON CONSTRAINT daily_sum_consumed_pkey
   DO UPDATE SET
     log_status = EXCLUDED.log_status,
     status_updated_at = EXCLUDED.status_updated_at,
@@ -390,7 +390,7 @@ BEGIN
       COALESCE(a.last_entry_activity_at, v_now),
       v_now
     FROM agg a
-    ON CONFLICT (user_id, entry_date)
+    ON CONFLICT ON CONSTRAINT daily_sum_consumed_pkey
     DO UPDATE SET
       calories = EXCLUDED.calories,
       protein_g = EXCLUDED.protein_g,
