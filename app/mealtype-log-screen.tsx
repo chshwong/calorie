@@ -2335,6 +2335,23 @@ export default function LogFoodScreen() {
             )}
           </View>
 
+        {/* AvoScore Donut Chart - Only shown when there are entries and meal totals */}
+        {entries.length > 0 && mealTotals && mealTotals.kcal > 0 && (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md }}>
+            <MacroCompositionDonutChart
+              gramsCarbTotal={mealTotals.carbs_g ?? 0}
+              gramsFiber={mealTotals.fiber_g ?? 0}
+              gramsProtein={mealTotals.protein_g ?? 0}
+              gramsFat={mealTotals.fat_g ?? 0}
+              size={220}
+              showGrams={true}
+              centerGrade={avo.grade}
+              centerLabel="avo_score.label"
+              centerReasons={avo.reasons}
+            />
+          </View>
+        )}
+
         {/* Food Log */}
         <View ref={tourFoodLogSectionRef as any} style={[styles.foodLogContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.entriesSection}>
@@ -2423,22 +2440,6 @@ export default function LogFoodScreen() {
               )}
             </View>
           </View>
-          {/* AvoScore Donut Chart - Only shown when there are entries and meal totals */}
-          {entries.length > 0 && mealTotals && mealTotals.kcal > 0 && (
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md }}>
-              <MacroCompositionDonutChart
-                gramsCarbTotal={mealTotals.carbs_g ?? 0}
-                gramsFiber={mealTotals.fiber_g ?? 0}
-                gramsProtein={mealTotals.protein_g ?? 0}
-                gramsFat={mealTotals.fat_g ?? 0}
-                size={220}
-                showGrams={true}
-                centerGrade={avo.grade}
-                centerLabel="avo_score.label"
-                centerReasons={avo.reasons}
-              />
-            </View>
-          )}
           {/* Notes row */}
           {currentMealMeta?.note && currentMealMeta.note.trim().length > 0 && (
             <TouchableOpacity
