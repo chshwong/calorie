@@ -120,6 +120,11 @@ export const V1_EXERCISES_TOUR_STEPS: TourStep[] = [
     messageKey: 'tour.exercises.daySummary',
   },
   {
+    id: 'ex-day-summary-gear',
+    anchorKey: 'exercise.daySummaryGear',
+    messageKey: 'tour.exercises.daySummaryGear',
+  },
+  {
     id: 'ex-quick-add',
     anchorKey: 'exercise.quickAdd',
     messageKey: 'tour.exercises.quickAdd',

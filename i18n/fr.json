@@ -109,6 +109,7 @@
     "exercises": {
       "intro": "Suivez vos exercices ici, conçu pour une saisie rapide.",
       "daySummary": "Les journaux d’exercice servent à suivre vos activités, pas les calories brûlées. Les utilisateurs se fient aux données de leur montre pour estimer plus précisément la dépense énergétique de la journée.",
+      "daySummaryGear": "Touchez le ⚙️ pour définir les préférences d’unités et activer/désactiver le suivi de la durée, de la distance, des répétitions, et plus encore.",
       "quickAdd": "Touchez une activité dans la liste pour l’enregistrer.\nAstuce : soyez aussi précis ou simple que vous voulez — certains notent développé couché et pompes, d’autres écrivent juste poitrine.",
       "logExerciseBtn": "Vous ne trouvez pas votre activité ? Touchez Log Exercise.\n\nBon suivi !"
     }

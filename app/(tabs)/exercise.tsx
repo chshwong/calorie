@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, ViewStyle, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, ViewStyle, useWindowDimensions, Switch } from 'react-native';
 import { useRouter, useLocalSearchParams, useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -189,9 +189,17 @@ type ExerciseRowProps = {
   isLast: boolean;
   animationValue?: Animated.Value;
   disabled?: boolean;
+  trackingPrefs?: {
+    cardio_duration: boolean;
+    cardio_distance: boolean;
+    cardio_effort: boolean;
+    strength_sets: boolean;
+    strength_reps: boolean;
+    strength_effort: boolean;
+  };
 };
 
-function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRepsUpdate, onIntensityUpdate, onDistanceUpdate, isLast, animationValue, disabled = false, distanceUnit = 'km' }: ExerciseRowProps & { distanceUnit?: 'km' | 'mi' }) {
+function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRepsUpdate, onIntensityUpdate, onDistanceUpdate, isLast, animationValue, disabled = false, distanceUnit = 'km', trackingPrefs }: ExerciseRowProps & { distanceUnit?: 'km' | 'mi' }) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isNarrow = width < NARROW_SCREEN_BREAKPOINT;
@@ -229,7 +237,7 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
   const intensityLabels: Record<'low' | 'medium' | 'high' | 'max', string> = {
     low: '🟢Low',
     medium: '🟡Med',
-    high: '🟠Hi',
+    high: '🟠High',
     max: '🔴Max',
   };
   const intensityDisplay = log.intensity ? intensityLabels[log.intensity] : null;
@@ -289,121 +297,64 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
           {log.category === 'cardio_mind_body' ? (
             // Cardio/Mind-Body: Minutes, Distance, Intensity chips
             <>
-              <InlineEditableNumberChip
-                value={log.minutes}
-                onCommit={(next) => onMinutesUpdate(log.id, next)}
-                unitSuffix="min"
-                placeholder={t('exercise.chip.add_min')}
-                min={RANGES.EXERCISE_MINUTES.MIN}
-                max={RANGES.EXERCISE_MINUTES.MAX}
-                allowNull
-                disabled={disabled}
-                colors={colors}
-                badgeBackgroundColor={exerciseOrangeLight}
-                badgeBorderColor={exerciseOrange}
-                badgeTextColor={exerciseOrange}
-                accessibilityLabel={t('exercise.chip.edit_minutes')}
-                commitOnBlur
-                chipPaddingHorizontal={Spacing.xs}
-              />
-              <InlineEditableNumberChip
-                value={
-                  distanceUnit === 'mi' && log.distance_km
-                    ? formatDistanceForDisplay(log.distance_km / KM_TO_MILES_CONVERSION)
-                    : log.distance_km !== null
-                    ? formatDistanceForDisplay(log.distance_km)
-                    : null
-                }
-                onCommit={(next) => {
-                  if (next === null) {
-                    onDistanceUpdate(log.id, null);
-                    return;
-                  }
-                  // Round user input to 2 decimals before conversion
-                  const roundedInput = roundTo2Decimals(next);
-                  // Convert to km if needed and round to 4 decimals for storage
-                  const distance_km = distanceUnit === 'mi' 
-                    ? roundTo4Decimals(roundedInput * KM_TO_MILES_CONVERSION)
-                    : roundTo4Decimals(roundedInput);
-                  onDistanceUpdate(log.id, distance_km);
-                }}
-                unitSuffix={distanceUnit === 'mi' ? 'mi' : 'km'}
-                placeholder={distanceUnit === 'mi' ? t('exercise.chip.add_mi') : t('exercise.chip.add_km')}
-                min={RANGES.EXERCISE_DISTANCE_KM.MIN}
-                max={RANGES.EXERCISE_DISTANCE_KM.MAX}
-                allowNull
-                disabled={disabled}
-                colors={colors}
-                badgeBackgroundColor={exerciseOrangeLight}
-                badgeBorderColor={exerciseOrange}
-                badgeTextColor={exerciseOrange}
-                accessibilityLabel={t('exercise.chip.edit_distance', { unit: distanceUnit })}
-                commitOnBlur
-                chipPaddingHorizontal={Spacing.xs}
-                allowDecimal={true}
-              />
-              <TouchableOpacity
-                onPress={() => onIntensityUpdate(log.id)}
-                disabled={disabled}
-                style={[
-                  styles.repsIntensityChip,
-                  {
-                    backgroundColor: intensityDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
-                    borderColor: intensityDisplay ? exerciseOrange : colors.separator,
-                  },
-                  disabled && { opacity: 0.6 },
-                ]}
-                activeOpacity={0.7}
-                {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
-                {...getButtonAccessibilityProps(intensityDisplay ? t('exercise.chip.edit_intensity_with_value', { value: intensityDisplay }) : t('exercise.chip.add_intensity'))}
-              >
-                <ThemedText style={[styles.repsIntensityText, { color: intensityDisplay ? exerciseOrange : colors.textSecondary }]}>
-                  {intensityDisplay || t('exercise.chip.add_intensity')}
-                </ThemedText>
-              </TouchableOpacity>
-            </>
-          ) : (
-            // Strength: Sets, Reps, Intensity chips
-            <>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: Spacing.sm }}>
+              {trackingPrefs?.cardio_duration !== false && (
                 <InlineEditableNumberChip
-                  value={log.sets}
-                  onCommit={(next) => onSetsUpdate(log.id, next)}
-                  unitSuffix="x"
-                  placeholder={t('exercise.chip.add_sets')}
-                  min={RANGES.EXERCISE_SETS.MIN}
-                  max={RANGES.EXERCISE_SETS.MAX}
+                  value={log.minutes}
+                  onCommit={(next) => onMinutesUpdate(log.id, next)}
+                  unitSuffix="min"
+                  placeholder={t('exercise.chip.add_min')}
+                  min={RANGES.EXERCISE_MINUTES.MIN}
+                  max={RANGES.EXERCISE_MINUTES.MAX}
                   allowNull
                   disabled={disabled}
                   colors={colors}
                   badgeBackgroundColor={exerciseOrangeLight}
                   badgeBorderColor={exerciseOrange}
                   badgeTextColor={exerciseOrange}
-                  accessibilityLabel={t('exercise.chip.edit_sets')}
+                  accessibilityLabel={t('exercise.chip.edit_minutes')}
                   commitOnBlur
                   chipPaddingHorizontal={Spacing.xs}
                 />
-                <TouchableOpacity
-                  onPress={() => onRepsUpdate(log.id)}
+              )}
+              {trackingPrefs?.cardio_distance !== false && (
+                <InlineEditableNumberChip
+                  value={
+                    distanceUnit === 'mi' && log.distance_km
+                      ? formatDistanceForDisplay(log.distance_km / KM_TO_MILES_CONVERSION)
+                      : log.distance_km !== null
+                      ? formatDistanceForDisplay(log.distance_km)
+                      : null
+                  }
+                  onCommit={(next) => {
+                    if (next === null) {
+                      onDistanceUpdate(log.id, null);
+                      return;
+                    }
+                    // Round user input to 2 decimals before conversion
+                    const roundedInput = roundTo2Decimals(next);
+                    // Convert to km if needed and round to 4 decimals for storage
+                    const distance_km = distanceUnit === 'mi' 
+                      ? roundTo4Decimals(roundedInput * KM_TO_MILES_CONVERSION)
+                      : roundTo4Decimals(roundedInput);
+                    onDistanceUpdate(log.id, distance_km);
+                  }}
+                  unitSuffix={distanceUnit === 'mi' ? 'mi' : 'km'}
+                  placeholder={distanceUnit === 'mi' ? t('exercise.chip.add_mi') : t('exercise.chip.add_km')}
+                  min={RANGES.EXERCISE_DISTANCE_KM.MIN}
+                  max={RANGES.EXERCISE_DISTANCE_KM.MAX}
+                  allowNull
                   disabled={disabled}
-                  style={[
-                    styles.repsIntensityChip,
-                    {
-                      backgroundColor: repsDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
-                      borderColor: repsDisplay ? exerciseOrange : colors.separator,
-                    },
-                    disabled && { opacity: 0.6 },
-                  ]}
-                  activeOpacity={0.7}
-                  {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
-                  {...getButtonAccessibilityProps(repsDisplay ? t('exercise.chip.edit_reps_with_value', { value: repsDisplay }) : t('exercise.chip.add_reps'))}
-                >
-                  <ThemedText style={[styles.repsIntensityText, { color: repsDisplay ? exerciseOrange : colors.textSecondary }]}>
-                    {repsDisplay || t('exercise.chip.add_reps')}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                  colors={colors}
+                  badgeBackgroundColor={exerciseOrangeLight}
+                  badgeBorderColor={exerciseOrange}
+                  badgeTextColor={exerciseOrange}
+                  accessibilityLabel={t('exercise.chip.edit_distance', { unit: distanceUnit })}
+                  commitOnBlur
+                  chipPaddingHorizontal={Spacing.xs}
+                  allowDecimal={true}
+                />
+              )}
+              {trackingPrefs?.cardio_effort === true && (
                 <TouchableOpacity
                   onPress={() => onIntensityUpdate(log.id)}
                   disabled={disabled}
@@ -423,7 +374,76 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                     {intensityDisplay || t('exercise.chip.add_intensity')}
                   </ThemedText>
                 </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            // Strength: Sets, Reps, Intensity chips
+            <>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: Spacing.sm }}>
+                {trackingPrefs?.strength_sets !== false && (
+                  <InlineEditableNumberChip
+                    value={log.sets}
+                    onCommit={(next) => onSetsUpdate(log.id, next)}
+                    unitSuffix="x"
+                    placeholder={t('exercise.chip.add_sets')}
+                    min={RANGES.EXERCISE_SETS.MIN}
+                    max={RANGES.EXERCISE_SETS.MAX}
+                    allowNull
+                    disabled={disabled}
+                    colors={colors}
+                    badgeBackgroundColor={exerciseOrangeLight}
+                    badgeBorderColor={exerciseOrange}
+                    badgeTextColor={exerciseOrange}
+                    accessibilityLabel={t('exercise.chip.edit_sets')}
+                    commitOnBlur
+                    chipPaddingHorizontal={Spacing.xs}
+                  />
+                )}
+                {trackingPrefs?.strength_reps === true && (
+                  <TouchableOpacity
+                    onPress={() => onRepsUpdate(log.id)}
+                    disabled={disabled}
+                    style={[
+                      styles.repsIntensityChip,
+                      {
+                        backgroundColor: repsDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
+                        borderColor: repsDisplay ? exerciseOrange : colors.separator,
+                      },
+                      disabled && { opacity: 0.6 },
+                    ]}
+                    activeOpacity={0.7}
+                    {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
+                    {...getButtonAccessibilityProps(repsDisplay ? t('exercise.chip.edit_reps_with_value', { value: repsDisplay }) : t('exercise.chip.add_reps'))}
+                  >
+                    <ThemedText style={[styles.repsIntensityText, { color: repsDisplay ? exerciseOrange : colors.textSecondary }]}>
+                      {repsDisplay || t('exercise.chip.add_reps')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
               </View>
+              {trackingPrefs?.strength_effort === true && (
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                  <TouchableOpacity
+                    onPress={() => onIntensityUpdate(log.id)}
+                    disabled={disabled}
+                    style={[
+                      styles.repsIntensityChip,
+                      {
+                        backgroundColor: intensityDisplay ? exerciseOrangeLight : colors.backgroundSecondary,
+                        borderColor: intensityDisplay ? exerciseOrange : colors.separator,
+                      },
+                      disabled && { opacity: 0.6 },
+                    ]}
+                    activeOpacity={0.7}
+                    {...(Platform.OS === 'web' && getFocusStyle(exerciseOrange))}
+                    {...getButtonAccessibilityProps(intensityDisplay ? t('exercise.chip.edit_intensity_with_value', { value: intensityDisplay }) : t('exercise.chip.add_intensity'))}
+                  >
+                    <ThemedText style={[styles.repsIntensityText, { color: intensityDisplay ? exerciseOrange : colors.textSecondary }]}>
+                      {intensityDisplay || t('exercise.chip.add_intensity')}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
             </>
           )}
         </View>
@@ -469,6 +489,16 @@ export default function ExerciseHomeScreen() {
   const { data: userConfig } = useUserConfig();
   const effectiveProfile = userConfig || authProfile;
   const updateProfileMutation = useUpdateProfile();
+
+  // Derive tracking preferences from userConfig with defaults
+  const trackingPrefs = useMemo(() => ({
+    cardio_duration: userConfig?.exercise_track_cardio_duration ?? true,
+    cardio_distance: userConfig?.exercise_track_cardio_distance ?? true,
+    cardio_effort: userConfig?.exercise_track_cardio_effort ?? false,
+    strength_sets: userConfig?.exercise_track_strength_sets ?? true,
+    strength_reps: userConfig?.exercise_track_strength_reps ?? false,
+    strength_effort: userConfig?.exercise_track_strength_effort ?? false,
+  }), [userConfig]);
 
   // Use shared date hook - always derived from URL params
   const {
@@ -533,6 +563,7 @@ export default function ExerciseHomeScreen() {
 
   const tourScreenRef = useTourAnchor('exercise.screen');
   const tourDaySummaryRef = useTourAnchor('exercise.daySummary');
+  const tourDaySummaryGearRef = useTourAnchor('exercise.daySummaryGear');
   const tourQuickAddRef = useTourAnchor('exercise.quickAdd');
   const tourLogExerciseBtnRef = useTourAnchor('exercise.logExerciseBtn');
   
@@ -544,6 +575,25 @@ export default function ExerciseHomeScreen() {
   
   const dayStatus = normalizeStatus(todayRow?.log_status);
   const prevStatusRef = useRef<string | null>(null);
+  const ENABLE_EXERCISE_DAY_COMPLETE_CELEBRATION = false;
+
+  useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'app/(tabs)/exercise.tsx:selectedDate/dayStatus',
+        message: 'Exercise date/status snapshot',
+        data: { selectedDateString, dayStatus },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [selectedDateString, dayStatus]);
 
   // Track status transitions and trigger celebration
   useEffect(() => {
@@ -552,8 +602,61 @@ export default function ExerciseHomeScreen() {
       prevStatusRef.current = dayStatus;
       return; // first load: do nothing
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'app/(tabs)/exercise.tsx:celebrationEffect',
+        message: 'Exercise celebration check',
+        data: { selectedDateString, prev, next: dayStatus },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
+    if (!ENABLE_EXERCISE_DAY_COMPLETE_CELEBRATION) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H4',
+          location: 'app/(tabs)/exercise.tsx:celebrationEffect',
+          message: 'Exercise celebration disabled (expected: only Food Home should celebrate)',
+          data: { selectedDateString, prev, next: dayStatus },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
+      prevStatusRef.current = dayStatus;
+      return;
+    }
+
     if (prev === 'unknown' && dayStatus === 'completed') {
       const msg = pickRandomDayCompletionMessage();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'app/(tabs)/exercise.tsx:celebrateCompleted',
+          message: 'Triggering Day Complete celebration from Exercise screen',
+          data: { selectedDateString, prev, next: dayStatus },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       show({ 
         title: '✅ Day Complete',
         message: msg,
@@ -563,6 +666,21 @@ export default function ExerciseHomeScreen() {
     }
     if (prev === 'unknown' && dayStatus === 'fasted') {
       const msg = pickRandomDayCompletionMessage();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'app/(tabs)/exercise.tsx:celebrateFasted',
+          message: 'Triggering Fasted Day celebration from Exercise screen',
+          data: { selectedDateString, prev, next: dayStatus },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       show({ 
         title: '✅ Fasted Day',
         message: msg,
@@ -614,6 +732,16 @@ export default function ExerciseHomeScreen() {
   useEffect(() => {
     const unsubscribe = registerOnStepChange((tourId, step) => {
       if (tourId !== 'V1_ExercisesTour') return;
+
+      if (step.id === 'ex-day-summary-gear') {
+        // Ensure the Day Summary header controls are visible before measuring the gear.
+        if (scrollOffsetRef.current > 20) {
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        }
+        setTimeout(() => requestRemeasure(), 200);
+        return;
+      }
+
       if (step.id !== 'ex-quick-add') return;
 
       if (quickAddY > 0) {
@@ -673,13 +801,26 @@ export default function ExerciseHomeScreen() {
   // Exercise settings modal state
   const [showExerciseSettings, setShowExerciseSettings] = useState(false);
   const [settingsDistanceUnit, setSettingsDistanceUnit] = useState<'km' | 'mi'>('km');
+  const [settingsTrackCardioDuration, setSettingsTrackCardioDuration] = useState<boolean>(true);
+  const [settingsTrackCardioDistance, setSettingsTrackCardioDistance] = useState<boolean>(true);
+  const [settingsTrackCardioEffort, setSettingsTrackCardioEffort] = useState<boolean>(false);
+  const [settingsTrackStrengthSets, setSettingsTrackStrengthSets] = useState<boolean>(true);
+  const [settingsTrackStrengthReps, setSettingsTrackStrengthReps] = useState<boolean>(false);
+  const [settingsTrackStrengthEffort, setSettingsTrackStrengthEffort] = useState<boolean>(false);
 
   // Initialize settings when modal opens
   useEffect(() => {
     if (showExerciseSettings) {
       setSettingsDistanceUnit((userConfig?.distance_unit as 'km' | 'mi') ?? 'km');
+      // Initialize tracking preferences from userConfig with defaults
+      setSettingsTrackCardioDuration(userConfig?.exercise_track_cardio_duration ?? true);
+      setSettingsTrackCardioDistance(userConfig?.exercise_track_cardio_distance ?? true);
+      setSettingsTrackCardioEffort(userConfig?.exercise_track_cardio_effort ?? false);
+      setSettingsTrackStrengthSets(userConfig?.exercise_track_strength_sets ?? true);
+      setSettingsTrackStrengthReps(userConfig?.exercise_track_strength_reps ?? false);
+      setSettingsTrackStrengthEffort(userConfig?.exercise_track_strength_effort ?? false);
     }
-  }, [showExerciseSettings, userConfig?.distance_unit]);
+  }, [showExerciseSettings, userConfig?.distance_unit, userConfig?.exercise_track_cardio_duration, userConfig?.exercise_track_cardio_distance, userConfig?.exercise_track_cardio_effort, userConfig?.exercise_track_strength_sets, userConfig?.exercise_track_strength_reps, userConfig?.exercise_track_strength_effort]);
   
   // Shared edit mode state (for both clone and delete)
   const [editMode, setEditMode] = useState(false);
@@ -1442,6 +1583,7 @@ export default function ExerciseHomeScreen() {
                           
                           {/* Settings button */}
                           <TouchableOpacity
+                            ref={tourDaySummaryGearRef as any}
                             onPress={() => setShowExerciseSettings(true)}
                             style={styles.cloneButton}
                             activeOpacity={0.7}
@@ -1597,6 +1739,7 @@ export default function ExerciseHomeScreen() {
                           isLast={isLast}
                           animationValue={animationRefs.current.get(log.id)}
                           disabled={editMode}
+                          trackingPrefs={trackingPrefs}
                         />
                       </HighlightableRow>
                     );
@@ -2178,7 +2321,7 @@ export default function ExerciseHomeScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} contentContainerStyle={styles.modalBodyContent}>
               {/* Distance Unit Setting */}
               <View style={styles.settingsRow}>
                 {/* NOTE: Hardcoded per user request - exact label "Distance Unit" required */}
@@ -2201,7 +2344,139 @@ export default function ExerciseHomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+
+              {/* Tracking Preferences Section */}
+              <View style={styles.trackingPreferencesSection}>
+                <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('exercise.settings.tracking_preferences.title')}
+                </ThemedText>
+                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                  {t('exercise.settings.tracking_preferences.helper_text')}
+                </ThemedText>
+
+                {/* Cardio & Mind-Body Section */}
+                <View style={styles.trackingSubsection}>
+                  <ThemedText type="defaultSemiBold" style={[styles.subsectionTitle, { color: colors.text }]}>
+                    {t('exercise.settings.tracking_preferences.cardio_section')}
+                  </ThemedText>
+                  
+                  {/* Duration Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleRow, { borderBottomColor: colors.separator }]}
+                    onPress={() => setSettingsTrackCardioDuration(!settingsTrackCardioDuration)}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('exercise.settings.tracking_preferences.duration_minutes'))}
+                  >
+                    <ThemedText style={[styles.toggleLabel, { color: colors.text }]}>
+                      {t('exercise.settings.tracking_preferences.duration_minutes')}
+                    </ThemedText>
+                    <Switch
+                      value={settingsTrackCardioDuration}
+                      onValueChange={setSettingsTrackCardioDuration}
+                      trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                      thumbColor={settingsTrackCardioDuration ? colors.tint : colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Distance Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleRow, { borderBottomColor: colors.separator }]}
+                    onPress={() => setSettingsTrackCardioDistance(!settingsTrackCardioDistance)}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('exercise.settings.tracking_preferences.distance'))}
+                  >
+                    <ThemedText style={[styles.toggleLabel, { color: colors.text }]}>
+                      {t('exercise.settings.tracking_preferences.distance')}
+                    </ThemedText>
+                    <Switch
+                      value={settingsTrackCardioDistance}
+                      onValueChange={setSettingsTrackCardioDistance}
+                      trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                      thumbColor={settingsTrackCardioDistance ? colors.tint : colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Effort Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleRow, { borderBottomColor: colors.separator }]}
+                    onPress={() => setSettingsTrackCardioEffort(!settingsTrackCardioEffort)}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('exercise.settings.tracking_preferences.effort'))}
+                  >
+                    <ThemedText style={[styles.toggleLabel, { color: colors.text }]}>
+                      {t('exercise.settings.tracking_preferences.effort')}
+                    </ThemedText>
+                    <Switch
+                      value={settingsTrackCardioEffort}
+                      onValueChange={setSettingsTrackCardioEffort}
+                      trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                      thumbColor={settingsTrackCardioEffort ? colors.tint : colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Strength Workout Section */}
+                <View style={styles.trackingSubsection}>
+                  <ThemedText type="defaultSemiBold" style={[styles.subsectionTitle, { color: colors.text }]}>
+                    {t('exercise.settings.tracking_preferences.strength_section')}
+                  </ThemedText>
+                  
+                  {/* Sets Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleRow, { borderBottomColor: colors.separator }]}
+                    onPress={() => setSettingsTrackStrengthSets(!settingsTrackStrengthSets)}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('exercise.settings.tracking_preferences.sets'))}
+                  >
+                    <ThemedText style={[styles.toggleLabel, { color: colors.text }]}>
+                      {t('exercise.settings.tracking_preferences.sets')}
+                    </ThemedText>
+                    <Switch
+                      value={settingsTrackStrengthSets}
+                      onValueChange={setSettingsTrackStrengthSets}
+                      trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                      thumbColor={settingsTrackStrengthSets ? colors.tint : colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Reps Range Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleRow, { borderBottomColor: colors.separator }]}
+                    onPress={() => setSettingsTrackStrengthReps(!settingsTrackStrengthReps)}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('exercise.settings.tracking_preferences.reps_range'))}
+                  >
+                    <ThemedText style={[styles.toggleLabel, { color: colors.text }]}>
+                      {t('exercise.settings.tracking_preferences.reps_range')}
+                    </ThemedText>
+                    <Switch
+                      value={settingsTrackStrengthReps}
+                      onValueChange={setSettingsTrackStrengthReps}
+                      trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                      thumbColor={settingsTrackStrengthReps ? colors.tint : colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Effort Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleRow, { borderBottomColor: colors.separator }]}
+                    onPress={() => setSettingsTrackStrengthEffort(!settingsTrackStrengthEffort)}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(t('exercise.settings.tracking_preferences.effort'))}
+                  >
+                    <ThemedText style={[styles.toggleLabel, { color: colors.text }]}>
+                      {t('exercise.settings.tracking_preferences.effort')}
+                    </ThemedText>
+                    <Switch
+                      value={settingsTrackStrengthEffort}
+                      onValueChange={setSettingsTrackStrengthEffort}
+                      trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                      thumbColor={settingsTrackStrengthEffort ? colors.tint : colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -2214,7 +2489,15 @@ export default function ExerciseHomeScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
                 onPress={() => {
-                  updateProfileMutation.mutate({ distance_unit: settingsDistanceUnit }, {
+                  updateProfileMutation.mutate({
+                    distance_unit: settingsDistanceUnit,
+                    exercise_track_cardio_duration: settingsTrackCardioDuration,
+                    exercise_track_cardio_distance: settingsTrackCardioDistance,
+                    exercise_track_cardio_effort: settingsTrackCardioEffort,
+                    exercise_track_strength_sets: settingsTrackStrengthSets,
+                    exercise_track_strength_reps: settingsTrackStrengthReps,
+                    exercise_track_strength_effort: settingsTrackStrengthEffort,
+                  }, {
                     onSuccess: () => {
                       showAppToast(t('exercise.settings.save'));
                       setShowExerciseSettings(false);
@@ -2582,6 +2865,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BorderRadius['2xl'],
     padding: Spacing.lg,
     maxHeight: '85%',
+    flex: 1,
+    justifyContent: 'space-between',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2595,7 +2880,11 @@ const styles = StyleSheet.create({
     ...getMinTouchTargetStyle(),
   },
   modalBody: {
+    flex: 1,
+  },
+  modalBodyContent: {
     gap: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
   settingsRow: {
     marginBottom: Spacing.md,
@@ -2658,6 +2947,36 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '600',
     marginBottom: Spacing.xs,
+  },
+  trackingPreferencesSection: {
+    marginTop: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: FontSize.lg,
+    marginBottom: Spacing.xs,
+  },
+  helperText: {
+    fontSize: FontSize.sm,
+    marginBottom: Spacing.md,
+  },
+  trackingSubsection: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  subsectionTitle: {
+    fontSize: FontSize.md,
+    marginBottom: Spacing.sm,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  toggleLabel: {
+    fontSize: FontSize.md,
+    flex: 1,
   },
   formInput: {
     padding: Spacing.md,

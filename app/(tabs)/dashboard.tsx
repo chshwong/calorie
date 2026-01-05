@@ -363,6 +363,12 @@ export default function DashboardScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: dashboardBackground }]}>
+      {/* COMING SOON Overlay */}
+      <View style={[styles.comingSoonOverlay, { backgroundColor: colorScheme === 'dark' ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]}>
+        <ThemedText style={[styles.comingSoonText, { color: colors.text }]}>
+          COMING SOON
+        </ThemedText>
+      </View>
       {/* Subtle background gradient for web */}
       {Platform.OS === 'web' && (
         <View
@@ -1194,5 +1200,19 @@ const styles = StyleSheet.create({
   quickActionLabel: {
     fontSize: FontSize.xs,
     fontWeight: '600',
+  },
+  // Coming Soon overlay
+  comingSoonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    pointerEvents: 'none',
+  },
+  comingSoonText: {
+    fontSize: 64,
+    fontWeight: '900',
+    letterSpacing: 4,
+    textTransform: 'uppercase',
   },
 });

@@ -111,6 +111,7 @@
     "exercises": {
       "intro": "Track exercises here, built for fast logging.",
       "daySummary": "Exercise logs are for tracking activities, not calorie burn. Users rely on wearable data for more accurate full-day energy burn.",
+      "daySummaryGear": "Tap the ⚙️ to set unit preferences and toggle tracking for duration, distance, reps, and more.",
       "quickAdd": "Tap activities from the list to log.\nTip: Log as detailed or as simple as you like—some choose bench press & push-ups, others just chest.",
       "logExerciseBtn": "Can’t find your activity? Tap Log Exercise.\n\nHappy logging!"
     }
@@ -1967,7 +1968,18 @@
       "kilometers": "Kilometers (km)",
       "miles": "Miles (mi)",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "tracking_preferences": {
+        "title": "Tracking Preferences",
+        "helper_text": "Choose what details you want to track. Hidden items won't appear when logging.",
+        "cardio_section": "Cardio & Mind-Body",
+        "strength_section": "Strength Workout",
+        "duration_minutes": "Duration (minutes)",
+        "distance": "Distance",
+        "effort": "Effort",
+        "sets": "Sets",
+        "reps_range": "Reps Range"
+      }
     },
     "loading": "Loading exercises...",
     "error": "Failed to load exercises",

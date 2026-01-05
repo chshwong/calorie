@@ -34,6 +34,14 @@ export type UserConfig = {
   water_unit: string | null;
   distance_unit: 'km' | 'mi' | null;
   
+  // Exercise tracking preferences
+  exercise_track_cardio_duration: boolean | null;
+  exercise_track_cardio_distance: boolean | null;
+  exercise_track_cardio_effort: boolean | null;
+  exercise_track_strength_sets: boolean | null;
+  exercise_track_strength_reps: boolean | null;
+  exercise_track_strength_effort: boolean | null;
+  
   // Daily Goals/Targets
   daily_calorie_goal: number | null;
   daily_calorie_goal_upper: number | null;
