@@ -14,7 +14,6 @@ import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
@@ -52,7 +51,7 @@ import { getLocalDateKey } from '@/utils/dateTime';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import { calculateNetCalories, canComputeNetCalories } from '@/lib/domain/burned/netCalories';
 import { useQueryClient } from '@tanstack/react-query';
-import { compareDateKeys } from '@/lib/date-guard';
+import { compareDateKeys, minDateKey } from '@/lib/date-guard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -166,39 +165,6 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     
     runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
   };
-
-  // Check if there are entries for the previous day for this meal type (visibility check)
-  const hasPreviousDayEntries = useMemo(() => {
-    if (!user?.id) return false;
-    
-    const previousDay = new Date(selectedDate);
-    previousDay.setDate(previousDay.getDate() - 1);
-    const previousDateString = getLocalDateKey(previousDay);
-    
-    // Check React Query cache for previous day entries
-    const previousDayQueryKey = ['entries', user.id, previousDateString];
-    const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
-    
-    // If cache is undefined (not loaded yet), default to hiding (conservative)
-    if (cachedPreviousDayEntries === undefined) {
-      return false;
-    }
-    
-    // If cache exists, check if there are entries for this meal type
-    if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
-      const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
-        entry.meal_type?.toLowerCase() === mealType.toLowerCase()
-      );
-      return mealTypeEntries.length > 0;
-    }
-    
-    return false;
-  }, [user?.id, selectedDate, mealType, queryClient]);
-  
-  // Hide component if there are no entries to copy
-  if (!hasPreviousDayEntries) {
-    return null;
-  }
 
   return (
     <View style={styles.copyFromYesterdayButton}>
@@ -438,8 +404,8 @@ export default function FoodLogHomeScreen() {
   const tourCallItADayRef = useTourAnchor('home.callItADay');
 
   const [welcomeConfettiVisible, setWelcomeConfettiVisible] = useState(false);
-  const [homeTourWelcomeVisible, setHomeTourWelcomeVisible] = useState(false);
   const isCheckingTourRef = useRef(false);
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Menu state for meal type options
   const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
@@ -473,6 +439,7 @@ export default function FoodLogHomeScreen() {
     isToday,
     today,
     minDate,
+    minDateKey: userSignupDateKey,
     canGoBack,
   } = useSelectedDate();
 
@@ -1016,9 +983,12 @@ export default function FoodLogHomeScreen() {
     : formattedDate;
 
   // Done CTA: within last N days (today + previous N-1 days)
+  // Grace window starts from the earlier of: (today - graceDays) or user's signup date
   const todayKey = toDateKey(new Date());
   const yesterdayKey = addDays(todayKey, -1);
-  const minDoneCtaKey = addDays(todayKey, -(FOOD_LOG.DONE_CTA_GRACE_DAYS - 1));
+  const calculatedMinDoneCtaKey = addDays(todayKey, -(FOOD_LOG.DONE_CTA_GRACE_DAYS - 1));
+  // Use the earlier date: ensure signup date is always included in grace window
+  const minDoneCtaKey = minDateKey(calculatedMinDoneCtaKey, userSignupDateKey);
   const shouldShowDoneCta =
     compareDateKeys(selectedDateString, minDoneCtaKey) >= 0 && compareDateKeys(selectedDateString, todayKey) <= 0;
 
@@ -1028,7 +998,6 @@ export default function FoodLogHomeScreen() {
     if (!userId || !onboardingComplete) return;
     if (activeTourId) return; // already running
     if (isCheckingTourRef.current) return;
-    if (homeTourWelcomeVisible) return; // waiting for user CTA
 
     isCheckingTourRef.current = true;
     try {
@@ -1038,7 +1007,13 @@ export default function FoodLogHomeScreen() {
       const welcomeShown = await isTourWelcomeShown('V1_HomePageTour', userId);
       if (!welcomeShown) {
         setWelcomeConfettiVisible(true);
-        setHomeTourWelcomeVisible(true);
+        showAppToast('Congratz on starting your fitness journey on AvoVibe!', { durationMs: 4000 });
+        await setTourWelcomeShown('V1_HomePageTour', userId);
+
+        if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = setTimeout(() => {
+          void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
+        }, 4100);
         return;
       }
 
@@ -1046,12 +1021,17 @@ export default function FoodLogHomeScreen() {
     } finally {
       isCheckingTourRef.current = false;
     }
-  }, [activeTourId, effectiveProfile?.onboarding_complete, homeTourWelcomeVisible, startTour, user?.id]);
+  }, [activeTourId, effectiveProfile?.onboarding_complete, startTour, user?.id]);
 
   // First-run welcome + tour start (per account on this device)
   useEffect(() => {
     void maybeStartHomeTour();
-    return () => {};
+    return () => {
+      if (startTimeoutRef.current) {
+        clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = null;
+      }
+    };
   }, [maybeStartHomeTour]);
 
   // Re-check on focus so resetting flags in Settings takes effect immediately.
@@ -1065,24 +1045,6 @@ export default function FoodLogHomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <ConfettiBurst visible={welcomeConfettiVisible} onDone={() => setWelcomeConfettiVisible(false)} />
-      <ConfirmModal
-        visible={homeTourWelcomeVisible}
-        title={t('tour.home_welcome.title')}
-        message={t('tour.home_welcome.message')}
-        confirmText={t('tour.home_welcome.cta')}
-        cancelText={null}
-        onConfirm={() => {
-          const userId = user?.id;
-          if (!userId) return;
-          setHomeTourWelcomeVisible(false);
-          void setTourWelcomeShown('V1_HomePageTour', userId);
-          void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
-        }}
-        // Require explicit CTA tap to proceed.
-        onCancel={() => {}}
-        confirmDisabled={!user?.id}
-        animationType="fade"
-      />
       <OfflineBanner />
       <CollapsibleModuleHeader
         greetingText={greetingText}
