@@ -28,6 +28,18 @@ BEGIN
   END IF;
 END $$;
 
+-- Add 'reopened' value to enum (migration-safe)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum 
+    WHERE enumlabel = 'reopened' 
+    AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'daily_log_status')
+  ) THEN
+    ALTER TYPE public.daily_log_status ADD VALUE 'reopened';
+  END IF;
+END $$;
+
 -- 2) Table
 CREATE TABLE IF NOT EXISTS public.daily_sum_consumed (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

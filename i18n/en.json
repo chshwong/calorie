@@ -190,8 +190,8 @@
       "kcal": "cal"
     },
     "previous_day_copy": {
-      "label_yesterday": "From Yesterday",
-      "label_previous": "From Previous Day",
+      "label_yesterday": "Yesterday",
+      "label_previous": "Previous Day",
       "accessibility_label_yesterday": "Copy yesterday's {{mealType}} entries to today",
       "accessibility_label_previous": "Copy previous day's {{mealType}} entries to current day",
       "success_message": "{{count}} {{items}} copied over from previous day.",
@@ -1373,6 +1373,7 @@
     "bundles": {
       "title": "Bundles",
       "empty": "Create food bundles for fast multi-entries",
+      "hint": "Tap + Create New Bundle to get started",
       "create_hint": "Create bundles to quickly log multiple foods at once",
       "example_hint": "i.e., Weekday Protein Breakfast A",
       "example_desc": "4 whole eggs, 20g Whey, 2 cups skim milk, 1 tbsp olive oil, 5oz ham",
@@ -2018,8 +2019,8 @@
       }
     },
     "previous_day_copy": {
-      "label_yesterday": "From Yesterday",
-      "label_previous": "From Previous Day",
+      "label_yesterday": "Yesterday",
+      "label_previous": "Previous Day",
       "accessibility_label_yesterday": "Copy yesterday's exercises to today",
       "accessibility_label_previous": "Copy previous day's exercises to current day",
       "success_message": "{{count}} {{items}} copied over from previous day.",
@@ -2268,8 +2269,8 @@
       }
     },
     "previous_day_copy": {
-      "label_yesterday": "From Yesterday",
-      "label_previous": "From Previous Day",
+      "label_yesterday": "Yesterday",
+      "label_previous": "Previous Day",
       "accessibility_label_yesterday": "Copy yesterday's intake to today",
       "accessibility_label_previous": "Copy previous day's intake to current day",
       "success_message": "{{count}} {{items}} copied over from previous day.",

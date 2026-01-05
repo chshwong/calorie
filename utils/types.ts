@@ -170,7 +170,7 @@ export interface DailySumBurned {
  *
  * NOTE: This is user intent and must never be inferred from totals.
  */
-export type DailyLogStatus = 'unknown' | 'completed' | 'fasted';
+export type DailyLogStatus = 'unknown' | 'completed' | 'fasted' | 'reopened';
 
 /**
  * Durable daily fact row for consumed totals + explicit day state.

@@ -223,8 +223,8 @@
       "kcal": "cal"
     },
     "previous_day_copy": {
-      "label_yesterday": "D'hier",
-      "label_previous": "Du jour précédent",
+      "label_yesterday": "Hier",
+      "label_previous": "Jour précédent",
       "accessibility_label_yesterday": "Copier les entrées {{mealType}} d'hier à aujourd'hui",
       "accessibility_label_previous": "Copier les entrées {{mealType}} du jour précédent au jour actuel",
       "success_message": "{{count}} {{items}} copiés depuis le jour précédent.",
@@ -1199,6 +1199,7 @@
     "bundles": {
       "title": "Ensembles",
       "empty": "Créez des ensembles pour des entrées multiples rapides",
+      "hint": "Appuyez sur + Créer un nouvel ensemble pour commencer",
       "create_hint": "Créez des ensembles pour enregistrer plusieurs aliments rapidement",
       "example_hint": "ex: Déjeuner protéiné du lundi",
       "example_desc": "4 œufs entiers, 20g Whey, 2 tasses lait écrémé, 1 c.s. huile olive, 150g jambon",

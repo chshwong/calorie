@@ -29,3 +29,4 @@ create index if not exists user_legal_acceptances_user_doc_idx
 
 
 
+

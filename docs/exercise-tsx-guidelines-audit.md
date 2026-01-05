@@ -165,3 +165,4 @@ const intensityLabels: Record<'low' | 'medium' | 'high' | 'max', string> = {
 **Violations:** 6 issues (4 critical, 2 acceptable exceptions)
 **Status:** Generally compliant with most guidelines, but needs cleanup of debug code and hardcoded strings.
 
+

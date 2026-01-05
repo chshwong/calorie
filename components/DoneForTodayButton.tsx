@@ -69,7 +69,7 @@ type FrozenModalRender = {
 };
 
 function normalizeStatus(input: string | null | undefined): DailyLogStatus {
-  if (input === 'completed' || input === 'fasted' || input === 'unknown') return input;
+  if (input === 'completed' || input === 'fasted' || input === 'unknown' || input === 'reopened') return input;
   return 'unknown';
 }
 
@@ -116,6 +116,7 @@ export function DoneForTodayButton({
   const isUnknown = logStatus === 'unknown';
   const isCompleted = logStatus === 'completed';
   const isFasted = logStatus === 'fasted';
+  const isReopened = logStatus === 'reopened';
 
   const isPrimaryFastedAllowedInHighCalories = calories < FOOD_LOG.DONE_MODAL.FASTED_PRIMARY_MAX_CAL_EXCLUSIVE;
 
@@ -127,14 +128,14 @@ export function DoneForTodayButton({
   const isYesterday = selectedDateKey === yesterdayKey;
 
   const ctaLabel = useMemo(() => {
-    if (isUnknown) {
+    if (isUnknown || isReopened) {
       if (isToday) return t('home.done_for_today.cta_today', { defaultValue: 'Done for Today' });
       if (isYesterday) return t('home.done_for_today.cta_yesterday', { defaultValue: 'Done for Yesterday' });
       return t('home.done_for_today.cta_day', { defaultValue: 'Done for the Day' });
     }
     if (isCompleted) return t('home.done_for_today.cta_completed', { defaultValue: 'Completed ✓' });
     return t('home.done_for_today.cta_fasted', { defaultValue: 'Fasted' });
-  }, [isCompleted, isToday, isYesterday, isUnknown, t]);
+  }, [isCompleted, isToday, isYesterday, isUnknown, isReopened, t]);
 
   const doneForDayLabel = useMemo(() => {
     if (isToday) return t('home.done_for_today.action_done_for_today', { defaultValue: 'Done for Today' });
@@ -143,10 +144,10 @@ export function DoneForTodayButton({
   }, [isToday, isYesterday, t]);
 
   const ctaIconName = useMemo(() => {
-    if (isUnknown) return 'checkmark.circle.fill' as const;
+    if (isUnknown || isReopened) return 'checkmark.circle.fill' as const;
     if (isCompleted) return 'checkmark' as const;
     return 'checkmark' as const;
-  }, [isCompleted, isUnknown]);
+  }, [isCompleted, isUnknown, isReopened]);
 
   const open = () => {
     if (setStatusMutation.isPending) {
@@ -166,8 +167,14 @@ export function DoneForTodayButton({
     setFrozenModalRender(null);
     setIsDismissing(false);
 
-    if (isUnknown) setModal('completionConfirm');
-    else setModal('changeStatus');
+    if (isReopened) {
+      // Silent close: directly set to completed without modal
+      applyStatus('completed', 'completed');
+    } else if (isUnknown) {
+      setModal('completionConfirm');
+    } else {
+      setModal('changeStatus');
+    }
   };
 
   const close = () => setModal('none');
@@ -185,7 +192,7 @@ export function DoneForTodayButton({
     setStatusMutation
       .mutateAsync({ entryDate: selectedDateKey, status: next })
       .then(() => {
-        // Trigger celebration only on unknown -> completed/fasted transitions
+        // Trigger celebration only on unknown -> completed/fasted transitions (not reopened -> completed/fasted)
         console.log('[celebrate] prev=', prevStatus, 'next=', next, 'Platform=', Platform.OS);
         if (prevStatus === 'unknown' && (next === 'completed' || next === 'fasted')) {
           // Calculate conditions for weight-loss-specific messages
@@ -343,7 +350,7 @@ export function DoneForTodayButton({
         }),
         primary: {
           label: t('home.done_for_today.action_reopen_log', { defaultValue: 'Reopen Log' }),
-          onPress: () => applyStatus('unknown', 'unknown'),
+          onPress: () => applyStatus('reopened', 'unknown'),
           dismisses: true,
         },
         secondary: {
@@ -376,7 +383,7 @@ export function DoneForTodayButton({
   }, [applyStatus, doneForDayLabel, isCompleted, t]);
 
   const buttonStyle = useMemo(() => {
-    if (isUnknown) {
+    if (isUnknown || isReopened) {
       return {
         backgroundColor: colors.tint,
         borderColor: 'transparent',
@@ -398,7 +405,7 @@ export function DoneForTodayButton({
       labelColor: colors.text,
       iconColor: colors.textSecondary,
     };
-  }, [colors, isCompleted, isUnknown, tintOnTintColor]);
+  }, [colors, isCompleted, isUnknown, isReopened, tintOnTintColor]);
 
   const showModal =
     modal === 'completionConfirm' || modal === 'fastedSecondaryConfirm' || modal === 'changeStatus';

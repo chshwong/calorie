@@ -167,6 +167,39 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
   };
 
+  // Check if there are entries for the previous day for this meal type (visibility check)
+  const hasPreviousDayEntries = useMemo(() => {
+    if (!user?.id) return false;
+    
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const previousDateString = getLocalDateKey(previousDay);
+    
+    // Check React Query cache for previous day entries
+    const previousDayQueryKey = ['entries', user.id, previousDateString];
+    const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
+    
+    // If cache is undefined (not loaded yet), default to hiding (conservative)
+    if (cachedPreviousDayEntries === undefined) {
+      return false;
+    }
+    
+    // If cache exists, check if there are entries for this meal type
+    if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
+      const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+        entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+      );
+      return mealTypeEntries.length > 0;
+    }
+    
+    return false;
+  }, [user?.id, selectedDate, mealType, queryClient]);
+  
+  // Hide component if there are no entries to copy
+  if (!hasPreviousDayEntries) {
+    return null;
+  }
+
   return (
     <View style={styles.copyFromYesterdayButton}>
       {isCopyingFromYesterday ? (
