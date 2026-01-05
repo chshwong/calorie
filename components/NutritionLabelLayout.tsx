@@ -18,9 +18,9 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TextInput } from 'react-native';
+import { View, StyleSheet, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { DashboardAccents, Colors } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getMacroColors } from '@/utils/macroColors';
 
@@ -33,7 +33,6 @@ type NutrientValueProps = {
 function NutrientValue({ value, unit, color }: NutrientValueProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const isDark = colorScheme === 'dark';
   
   return (
     <View style={styles.valueWithUnit}>
@@ -225,38 +224,11 @@ export function NutritionLabelLayout(props: NutritionLabelLayoutProps) {
     return React.cloneElement(node as any, clonedProps);
   };
 
-  // Apply the calories accent color recursively to any element tree
-  const applyCaloriesColor = (node: React.ReactNode): React.ReactNode => {
-    // Calories can remain with accent color even in dark mode
-    if (!React.isValidElement(node)) return node;
-
-    const normalizeStyle = (styleProp: any) => {
-      if (Array.isArray(styleProp)) return styleProp.filter(Boolean);
-      return styleProp ? [styleProp] : [];
-    };
-
-    const propsAny: any = node.props || {};
-
-    const mergedStyle = [
-      ...normalizeStyle((node.props as any)?.style),
-      styles.caloriesValueText,
-    ];
-
-    const clonedProps: any = {
-      ...propsAny,
-      style: mergedStyle,
-    };
-
-    if (propsAny && propsAny.children !== undefined) {
-      clonedProps.children = React.Children.map(propsAny.children, (child) =>
-        applyCaloriesColor(child)
-      );
-    }
-
-    return React.cloneElement(node as any, clonedProps);
-  };
-
-  const caloriesValueNode = applyCaloriesColor(formatNode(props.caloriesInput, 0));
+  // Calories value should match the label color (white in dark mode, black in light mode).
+  const caloriesValueNode = applyValueColor(
+    formatNode(props.caloriesInput, 0),
+    isDark ? colors.textPanelHeaderDark : '#000000'
+  );
   const fatValueNode = applyValueColor(formatNode(props.fatInput, 1), macroColors.fat);
   const satFatValueNode = applyValueColor(formatNode(props.satFatInput, 1));
   const transFatValueNode = applyValueColor(formatNode(props.transFatInput, 1));
@@ -480,10 +452,6 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     minWidth: 80,
     alignItems: 'flex-end',
-    color: DashboardAccents.food,
-  },
-  caloriesValueText: {
-    color: DashboardAccents.food,
   },
   row: {
     flexDirection: 'row',
