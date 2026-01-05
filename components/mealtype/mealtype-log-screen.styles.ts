@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
-import { Spacing, BorderRadius, FontSize, FontWeight, Shadows } from '@/constants/theme';
+import { Spacing, BorderRadius, FontSize, FontWeight, Shadows, FontFamilies } from '@/constants/theme';
 
 export const styles = StyleSheet.create({
   container: {
@@ -115,6 +115,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    paddingHorizontal: Spacing.sm, // 8px padding to prevent title from touching edges
   },
   foodLogDivider: {
     height: 1,
@@ -125,6 +126,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
+    fontFamily: FontFamilies.bold,
   },
   toggleContainer: {
     flexDirection: 'row',

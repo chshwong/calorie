@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Pressable, Text, StyleSheet, Platform, Animated, type LayoutChangeEvent } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, FontFamilies } from '@/constants/theme';
 
 /**
  * REUSABLE SEGMENTED TABS COMPONENT
@@ -187,6 +187,9 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                     fontWeight: isActive 
                       ? FontWeight.semibold 
                       : FontWeight.medium,
+                    fontFamily: isActive 
+                      ? FontFamilies.semibold 
+                      : FontFamilies.medium,
                   },
                 ]}
                 numberOfLines={1}

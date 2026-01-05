@@ -396,6 +396,7 @@ export const FontWeight = {
 export const FontFamilies = {
   regular: 'Inter_400Regular',
   semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
 } as const;
 
 // Shared gauge typography (kept in theme to avoid hardcoded font sizes in components)
