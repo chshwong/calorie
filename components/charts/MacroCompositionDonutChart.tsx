@@ -35,6 +35,7 @@ type MacroCompositionDonutChartProps = {
   gapDegrees?: number; // default 1.2
   minLabelPercent?: number; // default 0 (show all labels > 0%)
   showTooltips?: boolean; // deprecated (tooltips removed by request)
+  showGrams?: boolean; // default false - when true, shows gram values as third line in labels
   centerGrade?: AvoScoreGrade;
   centerLabel?: string; // default "AvoScore"
   centerReasons?: string[]; // 1-2 callouts rendered in overlay at donut center
@@ -107,6 +108,7 @@ export function MacroCompositionDonutChart({
   gapDegrees = 1.2,
   minLabelPercent = 0,
   // showTooltips deprecated; tooltips removed
+  showGrams = false,
   centerGrade,
   centerLabel,
   centerReasons,
@@ -175,7 +177,7 @@ export function MacroCompositionDonutChart({
   // Label geometry (chart-specific, not theme-driven).
   // Used for viewBox tightening and label sizing heuristics.
   const LABEL_BOX_MIN_W = 72;
-  const LABEL_BOX_H = 38; // two lines: (name + percent)
+  const LABEL_BOX_H = showGrams ? 57 : 38; // two lines: (name + percent) or three lines: (name + percent + grams)
 
   const cx = size / 2;
   const cy = size / 2;
@@ -406,17 +408,25 @@ export function MacroCompositionDonutChart({
 
   }, [innerSegments, outerSegments, minLabelPercent, cx, cy, innerOuterR, outerOuterR]);
 
-  const computeLabelBox = (labelText: string, percentText: string) => {
+  const computeLabelBox = (labelText: string, percentText: string, gramsText?: string) => {
     // Labels should match the score chip text size (stable, not affected by SVG scaling).
     const fontSize = FontSize.gaugeLabelMd;
     const lineHeight = FontSize.gaugeLabelMd + Spacing.xs; // ~17
     // NOTE: chart-geometry heuristic; not a theme token. If we need to theme this,
     // we should move it to a shared chart typography helper.
     const CHAR_W = 8.5;
-    const longest = Math.max(labelText.length, percentText.length);
+    const longest = Math.max(labelText.length, percentText.length, gramsText?.length ?? 0);
     const labelWidth = Math.max(longest * CHAR_W, LABEL_BOX_MIN_W);
     const labelHeight = LABEL_BOX_H;
     return { fontSize, lineHeight, labelWidth, labelHeight };
+  };
+
+  const formatGrams = (grams: number): string => {
+    // Round to 1 decimal place if less than 10, otherwise whole number
+    if (grams < 10) {
+      return `${grams.toFixed(1)}g`;
+    }
+    return `${Math.round(grams)}g`;
   };
 
   // Empty state - check AFTER all hooks are called
@@ -490,7 +500,8 @@ export function MacroCompositionDonutChart({
         {labelPositions.map((pos, idx) => {
           const labelText = macroLabel(pos.segment.name);
           const percentText = formatPercent(pos.segment.percent);
-          const { labelWidth, labelHeight } = computeLabelBox(labelText, percentText);
+          const gramsText = showGrams ? formatGrams(pos.segment.grams) : undefined;
+          const { labelWidth, labelHeight } = computeLabelBox(labelText, percentText, gramsText);
 
           const rectX = pos.side === 'right' ? pos.x : pos.x - labelWidth;
           const rectY = pos.y - labelHeight / 2;
@@ -519,7 +530,8 @@ export function MacroCompositionDonutChart({
         {labelPositions.map((pos, idx) => {
           const labelText = macroLabel(pos.segment.name);
           const percentText = formatPercent(pos.segment.percent);
-          const { fontSize, lineHeight, labelWidth, labelHeight } = computeLabelBox(labelText, percentText);
+          const gramsText = showGrams ? formatGrams(pos.segment.grams) : undefined;
+          const { fontSize, lineHeight, labelWidth, labelHeight } = computeLabelBox(labelText, percentText, gramsText);
 
           const rectX = pos.side === 'right' ? pos.x : pos.x - labelWidth;
           const rectY = pos.y - labelHeight / 2;
@@ -572,6 +584,25 @@ export function MacroCompositionDonutChart({
               >
                 {percentText}
               </Text>
+              {showGrams && gramsText && (
+                <Text
+                  style={[
+                    styles.sliceLabelText,
+                    {
+                      color: colors.textSecondary,
+                      fontSize,
+                      lineHeight,
+                      fontWeight: FontWeight.regular,
+                      textAlign: pos.side === 'right' ? 'left' : 'right',
+                      textShadowColor: colors.background,
+                      textShadowOffset: { width: 0, height: 0 },
+                      textShadowRadius: Spacing.xs,
+                    },
+                  ]}
+                >
+                  {gramsText}
+                </Text>
+              )}
             </View>
           );
         })}
