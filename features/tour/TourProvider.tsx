@@ -1,4 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ScrollView } from 'react-native';
 import { Dimensions } from 'react-native';
 
@@ -9,6 +18,8 @@ import { clearLastStepIndex, getLastStepIndex, isTourCompleted, setLastStepIndex
 export type SpotlightRect = { x: number; y: number; width: number; height: number };
 
 type StartOptions = { force?: boolean };
+
+export type OnTourStepChange = (tourId: TourId, step: TourStep, stepIndex: number) => void;
 
 type ScrollContainer = {
   ref: React.RefObject<ScrollView | null>;
@@ -31,6 +42,12 @@ type TourContextValue = {
   unregisterAnchor: (key: string) => void;
   registerScrollContainer: (container: ScrollContainer | null) => void;
   measureAnchor: (key: string) => Promise<SpotlightRect | null>;
+
+  /** Subscribe to step changes so screens can drive their own UI (tabs, expanders, etc). */
+  registerOnStepChange: (cb: OnTourStepChange) => () => void;
+
+  /** Request a re-measure of the current step's anchor (e.g., after UI is driven). */
+  requestRemeasure: () => void;
 };
 
 const TourContext = createContext<TourContextValue | null>(null);
@@ -61,6 +78,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   const anchorsRef = useRef(new Map<string, React.RefObject<any>>());
   const scrollContainerRef = useRef<ScrollContainer | null>(null);
+  const onStepChangeCbsRef = useRef(new Set<OnTourStepChange>());
+  const [remeasureNonce, setRemeasureNonce] = useState(0);
 
   const registerAnchor = useCallback((key: string, ref: React.RefObject<any>) => {
     anchorsRef.current.set(key, ref);
@@ -72,6 +91,17 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   const registerScrollContainer = useCallback((container: ScrollContainer | null) => {
     scrollContainerRef.current = container;
+  }, []);
+
+  const registerOnStepChange = useCallback((cb: OnTourStepChange) => {
+    onStepChangeCbsRef.current.add(cb);
+    return () => {
+      onStepChangeCbsRef.current.delete(cb);
+    };
+  }, []);
+
+  const requestRemeasure = useCallback(() => {
+    setRemeasureNonce((n) => n + 1);
   }, []);
 
   const measureAnchor = useCallback(async (key: string): Promise<SpotlightRect | null> => {
@@ -150,6 +180,20 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     void setLastStepIndex(activeTourId, userId, stepIndex);
   }, [activeTourId, stepIndex, userId]);
 
+  // Notify subscribers when the active step changes.
+  useLayoutEffect(() => {
+    if (!activeTourId) return;
+    const step = steps[stepIndex];
+    if (!step) return;
+    for (const cb of onStepChangeCbsRef.current) {
+      try {
+        cb(activeTourId, step, stepIndex);
+      } catch {
+        // Never let a subscriber crash the tour engine.
+      }
+    }
+  }, [activeTourId, stepIndex, steps]);
+
   // On step change: scroll into view (if needed) then measure and set spotlight rect.
   useEffect(() => {
     let cancelled = false;
@@ -159,57 +203,74 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     if (!step) return;
 
     const run = async () => {
-      // 1) initial measure
-      let rect = await measureAnchor(step.anchorKey);
+      const measureCurrent = async (): Promise<SpotlightRect | null> => {
+        // 1) initial measure
+        let rect = await measureAnchor(step.anchorKey);
+        if (cancelled) return null;
+
+        // 2) attempt to scroll it into view if we can and it looks off-screen
+        const container = scrollContainerRef.current;
+        if (container?.ref?.current && rect) {
+          const { height: screenH } = Dimensions.get('window');
+          const margin = 80;
+          const topLimit = margin;
+          const bottomLimit = screenH - margin;
+          const isAbove = rect.y < topLimit;
+          const isBelow = rect.y + rect.height > bottomLimit;
+
+          if (isAbove || isBelow) {
+            const currentOffset = clampNonNegative(container.getScrollOffset());
+            const desired =
+              step.scrollBehavior === 'start'
+                ? currentOffset + rect.y - margin
+                : currentOffset + rect.y - (screenH / 2 - rect.height / 2);
+            container.ref.current.scrollTo({ y: clampNonNegative(desired), animated: true });
+
+            // Allow scroll to settle before re-measuring.
+            await new Promise((r) => setTimeout(r, 220));
+            if (cancelled) return null;
+            rect = await measureAnchor(step.anchorKey);
+            if (cancelled) return null;
+          }
+        }
+
+        return rect;
+      };
+
+      // 3) set spotlight; if missing, retry briefly before auto-advancing (anchors may render after tab/UI changes)
+      let rect = await measureCurrent();
       if (cancelled) return;
 
-      // 2) attempt to scroll it into view if we can and it looks off-screen
-      const container = scrollContainerRef.current;
-      if (container?.ref?.current && rect) {
-        const { height: screenH } = Dimensions.get('window');
-        const margin = 80;
-        const topLimit = margin;
-        const bottomLimit = screenH - margin;
-        const isAbove = rect.y < topLimit;
-        const isBelow = rect.y + rect.height > bottomLimit;
-
-        if (isAbove || isBelow) {
-          const currentOffset = clampNonNegative(container.getScrollOffset());
-          const desired =
-            step.scrollBehavior === 'start'
-              ? currentOffset + rect.y - margin
-              : currentOffset + rect.y - (screenH / 2 - rect.height / 2);
-          container.ref.current.scrollTo({ y: clampNonNegative(desired), animated: true });
-
-          // Allow scroll to settle before re-measuring.
-          await new Promise((r) => setTimeout(r, 220));
+      if (!rect) {
+        // Retry a few times before skipping. This prevents "not yet rendered" from being treated as "missing".
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 180));
           if (cancelled) return;
-          rect = await measureAnchor(step.anchorKey);
+          rect = await measureCurrent();
           if (cancelled) return;
+          if (rect) break;
         }
       }
 
-      // 3) set spotlight or auto-advance if missing
       if (rect) {
         setSpotlightRect(rect);
-      } else {
-        setSpotlightRect(null);
-        // Don't block the tour if an anchor is missing; skip forward safely.
-        await new Promise((r) => setTimeout(r, 180));
-        if (cancelled) return;
-        setStepIndex((i) => {
-          const last = steps.length - 1;
-          if (i >= last) return i;
-          return i + 1;
-        });
+        return;
       }
+
+      setSpotlightRect(null);
+      // Don't block the tour if an anchor is truly missing; skip forward safely.
+      setStepIndex((i) => {
+        const last = steps.length - 1;
+        if (i >= last) return i;
+        return i + 1;
+      });
     };
 
     void run();
     return () => {
       cancelled = true;
     };
-  }, [activeTourId, measureAnchor, stepIndex, steps]);
+  }, [activeTourId, measureAnchor, remeasureNonce, stepIndex, steps]);
 
   // If steps change while active, keep index in range.
   useEffect(() => {
@@ -234,6 +295,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       unregisterAnchor,
       registerScrollContainer,
       measureAnchor,
+      registerOnStepChange,
+      requestRemeasure,
     }),
     [
       activeTourId,
@@ -242,7 +305,9 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       measureAnchor,
       next,
       registerAnchor,
+      registerOnStepChange,
       registerScrollContainer,
+      requestRemeasure,
       skip,
       spotlightRect,
       startTour,

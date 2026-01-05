@@ -80,6 +80,11 @@
       "skip": "Skip tour"
     },
     "reset_toast": "Tour guide reset. Go to Food Diary or Meal Log to start again.",
+    "home_welcome": {
+      "title": "Bienvenue",
+      "message": "Bravo pour le début de votre parcours fitness sur AvoVibe !",
+      "cta": "Allons-y !"
+    },
     "home": {
       "curvyGauge": "This is your daily calorie target. Click ⚙️ to adjust target.",
       "burnedEatenNet": "Keep track of your calorie deficit/surplus here.",
@@ -100,6 +105,12 @@
       "bundles": "Bundles save frequent multi-item meals so you can log them in one tap. E.g., my protein berry shake, mom’s special lunch box.",
       "quicklog": "Short on time? Use ⚡Quick Log.\nLess precise, but gives you a break—perfect after a big buffet.",
       "foodlog": "Your logged items appear here. You can edit them anytime."
+    },
+    "exercises": {
+      "intro": "Suivez vos exercices ici, conçu pour une saisie rapide.",
+      "daySummary": "Les journaux d’exercice servent à suivre vos activités, pas les calories brûlées. Les utilisateurs se fient aux données de leur montre pour estimer plus précisément la dépense énergétique de la journée.",
+      "quickAdd": "Touchez une activité dans la liste pour l’enregistrer.\nAstuce : soyez aussi précis ou simple que vous voulez — certains notent développé couché et pompes, d’autres écrivent juste poitrine.",
+      "logExerciseBtn": "Vous ne trouvez pas votre activité ? Touchez Log Exercise.\n\nBon suivi !"
     }
   },
 

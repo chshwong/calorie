@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Modal,
   Platform,
   Pressable,
@@ -14,6 +15,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 
 import { useTour } from '@/features/tour/TourProvider';
+import { useTranslation } from 'react-i18next';
+import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -21,6 +24,7 @@ function clamp(n: number, min: number, max: number) {
 
 export function TourOverlay() {
   const { activeTourId, steps, stepIndex, spotlightRect, back, next, skip, finish } = useTour();
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -28,8 +32,35 @@ export function TourOverlay() {
   const isVisible = activeTourId != null && steps.length > 0;
   const isLast = stepIndex >= steps.length - 1;
   const step = steps[stepIndex];
+  const [tooltipHeight, setTooltipHeight] = useState<number>(0);
+  const stepMessage = step?.messageKey ? t(step.messageKey) : '';
+
+  // Subtle "breathing" pulse for the spotlight border (visual-only; does not affect measurement).
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isVisible) return;
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [isVisible, pulse]);
+
+  const borderOpacity = useMemo(
+    () => pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
+    [pulse]
+  );
+  const borderScale = useMemo(
+    () => pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] }),
+    [pulse]
+  );
 
   const hole = useMemo(() => {
+    // Centered steps intentionally have no spotlight.
+    if (step?.placement === 'center') return null;
     if (!spotlightRect) return null;
     // Slightly asymmetric padding to avoid the hole bleeding into the next row (common on stacked cards).
     // `narrow` steps get a tighter frame (especially on the bottom).
@@ -55,6 +86,20 @@ export function TourOverlay() {
   }, [screenH, screenW, spotlightRect, step?.narrow]);
 
   const tooltip = useMemo(() => {
+    const margin = Spacing.lg;
+    const maxWidth = screenW - margin * 2;
+    const cardH = tooltipHeight > 0 ? tooltipHeight : 220; // conservative fallback before first layout
+
+    if (step?.placement === 'center') {
+      const top = clamp(Math.round(screenH / 2 - cardH / 2), margin, screenH - margin - cardH);
+      return {
+        top,
+        left: margin,
+        maxWidth,
+        placement: 'center' as const,
+      };
+    }
+
     if (!hole) {
       return {
         top: Math.round(screenH * 0.2),
@@ -64,32 +109,51 @@ export function TourOverlay() {
       };
     }
 
-    const margin = Spacing.lg;
-    const maxWidth = screenW - margin * 2;
     const desiredLeft = clamp(hole.x, margin, screenW - margin - Math.min(maxWidth, 360));
     const belowTop = hole.y + hole.height + 12;
-    const aboveTop = hole.y - 12; // will subtract card height via transform-ish padding by choosing bottom
     const nearBottom = hole.y + hole.height > screenH * 0.62;
 
-    if (nearBottom) {
-      // place above: we don't know card height yet, so use bottom positioning
-      const bottom = clamp(screenH - hole.y + 12, margin, screenH - margin);
+    // Special-case: Mealtype log anchors can be very tall, which tends to push the tooltip above
+    // and block key UI. Force a stable mid/lower placement and keep the caret pointing upward.
+    if (activeTourId === 'V1_MealtypeLogTour' && step?.anchorKey === 'mealtype.root') {
+      const top = clamp(Math.round(screenH * 0.44), margin, screenH - margin - cardH);
       return {
-        bottom,
+        top,
+        left: desiredLeft,
+        maxWidth,
+        placement: 'below' as const,
+      };
+    }
+
+    if (activeTourId === 'V1_MealtypeLogTour' && step?.anchorKey === 'mealtype.tabsAndList') {
+      const top = clamp(Math.round(screenH * 0.58), margin, screenH - margin - cardH);
+      return {
+        top,
+        left: desiredLeft,
+        maxWidth,
+        placement: 'below' as const,
+      };
+    }
+
+    if (nearBottom) {
+      // place above: clamp using measured card height so it never renders off-screen
+      const top = clamp(hole.y - 12 - cardH, margin, screenH - margin - cardH);
+      return {
+        top,
         left: desiredLeft,
         maxWidth,
         placement: 'above' as const,
       };
     }
 
-    const top = clamp(belowTop, margin, screenH - margin);
+    const top = clamp(belowTop, margin, screenH - margin - cardH);
     return {
       top,
       left: desiredLeft,
       maxWidth,
       placement: 'below' as const,
     };
-  }, [hole, screenH, screenW]);
+  }, [activeTourId, hole, screenH, screenW, step?.anchorKey, step?.placement, tooltipHeight]);
 
   if (!isVisible) return null;
 
@@ -105,7 +169,7 @@ export function TourOverlay() {
         {/* Touch shield */}
         <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
 
-        {/* Dim background + spotlight hole via 4 blocks */}
+        {/* Dim background + spotlight hole via 4 blocks (skipped for centered steps) */}
         {hole ? (
           <>
             <View
@@ -152,7 +216,7 @@ export function TourOverlay() {
             />
 
             {/* Highlight border */}
-            <View
+            <Animated.View
               pointerEvents="none"
               style={[
                 styles.holeBorder,
@@ -162,6 +226,8 @@ export function TourOverlay() {
                   width: hole.width,
                   height: hole.height,
                   borderColor: colors.tint,
+                  opacity: borderOpacity,
+                  transform: [{ scale: borderScale }],
                 },
               ]}
             />
@@ -183,8 +249,36 @@ export function TourOverlay() {
             },
           ]}
           pointerEvents="auto"
+          onLayout={(e) => {
+            const h = e?.nativeEvent?.layout?.height ?? 0;
+            if (h > 0 && Math.abs(h - tooltipHeight) > 1) setTooltipHeight(h);
+          }}
         >
-          <Text style={[styles.tooltipText, { color: colors.text }]}>{step?.message ?? ''}</Text>
+          {/* Caret pointer */}
+          {tooltip.placement === 'below' ? (
+            <View style={[styles.caret, styles.caretTop, { backgroundColor: colors.card }]} />
+          ) : tooltip.placement === 'above' ? (
+            <View style={[styles.caret, styles.caretBottom, { backgroundColor: colors.card }]} />
+          ) : null}
+
+          {/* Header + step progress */}
+          <View style={styles.tooltipHeader}>
+            <View
+              style={styles.tooltipHeaderMascot}
+              accessibilityElementsHidden={true}
+              importantForAccessibility="no-hide-descendants"
+            >
+              <BrandLogoMascotOnly width={36} height={36} />
+            </View>
+            <Text style={[styles.tooltipHeaderTitle, { color: colors.text }]} numberOfLines={1}>
+              {t('tour.overlay.title')}
+            </Text>
+            <Text style={[styles.tooltipHeaderCounter, { color: colors.textSecondary }]} numberOfLines={1}>
+              {stepIndex + 1} / {steps.length}
+            </Text>
+          </View>
+
+          <Text style={[styles.tooltipText, { color: colors.text }]}>{stepMessage}</Text>
 
           <View style={styles.controlsRow}>
             {stepIndex > 0 ? (
@@ -197,10 +291,10 @@ export function TourOverlay() {
                   pressed ? { opacity: 0.85 } : null,
                   Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
                 ]}
-                {...getButtonAccessibilityProps('Back')}
+                {...getButtonAccessibilityProps(t('common.back'))}
               >
                 <Text style={[styles.secondaryButtonText, { color: colors.text }]} numberOfLines={1}>
-                  Back
+                  {t('common.back')}
                 </Text>
               </Pressable>
             ) : (
@@ -216,10 +310,10 @@ export function TourOverlay() {
                 pressed ? { opacity: 0.85 } : null,
                 Platform.OS === 'web' ? getFocusStyle(colors.textOnTint) : null,
               ]}
-              {...getButtonAccessibilityProps(isLast ? 'Done' : 'Next')}
+              {...getButtonAccessibilityProps(isLast ? t('common.done') : t('common.next'))}
             >
               <Text style={[styles.primaryButtonText, { color: colors.textOnTint }]} numberOfLines={1}>
-                {isLast ? 'Done' : 'Next'}
+                {isLast ? t('common.done') : t('common.next')}
               </Text>
             </Pressable>
           </View>
@@ -234,10 +328,10 @@ export function TourOverlay() {
                 pressed ? { opacity: 0.8 } : null,
                 Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
               ]}
-              {...getButtonAccessibilityProps('Skip tour')}
+              {...getButtonAccessibilityProps(t('tour.overlay.skip'))}
             >
               <Text style={[styles.skipText, { color: colors.textSecondary }]} numberOfLines={1}>
-                Skip tour
+                {t('tour.overlay.skip')}
               </Text>
             </Pressable>
           </View>
@@ -258,6 +352,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 2,
     borderRadius: BorderRadius.lg,
+    backgroundColor: 'transparent',
   },
   tooltipCard: {
     position: 'absolute',
@@ -265,11 +360,58 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     maxWidth: 420,
+    overflow: 'visible',
+  },
+  tooltipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  tooltipHeaderIcon: {
+    fontSize: FontSize.base,
+    marginRight: 4,
+  },
+  tooltipHeaderMascot: {
+    marginRight: 6,
+  },
+  tooltipHeaderTitle: {
+    flex: 1,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+  },
+  tooltipHeaderCounter: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
   },
   tooltipText: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
     lineHeight: Math.round(FontSize.base * 1.35),
+  },
+  caret: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    left: '50%',
+    marginLeft: -6,
+    transform: [{ rotate: '45deg' }],
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+      },
+      default: {
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 6,
+      },
+    }),
+  },
+  caretTop: {
+    top: -6,
+  },
+  caretBottom: {
+    bottom: -6,
   },
   controlsRow: {
     marginTop: Spacing.md,

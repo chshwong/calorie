@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView
 import { useRouter, useLocalSearchParams, useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -53,6 +54,10 @@ import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessage
 import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
 import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
 import type { DailyLogStatus } from '@/utils/types';
+import { useTour } from '@/features/tour/TourProvider';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import { isTourCompleted } from '@/features/tour/storage';
+import { V1_EXERCISES_TOUR_STEPS } from '@/features/tour/tourSteps';
 
 // Constants for responsive breakpoints and conversion factors
 // These are UI layout constants, not spacing tokens, so they live here per guideline 11
@@ -518,6 +523,18 @@ export default function ExerciseHomeScreen() {
   const userId = user?.id;
   const { data: dayStatusRows = [] } = useDailySumConsumedRange(userId, selectedDateString, selectedDateString);
   const todayRow = dayStatusRows[0];
+
+  // Tour: Exercises
+  const { activeTourId, startTour, registerScrollContainer, registerOnStepChange, requestRemeasure } = useTour();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
+  const [quickAddY, setQuickAddY] = useState(0);
+  const isCheckingExerciseTourRef = useRef(false);
+
+  const tourScreenRef = useTourAnchor('exercise.screen');
+  const tourDaySummaryRef = useTourAnchor('exercise.daySummary');
+  const tourQuickAddRef = useTourAnchor('exercise.quickAdd');
+  const tourLogExerciseBtnRef = useTourAnchor('exercise.logExerciseBtn');
   
   // Normalize status function (same as DoneForTodayButton)
   const normalizeStatus = (input: string | null | undefined): DailyLogStatus => {
@@ -555,6 +572,57 @@ export default function ExerciseHomeScreen() {
     }
     prevStatusRef.current = dayStatus;
   }, [dayStatus, show]);
+
+  // Register Exercise scroll container for tour auto-scrolling/measurement.
+  useEffect(() => {
+    registerScrollContainer({
+      ref: scrollViewRef,
+      getScrollOffset: () => scrollOffsetRef.current,
+    });
+    return () => registerScrollContainer(null);
+  }, [registerScrollContainer]);
+
+  // Start the tour on focus if not completed (per-user, per-device).
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      if (activeTourId) return;
+      if (isCheckingExerciseTourRef.current) return;
+      isCheckingExerciseTourRef.current = true;
+
+      let cancelled = false;
+      (async () => {
+        try {
+          const completed = await isTourCompleted('V1_ExercisesTour', userId);
+          if (cancelled || completed) return;
+          await startTour('V1_ExercisesTour', V1_EXERCISES_TOUR_STEPS);
+        } catch {
+          // never block screen render for tour
+        } finally {
+          isCheckingExerciseTourRef.current = false;
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        isCheckingExerciseTourRef.current = false;
+      };
+    }, [activeTourId, startTour, userId])
+  );
+
+  // Drive UI on step start: scroll Quick Add near top, then re-measure.
+  useEffect(() => {
+    const unsubscribe = registerOnStepChange((tourId, step) => {
+      if (tourId !== 'V1_ExercisesTour') return;
+      if (step.id !== 'ex-quick-add') return;
+
+      if (quickAddY > 0) {
+        scrollViewRef.current?.scrollTo({ y: Math.max(0, quickAddY - 12), animated: true });
+      }
+      setTimeout(() => requestRemeasure(), 250);
+    });
+    return unsubscribe;
+  }, [quickAddY, registerOnStepChange, requestRemeasure]);
 
   // Mutations
   const createMutation = useCreateExerciseLog();
@@ -1262,46 +1330,53 @@ export default function ExerciseHomeScreen() {
     : formattedDate;
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <CollapsibleModuleHeader
-        dateText={dateText}
-        rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
-        preferredName={effectiveProfile?.first_name ?? undefined}
-        rightAction={
-          <DatePickerButton
-            selectedDate={selectedDate}
-            onDateSelect={navigateWithDate}
-            today={today}
-            module="exercise"
-            minimumDate={minDate}
-            maximumDate={today}
-          />
-        }
-        goBackOneDay={
-          canGoBack
-            ? () => {
-                const newDate = new Date(selectedDate);
-                newDate.setDate(newDate.getDate() - 1);
-                navigateWithDate(newDate);
-              }
-            : undefined
-        }
-        goForwardOneDay={() => {
-          if (!isToday) {
-            const newDate = new Date(selectedDate);
-            newDate.setDate(newDate.getDate() + 1);
-            navigateWithDate(newDate);
+    <View ref={tourScreenRef as any} style={{ flex: 1 }}>
+      <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+        <CollapsibleModuleHeader
+          dateText={dateText}
+          rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
+          preferredName={effectiveProfile?.first_name ?? undefined}
+          rightAction={
+            <DatePickerButton
+              selectedDate={selectedDate}
+              onDateSelect={navigateWithDate}
+              today={today}
+              module="exercise"
+              minimumDate={minDate}
+              maximumDate={today}
+            />
           }
-        }}
-        isToday={isToday}
-        module="exercise"
-      >
+          goBackOneDay={
+            canGoBack
+              ? () => {
+                  const newDate = new Date(selectedDate);
+                  newDate.setDate(newDate.getDate() - 1);
+                  navigateWithDate(newDate);
+                }
+              : undefined
+          }
+          goForwardOneDay={() => {
+            if (!isToday) {
+              const newDate = new Date(selectedDate);
+              newDate.setDate(newDate.getDate() + 1);
+              navigateWithDate(newDate);
+            }
+          }}
+          isToday={isToday}
+          module="exercise"
+          scrollViewRef={scrollViewRef}
+          onScroll={(e) => {
+            scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+          }}
+          scrollEventThrottle={16}
+        >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
 
           {/* Today's Exercise Section - Card */}
-          <ExerciseSectionContainer>
-            <SurfaceCard module="exercise">
+          <View ref={tourDaySummaryRef as any}>
+            <ExerciseSectionContainer>
+              <SurfaceCard module="exercise">
               {/* Standardized Summary Card Header */}
               <SummaryCardHeader
                 titleKey="home.summary.title_other"
@@ -1555,13 +1630,21 @@ export default function ExerciseHomeScreen() {
                 )}
               </>
             )}
+            </View>
+            </SurfaceCard>
+          </ExerciseSectionContainer>
           </View>
-          </SurfaceCard>
-        </ExerciseSectionContainer>
 
         {/* Quick Add Section - Card */}
-        <ExerciseSectionContainer>
-          <SurfaceCard module="exercise">
+        <View
+          ref={tourQuickAddRef as any}
+          onLayout={(e) => {
+            const y = e?.nativeEvent?.layout?.y ?? 0;
+            if (y > 0) setQuickAddY(y);
+          }}
+        >
+          <ExerciseSectionContainer>
+            <SurfaceCard module="exercise">
           <View style={styles.quickAddHeader}>
             <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
               {t('exercise.quick_add_title')}
@@ -1647,6 +1730,7 @@ export default function ExerciseHomeScreen() {
 
           {/* Custom Exercise Button */}
           <TouchableOpacity
+            ref={tourLogExerciseBtnRef as any}
             style={[styles.customButton, { backgroundColor: colors.tintLight, borderColor: colors.tint }]}
             onPress={openCustomForm}
             activeOpacity={0.7}
@@ -1713,8 +1797,9 @@ export default function ExerciseHomeScreen() {
               );
             })}
           </ScrollView>
-          </SurfaceCard>
-        </ExerciseSectionContainer>
+            </SurfaceCard>
+          </ExerciseSectionContainer>
+        </View>
 
         {/* Recent Days Section - Lighter Card */}
         <ExerciseSectionContainer>
@@ -1783,7 +1868,7 @@ export default function ExerciseHomeScreen() {
           </View>
         </ExerciseSectionContainer>
         </DesktopPageContainer>
-      </CollapsibleModuleHeader>
+        </CollapsibleModuleHeader>
       
 
       {/* Delete Confirmation Modal */}
@@ -2152,7 +2237,8 @@ export default function ExerciseHomeScreen() {
 
       {/* Celebration Toast */}
       <ConfettiCelebrationModal {...confettiToastProps} />
-    </ThemedView>
+      </ThemedView>
+    </View>
   );
 }
 

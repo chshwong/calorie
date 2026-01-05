@@ -173,9 +173,13 @@ export default function SettingsScreen() {
 
     setRestartTourLoading(true);
     try {
-      await resetTour('V1_HomePageTour', user.id);
-      showAppToast('Tour guide reset. Go to Food Diary to start again.');
+      await Promise.all([
+        resetTour('V1_HomePageTour', user.id),
+        resetTour('V1_MealtypeLogTour', user.id),
+      ]);
       setShowRestartTourConfirm(false);
+      // Redirect user to Food Diary home after re-enabling guidance
+      appRouter.replace('/');
     } catch (e) {
       Alert.alert(
         t('alerts.error_title'),
@@ -401,9 +405,9 @@ export default function SettingsScreen() {
             }}
           />
           <SettingItem
-            icon="arrow.clockwise"
-            title="Restart Tour Guide"
-            subtitle="Guidance will be re-enabled"
+            icon={<Text style={{ fontSize: 20 }}>💡</Text>}
+            title={t('settings.my_journey.restart_tour_guide_title')}
+            subtitle={t('settings.my_journey.restart_tour_guide_subtitle')}
             onPress={handleRestartTourGuide}
           />
         </SettingSection>
@@ -639,9 +643,9 @@ export default function SettingsScreen() {
 
       <ConfirmModal
         visible={showRestartTourConfirm}
-        title="Restart Tour Guide"
-        message="Guidance will be re-enabled. Replay the Home tour from the beginning?"
-        confirmText="Restart"
+        title={t('settings.my_journey.restart_tour_guide_title')}
+        message={t('settings.my_journey.restart_tour_guide_confirm_message')}
+        confirmText={t('settings.my_journey.restart_tour_guide_confirm_button')}
         cancelText={t('common.cancel', { defaultValue: 'Cancel' })}
         onConfirm={confirmRestartTourGuide}
         onCancel={() => setShowRestartTourConfirm(false)}

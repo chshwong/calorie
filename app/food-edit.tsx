@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
-import { computeAvoScore, normalizeAvoScoreInputToBasis, type AvoScoreBasis } from '@/utils/avoScore';
+import { computeAvoScore, normalizeAvoScoreInputToBasis, type AvoScoreBasis, type AvoScoreInput } from '@/utils/avoScore';
 import { Colors, Spacing } from '@/constants/theme';
 import { FOOD_ENTRY, RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -109,6 +109,17 @@ export default function FoodEditScreen() {
   const [sugar, setSugar] = useState('');
   const [sodium, setSodium] = useState('');
   const [selectionMasterUnits, setSelectionMasterUnits] = useState<number>(0);
+  const [selectionNutrientsRaw, setSelectionNutrientsRaw] = useState<{
+    calories: number;
+    carbG: number;
+    fiberG: number;
+    proteinG: number;
+    fatG: number;
+    sugarG: number;
+    sodiumMg: number;
+    satFatG: number;
+    transFatG: number;
+  } | null>(null);
 
   const [itemNameError, setItemNameError] = useState('');
   const [quantityError, setQuantityError] = useState('');
@@ -376,13 +387,24 @@ export default function FoodEditScreen() {
 
     const nutrients = calculateNutrientsSimple(food, masterUnits);
     setSelectionMasterUnits(masterUnits);
+    const transFatValue = (nutrients as any).trans_fat_g ?? (nutrients as any).transFat_g;
+    setSelectionNutrientsRaw({
+      calories: nutrients.calories_kcal ?? 0,
+      carbG: nutrients.carbs_g ?? 0,
+      fiberG: nutrients.fiber_g ?? 0,
+      proteinG: nutrients.protein_g ?? 0,
+      fatG: nutrients.fat_g ?? 0,
+      sugarG: nutrients.sugar_g ?? 0,
+      sodiumMg: nutrients.sodium_mg ?? 0,
+      satFatG: nutrients.saturated_fat_g ?? 0,
+      transFatG: transFatValue ?? 0,
+    });
     setCalories(nutrients.calories_kcal.toFixed(1));
     setProtein(nutrients.protein_g != null ? nutrients.protein_g.toFixed(1) : '');
     setCarbs(nutrients.carbs_g != null ? nutrients.carbs_g.toFixed(1) : '');
     setFat(nutrients.fat_g != null ? nutrients.fat_g.toFixed(1) : '');
     setFiber(nutrients.fiber_g != null ? nutrients.fiber_g.toFixed(1) : '');
     setSaturatedFat(nutrients.saturated_fat_g != null ? nutrients.saturated_fat_g.toFixed(1) : '');
-    const transFatValue = (nutrients as any).trans_fat_g ?? (nutrients as any).transFat_g;
     setTransFat(transFatValue != null ? transFatValue.toFixed(1) : '');
     setSugar(nutrients.sugar_g != null ? nutrients.sugar_g.toFixed(1) : '');
     setSodium(nutrients.sodium_mg != null ? nutrients.sodium_mg.toFixed(1) : '');
@@ -586,26 +608,19 @@ export default function FoodEditScreen() {
   const isSaveDisabled = loading || !isFormValid() || isCaloriesOverLimit;
 
   const avo = useMemo(() => {
-    const carbG = parseFloat(carbs) || 0;
-    const fiberG = parseFloat(fiber) || 0;
-    const proteinG = parseFloat(protein) || 0;
-    const fatG = parseFloat(fat) || 0;
-    const sugarG = parseFloat(sugar) || 0;
-    const sodiumMg = parseFloat(sodium) || 0;
-    const satFatG = parseFloat(saturatedFat) || 0;
-    const transFatG = parseFloat(transFat) || 0;
-
-    const baseInput = {
+    const fallbackBaseInput: AvoScoreInput = {
       calories: totalCalories,
-      carbG,
-      fiberG,
-      proteinG,
-      fatG,
-      sugarG,
-      sodiumMg,
-      satFatG,
-      transFatG,
+      carbG: parseFloat(carbs) || 0,
+      fiberG: parseFloat(fiber) || 0,
+      proteinG: parseFloat(protein) || 0,
+      fatG: parseFloat(fat) || 0,
+      sugarG: parseFloat(sugar) || 0,
+      sodiumMg: parseFloat(sodium) || 0,
+      satFatG: parseFloat(saturatedFat) || 0,
+      transFatG: parseFloat(transFat) || 0,
     };
+
+    const baseInput: AvoScoreInput = selectionNutrientsRaw ?? fallbackBaseInput;
 
     const baseUnit = (selectedFood?.serving_unit ?? '').toLowerCase();
     const basis: AvoScoreBasis =
@@ -629,7 +644,56 @@ export default function FoodEditScreen() {
     totalCalories,
     selectedFood?.serving_unit,
     selectionMasterUnits,
+    selectionNutrientsRaw,
   ]);
+
+  const macroBasis = useMemo(() => {
+    const baseUnit = (selectedFood?.serving_unit ?? '').toLowerCase();
+    const basis: AvoScoreBasis =
+      baseUnit.includes('ml') ? 'per100ml' : baseUnit.includes('g') ? 'per100g' : 'per100g';
+
+    const fallback = {
+      carbG: parseFloat(carbs) || 0,
+      fiberG: parseFloat(fiber) || 0,
+      proteinG: parseFloat(protein) || 0,
+      fatG: parseFloat(fat) || 0,
+    };
+
+    const base = selectionNutrientsRaw
+      ? {
+          carbG: selectionNutrientsRaw.carbG,
+          fiberG: selectionNutrientsRaw.fiberG,
+          proteinG: selectionNutrientsRaw.proteinG,
+          fatG: selectionNutrientsRaw.fatG,
+        }
+      : fallback;
+
+    const canNormalize = selectionMasterUnits > 0 && (baseUnit.includes('ml') || baseUnit.includes('g'));
+    if (!canNormalize) return base;
+
+    const normalized = normalizeAvoScoreInputToBasis(
+      {
+        calories: 0,
+        carbG: base.carbG,
+        fiberG: base.fiberG,
+        proteinG: base.proteinG,
+        fatG: base.fatG,
+        sugarG: 0,
+        sodiumMg: 0,
+        satFatG: 0,
+        transFatG: 0,
+      },
+      selectionMasterUnits,
+      basis
+    );
+
+    return {
+      carbG: normalized.carbG,
+      fiberG: normalized.fiberG,
+      proteinG: normalized.proteinG,
+      fatG: normalized.fatG,
+    };
+  }, [carbs, fiber, fat, protein, selectedFood?.serving_unit, selectionMasterUnits, selectionNutrientsRaw]);
 
   const saveEntryMutation = useMutation({
     mutationFn: async (params: {
@@ -1141,10 +1205,10 @@ export default function FoodEditScreen() {
             {/* Macro Composition Chart (placed under nutrition label, above actions) */}
             <View style={styles.chartContainer}>
               <MacroCompositionDonutChart
-                gramsCarbTotal={parseFloat(carbs) || 0}
-                gramsFiber={parseFloat(fiber) || 0}
-                gramsProtein={parseFloat(protein) || 0}
-                gramsFat={parseFloat(fat) || 0}
+                gramsCarbTotal={macroBasis.carbG}
+                gramsFiber={macroBasis.fiberG}
+                gramsProtein={macroBasis.proteinG}
+                gramsFat={macroBasis.fatG}
                 size={220}
                 centerGrade={avo.grade}
                 centerLabel={

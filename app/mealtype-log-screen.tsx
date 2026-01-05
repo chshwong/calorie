@@ -74,6 +74,12 @@ import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatt
 import { styles } from '@/components/mealtype/mealtype-log-screen.styles';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { useTour } from '@/features/tour/TourProvider';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import { V1_MEALTYPELOG_TOUR_STEPS } from '@/features/tour/tourSteps';
+import { isTourCompleted } from '@/features/tour/storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Layout } from '@/constants/theme';
 
 type CalorieEntry = {
   id: string;
@@ -110,6 +116,34 @@ export default function LogFoodScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const userId = user?.id;
+  const insets = useSafeAreaInsets();
+  const footerHeight = Layout.bottomTabBarHeight + (Platform.OS === 'web' ? 0 : Math.max(insets.bottom, 0));
+
+  // Tour: Mealtype Log
+  const {
+    activeTourId,
+    startTour,
+    registerOnStepChange,
+    requestRemeasure,
+  } = useTour();
+
+  const tourRootRef = useTourAnchor('mealtype.root');
+  const tourSearchBarRef = useTourAnchor('mealtype.searchBar');
+  const tourBarcodeBtnRef = useTourAnchor('mealtype.barcodeBtn');
+  const tourTabsAndListRef = useTourAnchor('mealtype.tabsAndList');
+  const tourCustomExpandedRef = useTourAnchor('mealtype.customTabExpanded');
+  const tourBundlesExpandedRef = useTourAnchor('mealtype.bundlesTabExpanded');
+  const tourQuickLogTabRef = useTourAnchor('mealtype.quickLogTab');
+  const tourFoodLogSectionRef = useTourAnchor('mealtype.foodLogSection');
+
+  // Refs for individual tab buttons (for precise "scroll into view" during tour)
+  const frequentTabBtnRef = useRef<any>(null);
+  const recentTabBtnRef = useRef<any>(null);
+  const customTabBtnRef = useRef<any>(null);
+  const bundleTabBtnRef = useRef<any>(null);
+
+  const isCheckingMealtypeTourRef = useRef(false);
   
   // Helper functions moved to @/constants/mealtype-ui-helpers.ts
   // Wrapper functions to maintain component API
@@ -472,6 +506,147 @@ export default function LogFoodScreen() {
       }
     }
   };
+
+  // Tour: step-driven UI helpers for tabs
+  const scrollTabIntoView = useCallback(
+    (tab: TabKey) => {
+      const sv = tabsScrollViewRef.current;
+      if (!sv) return;
+
+      const tabRef =
+        tab === 'frequent'
+          ? frequentTabBtnRef
+          : tab === 'recent'
+            ? recentTabBtnRef
+            : tab === 'custom'
+              ? customTabBtnRef
+              : tab === 'bundle'
+                ? bundleTabBtnRef
+                : tab === 'manual'
+                  ? (tourQuickLogTabRef as any)
+                  : null;
+
+      if (!tabRef?.current) return;
+
+      const currentOffset = tabsScrollOffsetRef.current ?? 0;
+      const pad = 12;
+
+      const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+      // Use window measurements to avoid brittle measureLayout node-handle gymnastics on ScrollView.
+      sv.measureInWindow((svX, _svY, svW) => {
+        tabRef.current?.measureInWindow((tabX: number, _tabY: number, tabW: number) => {
+          const leftBound = svX + pad;
+          const rightBound = svX + svW - pad;
+
+          let nextOffset = currentOffset;
+          if (tabX < leftBound) {
+            nextOffset = currentOffset - (leftBound - tabX);
+          } else if (tabX + tabW > rightBound) {
+            nextOffset = currentOffset + (tabX + tabW - rightBound);
+          } else {
+            return; // already fully visible
+          }
+
+          const maxOffset = Math.max(
+            0,
+            (tabsContentWidthRef.current || 0) - (tabsScrollViewWidthRef.current || 0)
+          );
+          nextOffset = clamp(nextOffset, 0, maxOffset);
+          sv.scrollTo({ x: nextOffset, animated: true });
+        });
+      });
+    },
+    [
+      tabsContentWidthRef,
+      tabsScrollOffsetRef,
+      tabsScrollViewRef,
+      tabsScrollViewWidthRef,
+      tourQuickLogTabRef,
+    ]
+  );
+
+  const setTabForTour = useCallback(
+    (tab: TabKey, opts?: { expand?: boolean; scroll?: 'left' | 'right' }) => {
+      // Keep signature stable, but prefer precise scrolling so we don't overshoot and hide labels.
+      scrollTabIntoView(tab);
+
+      if (tab === 'manual') {
+        // Do not auto-navigate during tour; we only spotlight the tab.
+        if (opts?.expand === true) setTabContentCollapsed(false);
+        return;
+      }
+
+      if (activeTab !== tab) {
+        setPreviousTabKey(activeTab);
+        setActiveTab(tab);
+      }
+      if (opts?.expand === true) setTabContentCollapsed(false);
+    },
+    [activeTab, scrollTabIntoView]
+  );
+
+  // Auto-start Mealtype Log tour on entry (per-user, per-device), if not completed.
+  // Important: re-check on focus so a Settings "Restart Tour Guide" takes effect without a full refresh.
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      if (activeTourId) return; // don't fight a running tour
+      if (isCheckingMealtypeTourRef.current) return;
+      isCheckingMealtypeTourRef.current = true;
+
+      let cancelled = false;
+      (async () => {
+        try {
+          const completed = await isTourCompleted('V1_MealtypeLogTour', userId);
+          if (cancelled || completed) return;
+          await startTour('V1_MealtypeLogTour', V1_MEALTYPELOG_TOUR_STEPS);
+        } catch {
+          // never block screen render for tour
+        } finally {
+          isCheckingMealtypeTourRef.current = false;
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        isCheckingMealtypeTourRef.current = false;
+      };
+    }, [activeTourId, startTour, userId])
+  );
+
+  // Drive UI on specific tour steps (select tabs / expand lists), then re-measure.
+  useEffect(() => {
+    const unsubscribe = registerOnStepChange((tourId, step, idx) => {
+      if (tourId !== 'V1_MealtypeLogTour') return;
+
+      if (step.id === 'mt-frequent') {
+        setTabForTour('frequent', { expand: true, scroll: 'left' });
+        setTimeout(() => requestRemeasure(), 200);
+        return;
+      }
+
+      if (step.id === 'mt-custom') {
+        setTabForTour('custom', { expand: true, scroll: 'right' });
+        setTimeout(() => requestRemeasure(), 200);
+        return;
+      }
+
+      if (step.id === 'mt-bundles') {
+        setTabForTour('bundle', { expand: true, scroll: 'right' });
+        setTimeout(() => requestRemeasure(), 200);
+        return;
+      }
+
+      if (step.id === 'mt-quicklog') {
+        // Do not navigate; just ensure the tab is visible.
+        setTabForTour('manual', { scroll: 'right' });
+        setTimeout(() => requestRemeasure(), 200);
+      }
+    });
+
+    return unsubscribe;
+  }, [registerOnStepChange, requestRemeasure, setTabForTour]);
   
   
   // Use React Query hooks for tab data
@@ -1747,50 +1922,54 @@ export default function LogFoodScreen() {
       
       case 'custom':
         return (
-          <CustomFoodsTab
-            customFoods={customFoods}
-            customFoodsLoading={customFoodsLoading}
-            searchQuery={searchQuery}
-            colors={colors}
-            t={t}
-            onFoodSelect={handleFoodSelect}
-            onQuickAdd={handleQuickAdd}
-            onDelete={handleDeleteCustomFood}
-            editMode={customFoodEditMode}
-            onToggleEditMode={() => {
-              setCustomFoodEditMode(!customFoodEditMode);
-            }}
-            newlyAddedFoodId={newlyAddedFoodId}
-            newlyEditedFoodId={newlyEditedFoodId}
-            mealType={mealType}
-            entryDate={entryDate}
-            styles={styles}
-          />
+          <View ref={tourCustomExpandedRef as any}>
+            <CustomFoodsTab
+              customFoods={customFoods}
+              customFoodsLoading={customFoodsLoading}
+              searchQuery={searchQuery}
+              colors={colors}
+              t={t}
+              onFoodSelect={handleFoodSelect}
+              onQuickAdd={handleQuickAdd}
+              onDelete={handleDeleteCustomFood}
+              editMode={customFoodEditMode}
+              onToggleEditMode={() => {
+                setCustomFoodEditMode(!customFoodEditMode);
+              }}
+              newlyAddedFoodId={newlyAddedFoodId}
+              newlyEditedFoodId={newlyEditedFoodId}
+              mealType={mealType}
+              entryDate={entryDate}
+              styles={styles}
+            />
+          </View>
         );
       
       case 'bundle':
         return (
-          <BundlesTab
-            bundles={bundles}
-            bundlesLoading={bundlesLoading}
-            searchQuery={searchQuery}
-            colors={colors}
-            t={t}
-            onAddBundle={handleAddBundleToMeal}
-            onDelete={handleDeleteBundle}
-            formatBundleItemsList={formatBundleItemsList}
-            isBundleNewlyAdded={isBundleNewlyAdded}
-            editMode={bundleEditMode}
-            onToggleEditMode={() => {
-              setBundleEditMode(!bundleEditMode);
-            }}
-            loading={bundleLoading}
-            mealType={mealType}
-            entryDate={entryDate}
-            styles={styles}
-            useTabBackgroundColor={useTabBackgroundColor}
-            {...(useTabBackgroundColor && { getTabListBackgroundColor: getTabListBackgroundColorLocal })}
-          />
+          <View ref={tourBundlesExpandedRef as any}>
+            <BundlesTab
+              bundles={bundles}
+              bundlesLoading={bundlesLoading}
+              searchQuery={searchQuery}
+              colors={colors}
+              t={t}
+              onAddBundle={handleAddBundleToMeal}
+              onDelete={handleDeleteBundle}
+              formatBundleItemsList={formatBundleItemsList}
+              isBundleNewlyAdded={isBundleNewlyAdded}
+              editMode={bundleEditMode}
+              onToggleEditMode={() => {
+                setBundleEditMode(!bundleEditMode);
+              }}
+              loading={bundleLoading}
+              mealType={mealType}
+              entryDate={entryDate}
+              styles={styles}
+              useTabBackgroundColor={useTabBackgroundColor}
+              {...(useTabBackgroundColor && { getTabListBackgroundColor: getTabListBackgroundColorLocal })}
+            />
+          </View>
         );
       
       case 'manual':
@@ -1832,6 +2011,18 @@ export default function LogFoodScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Tour: full-page anchor excluding global footer */}
+      <View
+        ref={tourRootRef as any}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: footerHeight,
+        }}
+      />
       {/* Date Picker Modal */}
       <AppDatePicker
         value={selectedDate}
@@ -1871,7 +2062,7 @@ export default function LogFoodScreen() {
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-            <View style={styles.searchBarWrapper}>
+            <View ref={tourSearchBarRef as any} style={styles.searchBarWrapper}>
               <FoodSearchBar
                 searchQuery={searchQuery}
                 onSearchChange={handleSearchChange}
@@ -1899,6 +2090,7 @@ export default function LogFoodScreen() {
               />
             </View>
             <TouchableOpacity
+              ref={tourBarcodeBtnRef as any}
               style={[styles.barcodeButton, { 
                 backgroundColor: colors.tint + '15', 
                 borderColor: colors.tint + '40',
@@ -1921,10 +2113,8 @@ export default function LogFoodScreen() {
           </View>
 
         {/* Tabs */}
-        <>
-            <View 
-              style={styles.tabsContainerWrapper}
-            >
+        <View ref={tourTabsAndListRef as any} style={{ width: '100%' }}>
+            <View style={styles.tabsContainerWrapper}>
               {/* Left arrow */}
               {canScrollLeft && (
                 <TouchableOpacity
@@ -2006,6 +2196,13 @@ export default function LogFoodScreen() {
                   }}
                   onActiveTabLayout={handleActiveTabLayout}
                   style={{ marginHorizontal: Spacing.sm, marginTop: Spacing.xs }}
+                  tabRefs={{
+                    frequent: frequentTabBtnRef,
+                    recent: recentTabBtnRef,
+                    custom: customTabBtnRef,
+                    bundle: bundleTabBtnRef,
+                    manual: tourQuickLogTabRef,
+                  }}
                 />
               </ScrollView>
               
@@ -2113,10 +2310,10 @@ export default function LogFoodScreen() {
                 renderContent={(key: TabKey) => renderTabContent(key, true)}
               />
             )}
-          </>
+          </View>
 
         {/* Food Log */}
-        <View style={[styles.foodLogContainer, { backgroundColor: colors.backgroundSecondary }]}>
+        <View ref={tourFoodLogSectionRef as any} style={[styles.foodLogContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.entriesSection}>
             <View style={styles.entriesHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>

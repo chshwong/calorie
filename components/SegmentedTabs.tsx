@@ -40,9 +40,11 @@ type SegmentedTabsProps = {
   onChange: (key: string) => void;
   style?: any;
   onActiveTabLayout?: (layout: { x: number; y: number; width: number; height: number } | null) => void;
+  /** Optional refs for specific tab buttons (used for guided tours / measurement). */
+  tabRefs?: Record<string, React.Ref<any> | undefined>;
 };
 
-export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLayout }: SegmentedTabsProps) {
+export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLayout, tabRefs }: SegmentedTabsProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const onActiveTabLayoutRef = useRef(onActiveTabLayout);
@@ -138,6 +140,7 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
           return (
             <Pressable
               key={item.key}
+              ref={tabRefs?.[item.key]}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={item.accessibilityLabel || item.label}

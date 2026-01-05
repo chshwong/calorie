@@ -14,6 +14,7 @@ import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
@@ -390,7 +391,7 @@ export default function FoodLogHomeScreen() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   // Tour wiring (Home tour)
-  const { startTour, registerScrollContainer, activeTourId } = useTour();
+  const { startTour, registerScrollContainer, activeTourId, registerOnStepChange, requestRemeasure } = useTour();
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const didInitTourScrollRef = useRef(false);
@@ -398,13 +399,14 @@ export default function FoodLogHomeScreen() {
   const tourCurvyGaugeRef = useTourAnchor('home.curvyGauge');
   const tourBurnedEatenNetRef = useTourAnchor('home.burnedEatenNet');
   const tourBurnedPencilRef = useTourAnchor('home.burnedPencil');
+  const tourMacrosAndOtherLimitsRef = useTourAnchor('home.macrosAndOtherLimits');
   const tourMealLogRef = useTourAnchor('home.mealLog');
   const tourMealSnackRef = useTourAnchor('home.mealSnack');
   const tourCallItADayRef = useTourAnchor('home.callItADay');
 
   const [welcomeConfettiVisible, setWelcomeConfettiVisible] = useState(false);
+  const [homeTourWelcomeVisible, setHomeTourWelcomeVisible] = useState(false);
   const isCheckingTourRef = useRef(false);
-  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Menu state for meal type options
   const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
@@ -708,6 +710,25 @@ export default function FoodLogHomeScreen() {
     storage.setBoolean(STORAGE_KEYS.SUMMARY_EXPANDED, newValue);
   };
 
+  const ensureSummaryExpanded = useCallback(() => {
+    if (summaryExpanded) return;
+    setSummaryExpanded(true);
+    storage.setBoolean(STORAGE_KEYS.SUMMARY_EXPANDED, true);
+  }, [summaryExpanded]);
+
+  // Tour: drive UI on specific Home tour steps (expand "Other limits")
+  useEffect(() => {
+    const unsubscribe = registerOnStepChange((tourId, step) => {
+      if (tourId !== 'V1_HomePageTour') return;
+      if (step.id !== 'home-macros') return;
+
+      // Expand the "Other limits" accordion so the spotlight includes the nutrient gauges.
+      ensureSummaryExpanded();
+      setTimeout(() => requestRemeasure(), 200);
+    });
+    return unsubscribe;
+  }, [ensureSummaryExpanded, registerOnStepChange, requestRemeasure]);
+
   // Refresh entries when page comes into focus (e.g., returning from mealtype-log page)
   const isInitialMount = useRef(true);
   useFocusEffect(
@@ -974,6 +995,7 @@ export default function FoodLogHomeScreen() {
     if (!userId || !onboardingComplete) return;
     if (activeTourId) return; // already running
     if (isCheckingTourRef.current) return;
+    if (homeTourWelcomeVisible) return; // waiting for user CTA
 
     isCheckingTourRef.current = true;
     try {
@@ -983,13 +1005,7 @@ export default function FoodLogHomeScreen() {
       const welcomeShown = await isTourWelcomeShown('V1_HomePageTour', userId);
       if (!welcomeShown) {
         setWelcomeConfettiVisible(true);
-        showAppToast('Congratz on starting your fitness journey on AvoVibe!', { durationMs: 4000 });
-        await setTourWelcomeShown('V1_HomePageTour', userId);
-
-        if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
-        startTimeoutRef.current = setTimeout(() => {
-          void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
-        }, 4100);
+        setHomeTourWelcomeVisible(true);
         return;
       }
 
@@ -997,17 +1013,12 @@ export default function FoodLogHomeScreen() {
     } finally {
       isCheckingTourRef.current = false;
     }
-  }, [activeTourId, effectiveProfile?.onboarding_complete, startTour, user?.id]);
+  }, [activeTourId, effectiveProfile?.onboarding_complete, homeTourWelcomeVisible, startTour, user?.id]);
 
   // First-run welcome + tour start (per account on this device)
   useEffect(() => {
     void maybeStartHomeTour();
-    return () => {
-      if (startTimeoutRef.current) {
-        clearTimeout(startTimeoutRef.current);
-        startTimeoutRef.current = null;
-      }
-    };
+    return () => {};
   }, [maybeStartHomeTour]);
 
   // Re-check on focus so resetting flags in Settings takes effect immediately.
@@ -1021,6 +1032,24 @@ export default function FoodLogHomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <ConfettiBurst visible={welcomeConfettiVisible} onDone={() => setWelcomeConfettiVisible(false)} />
+      <ConfirmModal
+        visible={homeTourWelcomeVisible}
+        title={t('tour.home_welcome.title')}
+        message={t('tour.home_welcome.message')}
+        confirmText={t('tour.home_welcome.cta')}
+        cancelText={null}
+        onConfirm={() => {
+          const userId = user?.id;
+          if (!userId) return;
+          setHomeTourWelcomeVisible(false);
+          void setTourWelcomeShown('V1_HomePageTour', userId);
+          void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
+        }}
+        // Require explicit CTA tap to proceed.
+        onCancel={() => {}}
+        confirmDisabled={!user?.id}
+        animationType="fade"
+      />
       <OfflineBanner />
       <CollapsibleModuleHeader
         greetingText={greetingText}
@@ -1122,129 +1151,132 @@ export default function FoodLogHomeScreen() {
                   tourBurnedPencilRef={tourBurnedPencilRef}
                 />
 
-                {/* Macro Gauges Row */}
-                <View style={styles.macroGaugeRowWrap}>
-                  <View style={styles.macroGaugeRow}>
-                    <View style={styles.macroGaugeRowGauges}>
-                      <View
-                        style={[
-                          { flexDirection: 'row' },
-                          // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
-                          Platform.OS === 'web' ? ({ columnGap: 4 } as any) : null,
-                        ]}
-                      >
-                        {/* Protein */}
-                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                          <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
-                        </View>
+                {/* Macro + "Other limits" block (tour: home.macrosAndOtherLimits) */}
+                <View ref={tourMacrosAndOtherLimitsRef as any}>
+                  {/* Macro Gauges Row */}
+                  <View style={styles.macroGaugeRowWrap}>
+                    <View style={styles.macroGaugeRow}>
+                      <View style={styles.macroGaugeRowGauges}>
+                        <View
+                          style={[
+                            { flexDirection: 'row' },
+                            // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
+                            Platform.OS === 'web' ? ({ columnGap: 4 } as any) : null,
+                          ]}
+                        >
+                          {/* Protein */}
+                          <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
+                            <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
+                          </View>
 
-                        {/* Fiber */}
-                        <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                          <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
-                        </View>
+                          {/* Fiber */}
+                          <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
+                            <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
+                          </View>
 
-                        {/* Carbs */}
-                        <View style={{ flex: 1 }}>
-                          <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                          {/* Carbs */}
+                          <View style={{ flex: 1 }}>
+                            <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                          </View>
                         </View>
                       </View>
                     </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.macroTargetsGearButtonAbsolute,
+                        getMinTouchTargetStyle(),
+                        Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                      ]}
+                      onPress={() => router.push('/settings/my-goal/edit-targets?from=home')}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      {...getButtonAccessibilityProps(
+                        t('settings.my_goal.a11y.edit_targets'),
+                        t('settings.my_goal.a11y.navigate_to_edit')
+                      )}
+                    >
+                      <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
+                    </TouchableOpacity>
                   </View>
+                  
+                  {/* Sub-fats Section - Collapsible */}
+                  <View style={[styles.subFatsSection, { borderTopColor: colors.separator }]}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.subFatsHeader,
+                        getMinTouchTargetStyle(),
+                        { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                      ]}
+                      onPress={toggleSummary}
+                      activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(
+                        summaryExpanded ? t('home.accessibility.collapse_details') : t('home.accessibility.expand_details'),
+                        t('home.accessibility.details_hint')
+                      )}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: summaryExpanded }}
+                    >
+                      <View style={styles.subFatsHeaderRight}>
+                        <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>
+                          {summaryExpanded ? t('home.summary.hide_other_limits') : t('home.summary.other_limits')}
+                        </ThemedText>
+                        <IconSymbol 
+                          name={summaryExpanded ? "chevron.up" : "chevron.down"} 
+                          size={16} 
+                          color={colors.textSecondary} 
+                          style={{ marginLeft: 4 }}
+                          decorative={true}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                    {summaryExpanded && (
+                      <View style={styles.miniGaugeSection}>
+                        <View style={styles.miniGaugeRow}>
+                          <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                            <MiniRingGauge
+                              label={t('home.summary.sugar')}
+                              value={sugarConsumedG}
+                              target={sugarMaxG}
+                              unit={t('units.g')}
+                              size="xs"
+                            />
+                          </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.macroTargetsGearButtonAbsolute,
-                      getMinTouchTargetStyle(),
-                      Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
-                    ]}
-                    onPress={() => router.push('/settings/my-goal/edit-targets?from=home')}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    {...getButtonAccessibilityProps(
-                      t('settings.my_goal.a11y.edit_targets'),
-                      t('settings.my_goal.a11y.navigate_to_edit')
-                    )}
-                  >
-                    <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Sub-fats Section - Collapsible */}
-                <View style={[styles.subFatsSection, { borderTopColor: colors.separator }]}>
-                  <TouchableOpacity 
-                    style={[
-                      styles.subFatsHeader,
-                      getMinTouchTargetStyle(),
-                      { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                    ]}
-                    onPress={toggleSummary}
-                    activeOpacity={0.7}
-                    {...getButtonAccessibilityProps(
-                      summaryExpanded ? t('home.accessibility.collapse_details') : t('home.accessibility.expand_details'),
-                      t('home.accessibility.details_hint')
-                    )}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: summaryExpanded }}
-                  >
-                    <View style={styles.subFatsHeaderRight}>
-                      <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>
-                        {summaryExpanded ? t('home.summary.hide_other_limits') : t('home.summary.other_limits')}
-                      </ThemedText>
-                      <IconSymbol 
-                        name={summaryExpanded ? "chevron.up" : "chevron.down"} 
-                        size={16} 
-                        color={colors.textSecondary} 
-                        style={{ marginLeft: 4 }}
-                        decorative={true}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                  {summaryExpanded && (
-                    <View style={styles.miniGaugeSection}>
-                      <View style={styles.miniGaugeRow}>
-                        <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                          <MiniRingGauge
-                            label={t('home.summary.sugar')}
-                            value={sugarConsumedG}
-                            target={sugarMaxG}
-                            unit={t('units.g')}
-                            size="xs"
-                          />
-                        </View>
+                          <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                            <MiniRingGauge
+                              label={t('home.summary.sodium')}
+                              value={sodiumConsumedMg}
+                              target={sodiumMaxMg}
+                              unit={t('units.mg')}
+                              size="xs"
+                            />
+                          </View>
 
-                        <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                          <MiniRingGauge
-                            label={t('home.summary.sodium')}
-                            value={sodiumConsumedMg}
-                            target={sodiumMaxMg}
-                            unit={t('units.mg')}
-                            size="xs"
-                          />
-                        </View>
+                          <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                            <MiniRingGauge
+                              label={t('home.summary.saturated_fat')}
+                              value={satFatConsumedG}
+                              target={satFatLimitG}
+                              unit={t('units.g')}
+                              size="xs"
+                            />
+                          </View>
 
-                        <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                          <MiniRingGauge
-                            label={t('home.summary.saturated_fat')}
-                            value={satFatConsumedG}
-                            target={satFatLimitG}
-                            unit={t('units.g')}
-                            size="xs"
-                          />
-                        </View>
-
-                        <View style={styles.miniGaugeItem}>
-                          <MiniRingGauge
-                            label={t('home.summary.trans_fat')}
-                            value={transFatConsumedG}
-                            target={transFatLimitG}
-                            unit={t('units.g')}
-                            size="xs"
-                            valueFormat="ceilToTenth"
-                          />
+                          <View style={styles.miniGaugeItem}>
+                            <MiniRingGauge
+                              label={t('home.summary.trans_fat')}
+                              value={transFatConsumedG}
+                              target={transFatLimitG}
+                              unit={t('units.g')}
+                              size="xs"
+                              valueFormat="ceilToTenth"
+                            />
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  )}
+                    )}
+                  </View>
                 </View>
               </View>
             )}
