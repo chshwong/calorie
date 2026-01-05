@@ -32,7 +32,27 @@
     "calories": "Calories",
     "protein": "Protéines",
     "carbs": "Glucides",
-    "fat": "Lipides"
+    "fat": "Lipides",
+    "fiber": "Fibres",
+    "net_carb": "Glucides nets"
+  },
+
+  "avo_score": {
+    "label": "AvoScore",
+    "label_per_100g": "AvoScore (pour 100 g)",
+    "label_per_100ml": "AvoScore (pour 100 ml)",
+    "reasons": {
+      "high_protein": "✅Riche en protéines",
+      "high_fiber": "✅Riche en fibres",
+      "high_unsat_fat": "✅Riche en gras insaturés",
+      "high_sugar": "⚠️Riche en sucre",
+      "high_sodium": "⚠️Riche en sodium",
+      "high_sat_fat": "⚠️Riche en gras saturés",
+      "trans_fat": "⚠️Gras trans",
+      "high_fat": "⚠️Riche en gras",
+      "balanced": "Macros équilibrés",
+      "no_macro_data": "Aucune donnée macro"
+    }
   },
 
   "date_guard": {

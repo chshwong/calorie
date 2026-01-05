@@ -20,6 +20,31 @@ export type AvoScoreInput = {
   transFatG: number;
 };
 
+export type AvoScoreBasis = 'per100g' | 'per100ml';
+
+export function normalizeAvoScoreInputToBasis(
+  input: AvoScoreInput,
+  gramsOrMlForCurrentSelection: number,
+  basis: AvoScoreBasis
+): AvoScoreInput {
+  // gramsOrMlForCurrentSelection is the total grams (if per100g) or total ml (if per100ml)
+  // corresponding to the currently selected qty/unit in the UI.
+  const denom = Math.max(gramsOrMlForCurrentSelection, 1);
+  const scale = 100 / denom;
+
+  return {
+    calories: input.calories * scale,
+    carbG: input.carbG * scale,
+    fiberG: input.fiberG * scale,
+    proteinG: input.proteinG * scale,
+    fatG: input.fatG * scale,
+    sugarG: input.sugarG * scale,
+    sodiumMg: input.sodiumMg * scale,
+    satFatG: input.satFatG * scale,
+    transFatG: input.transFatG * scale,
+  };
+}
+
 export type AvoScoreResult = {
   score: number; // 0-100
   grade: AvoScoreGrade;

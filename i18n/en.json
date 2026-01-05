@@ -41,6 +41,8 @@
 
   "avo_score": {
     "label": "AvoScore",
+    "label_per_100g": "AvoScore (per 100g)",
+    "label_per_100ml": "AvoScore (per 100ml)",
     "reasons": {
       "high_protein": "✅High protein",
       "high_fiber": "✅High fiber",
