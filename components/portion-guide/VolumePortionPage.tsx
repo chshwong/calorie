@@ -16,37 +16,55 @@ type VolumeRow = {
 
 const VOLUME_ROWS: VolumeRow[] = [
   {
+    key: 'tsp & tbsp',
+    emoji: '🥄',
+    emojiLabel: 'Teaspoon & tablespoon',
+    title: '1 Teaspoon & 1 tablespoon',
+    value: '5 ml & 15 ml',
+    examples: 'Salt, seasoning. Oil, sauce, dressing',
+  },
+  {
+    key: 'juice_box',
+    emoji: '🧃',
+    emojiLabel: 'Juice box',
+    title: '1 juice box',
+    value: '200 ml',
+    examples: 'Small ☕cappuccino',
+  },
+  
+  {
     key: 'cup',
-    emoji: '🥣',
+    emoji: '🥛',
     emojiLabel: 'Cup',
     title: '1 cup',
     value: '240 ml',
-    examples: 'Rice, cereal, soup',
+    examples: 'Cup of 🥛milk, small 🥣soup bowl',
   },
-  {
-    key: 'tbsp',
-    emoji: '🥄',
-    emojiLabel: 'Tablespoon',
-    title: '1 tablespoon',
-    value: '15 ml',
-    examples: 'Oil, sauce, dressing',
-  },
-  {
-    key: 'tsp',
-    emoji: '🥄',
-    emojiLabel: 'Teaspoon',
-    title: '1 teaspoon',
-    value: '5 ml',
-    examples: 'Sugar, salt, seasoning',
-  },
-  {
+    {
     key: 'mug',
     emoji: '☕',
     emojiLabel: 'Mug or small glass',
     title: 'Mug / small glass',
     value: '≈ 250–300 ml',
-    examples: 'Milk, juice',
+    examples: 'Latte, juice',
   },
+  {
+    key: 'can_soda',
+    emoji: '🥤',
+    emojiLabel: 'Soda can',
+    title: '1 standard soda can',
+    value: '355 ml',
+    examples: 'Pop can, standard 🥣soup bowl',
+  },
+  
+  {
+    key: 'can_soup',
+    emoji: '🥫',
+    emojiLabel: 'Canned soup',
+    title: '1 standard can',
+    value: '400 ml',
+    examples: 'Canned soup, stews',
+  },  
   {
     key: 'bottle',
     emoji: '🧴',
