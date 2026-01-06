@@ -28,6 +28,7 @@ import {
 } from '@/utils/nutritionMath';
 import { getServingsForFood } from '@/lib/servings';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PortionGuideSheet, type PortionGuideTabKey } from '@/components/portion-guide/PortionGuideSheet';
 import { createEntry, getEntriesForDate, updateEntryForUser } from '@/lib/services/calorieEntries';
 import { getFoodMasterById } from '@/lib/services/foodMaster';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
@@ -35,6 +36,7 @@ import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import { clampDateKey } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
 
 // Hide default Expo Router header; we render our own in-screen header
 export const options = {
@@ -128,6 +130,8 @@ export default function FoodEditScreen() {
   const [selectedFood, setSelectedFood] = useState<FoodMaster | null>(null);
   const [availableServings, setAvailableServings] = useState<ServingOption[]>([]);
   const [selectedServing, setSelectedServing] = useState<ServingOption | null>(null);
+  const [portionGuideVisible, setPortionGuideVisible] = useState(false);
+  const [portionGuideDefaultTab, setPortionGuideDefaultTab] = useState<PortionGuideTabKey>('weight');
   const [servingPickerVisible, setServingPickerVisible] = useState(false);
   const servingButtonRef = useRef<View>(null);
   const quantityInputRef = useRef<TextInput>(null);
@@ -324,6 +328,13 @@ export default function FoodEditScreen() {
     }
     return cleaned;
   }, []);
+
+  const openPortionGuide = useCallback(() => {
+    const rawUnit = ((selectedFood?.serving_unit ?? unit) || '').trim().toLowerCase();
+    const defaultTab: PortionGuideTabKey = rawUnit === 'ml' ? 'volume' : 'weight';
+    setPortionGuideDefaultTab(defaultTab);
+    setPortionGuideVisible(true);
+  }, [selectedFood?.serving_unit, unit]);
 
   const hydratedEntry = entryFromQuery ?? initialEntry;
 
@@ -1072,9 +1083,27 @@ export default function FoodEditScreen() {
         >
           <View style={[styles.centeredContainer, { maxWidth: isDesktop ? 520 : '100%' }]}>
             <View style={styles.formHeader}>
-              <ThemedText style={[styles.formTitle, { color: colors.text }]}>
-                {isCreateMode ? 'What did you eat?' : 'Edit Food Log'}
-              </ThemedText>
+              <View style={styles.formTitleRow}>
+                <ThemedText style={[styles.formTitle, { color: colors.text }]}>
+                  {isCreateMode ? 'What did you eat?' : 'Edit Food Log'}
+                </ThemedText>
+                <TouchableOpacity
+                  style={[
+                    styles.portionGuideButton,
+                    {
+                      backgroundColor: isDark ? colors.backgroundSecondary : 'transparent',
+                      borderColor: isDark ? colors.border : '#00000020',
+                    },
+                  ]}
+                  onPress={openPortionGuide}
+                  activeOpacity={0.7}
+                  {...getButtonAccessibilityProps('Open Portion Guide')}
+                >
+                  <ThemedText style={[styles.portionGuideIcon, { color: colors.text }]}>
+                    ⚖️
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
             <NutritionLabelLayout
               hideServingRow={false}
@@ -1125,7 +1154,7 @@ export default function FoodEditScreen() {
                     {
                       backgroundColor: isDark ? colors.inputBgDark : 'transparent',
                       borderColor: isDark ? colors.inputBorderDark : '#000000',
-                    }
+                    },
                   ]}
                   onPress={() => {
                     servingButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
@@ -1135,10 +1164,7 @@ export default function FoodEditScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <ThemedText style={[
-                    styles.servingUnitText,
-                    { color: isDark ? colors.inputTextDark : '#000000' }
-                  ]}>
+                  <ThemedText style={[styles.servingUnitText, { color: isDark ? colors.inputTextDark : '#000000' }]}>
                     {selectedServing ? selectedServing.label : unit}
                   </ThemedText>
                 </TouchableOpacity>
@@ -1288,6 +1314,12 @@ export default function FoodEditScreen() {
             </ScrollView>
           </View>
         </Modal>
+
+        <PortionGuideSheet
+          visible={portionGuideVisible}
+          onClose={() => setPortionGuideVisible(false)}
+          defaultTab={portionGuideDefaultTab}
+        />
       </ThemedView>
       </DesktopPageContainer>
     </>
@@ -1349,7 +1381,15 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   formHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     marginBottom: 12,
+  },
+  formTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   formTitle: {
     fontSize: 20,
@@ -1448,6 +1488,18 @@ const styles = StyleSheet.create({
     // color set via inline style for dark mode
     fontWeight: '600',
     fontSize: 16,
+  },
+  portionGuideButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  portionGuideIcon: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
