@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Toucha
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -711,9 +710,14 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
   // Don't render content if not admin
   if (authLoading) {
     return (
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-      </View>
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading...
+          </ThemedText>
+        </View>
+      </ThemedView>
     );
   }
 
@@ -734,9 +738,14 @@ const fetchCustomFoods = useCallback(async (userId: string) => {
 
   if (profileLoading) {
     return (
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-      </View>
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading profile...
+          </ThemedText>
+        </View>
+      </ThemedView>
     );
   }
 

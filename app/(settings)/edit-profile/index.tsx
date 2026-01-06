@@ -4,7 +4,6 @@ import { SexStep } from '@/components/onboarding/steps/SexStep';
 import { NameDobForm } from '@/components/profile/NameDobForm';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { StandardSubheader } from '@/components/navigation/StandardSubheader';
 import { POLICY } from '@/constants/constraints';
 import { Colors } from '@/constants/theme';
@@ -245,9 +244,12 @@ export default function EditProfileScreen() {
 
   if (profileLoading) {
     return (
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-      </View>
+      <ThemedView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+        <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+          {t('common.loading')}
+        </ThemedText>
+      </ThemedView>
     );
   }
 

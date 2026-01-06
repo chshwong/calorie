@@ -14,7 +14,6 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -555,9 +554,12 @@ export default function ExternalCacheFoodPromotionPage() {
   // Don't render content if not admin
   if (authLoading || isAdmin === null) {
     return (
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-      </View>
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <ThemedText style={styles.loadingText}>Checking permissions…</ThemedText>
+        </View>
+      </ThemedView>
     );
   }
 
@@ -712,7 +714,10 @@ export default function ExternalCacheFoodPromotionPage() {
           </View>
 
           {loading ? (
-            <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.tint} />
+              <ThemedText style={styles.loadingText}>Loading cache records…</ThemedText>
+            </View>
           ) : rows.length === 0 ? (
             <View style={styles.emptyContainer}>
               <ThemedText style={styles.emptyText}>No cache records found.</ThemedText>

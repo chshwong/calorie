@@ -14,7 +14,6 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Colors } from '@/constants/theme';
@@ -2834,9 +2833,9 @@ export default function MergeFoodScreen() {
   // Handle loading and access denied states - EARLY RETURNS AFTER ALL HOOKS
   if (authLoading) {
     return (
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-      </View>
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </ThemedView>
     );
   }
 

@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -334,9 +333,9 @@ export default function DashboardScreen() {
 
   if (!user) {
     return (
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-      </View>
+      <ThemedView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </ThemedView>
     );
   }
 

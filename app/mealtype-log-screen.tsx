@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import * as SecureStore from 'expo-secure-store';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, CategoryColors } from '@/constants/theme';
@@ -2686,9 +2685,14 @@ export default function LogFoodScreen() {
                 setBarcodeScanning(false);
               }}
             />
-            {barcodeScanning ? (
-              <BlockingBrandedLoader enabled={true} timeoutMs={5000} />
-            ) : null}
+            {barcodeScanning && (
+              <View style={styles.scannerOverlay}>
+                <ActivityIndicator size="large" color={colors.tint} />
+                <ThemedText style={[styles.scannerText, { color: '#fff' }]}>
+                  {t('mealtype_log.scanner.processing', 'Processing barcode...')}
+                </ThemedText>
+              </View>
+            )}
           </View>
         </ThemedView>
       </Modal>

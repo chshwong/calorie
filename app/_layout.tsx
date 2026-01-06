@@ -1,28 +1,28 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, View, StyleSheet } from 'react-native';
+import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useEffect, useRef } from 'react';
 import 'react-native-reanimated';
 import { I18nextProvider } from 'react-i18next';
 import i18n, { loadStoredLanguage } from '@/i18n';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { OfflineModeProvider } from '@/contexts/OfflineModeContext';
 import { ThemeProvider as AppThemeProvider } from '@/contexts/ThemeContext';
 import { DebugLoadingProvider } from '@/contexts/DebugLoadingContext';
+import { Colors } from '@/constants/theme';
 import { ToastProvider } from '@/components/ui/app-toast';
 import { DebugOverlay } from '@/components/DebugOverlay';
 import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { TourProvider } from '@/features/tour/TourProvider';
 import { TourOverlay } from '@/features/tour/TourOverlay';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 
 // Import QueryClient from separate module to avoid circular dependency with AuthContext
 import { queryClient } from '@/lib/query-client';
@@ -100,7 +100,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 export default function RootLayout() {
   const mountRef = useRef(false);
   const { fontsLoaded, fontError } = useAppFonts();
-  const isFontsBlocking = !fontsLoaded && !fontError;
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
 
   // Load stored language preference on app startup
   useEffect(() => {
@@ -151,22 +152,26 @@ export default function RootLayout() {
     };
   }, []);
 
+  // Show loading indicator while fonts are loading
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </View>
+    );
+  }
+
   return (
     <I18nextProvider i18n={i18n}>
-      <View style={{ flex: 1 }}>
-        <BlockingBrandedLoader enabled={isFontsBlocking} timeoutMs={5000} />
-        {!isFontsBlocking ? (
-          <QueryClientProvider client={queryClient}>
-            <DebugLoadingProvider>
-              <AppThemeProvider>
-                <OfflineModeProvider>
-                  <ThemeProviderWrapper />
-                </OfflineModeProvider>
-              </AppThemeProvider>
-            </DebugLoadingProvider>
-          </QueryClientProvider>
-        ) : null}
-      </View>
+      <QueryClientProvider client={queryClient}>
+        <DebugLoadingProvider>
+          <AppThemeProvider>
+            <OfflineModeProvider>
+              <ThemeProviderWrapper />
+            </OfflineModeProvider>
+          </AppThemeProvider>
+        </DebugLoadingProvider>
+      </QueryClientProvider>
     </I18nextProvider>
   );
 }
@@ -187,48 +192,35 @@ function ThemeProviderWrapper() {
 
   return (
     <AuthProvider>
-      <AuthBootGate>
-        <TourProvider>
-          <ToastProvider>
-            <GlobalAuthGuard />
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(minimal)" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="quick-log" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="scanned-item" options={{ title: 'Scanned Item', presentation: 'modal' }} />
-              <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-              <Stack.Screen name="my-goals" options={{ headerShown: false }} />
-              <Stack.Screen name="settings/my-goal" options={{ headerShown: false }} />
-              <Stack.Screen name="settings/my-goal/edit-goal" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="settings/my-goal/edit-calories" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="settings/my-goal/edit-targets" options={{ headerShown: false, presentation: 'modal' }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
-            <TourOverlay />
-            <StatusBar style="auto" />
-          </ThemeProvider>
-          </ToastProvider>
-        </TourProvider>
-      </AuthBootGate>
+      <TourProvider>
+        <ToastProvider>
+          <GlobalAuthGuard />
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(minimal)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="create-custom-food" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="create-bundle" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="quick-log" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="scanned-item" options={{ title: 'Scanned Item', presentation: 'modal' }} />
+            <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
+            <Stack.Screen name="my-goals" options={{ headerShown: false }} />
+            <Stack.Screen name="settings/my-goal" options={{ headerShown: false }} />
+            <Stack.Screen name="settings/my-goal/edit-goal" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="settings/my-goal/edit-calories" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="settings/my-goal/edit-targets" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <TourOverlay />
+          <StatusBar style="auto" />
+        </ThemeProvider>
+        </ToastProvider>
+      </TourProvider>
     </AuthProvider>
-  );
-}
-
-function AuthBootGate({ children }: { children: React.ReactNode }) {
-  // Global blocking gate: auth session restoration.
-  const { loading } = useAuth();
-  return (
-    <View style={{ flex: 1 }}>
-      <BlockingBrandedLoader enabled={loading} timeoutMs={5000} />
-      {!loading ? children : null}
-    </View>
   );
 }
 

@@ -24,7 +24,6 @@ import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { StandardSubheader } from '@/components/navigation/StandardSubheader';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
@@ -81,46 +80,48 @@ export default function LegalDocumentViewer() {
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <View style={styles.container}>
-          <BlockingBrandedLoader enabled={isLoading} timeoutMs={5000} />
-          {!isLoading ? (
-            <>
-              <StandardSubheader title={headerTitle} />
-              {error ? (
-                <View style={styles.errorContainer}>
-                  <Text style={[styles.errorText, { color: colors.text }]}>
-                    {t('legal.error_loading')}
+          <StandardSubheader title={headerTitle} />
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={colors.tint} size="large" />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                {t('legal.loading_docs')}
+              </Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={[styles.errorText, { color: colors.text }]}>
+                {t('legal.error_loading')}
+              </Text>
+            </View>
+          ) : !document ? (
+            <View style={styles.errorContainer}>
+              <Text style={[styles.errorText, { color: colors.text }]}>
+                {t('legal.error_loading')}
+              </Text>
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              contentInsetAdjustmentBehavior="never"
+              showsVerticalScrollIndicator={true}
+            >
+              {document.version && (
+                <View style={[styles.versionBadge, { backgroundColor: colors.tint + '20' }]}>
+                  <Text style={[styles.versionText, { color: colors.tint }]}>
+                    {t('legal.updated_version', { version: document.version })}
                   </Text>
                 </View>
-              ) : !document ? (
-                <View style={styles.errorContainer}>
-                  <Text style={[styles.errorText, { color: colors.text }]}>
-                    {t('legal.error_loading')}
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView
-                  style={styles.scrollView}
-                  contentContainerStyle={styles.scrollContent}
-                  contentInsetAdjustmentBehavior="never"
-                  showsVerticalScrollIndicator={true}
-                >
-                  {document.version && (
-                    <View style={[styles.versionBadge, { backgroundColor: colors.tint + '20' }]}>
-                      <Text style={[styles.versionText, { color: colors.tint }]}>
-                        {t('legal.updated_version', { version: document.version })}
-                      </Text>
-                    </View>
-                  )}
-                  <ThemedText style={[styles.documentTitle, { color: colors.text }]}>
-                    {document.title}
-                  </ThemedText>
-                  <ThemedText style={[styles.documentContent, { color: colors.text }]}>
-                    {document.content_md}
-                  </ThemedText>
-                </ScrollView>
               )}
-            </>
-          ) : null}
+              <ThemedText style={[styles.documentTitle, { color: colors.text }]}>
+                {document.title}
+              </ThemedText>
+              <ThemedText style={[styles.documentContent, { color: colors.text }]}>
+                {document.content_md}
+              </ThemedText>
+            </ScrollView>
+          )}
         </View>
       </SafeAreaView>
     </>
