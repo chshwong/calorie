@@ -10,6 +10,7 @@ import { WeightPortionPage } from '@/components/portion-guide/WeightPortionPage'
 import { VolumePortionPage } from '@/components/portion-guide/VolumePortionPage';
 import type { SegmentedTabItem } from '@/components/SegmentedTabs';
 import { Modal } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 export type PortionGuideTabKey = 'weight' | 'volume';
 
@@ -20,6 +21,7 @@ type PortionGuideSheetProps = {
 };
 
 export function PortionGuideSheet({ visible, onClose, defaultTab }: PortionGuideSheetProps) {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = (colorScheme ?? 'light') === 'dark';
@@ -56,10 +58,18 @@ export function PortionGuideSheet({ visible, onClose, defaultTab }: PortionGuide
 
   const tabs: SegmentedTabItem[] = useMemo(
     () => [
-      { key: 'weight', label: 'Weight', accessibilityLabel: 'Weight guidance' },
-      { key: 'volume', label: 'Volume', accessibilityLabel: 'Volume guidance' },
+      {
+        key: 'weight',
+        label: t('mealtype_log.portion_guide.tabs.weight'),
+        accessibilityLabel: t('mealtype_log.portion_guide.tabs.weight_accessibility'),
+      },
+      {
+        key: 'volume',
+        label: t('mealtype_log.portion_guide.tabs.volume'),
+        accessibilityLabel: t('mealtype_log.portion_guide.tabs.volume_accessibility'),
+      },
     ],
-    []
+    [t]
   );
 
   return (
@@ -100,11 +110,14 @@ export function PortionGuideSheet({ visible, onClose, defaultTab }: PortionGuide
               {/* First row: Title and Close button */}
               <View style={styles.headerRow}>
                 <View style={styles.headerLeft}>
-                  <ThemedText style={[styles.headerIcon, { color: colors.text }]} accessibilityLabel="Portion Guide">
+                  <ThemedText
+                    style={[styles.headerIcon, { color: colors.text }]}
+                    accessibilityLabel={t('mealtype_log.portion_guide.title')}
+                  >
                     ⚖️
                   </ThemedText>
                   <ThemedText style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-                    Portion Guide
+                    {t('mealtype_log.portion_guide.title')}
                   </ThemedText>
                 </View>
 
@@ -114,7 +127,7 @@ export function PortionGuideSheet({ visible, onClose, defaultTab }: PortionGuide
                     styles.closeButton,
                     { backgroundColor: isDark ? colors.backgroundSecondary : colors.card },
                   ]}
-                  {...getButtonAccessibilityProps('Close portion guide')}
+                  {...getButtonAccessibilityProps(t('mealtype_log.portion_guide.close_button'))}
                 >
                   <IconSymbol name="xmark" size={18} color={colors.text} />
                 </TouchableOpacity>

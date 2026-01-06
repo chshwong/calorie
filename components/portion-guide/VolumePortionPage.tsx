@@ -1,9 +1,10 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getIconAccessibilityProps } from '@/utils/accessibility';
+import { useTranslation } from 'react-i18next';
 
 type VolumeRow = {
   key: string;
@@ -14,66 +15,8 @@ type VolumeRow = {
   examples: string;
 };
 
-const VOLUME_ROWS: VolumeRow[] = [
-  {
-    key: 'tsp & tbsp',
-    emoji: '🥄',
-    emojiLabel: 'Teaspoon & tablespoon',
-    title: '1 Teaspoon & 1 tablespoon',
-    value: '5 ml & 15 ml',
-    examples: 'Salt, seasoning. Oil, sauce, dressing',
-  },
-  {
-    key: 'juice_box',
-    emoji: '🧃',
-    emojiLabel: 'Juice box',
-    title: '1 juice box',
-    value: '200 ml',
-    examples: 'Small ☕cappuccino',
-  },
-  
-  {
-    key: 'cup',
-    emoji: '🥛',
-    emojiLabel: 'Cup',
-    title: '1 cup',
-    value: '240 ml',
-    examples: 'Cup of 🥛milk, small 🥣soup bowl',
-  },
-    {
-    key: 'mug',
-    emoji: '☕',
-    emojiLabel: 'Mug or small glass',
-    title: 'Mug / small glass',
-    value: '≈ 250–300 ml',
-    examples: 'Latte, juice',
-  },
-  {
-    key: 'can_soda',
-    emoji: '🥤',
-    emojiLabel: 'Soda can',
-    title: '1 standard soda can',
-    value: '355 ml',
-    examples: 'Pop can, standard 🥣soup bowl',
-  },
-  
-  {
-    key: 'can_soup',
-    emoji: '🥫',
-    emojiLabel: 'Canned soup',
-    title: '1 standard can',
-    value: '400 ml',
-    examples: 'Canned soup, stews',
-  },  
-  {
-    key: 'bottle',
-    emoji: '🧴',
-    emojiLabel: 'Water bottle',
-    title: 'Water bottle',
-    value: '≈ 500 ml',
-    examples: 'Half bottle ≈ 250 ml',
-  },
-];
+// Volume row keys - translations loaded dynamically in component
+const VOLUME_ROW_KEYS = ['tsp_tbsp', 'juice_box', 'cup', 'mug', 'can_soda', 'can_soup', 'bottle', 'beer_pint'] as const;
 
 function VolumeReferenceRow({ emoji, emojiLabel, title, value, examples }: VolumeRow) {
   const colorScheme = useColorScheme();
@@ -112,33 +55,70 @@ function VolumeReferenceRow({ emoji, emojiLabel, title, value, examples }: Volum
 }
 
 export function VolumePortionPage() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const screenWidth = Dimensions.get('window').width;
+  const isDesktop = Platform.OS === 'web' && screenWidth >= 768;
+
+  const volumeRows: VolumeRow[] = VOLUME_ROW_KEYS.map((key) => {
+    const emojis: Record<string, string> = {
+      tsp_tbsp: '🥄',
+      juice_box: '🧃',
+      cup: '🥛',
+      mug: '☕',
+      can_soda: '🥤',
+      can_soup: '🥫',
+      bottle: '🧴',
+      beer_pint: '🍺',
+    };
+    return {
+      key,
+      emoji: emojis[key],
+      emojiLabel: t(`mealtype_log.portion_guide.volume.rows.${key}.emoji_label`),
+      title: t(`mealtype_log.portion_guide.volume.rows.${key}.title`),
+      value: t(`mealtype_log.portion_guide.volume.rows.${key}.value`),
+      examples: t(`mealtype_log.portion_guide.volume.rows.${key}.examples`),
+    };
+  });
 
   return (
-    <View style={styles.container}>
-      <ThemedText style={[styles.contextLine, { color: colors.textSecondary }]}>
-        For foods measured by volume (ml)
-      </ThemedText>
+    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      <View style={[styles.contentWrapper, isDesktop && styles.contentWrapperDesktop]}>
+        <ThemedText style={[styles.contextLine, { color: colors.textSecondary }]}>
+          {t('mealtype_log.portion_guide.volume.context_line')}
+        </ThemedText>
 
-      <View style={styles.rows}>
-        {VOLUME_ROWS.map((row) => (
-          <VolumeReferenceRow key={row.key} {...row} />
-        ))}
+        <View style={styles.rows}>
+          {volumeRows.map((row) => {
+            const { key, ...rowProps } = row;
+            return <VolumeReferenceRow key={key} {...rowProps} />;
+          })}
+        </View>
+
+        <ThemedText style={[styles.footer, { color: colors.textSecondary }]}>
+          {t('mealtype_log.portion_guide.volume.footer')}
+        </ThemedText>
       </View>
-
-      <ThemedText style={[styles.footer, { color: colors.textSecondary }]}>
-        Use everyday items around you.
-      </ThemedText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.lg,
+    width: '100%',
     paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
+  },
+  containerDesktop: {
+    maxWidth: Layout.desktopMaxWidth,
+    alignSelf: 'center',
+  },
+  contentWrapper: {
+    paddingHorizontal: Spacing.lg,
+  },
+  contentWrapperDesktop: {
+    paddingHorizontal: Spacing.lg,
   },
   contextLine: {
     fontSize: FontSize.sm,

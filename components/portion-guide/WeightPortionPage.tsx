@@ -1,9 +1,10 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getIconAccessibilityProps } from '@/utils/accessibility';
+import { useTranslation } from 'react-i18next';
 
 type WeightCard = {
   key: string;
@@ -15,61 +16,8 @@ type WeightCard = {
   reinforceEmoji?: string;
 };
 
-const WEIGHT_CARDS: WeightCard[] = [
-  {
-    key: 'palm',
-    emoji: '🖐️',
-    reinforceEmoji: '🥩',
-    emojiLabel: 'Palm of hand',
-    title: 'Palm, no fingers',
-    estimate: '≈ 100 g / 3.5 oz',
-    examples: 'Protein: Tofu, 🥩meat, 🐟fish, 2x🥚eggs',
-  },
-  {
-    key: 'deck',
-    emoji: '🃏',
-    reinforceEmoji: '🍗',
-    emojiLabel: 'Deck of cards',
-    title: 'Deck of cards',
-    estimate: '≈ 85 g / 3 oz',
-    examples: 'Protein:Tofu, 🍗meat, 🧀cheese, Protein bar',
-  },
-  {
-    key: 'fist',
-    emoji: '✊',
-    reinforceEmoji: '🍚',
-    emojiLabel: 'Closed fist',
-    title: 'Closed fist',
-    estimate: '≈ 150 g / 5 oz',
-    examples: 'Cooked carb: 🍚 Rice, 🍝 Pasta, 🫘 Beans, 🥕🥦',
-  },
-  {
-    key: 'thumb',
-    emoji: '👍',
-    reinforceEmoji: '🧈',
-    emojiLabel: 'Thumb',
-    title: 'Thumb',
-    estimate: '≈ 15 g / 0.5 oz',
-    examples: 'Tbsp of 🧈 Butter, 🫒 Oil, 🥜 Peanut butter',
-  },
-  {
-    key: 'fruit',
-    emoji: '🥑',
-    reinforceEmoji: '🍎',
-    emojiLabel: '<Chocolate bar slice>',
-    title: 'Medium Apple',
-    estimate: '≈ 150 g / 5 oz',
-    examples: 'Edible part: 🥑, 🍎, 🍊',
-  },
-  {
-    key: 'scale',
-    emoji: '⚖️',
-    emojiLabel: 'Small kitchen scale',
-    title: 'Small kitchen scale',
-    estimate: 'Most accurate',
-    examples: 'When available',
-  },
-];
+// Weight cards data - translations loaded dynamically in component
+const WEIGHT_CARD_KEYS = ['palm', 'deck', 'fist', 'thumb', 'fruit', 'scale'] as const;
 
 function WeightPortionCard({
   emoji,
@@ -119,35 +67,70 @@ function WeightPortionCard({
 }
 
 export function WeightPortionPage() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const screenWidth = Dimensions.get('window').width;
+  const isDesktop = Platform.OS === 'web' && screenWidth >= 768;
+
+  const weightCards: WeightCard[] = WEIGHT_CARD_KEYS.map((key) => {
+    const emojis: Record<string, { emoji: string; reinforceEmoji?: string }> = {
+      palm: { emoji: '🖐️', reinforceEmoji: '🥩' },
+      deck: { emoji: '🃏', reinforceEmoji: '🍗' },
+      fist: { emoji: '✊', reinforceEmoji: '🍚' },
+      thumb: { emoji: '👍', reinforceEmoji: '🧈' },
+      fruit: { emoji: '🥑', reinforceEmoji: '🍎' },
+      scale: { emoji: '⚖️' },
+    };
+    return {
+      key,
+      emoji: emojis[key].emoji,
+      reinforceEmoji: emojis[key].reinforceEmoji,
+      emojiLabel: t(`mealtype_log.portion_guide.weight.cards.${key}.emoji_label`),
+      title: t(`mealtype_log.portion_guide.weight.cards.${key}.title`),
+      estimate: t(`mealtype_log.portion_guide.weight.cards.${key}.estimate`),
+      examples: t(`mealtype_log.portion_guide.weight.cards.${key}.examples`),
+    };
+  });
 
   return (
-    <View style={styles.container}>
-      <ThemedText style={[styles.contextLine, { color: colors.textSecondary }]}>
-        For foods measured by weight (g / oz)
-      </ThemedText>
+    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      <View style={[styles.contentWrapper, isDesktop && styles.contentWrapperDesktop]}>
+        <ThemedText style={[styles.contextLine, { color: colors.textSecondary }]}>
+          {t('mealtype_log.portion_guide.weight.context_line')}
+        </ThemedText>
 
-      <View style={styles.grid}>
-        {WEIGHT_CARDS.map((card) => (
-          <View key={card.key} style={styles.gridItem}>
-            <WeightPortionCard {...card} />
-          </View>
-        ))}
+        <View style={styles.grid}>
+          {weightCards.map((card) => (
+            <View key={card.key} style={styles.gridItem}>
+              <WeightPortionCard {...card} />
+            </View>
+          ))}
+        </View>
+
+        <ThemedText style={[styles.footer, { color: colors.textSecondary }]}>
+          {t('mealtype_log.portion_guide.weight.footer')}
+        </ThemedText>
       </View>
-
-      <ThemedText style={[styles.footer, { color: colors.textSecondary }]}>
-        Precision not required. Estimate confidently.
-      </ThemedText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.lg,
+    width: '100%',
     paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
+  },
+  containerDesktop: {
+    maxWidth: Layout.desktopMaxWidth,
+    alignSelf: 'center',
+  },
+  contentWrapper: {
+    paddingHorizontal: Spacing.lg,
+  },
+  contentWrapperDesktop: {
+    paddingHorizontal: Spacing.lg,
   },
   contextLine: {
     fontSize: FontSize.sm,

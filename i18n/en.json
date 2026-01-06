@@ -1337,6 +1337,114 @@
       "sodium_placeholder": "0"
     },
     
+    "portion_guide": {
+      "title": "Portion Guide",
+      "open_button": "Open Portion Guide",
+      "close_button": "Close portion guide",
+      "tabs": {
+        "weight": "Weight",
+        "volume": "Volume",
+        "weight_accessibility": "Weight guidance",
+        "volume_accessibility": "Volume guidance"
+      },
+      "weight": {
+        "context_line": "For foods measured by weight (g / oz)",
+        "footer": "Precision not required. Estimate confidently.",
+        "cards": {
+          "palm": {
+            "title": "Palm, no fingers",
+            "estimate": "≈ 100 g / 3.5 oz",
+            "examples": "Protein: Tofu, 🥩meat, 🐟fish, 2x🥚eggs",
+            "emoji_label": "Palm of hand"
+          },
+          "deck": {
+            "title": "Deck of cards",
+            "estimate": "≈ 85 g / 3 oz",
+            "examples": "Protein:Tofu, 🍗meat, 🧀cheese, Protein bar",
+            "emoji_label": "Deck of cards"
+          },
+          "fist": {
+            "title": "Closed fist",
+            "estimate": "≈ 150 g / 5 oz",
+            "examples": "Cooked carb: 🍚 Rice, 🍝 Pasta, 🫘 Beans, 🥕🥦",
+            "emoji_label": "Closed fist"
+          },
+          "thumb": {
+            "title": "Thumb",
+            "estimate": "≈ 15 g / 0.5 oz",
+            "examples": "Tbsp of 🧈 Butter, 🫒 Oil, 🥜 Peanut butter",
+            "emoji_label": "Thumb"
+          },
+          "fruit": {
+            "title": "Medium Apple",
+            "estimate": "≈ 150 g / 5 oz",
+            "examples": "Edible part: 🥑, 🍎, 🍊",
+            "emoji_label": "<Chocolate bar slice>"
+          },
+          "scale": {
+            "title": "Small kitchen scale",
+            "estimate": "Most accurate",
+            "examples": "When available",
+            "emoji_label": "Small kitchen scale"
+          }
+        }
+      },
+      "volume": {
+        "context_line": "For foods measured by volume (ml)",
+        "footer": "Just approximate.",
+        "rows": {
+          "tsp_tbsp": {
+            "title": "1 Teaspoon & 1 tablespoon",
+            "value": "5 ml & 15 ml",
+            "examples": "Salt, seasoning. Oil, sauce, dressing",
+            "emoji_label": "Teaspoon & tablespoon"
+          },
+          "juice_box": {
+            "title": "1 juice box",
+            "value": "200 ml",
+            "examples": "Small ☕cappuccino",
+            "emoji_label": "Juice box"
+          },
+          "cup": {
+            "title": "1 cup",
+            "value": "240 ml",
+            "examples": "Cup of 🥛milk, small 🥣soup bowl",
+            "emoji_label": "Cup"
+          },
+          "mug": {
+            "title": "Mug / small glass",
+            "value": "≈ 250–300 ml",
+            "examples": "Latte, juice",
+            "emoji_label": "Mug or small glass"
+          },
+          "can_soda": {
+            "title": "1 standard soda can",
+            "value": "355 ml / 12 fl oz",
+            "examples": "Pop can, standard 🥣soup bowl",
+            "emoji_label": "Soda can"
+          },
+          "can_soup": {
+            "title": "1 standard can",
+            "value": "400 ml / 14 fl oz",
+            "examples": "Canned soup, stews",
+            "emoji_label": "Canned soup"
+          },
+          "bottle": {
+            "title": "Water bottle",
+            "value": "≈ 500 ml / 16 fl oz",
+            "examples": "Large🥣soup bowl",
+            "emoji_label": "Water bottle"
+          },
+          "beer_pint": {
+            "title": "1 pint (Canada / UK)",
+            "value": "570 ml",
+            "examples": "US pint: 473 ml /16 fl oz",
+            "emoji_label": "Beer pint"
+          }
+        }
+      }
+    },
+    
     "macros": {
       "protein_short": "Pro",
       "carbs_short": "Carb",

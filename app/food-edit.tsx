@@ -1097,7 +1097,7 @@ export default function FoodEditScreen() {
                   ]}
                   onPress={openPortionGuide}
                   activeOpacity={0.7}
-                  {...getButtonAccessibilityProps('Open Portion Guide')}
+                  {...getButtonAccessibilityProps(t('mealtype_log.portion_guide.open_button'))}
                 >
                   <ThemedText style={[styles.portionGuideIcon, { color: colors.text }]}>
                     ⚖️
