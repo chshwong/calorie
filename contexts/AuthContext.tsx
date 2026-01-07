@@ -224,6 +224,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         });
   
+        // Track daily login for streak tracking (fire-and-forget)
+        (async () => {
+          try {
+            await supabase.rpc('touch_daily_login');
+          } catch (err) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[AuthProvider] Failed to touch daily login:', err);
+            }
+          }
+        })();
+  
         // Load profile from Supabase in the background – do NOT block auth readiness
         void fetchProfile(session.user.id, true);
       } else {
@@ -311,6 +322,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
             }
           });
+
+          // Track daily login for streak tracking (fire-and-forget)
+          (async () => {
+            try {
+              await supabase.rpc('touch_daily_login');
+            } catch (err) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn('[AuthProvider] Failed to touch daily login:', err);
+              }
+            }
+          })();
 
           void fetchProfile(session.user.id, false);
         }

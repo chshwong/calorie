@@ -242,10 +242,7 @@ export function DoneForTodayButton({
       });
   };
 
-  if (!isWithinGraceWindow) {
-    return null;
-  }
-
+  // All hooks must be called before any early returns to maintain hook order consistency
   const completionConfirmContent = useMemo<ModalContent>(() => {
     const title = isToday
       ? t('home.done_for_today.confirm_title', { defaultValue: 'Done for Today?' })
@@ -486,6 +483,11 @@ export function DoneForTodayButton({
   const renderPrimaryText = frozenModalRender?.primaryText ?? modalContent.primary.label;
   const renderSecondaryText = frozenModalRender?.secondaryText ?? (modalContent.secondary?.label ?? null);
   const renderCancelText = frozenModalRender?.cancelText ?? cancelText;
+
+  // Early return check after all hooks to maintain hook order consistency
+  if (!isWithinGraceWindow) {
+    return null;
+  }
 
   return (
     <>

@@ -113,11 +113,59 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     },
   });
 
+  // Check cache for previous day data (best effort, no DB call)
+  // Only show button if cache indicates there's data to copy
+  const hasPreviousDayData = useMemo(() => {
+    if (!user?.id) return false;
+    
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const previousDateKey = toDateKey(previousDay);
+    
+    // Check entries cache
+    const previousDayQueryKey = ['entries', user.id, previousDateKey];
+    const cachedPreviousDayEntries = queryClient.getQueryData<CalorieEntry[]>(previousDayQueryKey);
+    
+    // Check meta cache
+    const previousDayMetaQueryKey = ['mealtypeMeta', user.id, previousDateKey];
+    const cachedPreviousDayMeta = queryClient.getQueryData<any[]>(previousDayMetaQueryKey);
+    
+    // Only show button if we have positive evidence of data in cache
+    // If cache is undefined (not loaded yet), hide button (best effort - no DB call)
+    // If cache exists and has data, show button
+    // If cache exists and is empty, hide button
+    
+    // Check entries
+    if (cachedPreviousDayEntries !== undefined) {
+      if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
+        const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+          entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+        );
+        if (mealTypeEntries.length > 0) {
+          return true;
+        }
+      }
+    }
+    
+    // Check notes from meta
+    if (cachedPreviousDayMeta !== undefined && cachedPreviousDayMeta !== null) {
+      const mealTypeMeta = cachedPreviousDayMeta.find(meta => 
+        meta.meal_type?.toLowerCase() === mealType.toLowerCase()
+      );
+      if (mealTypeMeta && mealTypeMeta.note != null && mealTypeMeta.note.trim().length > 0) {
+        return true;
+      }
+    }
+    
+    // No positive evidence of data - hide button
+    return false;
+  }, [user?.id, selectedDate, mealType, queryClient]);
+
   const handleCopy = () => {
     // Check cache for previous day before cloning
     const previousDay = new Date(selectedDate);
     previousDay.setDate(previousDay.getDate() - 1);
-    const previousDateString = getLocalDateKey(previousDay);
+    const previousDateString = toDateKey(previousDay);
     
     // Use React Query cache to check if previous day has entries or notes for this meal type
     const previousDayQueryKey = ['entries', user?.id, previousDateString];
@@ -165,6 +213,11 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     
     runCopyFromYesterday(() => cloneMealTypeFromPreviousDay());
   };
+
+  // Don't render if cache shows no data from previous day
+  if (!hasPreviousDayData) {
+    return null;
+  }
 
   return (
     <View style={styles.copyFromYesterdayButton}>
