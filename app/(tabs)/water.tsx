@@ -539,7 +539,11 @@ export default function WaterScreen() {
               module="water"
               isLoading={isLoading}
               onPressSettings={handleOpenSettings}
-              style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
+              style={{
+                paddingHorizontal: 0,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.separator,
+              }}
             />
 
           {isLoading ? (

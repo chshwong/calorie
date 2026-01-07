@@ -12,6 +12,7 @@
     "build:web": "expo export --platform web",
     "lint": "expo lint",
     "test": "vitest run",
+    "test:watch": "vitest",
     "seed:legal": "tsx scripts/seed-legal-docs.ts"
   },
   "dependencies": {

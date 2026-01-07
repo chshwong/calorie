@@ -84,7 +84,8 @@ export function useMedLogsForDate(dateString: string | Date) {
 
 
 /**
- * Hook to fetch med summary for recent days
+ * Hook to fetch med summary for recent days from daily_sum_meds table
+ * Uses persistent cache with 180 days TTL
  */
 export function useMedSummaryForRecentDays(days: number = 7) {
   const { user } = useAuth();
@@ -93,9 +94,11 @@ export function useMedSummaryForRecentDays(days: number = 7) {
 
   const cacheKey = medSummaryCacheKey(userId, days);
 
+  // 180 days persistent cache
+  const CACHE_TTL_180_DAYS_MS = 180 * 24 * 60 * 60 * 1000;
   const snapshot =
     cacheKey !== null
-      ? getPersistentCache<any>(cacheKey, DEFAULT_CACHE_MAX_AGE_MS)
+      ? getPersistentCache<any>(cacheKey, CACHE_TTL_180_DAYS_MS)
       : null;
 
   return useQuery({
@@ -114,7 +117,7 @@ export function useMedSummaryForRecentDays(days: number = 7) {
     },
     enabled: !!userId,
     staleTime: 60 * 1000, // 60 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes,
+    gcTime: 5 * 60 * 1000, // 5 minutes
     placeholderData: (previousData) => {
       if (previousData !== undefined) {
         return previousData;

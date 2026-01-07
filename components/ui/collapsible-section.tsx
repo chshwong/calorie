@@ -247,8 +247,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   headerTitle: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
   },
   headerSummary: {
     fontSize: FontSize.xs,

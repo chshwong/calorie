@@ -76,15 +76,14 @@ type MedRowProps = {
   log: { id: string; name: string; type: 'med' | 'supp' | 'other'; dose_amount: number | null; dose_unit: string | null; notes: string | null };
   colors: typeof Colors.light;
   onEdit: () => void;
-  onDelete: () => void;
   onDoseUpdate: (logId: string, dose_amount: number | null, dose_unit: string | null) => void;
   isLast: boolean;
   animationValue?: Animated.Value;
   t: (key: string) => string;
+  disabled?: boolean;
 };
 
-function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animationValue, t, disabled = false }: MedRowProps) {
-  const [deleteHovered, setDeleteHovered] = useState(false);
+function MedRow({ log, colors, onEdit, onDoseUpdate, isLast, animationValue, t, disabled = false }: MedRowProps) {
   const [isEditingDose, setIsEditingDose] = useState(false);
   const [doseAmountInput, setDoseAmountInput] = useState(log.dose_amount?.toString() || '');
   const [doseUnitInput, setDoseUnitInput] = useState(log.dose_unit || '');
@@ -271,18 +270,18 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
             <ThemedText style={[styles.medName, { color: colors.text }]}>
               {log.name}
             </ThemedText>
-            {(log.notes || log.type) && (
+            {log.notes && (
               <ThemedText
                 style={[styles.medMeta, { color: colors.textSecondary }]}
                 numberOfLines={2}
               >
-                {typeLabel}{log.notes ? ` · ${log.notes}` : ''}
+                {log.notes}
               </ThemedText>
             )}
           </View>
         </TouchableOpacity>
 
-        {/* Right side: Dose badge and Delete button */}
+        {/* Right side: Dose badge */}
         <View style={styles.medRowRight}>
           {/* Dose badge or inline editor */}
           {isEditingDose ? (
@@ -360,30 +359,6 @@ function MedRow({ log, colors, onEdit, onDelete, onDoseUpdate, isLast, animation
               </ThemedText>
             </TouchableOpacity>
           )}
-
-          {/* Delete button */}
-          <TouchableOpacity
-            onPress={onDelete}
-            disabled={disabled}
-            style={[
-              styles.deleteButtonGhost,
-              {
-                borderColor: colors.separator,
-                backgroundColor: deleteHovered ? colors.errorLight : 'transparent',
-                opacity: disabled ? 0.4 : 1,
-              },
-            ]}
-            activeOpacity={0.7}
-            onPressIn={() => setDeleteHovered(true)}
-            onPressOut={() => setDeleteHovered(false)}
-            {...(Platform.OS === 'web' && {
-              onMouseEnter: () => setDeleteHovered(true),
-              onMouseLeave: () => setDeleteHovered(false),
-            })}
-            {...getButtonAccessibilityProps('Delete med')}
-          >
-            <IconSymbol name="trash.fill" size={16} color={colors.error} />
-          </TouchableOpacity>
         </View>
       </View>
     </Animated.View>
@@ -556,24 +531,13 @@ export default function MedsHomeScreen() {
     clearSelection: clearEntrySelection,
   } = useMultiSelect<{ id: string }>({ enabled: editMode });
   
-  // Initialize all entries as selected when entering edit mode
+  // Clear selection when exiting edit mode
   useEffect(() => {
-    if (editMode && medLogs.length > 0) {
-      // Select all entries when entering edit mode
-      selectAllEntries(medLogs, (log) => log.id);
-    } else if (!editMode) {
+    if (!editMode) {
       // Clear selection when exiting edit mode
       clearEntrySelection();
     }
   }, [editMode]); // Only trigger when edit mode changes
-  
-  // Reset selection when entries change while in edit mode
-  useEffect(() => {
-    if (editMode && medLogs.length > 0) {
-      // Re-select all entries if we're in edit mode and entries changed
-      selectAllEntries(medLogs, (log) => log.id);
-    }
-  }, [medLogs.length]); // Only depend on length to avoid re-running on every render
   
   // Reset edit mode when date changes
   useEffect(() => {
@@ -906,21 +870,28 @@ export default function MedsHomeScreen() {
     }
   };
 
-  // Format recent days summary
-  const formatRecentDay = (summary: { date: string; item_count: number }) => {
+  // Format recent days summary (for accessibility)
+  const formatRecentDay = (summary: { date: string; item_count: number; med_count: number; supp_count: number }) => {
     const date = new Date(summary.date + 'T00:00:00');
     const dayLabel = formatDateForDisplay(date);
-    const count = summary.item_count;
+    const medCount = summary.med_count || 0;
+    const suppCount = summary.supp_count || 0;
+    const totalCount = summary.item_count || 0;
 
-    if (count === 0) {
+    if (totalCount === 0) {
       return t('meds.recent_days.format_no_meds', { day: dayLabel });
     }
 
-    return t('meds.recent_days.format', {
-      day: dayLabel,
-      count,
-      items: count === 1 ? t('meds.recent_days.item_one') : t('meds.recent_days.item_other'),
-    });
+    // Build accessibility string: day - med count, supplement count
+    const parts: string[] = [];
+    if (medCount > 0) {
+      parts.push(`${medCount} ${medCount === 1 ? t('meds.summary.med_one') : t('meds.summary.med_other')}`);
+    }
+    if (suppCount > 0) {
+      parts.push(`${suppCount} ${suppCount === 1 ? t('meds.summary.supp_one') : t('meds.summary.supp_other')}`);
+    }
+
+    return `${dayLabel} - ${parts.join(', ')}`;
   };
 
   // Handle dose amount input change in form
@@ -1020,18 +991,11 @@ export default function MedsHomeScreen() {
                 materialIcon="pill"
                 module="meds"
                 isLoading={logsLoading}
-                subtitle={
-                  !logsLoading && totalItems > 0
-                    ? t('meds.summary.total', {
-                        count: totalItems,
-                        items: totalItems === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other'),
-                        med_count: medCount,
-                        med: medCount === 1 ? t('meds.summary.med_one') : t('meds.summary.med_other'),
-                        supp_count: suppCount,
-                        supp: suppCount === 1 ? t('meds.summary.supp_one') : t('meds.summary.supp_other'),
-                      })
-                    : undefined
-                }
+                style={{
+                  paddingHorizontal: 0,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.separator,
+                }}
                 rightContent={
                   !logsLoading && (
                     <View style={styles.headerButtons}>
@@ -1102,7 +1066,6 @@ export default function MedsHomeScreen() {
                     </View>
                   )
                 }
-                style={{ borderBottomWidth: 1, borderBottomColor: colors.separator }}
               />
 
           {logsLoading ? (
@@ -1183,7 +1146,7 @@ export default function MedsHomeScreen() {
                       {/* Med Section First */}
                       {showMedSection && (
                         <CollapsibleSection
-                          title={t('meds.form.type_med')}
+                          title="Meds 🩺"
                           summary={
                             medCount > 0
                               ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
@@ -1207,11 +1170,6 @@ export default function MedsHomeScreen() {
                                       onEdit={() => {
                                         if (!editMode) {
                                           openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                        }
-                                      }}
-                                      onDelete={() => {
-                                        if (!editMode) {
-                                          handleDelete(log.id, log.name);
                                         }
                                       }}
                                       onDoseUpdate={handleDoseUpdate}
@@ -1254,7 +1212,7 @@ export default function MedsHomeScreen() {
                       {/* Supp Section Second */}
                       {showSuppSection && (
                         <CollapsibleSection
-                          title={t('meds.form.type_supp')}
+                          title="Supplements 🌿"
                           summary={
                             suppCount > 0
                               ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
@@ -1278,11 +1236,6 @@ export default function MedsHomeScreen() {
                                       onEdit={() => {
                                         if (!editMode) {
                                           openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                        }
-                                      }}
-                                      onDelete={() => {
-                                        if (!editMode) {
-                                          handleDelete(log.id, log.name);
                                         }
                                       }}
                                       onDoseUpdate={handleDoseUpdate}
@@ -1322,7 +1275,7 @@ export default function MedsHomeScreen() {
                       {/* Supp Section First */}
                       {showSuppSection && (
                         <CollapsibleSection
-                          title={t('meds.form.type_supp')}
+                          title="Supplements 🌿"
                           summary={
                             suppCount > 0
                               ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
@@ -1343,11 +1296,6 @@ export default function MedsHomeScreen() {
                                     onEdit={() => {
                                       if (!editMode) {
                                         openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                      }
-                                    }}
-                                    onDelete={() => {
-                                      if (!editMode) {
-                                        handleDelete(log.id, log.name);
                                       }
                                     }}
                                     onDoseUpdate={handleDoseUpdate}
@@ -1389,7 +1337,7 @@ export default function MedsHomeScreen() {
                       {/* Med Section Second */}
                       {showMedSection && (
                         <CollapsibleSection
-                          title={t('meds.form.type_med')}
+                          title="Meds 🩺"
                           summary={
                             medCount > 0
                               ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
@@ -1413,11 +1361,6 @@ export default function MedsHomeScreen() {
                                       onEdit={() => {
                                         if (!editMode) {
                                           openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                        }
-                                      }}
-                                      onDelete={() => {
-                                        if (!editMode) {
-                                          handleDelete(log.id, log.name);
                                         }
                                       }}
                                       onDoseUpdate={handleDoseUpdate}
@@ -1636,7 +1579,18 @@ export default function MedsHomeScreen() {
                     {formatDateForDisplay(new Date(summary.date + 'T00:00:00'))}
                   </ThemedText>
                   <ThemedText style={[styles.recentDayStats, { color: colors.textSecondary }]}>
-                    {summary.item_count} {summary.item_count === 1 ? t('meds.recent_days.item_one') : t('meds.recent_days.item_other')}
+                    {(() => {
+                      const medCount = summary.med_count || 0;
+                      const suppCount = summary.supp_count || 0;
+
+                      // Build stats string with emojis: 🩺{meds}   🌿{supps}
+                      const parts: string[] = [];
+                      
+                      parts.push(`🩺${medCount}`);
+                      parts.push(`🌿${suppCount}`);
+                      
+                      return parts.join('   '); // Two spaces between sections
+                    })()}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -2107,8 +2061,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   medName: {
-    fontSize: FontSize.md,
-    fontWeight: '600',
+    fontSize: FontSize.base,
+    fontWeight: '400',
     marginBottom: Spacing.xs,
   },
   medMeta: {
@@ -2161,17 +2115,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    ...getMinTouchTargetStyle(),
-  },
-  deleteButtonGhost: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: Spacing.sm,
-    backgroundColor: 'transparent',
     ...getMinTouchTargetStyle(),
   },
   // Quick Add chip styles

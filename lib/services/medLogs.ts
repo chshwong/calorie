@@ -76,18 +76,18 @@ export async function getMedLogsForDate(
 }
 
 /**
- * Fetch med summary for recent days
+ * Fetch med summary for recent days from daily_sum_meds table
  * 
  * @param userId - The user's ID
  * @param days - Number of recent days to fetch (default: 7)
- * @returns Array of objects with date and item_count
+ * @returns Array of objects with date, item_count, med_count, and supp_count
  * 
- * Required index: med_log_user_date_idx ON med_log(user_id, date)
+ * Required index: daily_sum_meds_user_date_desc_idx ON daily_sum_meds(user_id, date DESC)
  */
 export async function getMedSummaryForRecentDays(
   userId: string,
   days: number = 7
-): Promise<Array<{ date: string; item_count: number }>> {
+): Promise<Array<{ date: string; item_count: number; med_count: number; supp_count: number }>> {
   if (!userId) {
     return [];
   }
@@ -102,9 +102,10 @@ export async function getMedSummaryForRecentDays(
     const startDateString = getLocalDateKey(startDate);
     const endDateString = getLocalDateKey(endDate);
 
+    // Query daily_sum_meds table
     const { data, error } = await supabase
-      .from('med_log')
-      .select('date')
+      .from('daily_sum_meds')
+      .select('date, med_count, supp_count')
       .eq('user_id', userId)
       .gte('date', startDateString)
       .lte('date', endDateString)
@@ -115,21 +116,13 @@ export async function getMedSummaryForRecentDays(
       return [];
     }
 
-    // Aggregate by date
-    const summaryMap = new Map<string, number>();
-
-    (data || []).forEach((log) => {
-      const date = log.date;
-      summaryMap.set(date, (summaryMap.get(date) || 0) + 1);
-    });
-
-    // Convert to array and sort by date descending
-    const summaryArray = Array.from(summaryMap.entries())
-      .map(([date, item_count]) => ({
-        date,
-        item_count,
-      }))
-      .sort((a, b) => b.date.localeCompare(a.date));
+    // Map to UI-friendly shape: include med_count, supp_count, and item_count for backward compatibility
+    const summaryArray = (data || []).map((row) => ({
+      date: row.date,
+      med_count: row.med_count || 0,
+      supp_count: row.supp_count || 0,
+      item_count: (row.med_count || 0) + (row.supp_count || 0),
+    }));
 
     return summaryArray;
   } catch (error) {

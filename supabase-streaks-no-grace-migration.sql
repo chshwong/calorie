@@ -350,19 +350,19 @@ SELECT * FROM public.streak_state WHERE user_id = 'YOUR_ACTUAL_UUID_HERE';
 SELECT 
   entry_date,
   created_at,
-  public.get_user_local_day_cutoff('YOUR_ACTUAL_UUID_HERE'::uuid, entry_date) AS cutoff,
+  public.get_user_local_day_cutoff('f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid, entry_date) AS cutoff,
   now() AS current_time,
-  public.get_user_local_today('YOUR_ACTUAL_UUID_HERE'::uuid) AS local_today,
-  (SELECT timezone FROM public.profiles WHERE user_id = 'YOUR_ACTUAL_UUID_HERE'::uuid) AS user_timezone,
+  public.get_user_local_today('f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid) AS local_today,
+  (SELECT timezone FROM public.profiles WHERE user_id = 'f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid) AS user_timezone,
   CASE 
-    WHEN created_at < public.get_user_local_day_cutoff('YOUR_ACTUAL_UUID_HERE'::uuid, entry_date) 
+    WHEN created_at < public.get_user_local_day_cutoff('f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid, entry_date) 
     THEN 'Counts for streak'
     ELSE 'Does NOT count (created_at >= cutoff)'
   END AS eligibility,
-  created_at < public.get_user_local_day_cutoff('YOUR_ACTUAL_UUID_HERE'::uuid, entry_date) AS is_eligible
+  created_at < public.get_user_local_day_cutoff('f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid, entry_date) AS is_eligible
 FROM public.daily_sum_consumed
-WHERE user_id = 'YOUR_ACTUAL_UUID_HERE'::uuid
-  AND entry_date = public.get_user_local_today('YOUR_ACTUAL_UUID_HERE'::uuid);
+WHERE user_id = 'f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid
+  AND entry_date = public.get_user_local_today('f0e891f3-a79f-47f4-a8b7-9aeff4c8e06a'::uuid);
 
 -- 3) Show last 7 days eligibility with cutoff timestamps (uses auth.uid()):
 -- This shows which days count for streak (row exists AND created_at < cutoff)

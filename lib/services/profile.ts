@@ -94,12 +94,21 @@ export async function updateUserProfile(
       .single();
 
     if (error) {
+      // Handle specific schema errors gracefully (e.g., missing columns)
+      if (error.code === 'PGRST204' || error.message?.includes("Could not find the") || error.message?.includes("column")) {
+        // Don't log as error - this is expected if migrations haven't run yet
+        throw error;
+      }
       console.error('Error updating profile:', error);
       throw error;
     }
 
     return data;
   } catch (error) {
+    // Re-throw without logging if it's a schema error (will be handled by caller)
+    if ((error as any)?.code === 'PGRST204' || (error as any)?.message?.includes("Could not find the") || (error as any)?.message?.includes("column")) {
+      throw error;
+    }
     console.error('Exception updating profile:', error);
     throw error;
   }
