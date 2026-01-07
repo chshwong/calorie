@@ -800,7 +800,7 @@ export default function WaterScreen() {
                 }}
                 placeholder={profileWaterUnit === 'floz' ? '20' : profileWaterUnit === 'cup' ? '8' : '500'}
                 placeholderTextColor={colors.textSecondary}
-                allowDecimal={profileWaterUnit !== 'ml'}
+                allowDecimal={true}
                 maxDecimals={profileWaterUnit === 'ml' ? 0 : profileWaterUnit === 'floz' ? 1 : 2}
                 maxIntegers={4}
                 autoFocus
@@ -891,7 +891,7 @@ export default function WaterScreen() {
                 }}
                 placeholder={editTotalWaterUnit === 'floz' ? '64' : editTotalWaterUnit === 'cup' ? '8' : '2000'}
                 placeholderTextColor={colors.textSecondary}
-                allowDecimal={editTotalWaterUnit !== 'ml'}
+                allowDecimal={true}
                 maxDecimals={editTotalWaterUnit === 'ml' ? 0 : editTotalWaterUnit === 'floz' ? 1 : 2}
                 maxIntegers={4}
                 autoFocus
