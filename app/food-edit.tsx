@@ -40,6 +40,7 @@ import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/acc
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { deleteEntry as deleteEntryService } from '@/lib/services/calorieEntries';
 import { showAppToast } from '@/components/ui/app-toast';
+import { NumberInput } from '@/components/input/NumberInput';
 
 // Hide default Expo Router header; we render our own in-screen header
 export const options = {
@@ -1178,7 +1179,7 @@ export default function FoodEditScreen() {
                 </ThemedText>
               }
               servingQuantityInput={
-                <TextInput
+                <NumberInput
                   ref={quantityInputRef}
                   style={[
                     styles.nutritionLabelInput, 
@@ -1197,10 +1198,11 @@ export default function FoodEditScreen() {
                   placeholder="1"
                   placeholderTextColor={isDark ? colors.inputPlaceholderDark : colors.inputPlaceholder}
                   value={quantity}
-                  onChangeText={handleQuantityChange}
+                  onChangeValue={handleQuantityChange}
                   onFocus={() => setIsQuantityFocused(true)}
                   onBlur={() => setIsQuantityFocused(false)}
-                  keyboardType="numeric"
+                  allowDecimal
+                  maxDecimals={2}
                   maxLength={4}
                   returnKeyType="done"
                   onSubmitEditing={() => {
