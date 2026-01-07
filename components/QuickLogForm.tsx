@@ -6,26 +6,30 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors } from '@/constants/theme';
+import { Colors, SemanticColors } from '@/constants/theme';
 import { RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getCurrentDateTimeUTC } from '@/utils/calculations';
-import { supabase } from '@/lib/supabase';
+import { deleteEntry as deleteEntryService, createEntry as createEntryService, updateEntry as updateEntryService } from '@/lib/services/calorieEntries';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
   getWebAccessibilityProps,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 import type { CalorieEntry } from '@/utils/types';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
 import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { showAppToast } from '@/components/ui/app-toast';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 type QuickLogFormProps = {
   date: string;                 // ISO date string (YYYY-MM-DD)
@@ -78,6 +82,8 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
   const [sugar, setSugar] = useState('');
   const [sodium, setSodium] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Validation error states
   const [itemNameError, setItemNameError] = useState('');
@@ -518,28 +524,25 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
         }
       }
 
-      let error;
+      let error = null;
       if (quickLogId) {
-        // Update existing entry
-        const updateResult = await supabase
-          .from('calorie_entries')
-          .update(cleanedEntryData)
-          .eq('id', quickLogId);
-        error = updateResult.error;
+        // Update existing entry - uses service layer per engineering guidelines
+        const updatedEntry = await updateEntryService(quickLogId, cleanedEntryData);
+        if (!updatedEntry) {
+          error = { message: 'Failed to update entry' };
+        }
       } else {
-        // Insert new entry
-        const insertResult = await supabase
-          .from('calorie_entries')
-          .insert(cleanedEntryData)
-          .select('id')
-          .single();
-        error = insertResult.error;
+        // Insert new entry - uses service layer per engineering guidelines
+        const createdEntry = await createEntryService(cleanedEntryData);
+        if (!createdEntry) {
+          error = { message: 'Failed to create entry' };
+        }
       }
 
       if (error) {
         let errorMessage = `Failed to ${quickLogId ? 'update' : 'save'} food entry.`;
         const errorMsg = error.message || '';
-        const errorCode = error.code || '';
+        const errorCode = (error as any).code || '';
         
         if (errorCode === '23514' || errorMsg.includes('calories_kcal_check') || errorMsg.includes('calories_kcal') || (errorMsg.includes('check') && (errorMsg.includes(MAX_CALORIES.toString()) || errorMsg.includes('calories')))) {
           const currentCalories = parsedCalories || 0;
@@ -638,6 +641,64 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       registerSubmit(handleFormSubmit);
     }
   }, [registerSubmit, handleFormSubmit]);
+
+  // Delete entry function - uses service layer per engineering guidelines
+  const deleteEntry = useCallback(async (entryId: string) => {
+    if (!user?.id || !entryId) return;
+
+    try {
+      const success = await deleteEntryService(entryId);
+
+      if (!success) {
+        throw new Error(t('mealtype_log.delete_entry.failed', { error: 'Unknown error' }));
+      }
+
+      // Invalidate entries cache
+      const entriesKey = ['entries', user.id, effectiveDate] as const;
+      queryClient.setQueryData<CalorieEntry[]>(entriesKey, (prev) =>
+        (prev ?? []).filter((e) => e.id !== entryId)
+      );
+      queryClient.invalidateQueries({ queryKey: entriesKey });
+
+      // Invalidate daily sum consumed ranges
+      invalidateDailySumConsumedRangesForDate(queryClient, user.id, effectiveDate);
+
+      return true;
+    } catch (error: any) {
+      throw error;
+    }
+  }, [user?.id, effectiveDate, queryClient, t]);
+
+  // Delete handlers
+  const handleDeleteClick = useCallback(() => {
+    if (!quickLogId) return;
+    setShowDeleteConfirm(true);
+  }, [quickLogId]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!quickLogId || !user?.id) return;
+
+    // Close modal immediately
+    setShowDeleteConfirm(false);
+
+    // Show deleting toast
+    showAppToast(t('mealtype_log.delete_entry.deleting'));
+
+    setIsDeleting(true);
+    try {
+      await deleteEntry(quickLogId);
+      showAppToast(t('mealtype_log.delete_entry.deleted'));
+      onSaved(); // Navigate back
+    } catch (error: any) {
+      Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [quickLogId, user?.id, deleteEntry, onSaved, t]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setShowDeleteConfirm(false);
+  }, []);
 
   return (
     <View style={[
@@ -1132,6 +1193,25 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
 
       {/* Buttons */}
       <View style={styles.formActions}>
+        {quickLogId && (
+          <Pressable
+            onPress={handleDeleteClick}
+            disabled={isDeleting}
+            style={[
+              styles.deleteButton,
+              {
+                backgroundColor: 'transparent',
+                borderWidth: 0,
+                borderColor: 'transparent',
+                borderRadius: 0,
+              },
+              isDeleting && { opacity: 0.6 },
+            ]}
+            {...getButtonAccessibilityProps('Delete food entry')}
+          >
+            <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
+          </Pressable>
+        )}
         <TouchableOpacity
           style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
           onPress={onCancel}
@@ -1173,6 +1253,18 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           )}
         </TouchableOpacity>
       </View>
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title={t('mealtype_log.delete_entry.title_question')}
+        message={t('mealtype_log.delete_entry.message_cannot_undo')}
+        confirmText={t('mealtype_log.delete_entry.confirm')}
+        cancelText={t('mealtype_log.delete_entry.cancel')}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        confirmButtonStyle={{ backgroundColor: SemanticColors.error }}
+        confirmDisabled={isDeleting}
+      />
     </View>
   );
 }
@@ -1181,10 +1273,12 @@ const styles = StyleSheet.create({
   container: {
     // backgroundColor set via inline style for dark mode support
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
   },
   header: {
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   headerContent: {
     flexDirection: 'row',
@@ -1245,6 +1339,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
+  },
+  deleteButton: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
   },
   nutritionLabelInput: {
     fontSize: 14,

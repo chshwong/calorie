@@ -196,18 +196,9 @@ export function EntryCard({
         </View>
         <View style={styles.entryHeaderRight}>
           {/* Kcal value */}
-          <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11, marginRight: 4 }]}>
+          <ThemedText style={[styles.entryCaloriesValue, { color: colors.tint, fontSize: 11 }]}>
             {entry.calories_kcal} cal
           </ThemedText>
-          {!hasAnySelection && (
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: 'transparent', borderColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, width: 'auto', height: 'auto' }]}
-              onPress={() => onDelete(entry.id, entry.item_name)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>🗑️</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </HighlightableRow>

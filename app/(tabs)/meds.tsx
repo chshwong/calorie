@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, Dimensions, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -15,7 +15,6 @@ import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHe
 import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { MultiSelectItem } from '@/components/multi-select-item';
 import { useMultiSelect } from '@/hooks/use-multi-select';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -27,7 +26,7 @@ import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
 import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMedPreferences, useUpdateMedPreferences } from '@/hooks/use-med-preferences';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, ModuleThemes, SemanticColors } from '@/constants/theme';
 import { TEXT_LIMITS, RANGES } from '@/constants/constraints';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -460,29 +459,8 @@ export default function MedsHomeScreen() {
   const updatePrefsMutation = useUpdateMedPreferences();
   
   // Local collapsed state (synced with preferences)
-  const [isMedCollapsed, setIsMedCollapsed] = useState(medPrefs.collapsedMedSection ?? false);
-  const [isSuppCollapsed, setIsSuppCollapsed] = useState(medPrefs.collapsedSuppSection ?? false);
   const [isTemporarilyDisabled, setIsTemporarilyDisabled] = useState(false);
   const [disabledChips, setDisabledChips] = useState<Set<string>>(new Set());
-  
-  // Sync local state with preferences when they load
-  useEffect(() => {
-    setIsMedCollapsed(medPrefs.collapsedMedSection ?? false);
-    setIsSuppCollapsed(medPrefs.collapsedSuppSection ?? false);
-  }, [medPrefs.collapsedMedSection, medPrefs.collapsedSuppSection]);
-  
-  // Handlers to toggle and persist collapsed state
-  const handleToggleMedSection = () => {
-    const newValue = !isMedCollapsed;
-    setIsMedCollapsed(newValue);
-    updatePrefsMutation.mutate({ collapsedMedSection: newValue });
-  };
-  
-  const handleToggleSuppSection = () => {
-    const newValue = !isSuppCollapsed;
-    setIsSuppCollapsed(newValue);
-    updatePrefsMutation.mutate({ collapsedSuppSection: newValue });
-  };
 
   // Mutations
   const createMutation = useCreateMedLog();
@@ -732,6 +710,48 @@ export default function MedsHomeScreen() {
     setFormDoseUnit('');
     setFormNotes('');
   };
+
+  // Delete handlers for edit modal
+  const [showEditDeleteConfirm, setShowEditDeleteConfirm] = useState(false);
+  const [isDeletingEdit, setIsDeletingEdit] = useState(false);
+
+  const handleEditDeleteClick = useCallback(() => {
+    if (!editingLog) return;
+    setShowEditDeleteConfirm(true);
+  }, [editingLog]);
+
+  const handleEditDeleteConfirm = useCallback(async () => {
+    if (!editingLog?.id) return;
+
+    // Close modal immediately
+    setShowEditDeleteConfirm(false);
+    closeCustomForm();
+
+    // Show deleting toast
+    showAppToast('Deleting entry');
+
+    setIsDeletingEdit(true);
+    try {
+      deleteMutation.mutate(editingLog.id, {
+        onSuccess: () => {
+          showAppToast('Deleted');
+        },
+        onError: (error: any) => {
+          Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+        },
+        onSettled: () => {
+          setIsDeletingEdit(false);
+        },
+      });
+    } catch (error: any) {
+      Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+      setIsDeletingEdit(false);
+    }
+  }, [editingLog, deleteMutation, closeCustomForm, t]);
+
+  const handleEditDeleteCancel = useCallback(() => {
+    setShowEditDeleteConfirm(false);
+  }, []);
 
   // Handle form save
   const handleSaveMed = () => {
@@ -1125,7 +1145,12 @@ export default function MedsHomeScreen() {
                               disabled={!hasEntrySelection}
                               style={[
                                 styles.iconButtonInRow,
-                                { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40', borderWidth: 1 },
+                                { 
+                                  backgroundColor: 'transparent', 
+                                  borderWidth: 0, 
+                                  borderColor: 'transparent',
+                                  borderRadius: 0,
+                                },
                                 !hasEntrySelection && { opacity: 0.5 },
                               ]}
                               activeOpacity={0.7}
@@ -1145,146 +1170,157 @@ export default function MedsHomeScreen() {
                     <>
                       {/* Med Section First */}
                       {showMedSection && (
-                        <CollapsibleSection
-                          title="Meds 🩺"
-                          summary={
-                            medCount > 0
-                              ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
-                              : t('meds.summary.none')
-                          }
-                          isCollapsed={isMedCollapsed}
-                          onToggle={handleToggleMedSection}
-                          accessibilityLabel={t('meds.section.toggle_med')}
-                        >
-                          {medCount > 0 ? (
-                            <View style={styles.medList}>
-                              {medLogsFiltered.map((log, index) => {
-                                const rowContent = (
-                                  <HighlightableRow
-                                    key={log.id}
-                                    isNew={log.id === newEntryId}
-                                  >
-                                    <MedRow
-                                      log={log}
-                                      colors={colors}
-                                      onEdit={() => {
-                                        if (!editMode) {
-                                          openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                        }
-                                      }}
-                                      onDoseUpdate={handleDoseUpdate}
-                                      isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
-                                      animationValue={animationRefs.current.get(log.id)}
-                                      t={t}
-                                      disabled={editMode}
-                                    />
-                                  </HighlightableRow>
-                                );
-                                
-                                if (editMode) {
-                                  return (
-                                    <MultiSelectItem
-                                      key={log.id}
-                                      isSelected={isEntrySelected(log.id)}
-                                      onToggle={() => toggleEntrySelection(log.id)}
-                                    >
-                                      {rowContent}
-                                    </MultiSelectItem>
-                                  );
-                                }
-                                
-                                return rowContent;
-                              })}
+                        <View style={styles.sectionContainer}>
+                          <View style={[styles.sectionHeader, { borderBottomColor: colors.separator }]}>
+                            <View style={styles.sectionHeaderContent}>
+                              <ThemedText style={[styles.sectionHeaderTitle, { color: colors.text }]}>
+                                Meds 🩺
+                              </ThemedText>
+                              <ThemedText style={[styles.sectionHeaderSummary, { color: colors.textSecondary }]}>
+                                {medCount > 0
+                                  ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                                  : t('meds.summary.none')}
+                              </ThemedText>
                             </View>
-                          ) : (
-                            <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
-                              {t('meds.summary.none')}
-                            </ThemedText>
-                          )}
-                        </CollapsibleSection>
+                          </View>
+                          <View style={styles.sectionContent}>
+                            {medCount > 0 ? (
+                              <View style={styles.medList}>
+                                {medLogsFiltered.map((log, index) => {
+                                  const rowContent = (
+                                    <HighlightableRow
+                                      key={log.id}
+                                      isNew={log.id === newEntryId}
+                                    >
+                                      <MedRow
+                                        log={log}
+                                        colors={colors}
+                                        onEdit={() => {
+                                          if (!editMode) {
+                                            openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                          }
+                                        }}
+                                        onDoseUpdate={handleDoseUpdate}
+                                        isLast={index === medLogsFiltered.length - 1 && (!showSuppSection || suppCount === 0)}
+                                        animationValue={animationRefs.current.get(log.id)}
+                                        t={t}
+                                        disabled={editMode}
+                                      />
+                                    </HighlightableRow>
+                                  );
+                                  
+                                  if (editMode) {
+                                    return (
+                                      <MultiSelectItem
+                                        key={log.id}
+                                        isSelected={isEntrySelected(log.id)}
+                                        onToggle={() => toggleEntrySelection(log.id)}
+                                      >
+                                        {rowContent}
+                                      </MultiSelectItem>
+                                    );
+                                  }
+                                  
+                                  return rowContent;
+                                })}
+                              </View>
+                            ) : (
+                              <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+                                —
+                              </ThemedText>
+                            )}
+                          </View>
+                        </View>
                       )}
 
                       {/* Divider between sections */}
-                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && !isMedCollapsed && !isSuppCollapsed && (
+                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && (
                         <View style={[styles.sectionDivider, { backgroundColor: colors.separator }]} />
                       )}
 
                       {/* Supp Section Second */}
                       {showSuppSection && (
-                        <CollapsibleSection
-                          title="Supplements 🌿"
-                          summary={
-                            suppCount > 0
-                              ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
-                              : t('meds.summary.none')
-                          }
-                          isCollapsed={isSuppCollapsed}
-                          onToggle={handleToggleSuppSection}
-                          accessibilityLabel={t('meds.section.toggle_supp')}
-                        >
-                          {suppCount > 0 ? (
-                            <View style={styles.medList}>
-                              {suppLogsFiltered.map((log, index) => {
-                                const rowContent = (
-                                  <HighlightableRow
-                                    key={log.id}
-                                    isNew={log.id === newEntryId}
-                                  >
-                                    <MedRow
-                                      log={log}
-                                      colors={colors}
-                                      onEdit={() => {
-                                        if (!editMode) {
-                                          openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
-                                        }
-                                      }}
-                                      onDoseUpdate={handleDoseUpdate}
-                                      isLast={index === suppLogsFiltered.length - 1}
-                                      animationValue={animationRefs.current.get(log.id)}
-                                      t={t}
-                                      disabled={editMode}
-                                    />
-                                  </HighlightableRow>
-                                );
-                                
-                                if (editMode) {
-                                  return (
-                                    <MultiSelectItem
-                                      key={log.id}
-                                      isSelected={isEntrySelected(log.id)}
-                                      onToggle={() => toggleEntrySelection(log.id)}
-                                    >
-                                      {rowContent}
-                                    </MultiSelectItem>
-                                  );
-                                }
-                                
-                                return rowContent;
-                              })}
+                        <View style={styles.sectionContainer}>
+                          <View style={[styles.sectionHeader, { borderBottomColor: colors.separator }]}>
+                            <View style={styles.sectionHeaderContent}>
+                              <ThemedText style={[styles.sectionHeaderTitle, { color: colors.text }]}>
+                                Supplements 🌿
+                              </ThemedText>
+                              <ThemedText style={[styles.sectionHeaderSummary, { color: colors.textSecondary }]}>
+                                {suppCount > 0
+                                  ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                                  : t('meds.summary.none')}
+                              </ThemedText>
                             </View>
-                          ) : (
-                            <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
-                              {t('meds.summary.none')}
-                            </ThemedText>
-                          )}
-                        </CollapsibleSection>
+                          </View>
+                          <View style={styles.sectionContent}>
+                            {suppCount > 0 ? (
+                              <View style={styles.medList}>
+                                {suppLogsFiltered.map((log, index) => {
+                                  const rowContent = (
+                                    <HighlightableRow
+                                      key={log.id}
+                                      isNew={log.id === newEntryId}
+                                    >
+                                      <MedRow
+                                        log={log}
+                                        colors={colors}
+                                        onEdit={() => {
+                                          if (!editMode) {
+                                            openEditForm({ id: log.id, name: log.name, type: log.type, dose_amount: log.dose_amount, dose_unit: log.dose_unit, notes: log.notes });
+                                          }
+                                        }}
+                                        onDoseUpdate={handleDoseUpdate}
+                                        isLast={index === suppLogsFiltered.length - 1}
+                                        animationValue={animationRefs.current.get(log.id)}
+                                        t={t}
+                                        disabled={editMode}
+                                      />
+                                    </HighlightableRow>
+                                  );
+                                  
+                                  if (editMode) {
+                                    return (
+                                      <MultiSelectItem
+                                        key={log.id}
+                                        isSelected={isEntrySelected(log.id)}
+                                        onToggle={() => toggleEntrySelection(log.id)}
+                                      >
+                                        {rowContent}
+                                      </MultiSelectItem>
+                                    );
+                                  }
+                                  
+                                  return rowContent;
+                                })}
+                              </View>
+                            ) : (
+                              <ThemedText style={[styles.emptySectionText, { color: colors.textSecondary }]}>
+                                —
+                              </ThemedText>
+                            )}
+                          </View>
+                        </View>
                       )}
                     </>
                   ) : (
                     <>
                       {/* Supp Section First */}
                       {showSuppSection && (
-                        <CollapsibleSection
-                          title="Supplements 🌿"
-                          summary={
-                            suppCount > 0
-                              ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
-                              : t('meds.summary.none')
-                          }
-                          isCollapsed={isSuppCollapsed}
-                          onToggle={handleToggleSuppSection}
-                          accessibilityLabel={t('meds.section.toggle_supp')}
-                        >
+                        <View style={styles.sectionContainer}>
+                          <View style={[styles.sectionHeader, { borderBottomColor: colors.separator }]}>
+                            <View style={styles.sectionHeaderContent}>
+                              <ThemedText style={[styles.sectionHeaderTitle, { color: colors.text }]}>
+                                Supplements 🌿
+                              </ThemedText>
+                              <ThemedText style={[styles.sectionHeaderSummary, { color: colors.textSecondary }]}>
+                                {suppCount > 0
+                                  ? `${suppCount} ${suppCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                                  : t('meds.summary.none')}
+                              </ThemedText>
+                            </View>
+                          </View>
+                          <View style={styles.sectionContent}>
                           {suppCount > 0 ? (
                             <View style={styles.medList}>
                               {suppLogsFiltered.map((log, index) => {
@@ -1326,27 +1362,31 @@ export default function MedsHomeScreen() {
                               {t('meds.summary.none')}
                             </ThemedText>
                           )}
-                        </CollapsibleSection>
+                          </View>
+                        </View>
                       )}
 
                       {/* Divider between sections */}
-                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && !isMedCollapsed && !isSuppCollapsed && (
+                      {showMedSection && showSuppSection && medCount > 0 && suppCount > 0 && (
                         <View style={[styles.sectionDivider, { backgroundColor: colors.separator }]} />
                       )}
 
                       {/* Med Section Second */}
                       {showMedSection && (
-                        <CollapsibleSection
-                          title="Meds 🩺"
-                          summary={
-                            medCount > 0
-                              ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
-                              : t('meds.summary.none')
-                          }
-                          isCollapsed={isMedCollapsed}
-                          onToggle={handleToggleMedSection}
-                          accessibilityLabel={t('meds.section.toggle_med')}
-                        >
+                        <View style={styles.sectionContainer}>
+                          <View style={[styles.sectionHeader, { borderBottomColor: colors.separator }]}>
+                            <View style={styles.sectionHeaderContent}>
+                              <ThemedText style={[styles.sectionHeaderTitle, { color: colors.text }]}>
+                                Meds 🩺
+                              </ThemedText>
+                              <ThemedText style={[styles.sectionHeaderSummary, { color: colors.textSecondary }]}>
+                                {medCount > 0
+                                  ? `${medCount} ${medCount === 1 ? t('meds.summary.item_one') : t('meds.summary.item_other')}`
+                                  : t('meds.summary.none')}
+                              </ThemedText>
+                            </View>
+                          </View>
+                          <View style={styles.sectionContent}>
                           {medCount > 0 ? (
                             <View style={styles.medList}>
                               {medLogsFiltered.map((log, index) => {
@@ -1392,7 +1432,8 @@ export default function MedsHomeScreen() {
                               {t('meds.summary.none')}
                             </ThemedText>
                           )}
-                        </CollapsibleSection>
+                          </View>
+                        </View>
                       )}
                     </>
                   )}
@@ -1583,6 +1624,11 @@ export default function MedsHomeScreen() {
                       const medCount = summary.med_count || 0;
                       const suppCount = summary.supp_count || 0;
 
+                      // If no entries, show em dash
+                      if (medCount === 0 && suppCount === 0) {
+                        return '—';
+                      }
+
                       // Build stats string with emojis: 🩺{meds}   🌿{supps}
                       const parts: string[] = [];
                       
@@ -1649,7 +1695,7 @@ export default function MedsHomeScreen() {
         onRequestClose={closeCustomForm}
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, paddingBottom: Platform.OS === 'web' ? Spacing.lg : insets.bottom + Spacing.lg }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={{ color: colors.text }}>
                 {editingLog ? t('meds.form.title_edit') : t('meds.form.title')}
@@ -1761,6 +1807,25 @@ export default function MedsHomeScreen() {
                 </View>
 
                 <View style={styles.formButtons}>
+                  {editingLog && (
+                    <Pressable
+                      onPress={handleEditDeleteClick}
+                      disabled={isDeletingEdit}
+                      style={[
+                        styles.deleteButton,
+                        {
+                          backgroundColor: 'transparent',
+                          borderWidth: 0,
+                          borderColor: 'transparent',
+                          borderRadius: 0,
+                        },
+                        isDeletingEdit && { opacity: 0.6 },
+                      ]}
+                      {...getButtonAccessibilityProps('Delete med entry')}
+                    >
+                      <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
+                    </Pressable>
+                  )}
                   <TouchableOpacity
                     style={[styles.formButton, styles.cancelButton, { borderColor: colors.border }]}
                     onPress={closeCustomForm}
@@ -1783,6 +1848,18 @@ export default function MedsHomeScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
+
+                <ConfirmModal
+                  visible={showEditDeleteConfirm}
+                  title={t('mealtype_log.delete_entry.title_question')}
+                  message={t('mealtype_log.delete_entry.message_cannot_undo')}
+                  confirmText={t('mealtype_log.delete_entry.confirm')}
+                  cancelText={t('mealtype_log.delete_entry.cancel')}
+                  onConfirm={handleEditDeleteConfirm}
+                  onCancel={handleEditDeleteCancel}
+                  confirmButtonStyle={{ backgroundColor: SemanticColors.error }}
+                  confirmDisabled={isDeletingEdit}
+                />
               </View>
             </ScrollView>
           </View>
@@ -2177,14 +2254,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    // Transparent background - icon sits directly on card background
+    backgroundColor: 'transparent',
+    // Proper touch target via padding (icon is 20px, so padding ensures 44x44 minimum)
+    padding: (44 - 20) / 2, // (minTouchTarget - iconSize) / 2 = 12px padding
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderColor: '#EF4444' + '40',
+    // Ensure minimum touch target size
     ...getMinTouchTargetStyle(),
   },
   actionButtonInRow: {
@@ -2386,6 +2462,34 @@ const styles = StyleSheet.create({
   },
   deleteConfirmButton: {
     // backgroundColor set inline
+  },
+  sectionContainer: {
+    width: '100%',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    borderBottomWidth: 1,
+    minHeight: 44,
+  },
+  sectionHeaderContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  sectionHeaderTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+  },
+  sectionHeaderSummary: {
+    fontSize: FontSize.xs,
+  },
+  sectionContent: {
+    width: '100%',
   },
   // Preferences modal styles
   prefsToggleRow: {

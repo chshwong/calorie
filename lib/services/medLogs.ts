@@ -80,13 +80,15 @@ export async function getMedLogsForDate(
  * 
  * @param userId - The user's ID
  * @param days - Number of recent days to fetch (default: 7)
+ * @param userCreatedAt - User's signup timestamp (ISO string) to filter dates before signup
  * @returns Array of objects with date, item_count, med_count, and supp_count
  * 
  * Required index: daily_sum_meds_user_date_desc_idx ON daily_sum_meds(user_id, date DESC)
  */
 export async function getMedSummaryForRecentDays(
   userId: string,
-  days: number = 7
+  days: number = 7,
+  userCreatedAt?: string | null
 ): Promise<Array<{ date: string; item_count: number; med_count: number; supp_count: number }>> {
   if (!userId) {
     return [];
@@ -98,6 +100,13 @@ export async function getMedSummaryForRecentDays(
     endDate.setHours(0, 0, 0, 0);
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - (days - 1));
+
+    // Calculate minimum allowed date from user signup
+    let minDateKey: string | null = null;
+    if (userCreatedAt) {
+      const { getMinAllowedDateKeyFromSignupAt } = await import('@/lib/date-guard');
+      minDateKey = getMinAllowedDateKeyFromSignupAt(userCreatedAt);
+    }
 
     const startDateString = getLocalDateKey(startDate);
     const endDateString = getLocalDateKey(endDate);
@@ -117,14 +126,47 @@ export async function getMedSummaryForRecentDays(
     }
 
     // Map to UI-friendly shape: include med_count, supp_count, and item_count for backward compatibility
-    const summaryArray = (data || []).map((row) => ({
+    let summaryArray = (data || []).map((row) => ({
       date: row.date,
       med_count: row.med_count || 0,
       supp_count: row.supp_count || 0,
       item_count: (row.med_count || 0) + (row.supp_count || 0),
     }));
 
-    return summaryArray;
+    // Filter out dates before user signup
+    if (minDateKey) {
+      summaryArray = summaryArray.filter(item => item.date >= minDateKey!);
+    }
+
+    // Fill missing days with empty entries for consistent UI, but only for dates >= signup date
+    const dateMap = new Map(summaryArray.map(item => [item.date, item]));
+    const allDates: string[] = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(endDate);
+      date.setDate(date.getDate() - i);
+      const dateKey = getLocalDateKey(date);
+      // Only include dates that are >= signup date
+      if (!minDateKey || dateKey >= minDateKey) {
+        allDates.push(dateKey);
+      }
+    }
+    allDates.reverse(); // Start with oldest, end with today
+
+    const filledArray = allDates.map((date) => {
+      if (dateMap.has(date)) {
+        return dateMap.get(date)!;
+      }
+      // Missing day - return empty entry
+      return {
+        date,
+        med_count: 0,
+        supp_count: 0,
+        item_count: 0,
+      };
+    });
+
+    // Sort by date descending (newest first)
+    return filledArray.sort((a, b) => b.date.localeCompare(a.date));
   } catch (error) {
     console.error('Exception fetching med summary:', error);
     return [];

@@ -9,7 +9,6 @@ import {
   Platform,
   Modal,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
@@ -41,6 +40,8 @@ import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import i18n from '@/i18n';
 import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, minDateKey as minDateKeyOf } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { SemanticColors } from '@/constants/theme';
 
 type WeightUnit = 'kg' | 'lbs';
 
@@ -78,6 +79,7 @@ export default function WeightEntryScreen() {
   const { dateKey: clampedRouteDateKey, minDate, minDateKey, today, todayKey } = useClampedDateParam({ paramKey: 'date' });
   const weight366Query = useWeightLogs366d();
   const deleteMutation = useDeleteWeightLog(userId ?? '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const initialDate = useMemo(() => {
     if (dateParam && typeof dateParam === 'string') {
@@ -380,41 +382,35 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
       setError('User not authenticated');
       return;
     }
+    setShowDeleteConfirm(true);
+  };
 
-    // TEMP: prove the press fires (remove once verified)
-    showAppToast('Delete pressed');
+  const handleDeleteConfirm = () => {
+    if (!editingEntryId || !userId) return;
+    
+    // Close modal immediately
+    setShowDeleteConfirm(false);
+    
+    // Show deleting toast
+    showAppToast(i18n.t('mealtype_log.delete_entry.deleting'));
+    
+    const weighedAtISO =
+      (weighedAtParam && typeof weighedAtParam === 'string' ? weighedAtParam : null) ??
+      (editingEntryFromCache?.weighed_at ?? null);
 
-    const doDelete = () => {
-      const weighedAtISO =
-        (weighedAtParam && typeof weighedAtParam === 'string' ? weighedAtParam : null) ??
-        (editingEntryFromCache?.weighed_at ?? null);
+    deleteMutation.mutate({ id: editingEntryId, weighedAtISO }, {
+      onSuccess: () => {
+        showAppToast(i18n.t('mealtype_log.delete_entry.deleted'));
+        navigateAfterDone();
+      },
+      onError: (err: any) => {
+        setError(err?.message || 'Failed to delete entry.');
+      },
+    });
+  };
 
-      deleteMutation.mutate({ id: editingEntryId, weighedAtISO }, {
-        onSuccess: () => {
-          showAppToast('Deleted');
-          navigateAfterDone();
-        },
-        onError: (err: any) => {
-          setError(err?.message || 'Failed to delete entry.');
-        },
-      });
-    };
-
-    if (Platform.OS === 'web') {
-      const ok = typeof window !== 'undefined' ? window.confirm("Delete this entry? This can't be undone.") : false;
-      if (ok) doDelete();
-      return;
-    }
-
-    Alert.alert(
-      'Delete entry?',
-      "This can't be undone.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: doDelete },
-      ],
-      { cancelable: true }
-    );
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
   };
 
   return (
@@ -624,7 +620,12 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
                 disabled={deleteMutation.isPending}
                 style={[
                   styles.deleteButton,
-                  { borderColor: colors.error },
+                  {
+                    backgroundColor: 'transparent',
+                    borderWidth: 0,
+                    borderColor: 'transparent',
+                    borderRadius: 0,
+                  },
                   deleteMutation.isPending && { opacity: 0.6 },
                 ]}
                 {...getButtonAccessibilityProps('Delete weight entry')}
@@ -737,6 +738,18 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
           </Pressable>
         </Modal>
       )}
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title={i18n.t('mealtype_log.delete_entry.title_question')}
+        message={i18n.t('mealtype_log.delete_entry.message_cannot_undo')}
+        confirmText={i18n.t('mealtype_log.delete_entry.confirm')}
+        cancelText={i18n.t('mealtype_log.delete_entry.cancel')}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        confirmButtonStyle={{ backgroundColor: SemanticColors.error }}
+        confirmDisabled={deleteMutation.isPending}
+      />
     </ThemedView>
   );
 }
@@ -967,8 +980,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     ...getMinTouchTargetStyle(),

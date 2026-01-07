@@ -1591,8 +1591,10 @@
     
     "delete_entry": {
       "title": "Delete Entry",
+      "title_question": "Delete entry?",
       "message": "Are you sure to delete {{name}}?",
       "message_generic": "Are you sure to delete this entry?",
+      "message_cannot_undo": "This can't be undone.",
       "confirm": "Delete",
       "cancel": "Cancel",
       "success": "Entry deleted successfully",
@@ -1600,7 +1602,9 @@
       "entry_singular": "entry",
       "entry_plural": "entries",
       "failed": "Failed to delete entry: {{error}}",
-      "failed_multiple": "Failed to delete entries: {{error}}"
+      "failed_multiple": "Failed to delete entries: {{error}}",
+      "deleting": "Deleting entry",
+      "deleted": "Deleted"
     },
     
     "delete_custom_food": {
@@ -2246,7 +2250,7 @@
     "title": "Meds",
     "today_title": "Today's 💊",
     "quick_add_title": "Quick Add",
-    "recent_days_title": "Days",
+    "recent_days_title": "Last 7 days",
     "summary": {
       "total": "Total: {{count}} {{items}} ({{med_count}} {{med}}, {{supp_count}} {{supp}})",
       "item_one": "item",
@@ -2255,7 +2259,7 @@
       "med_other": "meds",
       "supp_one": "supp",
       "supp_other": "supps",
-      "no_meds": "No meds logged yet",
+      "no_meds": "No meds / supplements logged yet",
       "none": "None"
     },
     "entry": {

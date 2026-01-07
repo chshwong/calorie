@@ -90,6 +90,7 @@ export function useMedLogsForDate(dateString: string | Date) {
 export function useMedSummaryForRecentDays(days: number = 7) {
   const { user } = useAuth();
   const userId = user?.id;
+  const userCreatedAt = user?.created_at;
   const queryClient = useQueryClient();
 
   const cacheKey = medSummaryCacheKey(userId, days);
@@ -107,7 +108,7 @@ export function useMedSummaryForRecentDays(days: number = 7) {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-      const data = await getMedSummaryForRecentDays(userId, days);
+      const data = await getMedSummaryForRecentDays(userId, days, userCreatedAt);
 
       if (cacheKey !== null) {
         setPersistentCache(cacheKey, data);

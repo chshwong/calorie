@@ -105,7 +105,7 @@ export function SummaryCardHeader({
           ) : onPressSettings ? (
             <TouchableOpacity
               onPress={onPressSettings}
-              style={[styles.settingsButton, { backgroundColor: colors.backgroundSecondary }]}
+              style={[styles.settingsButton, { backgroundColor: 'transparent' }]}
               activeOpacity={0.7}
               {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
               {...getButtonAccessibilityProps(t('common.settings') || 'Settings')}

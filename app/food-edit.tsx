@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, ActivityIndicator, Dimensions, Platform, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import { DesktopPageContainer } from '@/components/layout/desktop-page-container
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
 import { computeAvoScore, normalizeAvoScoreInputToBasis, type AvoScoreBasis, type AvoScoreInput } from '@/utils/avoScore';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, SemanticColors } from '@/constants/theme';
 import { FOOD_ENTRY, RANGES } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,7 +36,10 @@ import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import { clampDateKey } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
-import { getButtonAccessibilityProps } from '@/utils/accessibility';
+import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { deleteEntry as deleteEntryService } from '@/lib/services/calorieEntries';
+import { showAppToast } from '@/components/ui/app-toast';
 
 // Hide default Expo Router header; we render our own in-screen header
 export const options = {
@@ -143,6 +146,8 @@ export default function FoodEditScreen() {
 
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(mode === 'create');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!user?.id || !initialEntry) return;
@@ -783,6 +788,65 @@ export default function FoodEditScreen() {
     });
   }, [router]);
 
+  // Delete entry function - uses service layer per engineering guidelines
+  const deleteEntry = useCallback(async (entryId: string) => {
+    if (!user?.id || !entryId) return;
+
+    try {
+      const success = await deleteEntryService(entryId);
+
+      if (!success) {
+        throw new Error(t('mealtype_log.delete_entry.failed', { error: 'Unknown error' }));
+      }
+
+      // Invalidate entries cache
+      const entryDateKey = entryDate || entryDateParam || '';
+      const entriesKey = ['entries', user.id, entryDateKey] as const;
+      queryClient.setQueryData<CalorieEntry[]>(entriesKey, (prev) =>
+        (prev ?? []).filter((e) => e.id !== entryId)
+      );
+      queryClient.invalidateQueries({ queryKey: entriesKey });
+
+      // Invalidate daily sum consumed ranges
+      invalidateDailySumConsumedRangesForDate(queryClient, user.id, entryDateKey);
+
+      return true;
+    } catch (error: any) {
+      throw error;
+    }
+  }, [user?.id, entryDate, entryDateParam, queryClient, t]);
+
+  // Delete handlers
+  const handleDeleteClick = useCallback(() => {
+    if (!entryId) return;
+    setShowDeleteConfirm(true);
+  }, [entryId]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!entryId || !user?.id) return;
+
+    // Close modal immediately
+    setShowDeleteConfirm(false);
+
+    // Show deleting toast
+    showAppToast(t('mealtype_log.delete_entry.deleting'));
+
+    setIsDeleting(true);
+    try {
+      await deleteEntry(entryId);
+      showAppToast(t('mealtype_log.delete_entry.deleted'));
+      goBackSafely({ entryDate, mealType });
+    } catch (error: any) {
+      Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [entryId, user?.id, deleteEntry, goBackSafely, entryDate, mealType, t]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setShowDeleteConfirm(false);
+  }, []);
+
   const handleSaveEntry = useCallback(async () => {
     // Prevent double execution with ref guard (faster than state)
     if (isSavingRef.current || loading) {
@@ -1247,6 +1311,25 @@ export default function FoodEditScreen() {
             </View>
 
             <View style={styles.formActions}>
+              {!isCreateMode && entryId && (
+                <Pressable
+                  onPress={handleDeleteClick}
+                  disabled={isDeleting}
+                  style={[
+                    styles.deleteButton,
+                    {
+                      backgroundColor: 'transparent',
+                      borderWidth: 0,
+                      borderColor: 'transparent',
+                      borderRadius: 0,
+                    },
+                    isDeleting && { opacity: 0.6 },
+                  ]}
+                  {...getButtonAccessibilityProps('Delete food entry')}
+                >
+                  <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
+                </Pressable>
+              )}
               <TouchableOpacity
                 style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
                 onPress={() => goBackSafely({ entryDate, mealType })}
@@ -1320,6 +1403,18 @@ export default function FoodEditScreen() {
           onClose={() => setPortionGuideVisible(false)}
           defaultTab={portionGuideDefaultTab}
         />
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title={t('mealtype_log.delete_entry.title_question')}
+        message={t('mealtype_log.delete_entry.message_cannot_undo')}
+        confirmText={t('mealtype_log.delete_entry.confirm')}
+        cancelText={t('mealtype_log.delete_entry.cancel')}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        confirmButtonStyle={{ backgroundColor: SemanticColors.error }}
+        confirmDisabled={isDeleting}
+      />
       </ThemedView>
       </DesktopPageContainer>
     </>
@@ -1406,6 +1501,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
+  },
+  deleteButton: {
+    marginTop: Spacing.md,
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
   },
   cancelButton: {
     flex: 1,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, ViewStyle, useWindowDimensions, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, ViewStyle, useWindowDimensions, Switch, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams, useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -484,6 +484,7 @@ export default function ExerciseHomeScreen() {
   const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { width } = useWindowDimensions();
   
   // Get user config for avatar
   const { data: userConfig } = useUserConfig();
@@ -1063,6 +1064,48 @@ export default function ExerciseHomeScreen() {
     setFormCategory('');
     setFormNotes('');
   };
+
+  // Delete handlers for edit modal
+  const [showEditDeleteConfirm, setShowEditDeleteConfirm] = useState(false);
+  const [isDeletingEdit, setIsDeletingEdit] = useState(false);
+
+  const handleEditDeleteClick = useCallback(() => {
+    if (!editingLog) return;
+    setShowEditDeleteConfirm(true);
+  }, [editingLog]);
+
+  const handleEditDeleteConfirm = useCallback(async () => {
+    if (!editingLog?.id) return;
+
+    // Close modal immediately
+    setShowEditDeleteConfirm(false);
+    closeCustomForm();
+
+    // Show deleting toast
+    showAppToast(t('mealtype_log.delete_entry.deleting'));
+
+    setIsDeletingEdit(true);
+    try {
+      deleteMutation.mutate(editingLog.id, {
+        onSuccess: () => {
+          showAppToast(t('mealtype_log.delete_entry.deleted'));
+        },
+        onError: (error: any) => {
+          Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+        },
+        onSettled: () => {
+          setIsDeletingEdit(false);
+        },
+      });
+    } catch (error: any) {
+      Alert.alert(t('alerts.error_title'), error?.message || t('common.unexpected_error'));
+      setIsDeletingEdit(false);
+    }
+  }, [editingLog, deleteMutation, closeCustomForm, t]);
+
+  const handleEditDeleteCancel = useCallback(() => {
+    setShowEditDeleteConfirm(false);
+  }, []);
 
   // Handle minutes input change - only allow integers within configured range
   const handleMinutesChange = (text: string) => {
@@ -1697,7 +1740,12 @@ export default function ExerciseHomeScreen() {
                               disabled={!hasEntrySelection}
                               style={[
                                 styles.iconButtonInRow,
-                                { backgroundColor: SemanticColors.errorLight, borderColor: SemanticColors.error + '40', borderWidth: 1 },
+                                { 
+                                  backgroundColor: 'transparent', 
+                                  borderWidth: 0, 
+                                  borderColor: 'transparent',
+                                  borderRadius: 0,
+                                },
                                 !hasEntrySelection && { opacity: 0.5 },
                               ]}
                               activeOpacity={0.7}
@@ -2062,7 +2110,14 @@ export default function ExerciseHomeScreen() {
         onRequestClose={closeCustomForm}
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+          <View style={[
+            styles.modalContent, 
+            { backgroundColor: colors.background },
+            width >= LARGE_SCREEN_BREAKPOINT && {
+              maxWidth: Layout.desktopMaxWidth,
+              alignSelf: 'center',
+            },
+          ]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={{ color: colors.text }}>
                 {editingLog ? t('exercise.form.title_edit') : t('exercise.form.title')}
@@ -2076,7 +2131,11 @@ export default function ExerciseHomeScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.formScrollView} 
+              contentContainerStyle={styles.formScrollViewContent}
+              showsVerticalScrollIndicator={false}
+            >
               <View style={styles.formContent}>
                 <View>
                   <ThemedText style={[styles.formLabel, { color: colors.text }]}>
@@ -2158,6 +2217,25 @@ export default function ExerciseHomeScreen() {
                 </View>
 
                 <View style={styles.formButtons}>
+                  {editingLog && (
+                    <Pressable
+                      onPress={handleEditDeleteClick}
+                      disabled={isDeletingEdit}
+                      style={[
+                        styles.deleteButton,
+                        {
+                          backgroundColor: 'transparent',
+                          borderWidth: 0,
+                          borderColor: 'transparent',
+                          borderRadius: 0,
+                        },
+                        isDeletingEdit && { opacity: 0.6 },
+                      ]}
+                      {...getButtonAccessibilityProps('Delete exercise entry')}
+                    >
+                      <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
+                    </Pressable>
+                  )}
                   <TouchableOpacity
                     style={[styles.formButton, styles.cancelButton, { borderColor: colors.border }]}
                     onPress={closeCustomForm}
@@ -2180,6 +2258,18 @@ export default function ExerciseHomeScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
+
+                <ConfirmModal
+                  visible={showEditDeleteConfirm}
+                  title={t('mealtype_log.delete_entry.title_question')}
+                  message={t('mealtype_log.delete_entry.message_cannot_undo')}
+                  confirmText={t('mealtype_log.delete_entry.confirm')}
+                  cancelText={t('mealtype_log.delete_entry.cancel')}
+                  onConfirm={handleEditDeleteConfirm}
+                  onCancel={handleEditDeleteCancel}
+                  confirmButtonStyle={{ backgroundColor: SemanticColors.error }}
+                  confirmDisabled={isDeletingEdit}
+                />
               </View>
             </ScrollView>
           </View>
@@ -2804,14 +2894,13 @@ const styles = StyleSheet.create({
     marginRight: -Spacing.sm, // Nudge action icons right to align with row trash icons
   },
   deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    // Transparent background - icon sits directly on card background
+    backgroundColor: 'transparent',
+    // Proper touch target via padding (icon is 20px, so padding ensures 44x44 minimum)
+    padding: (44 - 20) / 2, // (minTouchTarget - iconSize) / 2 = 12px padding
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderColor: '#EF4444' + '40',
+    // Ensure minimum touch target size
     ...getMinTouchTargetStyle(),
   },
   iconButtonInRow: {
@@ -2865,8 +2954,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BorderRadius['2xl'],
     padding: Spacing.lg,
     maxHeight: '85%',
-    flex: 1,
-    justifyContent: 'space-between',
+    width: '100%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2939,6 +3027,9 @@ const styles = StyleSheet.create({
   },
   formScrollView: {
     flex: 1,
+  },
+  formScrollViewContent: {
+    flexGrow: 0,
   },
   formContent: {
     gap: Spacing.lg,

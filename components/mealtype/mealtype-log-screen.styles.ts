@@ -211,6 +211,7 @@ export const styles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
     zIndex: 10,
+    paddingRight: 8, // Match left side padding (entryItemNameButton has paddingHorizontal: 8)
   },
   entryNameRow: {
     flexDirection: 'row',
