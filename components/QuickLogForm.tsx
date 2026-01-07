@@ -30,6 +30,7 @@ import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { NumberInput } from '@/components/input/NumberInput';
 
 type QuickLogFormProps = {
   date: string;                 // ISO date string (YYYY-MM-DD)
@@ -47,17 +48,6 @@ const MAX_CALORIES = RANGES.CALORIES_KCAL.MAX;
 const MAX_MACRO = 9999.99;
 const ENTRIES_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS;
 
-// Limit numeric inputs to 4 digits before decimal and 2 after
-const formatNumberInput = (text: string): string => {
-  const cleaned = text.replace(/[^0-9.]/g, '');
-  const [rawInt = '', rawFrac = ''] = cleaned.split('.');
-  const intPart = rawInt.slice(0, 4);
-  const fracPart = rawFrac.slice(0, 2);
-  if (cleaned.includes('.')) {
-    return `${intPart || '0'}${fracPart ? `.${fracPart}` : '.'}`;
-  }
-  return intPart;
-};
 
 export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCancel, onSaved, registerSubmit }: QuickLogFormProps) {
   const { t } = useTranslation();
@@ -196,22 +186,6 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     }
   }, [entriesLoaded, hydratedEntry, onCancel, quickLogId, t]);
 
-  // Validate numeric input: 4 digits max before decimal, 2 after
-  const formatNumberInput = (text: string): string => {
-    const cleaned = text.replace(/[^0-9.]/g, '');
-    const [rawInt = '', rawFrac = ''] = cleaned.split('.');
-    const intPart = rawInt.slice(0, 4);
-    const fracPart = rawFrac.slice(0, 2);
-    if (cleaned.includes('.')) {
-      return `${intPart || '0'}${fracPart ? `.${fracPart}` : '.'}`;
-    }
-    return intPart;
-  };
-
-  // Handle calories change with validation
-  const handleCaloriesChange = useCallback((text: string) => {
-    setCalories(formatNumberInput(text));
-  }, []);
 
   // Real-time validation
   const validateFields = useCallback(() => {
@@ -783,7 +757,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           servingQuantityInput={
             <View>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelSmallInput,
@@ -799,9 +773,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="1"
                 placeholderTextColor={colors.textTertiary}
                 value={quantity}
-                onChangeText={(text) => setQuantity(formatNumberInput(text))}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setQuantity}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -857,7 +832,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           caloriesInput={
             <View>
               <View style={styles.nutritionLabelInputWithUnit}>
-                <TextInput
+                <NumberInput
                   style={[
                     styles.nutritionLabelInput,
                     styles.nutritionLabelCaloriesInput,
@@ -875,9 +850,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                   placeholder="325"
                   placeholderTextColor={colors.textTertiary}
                   value={calories}
-                  onChangeText={handleCaloriesChange}
-                  keyboardType="number-pad"
-                  maxLength={4}
+                  onChangeValue={setCalories}
+                  allowDecimal
+                  maxDecimals={2}
+                  maxIntegers={4}
                   returnKeyType="done"
                   onSubmitEditing={handleFormSubmit}
                   {...getInputAccessibilityProps(
@@ -902,7 +878,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           fatInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -919,11 +895,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={fat}
-                onChangeText={(text) => {
-                  setFat(formatNumberInput(text));
-                }}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setFat}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -939,7 +914,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           satFatInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -956,9 +931,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={saturatedFat}
-                onChangeText={(text) => setSaturatedFat(formatNumberInput(text))}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setSaturatedFat}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -974,7 +950,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           transFatInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -991,9 +967,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={transFat}
-                onChangeText={(text) => setTransFat(formatNumberInput(text))}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setTransFat}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1009,7 +986,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           carbsInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -1026,11 +1003,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={carbs}
-                onChangeText={(text) => {
-                  setCarbs(formatNumberInput(text));
-                }}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setCarbs}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1046,7 +1022,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           fiberInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -1063,11 +1039,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={fiber}
-                onChangeText={(text) => {
-                  setFiber(formatNumberInput(text));
-                }}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setFiber}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1083,7 +1058,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           sugarInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -1100,9 +1075,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={sugar}
-                onChangeText={(text) => setSugar(formatNumberInput(text))}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setSugar}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1118,7 +1094,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           proteinInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -1135,11 +1111,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={protein}
-                onChangeText={(text) => {
-                  setProtein(formatNumberInput(text));
-                }}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setProtein}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(
@@ -1155,7 +1130,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           sodiumInput={
             <View style={styles.nutritionLabelInputWithUnit}>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.nutritionLabelInput,
                   styles.nutritionLabelNutrientInput,
@@ -1172,9 +1147,10 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder="0"
                 placeholderTextColor={colors.textTertiary}
                 value={sodium}
-                onChangeText={(text) => setSodium(formatNumberInput(text))}
-                keyboardType="decimal-pad"
-                maxLength={7}
+                onChangeValue={setSodium}
+                allowDecimal
+                maxDecimals={2}
+                maxIntegers={4}
                 returnKeyType="done"
                 onSubmitEditing={handleFormSubmit}
                 {...getInputAccessibilityProps(

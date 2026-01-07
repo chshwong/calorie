@@ -1203,7 +1203,7 @@ export default function FoodEditScreen() {
                   onBlur={() => setIsQuantityFocused(false)}
                   allowDecimal
                   maxDecimals={2}
-                  maxLength={4}
+                  maxIntegers={4}
                   returnKeyType="done"
                   onSubmitEditing={() => {
                     if (!isSaveDisabled) {

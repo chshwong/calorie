@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { NumberInput } from '@/components/input/NumberInput';
 
 // ============================================================================
 // QUICK ADD ICON LAYOUT CONSTANTS (theme-token based; no magic numbers)
@@ -783,7 +784,7 @@ export default function WaterScreen() {
               <ThemedText style={[styles.formLabel, { color: colors.text }]}>
                 {t('water.custom_input_label', { unit: profileWaterUnit === 'floz' ? 'fl oz' : profileWaterUnit === 'cup' ? 'cups' : 'ml' })}
               </ThemedText>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.formInput,
                   {
@@ -793,15 +794,15 @@ export default function WaterScreen() {
                   },
                 ]}
                 value={customInput}
-                onChangeText={(text) => {
-                  // Validate and format input based on unit's decimal rules
-                  const formatted = validateAndFormatInput(text, profileWaterUnit);
-                  setCustomInput(formatted);
+                onChangeValue={(text) => {
+                  setCustomInput(text);
                   setCustomInputError('');
                 }}
                 placeholder={profileWaterUnit === 'floz' ? '20' : profileWaterUnit === 'cup' ? '8' : '500'}
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
+                allowDecimal={profileWaterUnit !== 'ml'}
+                maxDecimals={profileWaterUnit === 'ml' ? 0 : profileWaterUnit === 'floz' ? 1 : 2}
+                maxIntegers={4}
                 autoFocus
               />
               {customInputError && (
@@ -874,7 +875,7 @@ export default function WaterScreen() {
               <ThemedText style={[styles.formLabel, { color: colors.text }]}>
                 {t('water.edit_total.label', { unit: editTotalWaterUnit === 'floz' ? 'fl oz' : editTotalWaterUnit === 'cup' ? 'cups' : 'ml' })}
               </ThemedText>
-              <TextInput
+              <NumberInput
                 style={[
                   styles.formInput,
                   {
@@ -884,15 +885,15 @@ export default function WaterScreen() {
                   },
                 ]}
                 value={editTotalInput}
-                onChangeText={(text) => {
-                  // Validate and format input based on unit's decimal rules
-                  const formatted = validateAndFormatInput(text, profileWaterUnit);
-                  setEditTotalInput(formatted);
+                onChangeValue={(text) => {
+                  setEditTotalInput(text);
                   setEditTotalError('');
                 }}
                 placeholder={editTotalWaterUnit === 'floz' ? '64' : editTotalWaterUnit === 'cup' ? '8' : '2000'}
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
+                allowDecimal={editTotalWaterUnit !== 'ml'}
+                maxDecimals={editTotalWaterUnit === 'ml' ? 0 : editTotalWaterUnit === 'floz' ? 1 : 2}
+                maxIntegers={4}
                 autoFocus
               />
               {editTotalError && (
