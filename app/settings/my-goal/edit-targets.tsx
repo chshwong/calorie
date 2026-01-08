@@ -88,6 +88,13 @@ export default function EditTargetsScreen() {
               onErrorClear={() => {}}
               loading={updateProfileMutation.isPending}
               colors={colors}
+              initialTargets={profile ? {
+                proteinGMin: profile.protein_g_min || 100,
+                fiberGMin: profile.fiber_g_min || 28,
+                carbsGMax: profile.carbs_g_max || 200,
+                sugarGMax: profile.sugar_g_max || 40,
+                sodiumMgMax: profile.sodium_mg_max || 2300,
+              } : undefined}
             />
           </View>
         </EditSheet>

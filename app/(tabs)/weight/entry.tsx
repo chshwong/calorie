@@ -592,6 +592,30 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
                 </ThemedText>
               </TouchableOpacity>
 
+              {isEditMode && (
+                <Pressable
+                  onPress={confirmAndDelete}
+                  disabled={deleteMutation.isPending}
+                  style={[
+                    styles.deleteButton,
+                    {
+                      backgroundColor: 'transparent',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: BorderRadius.full,
+                      paddingVertical: Spacing.md,
+                      paddingHorizontal: Spacing.md,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    deleteMutation.isPending && { opacity: 0.6 },
+                  ]}
+                  {...getButtonAccessibilityProps('Delete weight entry')}
+                >
+                  <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
+                </Pressable>
+              )}
+
               <TouchableOpacity
                 style={[
                   styles.saveButton,
@@ -613,26 +637,6 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
                 )}
               </TouchableOpacity>
             </View>
-
-            {isEditMode && (
-              <Pressable
-                onPress={confirmAndDelete}
-                disabled={deleteMutation.isPending}
-                style={[
-                  styles.deleteButton,
-                  {
-                    backgroundColor: 'transparent',
-                    borderWidth: 0,
-                    borderColor: 'transparent',
-                    borderRadius: 0,
-                  },
-                  deleteMutation.isPending && { opacity: 0.6 },
-                ]}
-                {...getButtonAccessibilityProps('Delete weight entry')}
-              >
-                <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
-              </Pressable>
-            )}
           </View>
         </DesktopPageContainer>
       </ScrollView>

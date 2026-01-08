@@ -1449,13 +1449,13 @@ export function suggestWeightLossNutrients(params: {
   const { goalWeightLb, currentWeightLb, sexAtBirth, activityLevel } = params;
 
   // Protein min
-  let proteinMultiplier = 0.6; // sedentary default
+  let proteinMultiplier = 0.7; // sedentary default
   if (activityLevel === 'light' || activityLevel === 'moderate') {
-    proteinMultiplier = 0.75;
+    proteinMultiplier = 0.7;
   } else if (activityLevel === 'high' || activityLevel === 'very_high') {
     proteinMultiplier = 0.85;
   }
-  proteinMultiplier = clamp(proteinMultiplier, 0.5, 1.0);
+  proteinMultiplier = clamp(proteinMultiplier, 0.7, 0.85);
   let proteinG = Math.round(goalWeightLb * proteinMultiplier);
   proteinG = clamp(proteinG, 80, 250);
   proteinG = Math.round(proteinG / 5) * 5; // Round to nearest 5g
@@ -1602,13 +1602,13 @@ export function computeSuggestedTargets(
 
   // For non-weight-loss, use simplified logic (can be enhanced later)
   // Protein (always primary)
-  let proteinMultiplier = 0.6; // sedentary default
+  let proteinMultiplier = 0.7; // sedentary default
   if (activityLevel === 'light' || activityLevel === 'moderate') {
-    proteinMultiplier = 0.75;
+    proteinMultiplier = 0.7;
   } else if (activityLevel === 'high' || activityLevel === 'very_high') {
     proteinMultiplier = 0.85;
   }
-  proteinMultiplier = clamp(proteinMultiplier, 0.5, 1.0);
+  proteinMultiplier = clamp(proteinMultiplier, 0.7, 0.85);
   let proteinG = Math.round(weightLb * proteinMultiplier);
   proteinG = clamp(proteinG, NUTRIENT_TARGETS.PROTEIN_G.MIN, NUTRIENT_TARGETS.PROTEIN_G.MAX);
   proteinG = Math.round(proteinG / NUTRIENT_TARGETS.PROTEIN_G.STEP) * NUTRIENT_TARGETS.PROTEIN_G.STEP;

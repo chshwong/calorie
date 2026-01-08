@@ -1446,16 +1446,18 @@ export default function ExerciseHomeScreen() {
     const minutes = Math.round(summary.total_minutes);
     const distanceKm = summary.cardio_distance_km || 0;
     const distanceUnit = userConfig?.distance_unit ?? 'km';
-    const distanceValue = distanceUnit === 'mi' && distanceKm > 0 
-      ? formatDistanceForDisplay(distanceKm / KM_TO_MILES_CONVERSION)
-      : formatDistanceForDisplay(distanceKm);
+    
+    // User preferences for displaying duration and distance
+    const showDuration = userConfig?.exercise_track_cardio_duration ?? true;
+    const showDistance = userConfig?.exercise_track_cardio_distance ?? true;
+    
     const cardioCount = summary.cardio_count || 0;
     const strengthCount = summary.strength_count || 0;
 
     // Build accessibility string: day - duration, distance, cardio count, strength count
     const parts: string[] = [];
     
-    if (minutes > 0) {
+    if (showDuration && minutes > 0) {
       const hours = Math.floor(minutes / 60);
       const mins = minutes % 60;
       if (hours > 0 && mins > 0) {
@@ -1467,10 +1469,14 @@ export default function ExerciseHomeScreen() {
       }
     }
     
-    if (distanceValue > 0) {
-      const formattedDistance = distanceValue % 1 === 0 
-        ? distanceValue.toString() 
-        : parseFloat(distanceValue.toFixed(2)).toString();
+    if (showDistance && distanceKm > 0) {
+      // Convert to miles if needed
+      let distanceValue = distanceKm;
+      if (distanceUnit === 'mi') {
+        distanceValue = distanceKm / KM_TO_MILES_CONVERSION;
+      }
+      // Round to integer (0 decimals)
+      const formattedDistance = Math.round(distanceValue);
       parts.push(`${formattedDistance} ${distanceUnit === 'mi' ? 'miles' : 'kilometers'}`);
     }
     
@@ -2025,24 +2031,29 @@ export default function ExerciseHomeScreen() {
                       const minutes = Math.round(summary.total_minutes);
                       const distanceKm = summary.cardio_distance_km || 0;
                       const distanceUnit = userConfig?.distance_unit ?? 'km';
-                      const distanceValue = distanceUnit === 'mi' && distanceKm > 0 
-                        ? formatDistanceForDisplay(distanceKm / KM_TO_MILES_CONVERSION)
-                        : formatDistanceForDisplay(distanceKm);
+                      
+                      // User preferences for displaying duration and distance
+                      const showDuration = userConfig?.exercise_track_cardio_duration ?? true;
+                      const showDistance = userConfig?.exercise_track_cardio_distance ?? true;
+                      
                       const cardioCount = summary.cardio_count || 0;
                       const strengthCount = summary.strength_count || 0;
 
                       // Build stats string with emojis: 🕒{hours}m  📏{distance}{unit}   🏃{cardio}   🏋️{strength}
                       const parts: string[] = [];
                       
-                      if (minutes > 0) {
+                      if (showDuration && minutes > 0) {
                         parts.push(`🕒${formatMinutesAsHoursMinutes(minutes)}`);
                       }
                       
-                      if (distanceValue > 0) {
-                        // Format distance with max 2 decimals, trimming trailing zeros
-                        const formattedDistance = distanceValue % 1 === 0 
-                          ? distanceValue.toString() 
-                          : parseFloat(distanceValue.toFixed(2)).toString();
+                      if (showDistance && distanceKm > 0) {
+                        // Convert to miles if needed
+                        let distanceValue = distanceKm;
+                        if (distanceUnit === 'mi') {
+                          distanceValue = distanceKm / KM_TO_MILES_CONVERSION;
+                        }
+                        // Round to integer (0 decimals)
+                        const formattedDistance = Math.round(distanceValue);
                         parts.push(`📏${formattedDistance} ${distanceUnit === 'mi' ? 'mi' : 'km'}`);
                       }
                       

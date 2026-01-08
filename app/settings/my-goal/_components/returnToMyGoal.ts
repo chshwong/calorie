@@ -3,6 +3,7 @@ import { Router } from 'expo-router';
 /**
  * Navigate back from any My-Goal edit modal.
  * - If coming from home: navigates back to home page
+ * - If coming from dashboard: navigates back to dashboard
  * - Otherwise: navigates to /settings/my-goal (default behavior for settings/onboarding)
  * Uses router.dismiss() if available, otherwise falls back to router.replace().
  */
@@ -20,6 +21,22 @@ export function returnToMyGoal(router: Router, source?: string): void {
     }
     // Fallback: navigate to home tabs
     router.replace('/(tabs)');
+    return;
+  }
+  
+  // If coming from dashboard, navigate back to dashboard
+  if (source === 'dashboard') {
+    try {
+      // Try dismiss first (works for modals)
+      if (typeof router.dismiss === 'function') {
+        router.dismiss();
+        return;
+      }
+    } catch {
+      // If dismiss fails, fall through to replace
+    }
+    // Fallback: navigate to dashboard
+    router.replace('/(tabs)/dashboard');
     return;
   }
   

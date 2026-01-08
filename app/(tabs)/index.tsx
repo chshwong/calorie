@@ -15,8 +15,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
-import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
 import { BorderRadius, Colors, FontSize, Layout, Nudge, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
@@ -440,7 +438,6 @@ export default function FoodLogHomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [refreshing, setRefreshing] = useState(false);
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   // Tour wiring (Home tour)
   const { startTour, registerScrollContainer, activeTourId, registerOnStepChange, requestRemeasure } = useTour();
@@ -750,37 +747,6 @@ export default function FoodLogHomeScreen() {
   }, [registerScrollContainer]);
 
 
-  // Load summary expanded preference from storage (uses adapter per guideline 7)
-  useEffect(() => {
-    const saved = storage.getBoolean(STORAGE_KEYS.SUMMARY_EXPANDED, false);
-    setSummaryExpanded(saved);
-  }, []);
-
-  // Toggle and save summary expanded preference
-  const toggleSummary = () => {
-    const newValue = !summaryExpanded;
-    setSummaryExpanded(newValue);
-    storage.setBoolean(STORAGE_KEYS.SUMMARY_EXPANDED, newValue);
-  };
-
-  const ensureSummaryExpanded = useCallback(() => {
-    if (summaryExpanded) return;
-    setSummaryExpanded(true);
-    storage.setBoolean(STORAGE_KEYS.SUMMARY_EXPANDED, true);
-  }, [summaryExpanded]);
-
-  // Tour: drive UI on specific Home tour steps (expand "Other limits")
-  useEffect(() => {
-    const unsubscribe = registerOnStepChange((tourId, step) => {
-      if (tourId !== 'V1_HomePageTour') return;
-      if (step.id !== 'home-macros') return;
-
-      // Expand the "Other limits" accordion so the spotlight includes the nutrient gauges.
-      ensureSummaryExpanded();
-      setTimeout(() => requestRemeasure(), 200);
-    });
-    return unsubscribe;
-  }, [ensureSummaryExpanded, registerOnStepChange, requestRemeasure]);
 
   // Refresh entries when page comes into focus (e.g., returning from mealtype-log page)
   const isInitialMount = useRef(true);
@@ -841,42 +807,6 @@ export default function FoodLogHomeScreen() {
   }, [dailyBurned?.tdee_cal, calorieConsumed]);
 
   // Week section removed per spec (v1 only needed in earlier iteration).
-
-  // NOTE: profile/dailyTotals typing is behind current DB schema; remove these narrow casts once types are regenerated.
-  const sodiumConsumedMg = Number(
-    (dailyTotals as unknown as { sodium_mg?: number | null })?.sodium_mg ?? dailyTotals?.sodium ?? 0
-  );
-  const sodiumMaxMg = Number((effectiveProfile as unknown as { sodium_mg_max?: number | null })?.sodium_mg_max ?? 0);
-
-  const sugarConsumedG = Number(
-    (dailyTotals as unknown as { sugar_g?: number | null })?.sugar_g ?? dailyTotals?.sugar ?? 0
-  );
-  const sugarMaxG = Number((effectiveProfile as unknown as { sugar_g_max?: number | null })?.sugar_g_max ?? 0);
-
-  const satFatConsumedG = Number(
-    (dailyTotals as unknown as { sat_fat_g?: number | null })?.sat_fat_g ??
-      (dailyTotals as unknown as { sat_fat?: number | null })?.sat_fat ??
-      (dailyTotals as unknown as { saturated_fat?: number | null })?.saturated_fat ??
-      dailyTotals?.saturatedFat ??
-      0
-  );
-  const satFatLimitG = NUTRIENT_LIMITS.satFatG;
-
-  // IMPORTANT: Trans Fat should not be integer-rounded (MiniRingGauge will ceil to nearest 0.1 for display).
-  // Prefer summing from raw entries (may include decimals), then fall back to totals if needed.
-  const transFatConsumedG = useMemo(() => {
-    const raw = entries.reduce((sum, entry) => sum + (entry.trans_fat_g ?? 0), 0);
-    if (Number.isFinite(raw)) return raw;
-
-    return Number(
-      (dailyTotals as unknown as { trans_fat_g?: number | null })?.trans_fat_g ??
-        (dailyTotals as unknown as { trans_fat?: number | null })?.trans_fat ??
-        (dailyTotals as unknown as { transfat?: number | null })?.transfat ??
-        dailyTotals?.transFat ??
-        0
-    );
-  }, [dailyTotals, entries]);
-  const transFatLimitG = NUTRIENT_LIMITS.transFatG;
 
   // DEV ONLY: bust caches once so new profile columns show up immediately
   const didInvalidateProfileQueriesRef = useRef(false);
@@ -1199,7 +1129,7 @@ export default function FoodLogHomeScreen() {
                   tourBurnedPencilRef={tourBurnedPencilRef}
                 />
 
-                {/* Macro + "Other limits" block (tour: home.macrosAndOtherLimits) */}
+                {/* Macro Gauges block (tour: home.macrosAndOtherLimits) */}
                 <View ref={tourMacrosAndOtherLimitsRef as any}>
                   {/* Macro Gauges Row */}
                   <View style={styles.macroGaugeRowWrap}>
@@ -1246,84 +1176,6 @@ export default function FoodLogHomeScreen() {
                     >
                       <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
                     </TouchableOpacity>
-                  </View>
-                  
-                  {/* Sub-fats Section - Collapsible */}
-                  <View style={[styles.subFatsSection, { borderTopColor: colors.separator }]}>
-                    <TouchableOpacity 
-                      style={[
-                        styles.subFatsHeader,
-                        getMinTouchTargetStyle(),
-                        { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
-                      ]}
-                      onPress={toggleSummary}
-                      activeOpacity={0.7}
-                      {...getButtonAccessibilityProps(
-                        summaryExpanded ? t('home.accessibility.collapse_details') : t('home.accessibility.expand_details'),
-                        t('home.accessibility.details_hint')
-                      )}
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: summaryExpanded }}
-                    >
-                      <View style={styles.subFatsHeaderRight}>
-                        <ThemedText style={[styles.subFatsTitle, { color: colors.textSecondary }]}>
-                          {summaryExpanded ? t('home.summary.hide_other_limits') : t('home.summary.other_limits')}
-                        </ThemedText>
-                        <IconSymbol 
-                          name={summaryExpanded ? "chevron.up" : "chevron.down"} 
-                          size={16} 
-                          color={colors.textSecondary} 
-                          style={{ marginLeft: 4 }}
-                          decorative={true}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    {summaryExpanded && (
-                      <View style={styles.miniGaugeSection}>
-                        <View style={styles.miniGaugeRow}>
-                          <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                            <MiniRingGauge
-                              label={t('home.summary.sugar')}
-                              value={sugarConsumedG}
-                              target={sugarMaxG}
-                              unit={t('units.g')}
-                              size="xs"
-                            />
-                          </View>
-
-                          <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                            <MiniRingGauge
-                              label={t('home.summary.sodium')}
-                              value={sodiumConsumedMg}
-                              target={sodiumMaxMg}
-                              unit={t('units.mg')}
-                              size="xs"
-                            />
-                          </View>
-
-                          <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                            <MiniRingGauge
-                              label={t('home.summary.saturated_fat')}
-                              value={satFatConsumedG}
-                              target={satFatLimitG}
-                              unit={t('units.g')}
-                              size="xs"
-                            />
-                          </View>
-
-                          <View style={styles.miniGaugeItem}>
-                            <MiniRingGauge
-                              label={t('home.summary.trans_fat')}
-                              value={transFatConsumedG}
-                              target={transFatLimitG}
-                              unit={t('units.g')}
-                              size="xs"
-                              valueFormat="ceilToTenth"
-                            />
-                          </View>
-                        </View>
-                      </View>
-                    )}
                   </View>
                 </View>
               </View>

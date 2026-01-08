@@ -34,6 +34,7 @@ interface DailyFocusTargetsStepProps {
   loading: boolean;
   colors: typeof Colors.light;
   stepKey?: string | number; // Used to trigger scroll to top on step change
+  initialTargets?: DailyFocusTargets | null; // Optional initial values (for edit mode)
 }
 
 export interface DailyFocusTargets {
@@ -58,6 +59,7 @@ interface TargetStepperProps {
   unit: string;
   suggestedValue: number;
   currentValue: number;
+  currentTargetValue?: number | null; // Original saved value from profile (for edit mode)
   min: number;
   max: number;
   step: number;
@@ -72,6 +74,7 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
   unit,
   suggestedValue,
   currentValue,
+  currentTargetValue,
   min,
   max,
   step,
@@ -196,6 +199,11 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
           <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
             Suggested: {suggestedValue} {unit}
           </Text>
+          {currentTargetValue != null && (
+            <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
+              Current: {currentTargetValue} {unit}
+            </Text>
+          )}
         </View>
 
         {/* Row B: Input */}
@@ -366,6 +374,7 @@ interface NutrientTargetSliderCardProps {
   constraintType: 'min' | 'max' | 'target';
   suggestedValue: number;
   currentValue: number;
+  currentTargetValue?: number | null; // Original saved value from profile (for edit mode)
   min: number;
   max: number;
   step: number;
@@ -384,6 +393,7 @@ const NutrientTargetSliderCard: React.FC<NutrientTargetSliderCardProps> = ({
   unit,
   suggestedValue,
   currentValue,
+  currentTargetValue,
   min,
   max,
   step,
@@ -447,9 +457,16 @@ const NutrientTargetSliderCard: React.FC<NutrientTargetSliderCardProps> = ({
 
       {/* Suggested value with inline Reference */}
       <View style={styles.suggestedRow}>
-        <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
-          Suggested: {formatValue ? formatValue(suggestedValue) : suggestedValue.toString()} {unit}
-        </Text>
+        <View>
+          <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
+            Suggested: {formatValue ? formatValue(suggestedValue) : suggestedValue.toString()} {unit}
+          </Text>
+          {currentTargetValue != null && (
+            <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
+              Current: {formatValue ? formatValue(currentTargetValue) : currentTargetValue.toString()} {unit}
+            </Text>
+          )}
+        </View>
         <TouchableOpacity
           onPress={onReferencePress}
           disabled={disabled}
@@ -501,6 +518,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
   loading,
   colors,
   stepKey,
+  initialTargets,
 }) => {
   const { t } = useTranslation();
   const isDark = useColorScheme() === 'dark';
@@ -533,8 +551,14 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
   const prevGoalTypeRef = React.useRef<typeof goalType>(goalType);
   const hasInitializedRef = React.useRef<boolean>(false);
 
-  // Initialize current values from suggestions - only once or when goal changes
+  // Initialize current values from initialTargets (edit mode) or suggestions (onboarding)
   const [targets, setTargets] = useState<DailyFocusTargets>(() => {
+    // If initialTargets is provided (edit mode), use those values
+    if (initialTargets) {
+      hasInitializedRef.current = true;
+      return initialTargets;
+    }
+    // Otherwise, use suggested values (onboarding mode)
     if (!suggested) {
       return {
         proteinGMin: 100,
@@ -555,7 +579,12 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
   });
 
   // Only update targets when goalType changes (not on every suggested change)
+  // Skip this logic if initialTargets is provided (edit mode - don't reset to suggested)
   useEffect(() => {
+    // In edit mode, don't reset to suggested values
+    if (initialTargets) {
+      return;
+    }
     // Check if goalType actually changed
     if (prevGoalTypeRef.current !== goalType) {
       prevGoalTypeRef.current = goalType;
@@ -581,7 +610,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
       });
       hasInitializedRef.current = true;
     }
-  }, [goalType, suggested]);
+  }, [goalType, suggested, initialTargets]);
 
   // Notify parent of changes (onTargetChange is stable setState from parent)
   useEffect(() => {
@@ -833,6 +862,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                       step: number;
                     };
                     const currentValue = targets[nutrient.targetKey];
+                    const currentTargetValue = initialTargets?.[nutrient.targetKey as keyof DailyFocusTargets];
                     const range = getSliderRange(
                       nutrient.key,
                       suggestedData.value,
@@ -849,6 +879,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                         constraintType={nutrient.constraintType}
                         suggestedValue={suggestedData.value}
                         currentValue={currentValue}
+                        currentTargetValue={currentTargetValue}
                         min={range.min}
                         max={range.max}
                         step={range.step}
@@ -900,16 +931,17 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                         max: number;
                         step: number;
                       };
-                      const currentValue = targets[nutrient.targetKey];
-                      const range = getSliderRange(
-                        nutrient.key,
-                        suggestedData.value,
-                        isMaintenanceOrRecomp
-                          ? undefined
-                          : { min: suggestedData.min, max: suggestedData.max, step: suggestedData.step }
-                      );
-                      
-                      return (
+                    const currentValue = targets[nutrient.targetKey];
+                    const currentTargetValue = initialTargets?.[nutrient.targetKey as keyof DailyFocusTargets];
+                    const range = getSliderRange(
+                      nutrient.key,
+                      suggestedData.value,
+                      isMaintenanceOrRecomp
+                        ? undefined
+                        : { min: suggestedData.min, max: suggestedData.max, step: suggestedData.step }
+                    );
+                    
+                    return (
                         <NutrientTargetSliderCard
                           key={nutrient.key}
                           label={t(nutrient.labelKey)}
@@ -917,6 +949,7 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                           constraintType={nutrient.constraintType}
                           suggestedValue={suggestedData.value}
                           currentValue={currentValue}
+                          currentTargetValue={currentTargetValue}
                           min={range.min}
                           max={range.max}
                           step={range.step}

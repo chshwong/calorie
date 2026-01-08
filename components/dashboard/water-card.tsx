@@ -12,7 +12,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
 import { Colors, BorderRadius, Shadows, Spacing, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useWaterDaily } from '@/hooks/use-water-logs';
+import { useWaterDaily, useWaterDailyForDate } from '@/hooks/use-water-logs';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { formatWaterDisplay, WaterUnit, fromMl, toMl, getEffectiveGoal } from '@/utils/waterUnits';
 import { ModuleThemes } from '@/constants/theme';
@@ -21,18 +21,23 @@ import { Animated } from 'react-native';
 import { useRef } from 'react';
 
 type WaterCardProps = {
+  dateString?: string;
   onPress?: () => void;
 };
 
-export function WaterCard({ onPress }: WaterCardProps) {
+export function WaterCard({ dateString, onPress }: WaterCardProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  // Get water data
-  const { todayWater, isLoading } = useWaterDaily({ daysBack: 0 });
+  // Get water data - use dateString if provided, otherwise use today
+  const waterQuery = dateString 
+    ? useWaterDailyForDate(dateString)
+    : useWaterDaily({ daysBack: 0 });
+  const todayWater = waterQuery.data;
+  const isLoading = waterQuery.isLoading;
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
   
