@@ -139,22 +139,6 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
             {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
           >
           <View style={styles.caloriesRow}>
-            <View style={styles.foodChipsOverlay} pointerEvents="box-none">
-              <View style={styles.foodChipsColumn}>
-                <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
-                  <ThemedText style={[styles.foodChipText, { color: colors.textSecondary }]}>
-                    Goal: {getGoalLabel}
-                  </ThemedText>
-                </View>
-
-                <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
-                  <ThemedText style={[styles.foodChipText, { color: colors.textSecondary }]}>
-                    Aim: {Number(foodSummary.caloriesGoal).toLocaleString('en-US')} {t('units.kcal')}/day
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-
             <AvocadoGauge
               consumed={Number(foodSummary.caloriesTotal)}
               target={Number(foodSummary.caloriesGoal)}
@@ -164,6 +148,29 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               surfaceBg={colors.card}
               showLabel
             />
+            
+            {/* Chips overlay at bottom of avocado gauge */}
+            <View style={styles.avocadoChipsOverlay} pointerEvents="box-none">
+              <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
+                <ThemedText 
+                  style={[styles.foodChipText, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  Goal: {getGoalLabel}
+                </ThemedText>
+              </View>
+
+              <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
+                <ThemedText 
+                  style={[styles.foodChipText, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  Aim: {Number(foodSummary.caloriesGoal).toLocaleString('en-US')} {t('units.kcal')}/day
+                </ThemedText>
+              </View>
+            </View>
           </View>
           </TouchableOpacity>
 
@@ -924,6 +931,18 @@ const styles = StyleSheet.create({
   foodChipsColumn: {
     alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  avocadoChipsOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 6, // Position in blank space below avocado
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    zIndex: 5,
+    pointerEvents: 'box-none',
   },
   foodChip: {
     paddingHorizontal: Spacing.sm,
