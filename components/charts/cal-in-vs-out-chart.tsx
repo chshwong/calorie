@@ -9,11 +9,11 @@ import { ThemedText } from '@/components/themed-text';
 import { RANGES } from '@/constants/constraints';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import type { CalorieZone } from '@/lib/utils/calorie-zone';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import type { CalorieZone } from '@/lib/utils/calorie-zone';
 
 // Chart-specific display constants (not validation limits)
 // These define the Y-axis scale and label positions for the calorie chart
@@ -57,38 +57,71 @@ export function CalInVsOutChart({
   const { t } = useTranslation();
 
   // Calculate max value for scaling (consider both in and out)
-  // Scale so that MIN_SCALE_MAX means the bar would almost touch the legend at the top (2px away)
-  // Use RANGES.CALORIES_KCAL.MAX as reference, but allow chart to scale higher if data exceeds it
+  // Use actual data max to fill available height, similar to exercise charts
+  // Only use MIN_SCALE_MAX as a fallback if data is empty
   const maxValue = useMemo(() => {
     const allValues = data.flatMap(d => [d.caloriesIn, d.caloriesOut]);
     const dataMax = Math.max(...allValues, 1);
-    // Use MIN_SCALE_MAX as the minimum max scale, or data max if it's higher
-    // This ensures consistent chart scaling while accommodating higher values
-    return Math.max(dataMax, CHART_SCALE.MIN_SCALE_MAX);
+    // Use actual data max so bars fill the available height
+    // Only fall back to MIN_SCALE_MAX if data is empty or very small
+    return dataMax >= 100 ? dataMax : CHART_SCALE.MIN_SCALE_MAX;
   }, [data]);
 
-  // Minimal top inset - just 2px gap from legend (legend is outside chartContainer)
-  const topInset = 2; // 2px gap as requested
+  // Minimal top inset - collapsed to minimize space, similar to exercise charts
+  const topInset = 0; // No top inset - bars can reach closer to legend
   const xAxisHeight = showLabels ? (FontSize.xs + Spacing.xs) : 0;
   const yAxisWidth = 40; // Width for Y-axis labels
   const plotHeight = Math.max(height - topInset - xAxisHeight, 1);
+  
+  // Y-axis label vertical alignment offsets
+  const BASE_LABEL_OFFSET = Math.round(FontSize.xs * 0.35)+6;
+  const ZERO_EXTRA_OFFSET = Math.round(FontSize.xs * 0.35)-4;
 
-  // Calculate Y-axis points: 0, 1.5k, 3k (3 points total)
+  // Calculate Y-axis points: 0, and conditionally labels based on maxValue
+  // If maxValue > 10000: labels at every 1.5k increment starting at 1.5k
+  // If maxValue > 5000: labels at every 1k increment starting at 1.5k
+  // Otherwise: labels at every 500 increment starting at 1.5k
   // 0 is at the bottom (at x-axis level)
   // Positions scale based on maxValue so labels align with actual bar heights
   // Position is measured from bottom, so higher values = higher positions
   const yAxisPoints = useMemo(() => {
-    return [
+    const points = [
       { value: 0, position: 0 }, // Bottom (0) - at x-axis level
-      {
-        value: CHART_SCALE.Y_AXIS_LABELS.MIDDLE,
-        position: (CHART_SCALE.Y_AXIS_LABELS.MIDDLE / maxValue) * plotHeight,
-      }, // Middle (1.5k) - scaled position
-      {
-        value: CHART_SCALE.Y_AXIS_LABELS.TOP,
-        position: (CHART_SCALE.Y_AXIS_LABELS.TOP / maxValue) * plotHeight,
-      }, // Top (3k) - scaled position
     ];
+    
+    // If tallest bar is under 1.5k, show a label at the tallest bar position
+    if (maxValue < CHART_SCALE.Y_AXIS_LABELS.MIDDLE) {
+      points.push({
+        value: maxValue,
+        position: plotHeight, // At the top (where tallest bar ends)
+      }); // Max value - shows where tallest bar reaches
+    } else {
+      // Determine increment based on maxValue to avoid cramped labels
+      // Above 10000: use 1.5k increments (1500, 3000, 4500, 6000, 7500, 9000, ...)
+      // Above 5000: use 1k increments (1500, 2500, 3500, 4500, 5500, ...)
+      // Otherwise: use 500 increments (1500, 2000, 2500, 3000, 3500, ...)
+      const startValue = 1500;
+      let increment: number;
+      if (maxValue > 10000) {
+        increment = 1500;
+      } else if (maxValue > 5000) {
+        increment = 1000;
+      } else {
+        increment = 500;
+      }
+      
+      // Generate labels at the determined increment from 1500 up to maxValue
+      // Only include values that don't exceed the tallest bar
+      for (let value = startValue; value <= maxValue; value += increment) {
+        points.push({
+          value: value,
+          position: (value / maxValue) * plotHeight,
+        });
+      }
+    }
+    
+    // Sort by position (bottom to top) to ensure correct rendering order
+    return points.sort((a, b) => a.position - b.position);
   }, [maxValue, plotHeight]);
 
   // Format Y-axis label (e.g., 5000 -> "5k", 2500 -> "2.5k")
@@ -212,8 +245,9 @@ export function CalInVsOutChart({
         {/* Y-axis labels */}
         <View style={[styles.yAxisContainer, { width: yAxisWidth, height: plotHeight, bottom: xAxisHeight }]}>
           {yAxisPoints.map((point, idx) => {
-            // Position labels slightly below the dotted lines (add small offset)
-            const labelOffset = idx === 0 ? 0 : FontSize.xs / 2; // Only offset non-zero labels
+            // Position labels to align with their respective dotted lines
+            // Apply transform for fine-tuning alignment, with extra offset for "0" label
+            const isZero = point.value === 0;
             return (
               <View
                 key={idx}
@@ -221,7 +255,10 @@ export function CalInVsOutChart({
                   styles.yAxisLabelContainer,
                   {
                     position: 'absolute',
-                    bottom: point.position - labelOffset, // Position from bottom, slightly below line
+                    bottom: point.position,
+                    transform: [
+                      { translateY: BASE_LABEL_OFFSET + (isZero ? ZERO_EXTRA_OFFSET : 0) }
+                    ],
                   },
                 ]}
               >
@@ -235,7 +272,7 @@ export function CalInVsOutChart({
 
         {/* Plot area */}
         <View style={[styles.plotArea, { height: plotHeight, bottom: xAxisHeight, left: yAxisWidth }]}>
-          {/* Dotted horizontal lines at Y-axis points */}
+          {/* Dotted horizontal lines at Y-axis points - rendered behind bars */}
           {yAxisPoints.map((point, idx) => (
             <View
               key={idx}
@@ -243,17 +280,20 @@ export function CalInVsOutChart({
                 styles.yAxisLine,
                 {
                   bottom: point.position,
-                  borderColor: colors.border,
+                  borderColor: colors.textSecondary,
                 },
               ]}
             />
           ))}
 
           {/* Bars */}
-          <View style={styles.barsContainer}>
+          <View style={[styles.barsContainer, { zIndex: 2 }]}>
             {data.map((item, index) => {
-              const barHeightIn = Math.min((item.caloriesIn / maxValue) * plotHeight * 1.1, plotHeight);
-              const barHeightOut = Math.min((item.caloriesOut / maxValue) * plotHeight * 1.1, plotHeight);
+              // Scale bars to use full plotHeight based on maxValue, with small top margin
+              const topMargin = 2; // Small margin from top
+              const availableHeight = plotHeight - topMargin;
+              const barHeightIn = Math.max((item.caloriesIn / maxValue) * availableHeight, 0);
+              const barHeightOut = Math.max((item.caloriesOut / maxValue) * availableHeight, 0);
               const isSelected = selectedDate === item.date;
               const zoneColor = getZoneColor(item.zone);
               
@@ -363,7 +403,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: Spacing.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xxs, // Minimal spacing after legend
   },
   legendItem: {
     flexDirection: 'row',
@@ -403,8 +443,8 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopWidth: 1,
     borderStyle: 'dashed',
-    opacity: 0.5,
-    zIndex: 1,
+    opacity: 0.8, // Increased opacity for better visibility, especially in light mode
+    zIndex: 0, // Behind bars
   },
   plotArea: {
     position: 'absolute',

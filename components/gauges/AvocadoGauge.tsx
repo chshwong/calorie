@@ -219,10 +219,12 @@ export function AvocadoGauge({
   const horizontalOffset = 18; // Offset distance toward exterior
   const tipLabelX = isLeftSide ? tip.x - horizontalOffset : tip.x + horizontalOffset;
   
-  // Position label above the tip, but ensure it's visible in the viewBox
+  // Position label above the tip, accounting for stroke path thickness
+  // Vertical offset accounts for strokeWidth (can be up to 8) to ensure text is clear
   // When at top (y ~5), position at y ~-15 to use the white space
-  // When at bottom, keep closer to tip
-  const tipLabelY = tip.y < 50 ? tip.y - 18 : tip.y - 12;
+  // When at bottom, keep closer to tip but with extra clearance for thick strokes
+  const strokeClearance = Math.max(4, strokeWidth / 2); // Half of strokeWidth for clearance
+  const tipLabelY = tip.y < 50 ? tip.y - 18 : tip.y - (12 + strokeClearance);
   const tipLabelFontSize = Math.max(FontSize.xs, MACRO_GAUGE_TEXT.value.sm.fontSize - Nudge.px1);
 
   const height = Math.round(size * (VB_H / VB_W));
@@ -362,11 +364,11 @@ export function AvocadoGauge({
           </>
         )}
 
-        {/* Tip marker + consumed label (moves with progress, rendered last to appear on top) */}
+        {/* Tip marker + consumed label (moves with progress, rendered last in group to appear on top) */}
         {fillT > 0 && (
-          <>
+          <G>
             <Circle cx={tip.x} cy={tip.y} r={4} fill={lineColor} />
-            {/* Text halo (drawn first for contrast) */}
+            {/* Text halo (drawn first for contrast) - increased strokeWidth to 8 for maximum visibility */}
             <SvgText
               x={tipLabelX}
               y={tipLabelY}
@@ -374,7 +376,7 @@ export function AvocadoGauge({
               fontFamily={FontFamilies.regular}
               fill={bgForContrast}
               stroke={bgForContrast}
-              strokeWidth={4}
+              strokeWidth={8}
               strokeLinejoin="round"
               textAnchor="middle"
             >
@@ -397,7 +399,7 @@ export function AvocadoGauge({
                 <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
               ) : null}
             </SvgText>
-          </>
+          </G>
         )}
       </Svg>
     </View>

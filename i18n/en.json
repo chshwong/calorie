@@ -85,7 +85,10 @@
     "home_welcome": {
       "title": "Welcome",
       "message": "Congratz on starting your fitness journey on AvoVibe!",
-      "cta": "Let’s do it!"
+      "cta": "Let's do it!"
+    },
+    "welcome": {
+      "get_started": "Get started"
     },
     "home": {
       "curvyGauge": "This is your daily calorie target. Click ⚙️ to adjust target.",
@@ -158,6 +161,7 @@
       "sodium": "Sodium",
       "other_limits": "Other limits",
       "hide_other_limits": "Hide other limits",
+      "toggle_other_limits": "Toggle other limits section",
       "loading_entries": "Loading entries..."
     },
     "date_picker": {
@@ -1217,7 +1221,10 @@
     "g": "g",
     "mg": "mg",
     "ml": "ml",
-    "L": "L"
+    "L": "L",
+    "min": "min",
+    "km": "km",
+    "mi": "mi"
   },
 
   "accessibility": {
@@ -2169,7 +2176,7 @@
     },
     "snapshot": {
       "food": "Food",
-      "ex": "Ex",
+      "ex": "Move & Groove",
       "meds": "Meds",
       "kcal": "cal",
       "min": "min",
@@ -2215,7 +2222,8 @@
       "no_exercises": "No exercises logged today",
       "main": "Main",
       "chart_7d": "7d min",
-      "streak": "Ex streak"
+      "streak": "Ex streak",
+      "last_days": "Last {{days}} days"
     },
     "loading": "Loading",
     "meds": {

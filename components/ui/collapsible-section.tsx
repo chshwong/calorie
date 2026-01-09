@@ -87,6 +87,16 @@ export interface CollapsibleSectionProps {
    * Optional: Custom content container style
    */
   contentStyle?: object;
+  
+  /**
+   * Optional: Custom title text style
+   */
+  titleStyle?: object;
+  
+  /**
+   * Optional: Position title on the right side (default: left)
+   */
+  titlePosition?: 'left' | 'right';
 }
 
 const ANIMATION_DURATION = 200;
@@ -101,6 +111,8 @@ export function CollapsibleSection({
   reduceMotion = false,
   headerStyle,
   contentStyle,
+  titleStyle,
+  titlePosition = 'left',
 }: CollapsibleSectionProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -181,30 +193,66 @@ export function CollapsibleSection({
         {...getButtonAccessibilityProps(accessibilityLabel)}
         accessibilityState={{ expanded: !isCollapsed }}
       >
-        <View style={styles.headerContent}>
-          <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-            {title}
-          </ThemedText>
-          {summary && (
-            <ThemedText style={[styles.headerSummary, { color: colors.textSecondary }]}>
-              {summary}
-            </ThemedText>
-          )}
-        </View>
-        <Animated.View
-          style={[
-            styles.chevronContainer,
-            {
-              transform: [{ rotate: chevronRotation }],
-            },
-          ]}
-        >
-          <IconSymbol
-            name="chevron.down"
-            size={16}
-            color={colors.textSecondary}
-          />
-        </Animated.View>
+        {titlePosition === 'right' ? (
+          <>
+            <View style={{ flex: 1 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+              <ThemedText 
+                style={[styles.headerTitle, { color: colors.text }, titleStyle]}
+                numberOfLines={1}
+              >
+                {title}
+              </ThemedText>
+              {summary && (
+                <ThemedText style={[styles.headerSummary, { color: colors.textSecondary }]}>
+                  {summary}
+                </ThemedText>
+              )}
+              <Animated.View
+                style={[
+                  styles.chevronContainer,
+                  {
+                    transform: [{ rotate: chevronRotation }],
+                    marginLeft: Spacing.xs,
+                  },
+                ]}
+              >
+                <IconSymbol
+                  name="chevron.down"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              </Animated.View>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.headerContent}>
+              <ThemedText style={[styles.headerTitle, { color: colors.text }, titleStyle]}>
+                {title}
+              </ThemedText>
+              {summary && (
+                <ThemedText style={[styles.headerSummary, { color: colors.textSecondary }]}>
+                  {summary}
+                </ThemedText>
+              )}
+            </View>
+            <Animated.View
+              style={[
+                styles.chevronContainer,
+                {
+                  transform: [{ rotate: chevronRotation }],
+                },
+              ]}
+            >
+              <IconSymbol
+                name="chevron.down"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </Animated.View>
+          </>
+        )}
       </TouchableOpacity>
       
       {/* Content - Collapsible */}

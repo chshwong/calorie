@@ -12,8 +12,6 @@ import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { PremiumCard } from '@/components/dashboard/premium-card';
 import { CalInVsOutChart } from '@/components/charts/cal-in-vs-out-chart';
 import { ExerciseActivitiesChart } from '@/components/dashboard/exercise-activities-chart';
-import { MacroGauge } from '@/components/MacroGauge';
-import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 import { BodyStatsRow } from '@/components/body/body-stats-row';
 import { WaterCard } from '@/components/dashboard/water-card';
 import { AvocadoGauge } from '@/components/gauges/AvocadoGauge';
@@ -31,9 +29,6 @@ import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useMedLogsForDate, useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
 import { useWaterDailyForDate } from '@/hooks/use-water-logs';
 import { useStreakState } from '@/hooks/use-streak-state';
-import { useDailyEntries } from '@/hooks/use-daily-entries';
-import { calculateDailyTotals } from '@/utils/dailyTotals';
-import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
 import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
@@ -63,52 +58,12 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
   const router = useRouter();
   const foodSummary = useDailyFoodSummary(dateString);
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
-  const { data: entries = [] } = useDailyEntries(dateString);
   const { data: userConfig } = useUserConfig();
-
-  // Calculate daily totals (same as home screen)
-  const dailyTotals = calculateDailyTotals(entries);
-
-  // Macro values (same as home screen)
-  const proteinConsumed = Number(dailyTotals?.protein ?? 0);
-  const proteinTarget = Number(userConfig?.protein_g_min ?? 0);
-  const fiberConsumed = Number(dailyTotals?.fiber ?? 0);
-  const fiberTarget = Number(userConfig?.fiber_g_min ?? 0);
-  const carbsConsumed = Number(dailyTotals?.carbs ?? 0);
-  const carbsMax = Number(userConfig?.carbs_g_max ?? 0);
-
-  // Mini gauge values (same as home screen)
-  const sodiumConsumedMg = Number(
-    (dailyTotals as unknown as { sodium_mg?: number | null })?.sodium_mg ?? dailyTotals?.sodium ?? 0
-  );
-  const sodiumMaxMg = Number((userConfig as unknown as { sodium_mg_max?: number | null })?.sodium_mg_max ?? 0);
-  const sugarConsumedG = Number(
-    (dailyTotals as unknown as { sugar_g?: number | null })?.sugar_g ?? dailyTotals?.sugar ?? 0
-  );
-  const sugarMaxG = Number((userConfig as unknown as { sugar_g_max?: number | null })?.sugar_g_max ?? 0);
-  const satFatConsumedG = Number(
-    (dailyTotals as unknown as { sat_fat_g?: number | null })?.sat_fat_g ??
-      (dailyTotals as unknown as { sat_fat?: number | null })?.sat_fat ??
-      (dailyTotals as unknown as { saturated_fat?: number | null })?.saturated_fat ??
-      dailyTotals?.saturatedFat ??
-      0
-  );
-  const satFatLimitG = NUTRIENT_LIMITS.satFatG;
-  // IMPORTANT: Trans Fat should not be integer-rounded (MiniRingGauge will ceil to nearest 0.1 for display).
-  // Prefer summing from raw entries (may include decimals), then fall back to totals if needed.
-  const transFatConsumedG = useMemo(() => {
-    const raw = entries.reduce((sum, entry) => sum + (entry.trans_fat_g ?? 0), 0);
-    if (Number.isFinite(raw)) return raw;
-
-    return Number(
-      (dailyTotals as unknown as { trans_fat_g?: number | null })?.trans_fat_g ??
-        (dailyTotals as unknown as { trans_fat?: number | null })?.trans_fat ??
-        (dailyTotals as unknown as { transfat?: number | null })?.transfat ??
-        dailyTotals?.transFat ??
-        0
-    );
-  }, [dailyTotals, entries]);
-  const transFatLimitG = NUTRIENT_LIMITS.transFatG;
+  
+  // Handle date selection from chart - navigate to Food Log page with selected date
+  const handleFoodChartDateSelect = useCallback((selectedDateString: string) => {
+    router.push(`/?date=${selectedDateString}`);
+  }, [router]);
 
   // Helper function to get goal label
   const getGoalLabel = () => {
@@ -200,7 +155,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               data={weeklyCalInVsOut.data}
               selectedDate={dateString}
               todayDateString={getTodayKey()}
-              onBarPress={onDateSelect}
+              onBarPress={handleFoodChartDateSelect}
               height={isSmallScreen ? 105 : isMobile ? 120 : 128}
             />
             {weeklyCalInVsOut.data.length > 0 && (
@@ -210,97 +165,6 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
             )}
           </View>
 
-          {/* Macro Gauges Row (same as home screen) */}
-          <View style={styles.macroGaugeRowWrap}>
-            <View style={styles.macroGaugeRow}>
-              <View style={styles.macroGaugeRowGauges}>
-                <View
-                  style={[
-                    { flexDirection: 'row' },
-                    Platform.OS === 'web' ? ({ columnGap: 4 } as any) : null,
-                  ]}
-                >
-                  {/* Protein */}
-                  <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                    <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
-                  </View>
-
-                  {/* Fiber */}
-                  <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                    <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
-                  </View>
-
-                  {/* Carbs */}
-                  <View style={{ flex: 1 }}>
-                    <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.macroTargetsGearButtonAbsolute,
-                getMinTouchTargetStyle(),
-                Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
-              ]}
-              onPress={() => router.push('/settings/my-goal/edit-targets?from=dashboard')}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              {...getButtonAccessibilityProps(
-                t('settings.my_goal.a11y.edit_targets'),
-                t('settings.my_goal.a11y.navigate_to_edit')
-              )}
-            >
-              <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Mini Gauges Section - Always Visible */}
-          <View style={styles.miniGaugeSection}>
-            <View style={styles.miniGaugeRow}>
-              <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                <MiniRingGauge
-                  label={t('home.summary.sugar')}
-                  value={sugarConsumedG}
-                  target={sugarMaxG}
-                  unit={t('units.g')}
-                  size="xs"
-                />
-              </View>
-
-              <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                <MiniRingGauge
-                  label={t('home.summary.sodium')}
-                  value={sodiumConsumedMg}
-                  target={sodiumMaxMg}
-                  unit={t('units.mg')}
-                  size="xs"
-                />
-              </View>
-
-              <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                <MiniRingGauge
-                  label={t('home.summary.saturated_fat')}
-                  value={satFatConsumedG}
-                  target={satFatLimitG}
-                  unit={t('units.g')}
-                  size="xs"
-                />
-              </View>
-
-              <View style={styles.miniGaugeItem}>
-                <MiniRingGauge
-                  label={t('home.summary.trans_fat')}
-                  value={transFatConsumedG}
-                  target={transFatLimitG}
-                  unit={t('units.g')}
-                  size="xs"
-                  valueFormat="ceilToTenth"
-                />
-              </View>
-            </View>
-          </View>
         </PremiumCard>
       </TouchableOpacity>
     </DashboardSectionContainer>
@@ -366,18 +230,6 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
   const day7Logs = useExerciseLogsForDate(recentDays[6] || dateString);
   
   const recentDaysLogs = [day1Logs, day2Logs, day3Logs, day4Logs, day5Logs, day6Logs, day7Logs];
-  // Calculate summary inline
-  const totalMinutes = logs.reduce((sum, log) => sum + (log.minutes || 0), 0);
-  const activityCount = logs.length;
-  const activityMap = new Map<string, number>();
-  logs.forEach(log => {
-    const count = activityMap.get(log.name) || 0;
-    activityMap.set(log.name, count + 1);
-  });
-  const mainLabels = Array.from(activityMap.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([name]) => name);
 
   if (isLoading) {
     return (
@@ -416,20 +268,6 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
             </View>
           </View>
 
-          <View style={styles.exerciseToday}>
-            <ThemedText style={[styles.exerciseValue, { color: colors.text }]}>
-              {totalMinutes} {t('dashboard.snapshot.min')}
-            </ThemedText>
-            <ThemedText style={[styles.exerciseSubtext, { color: colors.textMuted }]}>
-              {activityCount} {activityCount === 1 ? t('dashboard.exercise.activity_one') : t('dashboard.exercise.activity_other')}
-            </ThemedText>
-            {mainLabels.length > 0 && (
-              <ThemedText style={[styles.exerciseMain, { color: colors.textSubtle }]}>
-                {t('dashboard.exercise.main')}: {mainLabels.join(', ')}
-              </ThemedText>
-            )}
-          </View>
-
           {/* Cardio/Mind-body Activities Chart */}
           <ExerciseActivitiesChart
             dateString={dateString}
@@ -439,10 +277,11 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
             category="cardio_mind_body"
             titleIcons={[
               { name: 'figure.run', size: 16 },
-              { name: 'figure.yoga', size: 16 },
+              { name: 'figure.seated', size: 16 },
             ]}
             titleText="Cardio & Mind-Body"
             isWide={isWide}
+            showTopBorder={false}
           />
           
           {/* Strength Activities Chart */}
@@ -982,7 +821,7 @@ const styles = StyleSheet.create({
     marginBottom: Layout.chartGapCompact,
   },
   chartSection: {
-    marginTop: Spacing.sm, // Reduced spacing after avocado gauge
+    marginTop: Spacing.none, // Minimal spacing after avocado gauge
     marginBottom: Spacing.sm, // Reduced spacing before macro gauges
   },
   chartTitle: {
@@ -1013,7 +852,7 @@ const styles = StyleSheet.create({
     position: 'relative', // IMPORTANT: anchor for absolute overlay
     marginTop: 0 - Spacing.sm,
     marginBottom: 0,
-    minHeight: 240, // ensure overlay has room, but doesn't force layout shifts
+    minHeight: 220, // Reduced to minimize spacing after gauge
   },
   foodChipsOverlay: {
     position: 'absolute',
@@ -1034,58 +873,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
   },
-  // Macro gauges (same as home screen)
-  macroGaugeRowWrap: {
-    marginTop: Spacing.none, // Spacing handled by chartSection marginBottom
-    position: 'relative',
-  },
-  macroGaugeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  macroGaugeRowGauges: {
-    flex: 1,
-    minWidth: 0,
-    paddingLeft: 0,
-    paddingRight: 0,
-  },
-  macroTargetsGearButtonAbsolute: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    padding: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniGaugeSection: {
-    marginTop: Spacing.sm,
-  },
-  miniGaugeRow: {
-    flexDirection: 'row',
-  },
-  miniGaugeItem: {
-    flex: 1,
-  },
-  miniGaugeItemSpaced: {
-    marginRight: Spacing.sm,
-  },
   // Exercise styles
-  exerciseToday: {
-    alignItems: 'center',
-    marginBottom: Layout.chartGapCompact,
-  },
-  exerciseValue: {
-    fontSize: FontSize['2xl'],
-    fontWeight: FontWeight.bold,
-    marginBottom: 3,
-  },
-  exerciseSubtext: {
-    fontSize: FontSize.sm,
-    marginBottom: 3,
-  },
-  exerciseMain: {
-    fontSize: FontSize.xs,
-  },
   // Meds styles
   medsToday: {
     alignItems: 'center',

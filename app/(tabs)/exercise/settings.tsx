@@ -63,7 +63,7 @@ export default function ExerciseSettingsScreen() {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Distance Unit Setting */}
           <View style={styles.settingSection}>
-            <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
+            <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
               Distance Unit
             </ThemedText>
             <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
@@ -183,9 +183,8 @@ const styles = StyleSheet.create({
   settingSection: {
     marginBottom: Spacing.xl,
   },
-  settingLabel: {
+  sectionTitle: {
     fontSize: FontSize.lg,
-    fontWeight: '700',
     marginBottom: Spacing.xs,
   },
   settingDescription: {

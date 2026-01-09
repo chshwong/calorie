@@ -15,7 +15,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { BorderRadius, Colors, FontSize, Layout, Nudge, Spacing } from '@/constants/theme';
+import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Nudge, Spacing } from '@/constants/theme';
+import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -454,6 +458,7 @@ export default function FoodLogHomeScreen() {
   const tourCallItADayRef = useTourAnchor('home.callItADay');
 
   const [welcomeConfettiVisible, setWelcomeConfettiVisible] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const isCheckingTourRef = useRef(false);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -472,6 +477,9 @@ export default function FoodLogHomeScreen() {
   }>({ visible: false, mealType: null, mode: 'copy' });
 
   const [burnedModalVisible, setBurnedModalVisible] = useState(false);
+  
+  // Mini gauges section collapse state
+  const [isMiniGaugesCollapsed, setIsMiniGaugesCollapsed] = useState(false);
 
   // Password recovery UI is not supported (passwordless-only).
   // If Supabase ever enters PASSWORD_RECOVERY mode, we intentionally do nothing here.
@@ -800,6 +808,39 @@ export default function FoodLogHomeScreen() {
   const calorieTarget = Number(profileGoals?.daily_calorie_target ?? 0);
   const goalType = (profileGoals?.goal_type ?? 'maintain') as 'lose' | 'maintain' | 'recomp' | 'gain';
 
+  // Mini gauge values (Sugar, Sodium, Sat Fat, Trans Fat)
+  const sodiumConsumedMg = Number(
+    (dailyTotals as unknown as { sodium_mg?: number | null })?.sodium_mg ?? dailyTotals?.sodium ?? 0
+  );
+  const sodiumMaxMg = Number((effectiveProfile as unknown as { sodium_mg_max?: number | null })?.sodium_mg_max ?? 0);
+  const sugarConsumedG = Number(
+    (dailyTotals as unknown as { sugar_g?: number | null })?.sugar_g ?? dailyTotals?.sugar ?? 0
+  );
+  const sugarMaxG = Number((effectiveProfile as unknown as { sugar_g_max?: number | null })?.sugar_g_max ?? 0);
+  const satFatConsumedG = Number(
+    (dailyTotals as unknown as { sat_fat_g?: number | null })?.sat_fat_g ??
+      (dailyTotals as unknown as { sat_fat?: number | null })?.sat_fat ??
+      (dailyTotals as unknown as { saturated_fat?: number | null })?.saturated_fat ??
+      dailyTotals?.saturatedFat ??
+      0
+  );
+  const satFatLimitG = NUTRIENT_LIMITS.satFatG;
+  // IMPORTANT: Trans Fat should not be integer-rounded (MiniRingGauge will ceil to nearest 0.1 for display).
+  // Prefer summing from raw entries (may include decimals), then fall back to totals if needed.
+  const transFatConsumedG = useMemo(() => {
+    const raw = entries.reduce((sum, entry) => sum + (entry.trans_fat_g ?? 0), 0);
+    if (Number.isFinite(raw)) return raw;
+
+    return Number(
+      (dailyTotals as unknown as { trans_fat_g?: number | null })?.trans_fat_g ??
+        (dailyTotals as unknown as { trans_fat?: number | null })?.trans_fat ??
+        (dailyTotals as unknown as { transfat?: number | null })?.transfat ??
+        dailyTotals?.transFat ??
+        0
+    );
+  }, [dailyTotals, entries]);
+  const transFatLimitG = NUTRIENT_LIMITS.transFatG;
+
   // Net calories remain available for other modules (e.g. week overview); UI formatting lives in EnergyBalanceBlock.
   const netCalories = useMemo(() => {
     if (dailyBurned?.tdee_cal == null) return null;
@@ -990,13 +1031,8 @@ export default function FoodLogHomeScreen() {
       const welcomeShown = await isTourWelcomeShown('V1_HomePageTour', userId);
       if (!welcomeShown) {
         setWelcomeConfettiVisible(true);
-        showAppToast('Congratz on starting your fitness journey on AvoVibe!', { durationMs: 4000 });
+        setShowWelcomeModal(true);
         await setTourWelcomeShown('V1_HomePageTour', userId);
-
-        if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
-        startTimeoutRef.current = setTimeout(() => {
-          void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
-        }, 4100);
         return;
       }
 
@@ -1025,9 +1061,47 @@ export default function FoodLogHomeScreen() {
     }, [maybeStartHomeTour])
   );
 
+  // Handle welcome modal "Get started" button click
+  const handleWelcomeModalConfirm = useCallback(() => {
+    setShowWelcomeModal(false);
+    void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
+  }, [startTour]);
+
+  // Drive UI on step start: expand "Other limits" section on step 4/9 (home-macros)
+  useEffect(() => {
+    const unsubscribe = registerOnStepChange((tourId, step) => {
+      if (tourId !== 'V1_HomePageTour') return;
+      
+      if (step.id === 'home-macros') {
+        // Expand "Other limits" section if it's collapsed, then re-measure to include mini gauges
+        if (isMiniGaugesCollapsed) {
+          setIsMiniGaugesCollapsed(false);
+          // Wait for expansion animation to complete before re-measuring
+          setTimeout(() => {
+            requestRemeasure();
+          }, 250);
+        } else {
+          // Already expanded, just re-measure to ensure spotlight includes mini gauges
+          requestRemeasure();
+        }
+      }
+    });
+    return unsubscribe;
+  }, [isMiniGaugesCollapsed, registerOnStepChange, requestRemeasure]);
+
   return (
     <ThemedView style={styles.container}>
       <ConfettiBurst visible={welcomeConfettiVisible} onDone={() => setWelcomeConfettiVisible(false)} />
+      <ConfirmModal
+        visible={showWelcomeModal}
+        title={t('tour.home_welcome.title')}
+        message={t('tour.home_welcome.message') + ' Let\'s take a quick tour to get you started.'}
+        confirmText={t('tour.welcome.get_started')}
+        cancelText={null}
+        onConfirm={handleWelcomeModalConfirm}
+        onCancel={handleWelcomeModalConfirm}
+        animationType="fade"
+      />
       <OfflineBanner />
       <CollapsibleModuleHeader
         greetingText={greetingText}
@@ -1177,6 +1251,73 @@ export default function FoodLogHomeScreen() {
                       <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
                     </TouchableOpacity>
                   </View>
+
+                  {/* Mini Gauges Section - Collapsible */}
+                  <CollapsibleSection
+                  title={t('home.summary.other_limits')}
+                  isCollapsed={isMiniGaugesCollapsed}
+                  onToggle={() => setIsMiniGaugesCollapsed(!isMiniGaugesCollapsed)}
+                  accessibilityLabel={t('home.summary.toggle_other_limits')}
+                  titlePosition="right"
+                  headerStyle={{
+                    borderBottomWidth: 0,
+                    paddingVertical: Spacing.xxs,
+                    paddingTop: Spacing.xxs,
+                    paddingBottom: Spacing.xxs,
+                    minHeight: 32,
+                  }}
+                  titleStyle={{
+                    fontSize: FontSize.sm,
+                    fontWeight: FontWeight.regular,
+                  }}
+                  contentStyle={{
+                    paddingTop: Spacing.none,
+                    paddingBottom: Spacing.none,
+                  }}
+                >
+                  <View style={styles.miniGaugeRow}>
+                    <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                      <MiniRingGauge
+                        label={t('home.summary.sugar')}
+                        value={sugarConsumedG}
+                        target={sugarMaxG}
+                        unit={t('units.g')}
+                        size="xs"
+                      />
+                    </View>
+
+                    <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                      <MiniRingGauge
+                        label={t('home.summary.sodium')}
+                        value={sodiumConsumedMg}
+                        target={sodiumMaxMg}
+                        unit={t('units.mg')}
+                        size="xs"
+                      />
+                    </View>
+
+                    <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                      <MiniRingGauge
+                        label={t('home.summary.saturated_fat')}
+                        value={satFatConsumedG}
+                        target={satFatLimitG}
+                        unit={t('units.g')}
+                        size="xs"
+                      />
+                    </View>
+
+                    <View style={styles.miniGaugeItem}>
+                      <MiniRingGauge
+                        label={t('home.summary.trans_fat')}
+                        value={transFatConsumedG}
+                        target={transFatLimitG}
+                        unit={t('units.g')}
+                        size="xs"
+                        valueFormat="ceilToTenth"
+                      />
+                    </View>
+                  </View>
+                </CollapsibleSection>
                 </View>
               </View>
             )}
@@ -2028,6 +2169,8 @@ const styles = StyleSheet.create({
   },
   miniGaugeRow: {
     flexDirection: 'row',
+    paddingTop: Spacing.none,
+    paddingBottom: Spacing.none,
   },
   miniGaugeItem: {
     flex: 1,

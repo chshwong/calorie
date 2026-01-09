@@ -166,3 +166,4 @@ const intensityLabels: Record<'low' | 'medium' | 'high' | 'max', string> = {
 **Status:** Generally compliant with most guidelines, but needs cleanup of debug code and hardcoded strings.
 
 
+

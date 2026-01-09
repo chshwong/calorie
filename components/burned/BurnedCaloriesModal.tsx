@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -13,7 +13,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { getTodayKey, getYesterdayKey, toDateKey } from '@/utils/dateKey';
-import { validateBurnedTdeeKcal } from '@/utils/validation';
 
 type Props = {
   visible: boolean;
@@ -117,10 +116,15 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       return false;
     }
 
+    // Only validate against hard limit (>= 15000). Warning for 6000-14999 is non-blocking.
     if (candidateTdeeToSave !== null) {
-      const res = validateBurnedTdeeKcal(candidateTdeeToSave);
-      if (!res.valid) {
-        setValidationError(t(res.errorKey ?? 'burned.errors.save_failed'));
+      if (candidateTdeeToSave >= BURNED.TDEE_KCAL.MAX) {
+        setValidationError(t('burned.errors.max_kcal'));
+        return false;
+      }
+      // Check for invalid values (negative or non-finite)
+      if (!Number.isFinite(candidateTdeeToSave) || candidateTdeeToSave < BURNED.TDEE_KCAL.MIN) {
+        setValidationError(t('burned.errors.invalid_number'));
         return false;
       }
     }
@@ -211,18 +215,10 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const handleSave = async () => {
     if (!burnedRow) return;
 
-    // UI guard: do not allow saving at/above the hard threshold; user must correct first.
+    // UI guard: do not allow saving at/above the hard threshold (>= 15000); user must correct first.
     if (isTooHighBurn) return;
 
-    const isManualSaveAttempt = touched.bmr || touched.active || touched.tdee;
-    if (isManualSaveAttempt && shouldWarnHighBurn) {
-      Alert.alert(t('burned.warning.title'), t('burned.warning.body'), [
-        { text: t('burned.warning.cancel'), style: 'cancel' },
-        { text: t('burned.warning.save_anyway'), style: 'destructive', onPress: () => void persistSave() },
-      ]);
-      return;
-    }
-
+    // Save immediately for any TDEE < 15000 (warning banner for 6000-14999 is informational only)
     await persistSave();
   };
 
@@ -233,7 +229,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.header, { borderBottomColor: colors.separator }]}>
             <ThemedText style={[styles.title, { color: colors.text }]}>{titleText}</ThemedText>

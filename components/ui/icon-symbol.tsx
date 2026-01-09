@@ -60,6 +60,8 @@ const MAPPING = {
   'figure.pool.swim': { type: 'community', name: 'swim' },
   'figure.yoga': { type: 'community', name: 'yoga' },
   'figure.flexibility': { type: 'community', name: 'yoga' },
+  'figure.meditation': { type: 'community', name: 'yoga' },
+  'figure.seated': { type: 'community', name: 'yoga' },
   'bolt.fill': 'flash-on',
   'figure.arms.open': { type: 'community', name: 'arm-flex' },
   'figure.chest': { type: 'community', name: 'weight-lifter' },
