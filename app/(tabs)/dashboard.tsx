@@ -558,13 +558,86 @@ type DashboardStreaksSectionProps = {
 
 function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStreaksSectionProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { loginStreak, foodStreak, isLoading: isLoadingStreaks } = useStreakState();
+  const todayKey = getTodayKey();
 
-  // Define streak types with labels and icons (only Login and Food)
+  // Define streak types with labels, icons, and category colors
   const streakTypes = [
-    { type: 'login' as const, label: t('dashboard.streaks.login'), icon: 'person.fill', streak: loginStreak },
-    { type: 'food' as const, label: t('dashboard.streaks.food'), icon: 'fork.knife', streak: foodStreak },
+    { 
+      type: 'login' as const, 
+      label: t('dashboard.streaks.login'), 
+      icon: 'person.fill', 
+      streak: loginStreak,
+      accentColor: colors.accentStreak, // Purple for login streak
+    },
+    { 
+      type: 'food' as const, 
+      label: t('dashboard.streaks.food'), 
+      icon: 'fork.knife', 
+      streak: foodStreak,
+      accentColor: colors.accentFood, // Salmon for food streak
+    },
   ];
+
+  // Helper to generate 7-day indicator for last 7 calendar days
+  const getWeekIndicator = (lastDayKey: string | null, currentDays: number, status: 'active' | 'broken') => {
+    if (!lastDayKey || status === 'broken' || currentDays === 0) {
+      // If broken or no streak, all empty
+      return Array(7).fill(false);
+    }
+
+    // Generate last 7 calendar days (today-6, today-5, ..., today)
+    // Ordered oldest to newest (left to right)
+    const last7Days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      last7Days.push(addDays(todayKey, -i));
+    }
+
+    // Determine which days are part of the streak
+    // lastDayKey is the last day that was part of the streak
+    // The streak spans from (lastDayKey - currentDays + 1) to lastDayKey
+    const lastDayDate = new Date(lastDayKey + 'T00:00:00');
+    const streakStartDate = new Date(lastDayDate);
+    streakStartDate.setDate(streakStartDate.getDate() - (currentDays - 1));
+
+    // For each of the last 7 days, check if it's within the streak range
+    const dots: boolean[] = [];
+    for (const dayKey of last7Days) {
+      const dayDate = new Date(dayKey + 'T00:00:00');
+      const isInStreak = dayDate >= streakStartDate && dayDate <= lastDayDate;
+      dots.push(isInStreak);
+    }
+
+    return dots;
+  };
+
+  // Helper to check if today is logged
+  const isTodayLogged = (lastDayKey: string | null) => {
+    return lastDayKey === todayKey;
+  };
+
+  // Helper to get PR (personal best) text
+  const getPRText = (currentDays: number, bestDays: number) => {
+    if (currentDays === bestDays && currentDays > 0) {
+      return `Best: ${bestDays} days · tied`;
+    }
+    if (currentDays > bestDays) {
+      return `Best: ${currentDays} days · new PR 🎉`;
+    }
+    return `Best: ${bestDays} days`;
+  };
+
+  // Helper to get motivation message
+  const getMotivationText = (currentDays: number, bestDays: number) => {
+    if (bestDays > 0 && currentDays < bestDays) {
+      const daysToBeat = bestDays - currentDays;
+      if (daysToBeat <= 2) {
+        return daysToBeat === 1 ? '1 day to beat your best' : `${daysToBeat} days to beat your best`;
+      }
+    }
+    return null;
+  };
 
   if (isLoading || isLoadingStreaks) {
     return (
@@ -596,49 +669,122 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
           </ThemedText>
         </View>
         <View style={styles.streaksList}>
-          {streakTypes.map(({ type, label, icon, streak }) => {
+          {streakTypes.map(({ type, label, icon, streak, accentColor }, index) => {
             if (!streak) {
               return null; // Don't render if streak data not available
             }
 
-            const { currentDays, bestDays, status } = streak;
+            const { currentDays, bestDays, status, lastDayKey } = streak;
+            const weekDots = getWeekIndicator(lastDayKey, currentDays, status);
+            const prText = getPRText(currentDays, bestDays);
+            const motivationText = getMotivationText(currentDays, bestDays);
+            const todayLogged = isTodayLogged(lastDayKey);
+            const isAtRisk = status === 'active' && !todayLogged;
 
             return (
-              <View key={type} style={[styles.streakRow, { backgroundColor: colors.backgroundSecondary }]}>
+              <TouchableOpacity
+                key={type}
+                style={[styles.streakRow, { backgroundColor: colors.backgroundSecondary }]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Navigate to streaks detail if route exists
+                  // For now, just a placeholder - can be implemented later
+                }}
+                {...getButtonAccessibilityProps(label, t('dashboard.streaks.accessibility_hint', { defaultValue: 'View streak details' }))}
+                {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
+              >
                 <View style={styles.streakLeft}>
-                  <IconSymbol name={icon as any} size={20} color={colors.text} decorative />
-                  <ThemedText style={[styles.streakLabel, { color: colors.text }]}>
-                    {label}
-                  </ThemedText>
+                  <View style={[styles.streakIconContainer, { backgroundColor: accentColor + '20' }]}>
+                    <IconSymbol name={icon as any} size={18} color={accentColor} decorative />
+                  </View>
+                  <View style={styles.streakLabelContainer}>
+                    <ThemedText style={[styles.streakLabel, { color: colors.text }]}>
+                      {label}
+                    </ThemedText>
+                  </View>
                 </View>
                 <View style={styles.streakRight}>
-                  <View style={styles.streakStats}>
-                    <ThemedText style={[styles.streakValue, { color: colors.text }]}>
-                      {currentDays} {t('dashboard.streaks.days')}
+                  <View style={styles.streakHeroContainer}>
+                    <View style={styles.streakHeroRow}>
+                      <ThemedText style={[styles.streakHeroValue, { color: colors.text }]}>
+                        {currentDays}
+                      </ThemedText>
+                      {status === 'active' && (
+                        <ThemedText 
+                          style={[
+                            styles.streakFireEmoji,
+                            isAtRisk && { opacity: 0.5 }
+                          ]}
+                        >
+                          🔥
+                        </ThemedText>
+                      )}
+                    </View>
+                    <ThemedText style={[styles.streakHeroLabel, { color: colors.textMuted }]}>
+                      {currentDays === 1 ? 'day' : 'days'} streak
                     </ThemedText>
-                    <ThemedText style={[styles.streakBest, { color: colors.textMuted }]}>
-                      {t('dashboard.streaks.best')} {bestDays}
-                    </ThemedText>
+                    {motivationText ? (
+                      <ThemedText style={[styles.streakMotivationText, { color: accentColor }]}>
+                        {motivationText}
+                      </ThemedText>
+                    ) : (
+                      <ThemedText style={[styles.streakPRText, { color: colors.textMuted }]}>
+                        {prText}
+                      </ThemedText>
+                    )}
+                    {isAtRisk && (
+                      <ThemedText style={[styles.streakAtRiskText, { color: colors.textMuted }]}>
+                        Log today to keep streak
+                      </ThemedText>
+                    )}
                   </View>
-                  <View
-                    style={[
-                      styles.streakStatus,
-                      {
-                        backgroundColor: status === 'active' ? colors.accentFood : colors.backgroundTertiary,
-                      },
-                    ]}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.streakStatusText,
-                        { color: status === 'active' ? colors.textInverse : colors.textSecondary },
-                      ]}
-                    >
-                      {status === 'active' ? t('dashboard.streaks.active') : t('dashboard.streaks.broken')}
-                    </ThemedText>
+                  <View style={styles.streakRightActions}>
+                    {status === 'active' && (
+                      <View 
+                        style={[
+                          styles.streakActiveIndicator, 
+                          { 
+                            backgroundColor: isAtRisk ? accentColor + '60' : accentColor 
+                          }
+                        ]}
+                      >
+                        <IconSymbol name="flame.fill" size={12} color={colors.textInverse} decorative />
+                      </View>
+                    )}
+                    <IconSymbol 
+                      name="chevron.right" 
+                      size={16} 
+                      color={colors.textMuted} 
+                      style={styles.streakChevron}
+                      decorative 
+                    />
                   </View>
                 </View>
-              </View>
+                <View style={[styles.streakWeekIndicator, { borderTopColor: colors.backgroundTertiary }]}>
+                  {index === 0 && (
+                    <View style={styles.streakWeekIndicatorHeader}>
+                      <ThemedText style={[styles.streakWeekLabel, { color: colors.textMuted }]}>
+                        Last 7 days
+                      </ThemedText>
+                    </View>
+                  )}
+                  <View style={styles.streakWeekDotsContainer}>
+                    {weekDots.map((filled, dotIndex) => (
+                      <View
+                        key={dotIndex}
+                        style={[
+                          styles.streakWeekDot,
+                          {
+                            backgroundColor: filled
+                              ? accentColor
+                              : colors.backgroundTertiary,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -1036,9 +1182,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   streakRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: Spacing.md,
     borderRadius: BorderRadius.card,
     marginBottom: Spacing.xs,
@@ -1047,36 +1190,107 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  streakIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakLabelContainer: {
     flex: 1,
   },
   streakLabel: {
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
   },
   streakRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xs,
   },
-  streakStats: {
-    alignItems: 'flex-end',
+  streakHeroContainer: {
+    flex: 1,
   },
-  streakValue: {
-    fontSize: FontSize.base,
+  streakHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.xs,
+  },
+  streakHeroValue: {
+    fontSize: FontSize['3xl'] * 1.1,
     fontWeight: FontWeight.bold,
+    lineHeight: FontSize['3xl'] * 1.2,
   },
-  streakBest: {
-    fontSize: FontSize.xs,
-    marginTop: Spacing.xxs,
+  streakFireEmoji: {
+    fontSize: FontSize.xl * 1.15,
+    lineHeight: FontSize.xl * 1.3,
   },
-  streakStatus: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.chip,
+  streakHeroLabel: {
+    fontSize: FontSize.xs * 0.9,
+    fontWeight: FontWeight.medium,
+    marginTop: 2,
+    opacity: 0.7,
   },
-  streakStatusText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
+  streakPRText: {
+    fontSize: FontSize.xs * 0.85,
+    fontWeight: FontWeight.regular,
+    marginTop: 2,
+    opacity: 0.65,
+  },
+  streakMotivationText: {
+    fontSize: FontSize.xs * 0.9,
+    fontWeight: FontWeight.medium,
+    marginTop: 2,
+  },
+  streakAtRiskText: {
+    fontSize: FontSize.xs * 0.85,
+    fontWeight: FontWeight.regular,
+    marginTop: 4,
+    opacity: 0.7,
+    fontStyle: 'italic',
+  },
+  streakRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  streakActiveIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakChevron: {
+    marginLeft: Spacing.xs,
+  },
+  streakWeekIndicator: {
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: 'transparent', // Will be set dynamically
+  },
+  streakWeekIndicatorHeader: {
+    marginBottom: Spacing.xs / 2,
+  },
+  streakWeekLabel: {
+    fontSize: FontSize.xs * 0.85,
+    fontWeight: FontWeight.regular,
+    opacity: 0.6,
+  },
+  streakWeekDotsContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  streakWeekDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flex: 1,
   },
   // Exercise chips section (Last N days)
   exerciseChipsSection: {

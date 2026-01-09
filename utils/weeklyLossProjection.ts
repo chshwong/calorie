@@ -18,10 +18,11 @@ export function formatWeeklyLossProjection(
   const perWeek = unit === 'kg' ? lbToKg(lbPerWeek) : lbPerWeek;
   // round to 1 decimal, minimum 0.1
   const rounded = Math.max(0.1, Math.round(perWeek * 10) / 10);
+  const unitStr = unit === 'kg' ? 'kg' : 'lb';
+  const projection = `${rounded.toFixed(1)} ${unitStr} per week`;
   return t('home.done_for_today.weekly_loss_projection', {
-    amount: rounded.toFixed(1),
-    unit: unit === 'kg' ? 'kg' : 'lb',
-    defaultValue: `Days like today ≈ ${rounded.toFixed(1)} ${unit === 'kg' ? 'kg' : 'lb'} per week.`,
+    projection,
+    defaultValue: `Days like today ≈ ${projection}.`,
   });
 }
 
