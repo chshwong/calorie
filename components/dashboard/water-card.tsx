@@ -220,6 +220,7 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
                   goalMl={goalMl}
                   unitPreference={unitPreference}
                   size="medium"
+                  variant="dashboard"
                 />
               </Pressable>
               <View style={styles.chartContainer}>

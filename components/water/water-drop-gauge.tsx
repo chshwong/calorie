@@ -90,6 +90,7 @@ type WaterDropGaugeProps = {
   goalMl: number | null;
   unitPreference: WaterUnit; // Now accepts WaterUnit instead of 'metric' | 'imperial'
   size?: 'small' | 'medium' | 'large';
+  variant?: 'default' | 'dashboard';
 };
 
 // Size configurations - increased sizes to prevent clipping
@@ -125,6 +126,7 @@ function WaterDropGaugeComponent({
   goalMl,
   unitPreference,
   size = 'large',
+  variant = 'default',
 }: WaterDropGaugeProps) {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
@@ -132,6 +134,11 @@ function WaterDropGaugeComponent({
   const waterTheme = ModuleThemes.water;
   
   const config = SIZE_CONFIG[size];
+  
+  // Scale factor for dashboard variant (0.7 = 30% smaller)
+  const scale = variant === 'dashboard' ? 0.7 : 1;
+  const layoutWidth = config.width * scale;
+  const layoutHeight = config.height * scale;
   
   // Get effective goal (with fallback to defaults if goalMl is null/undefined)
   const effectiveGoalMl = useMemo(
@@ -192,16 +199,39 @@ function WaterDropGaugeComponent({
   
   return (
     <View style={styles.container}>
-      <View style={[styles.gaugeContainer, { width: config.width, height: config.height }]}>
-        <Svg
-          width={config.width}
-          height={config.height}
-          viewBox={DROPLET_VIEWBOX}
+      <View 
+        style={[
+          styles.gaugeWrapper,
+          { 
+            width: layoutWidth, 
+            height: layoutHeight,
+          }
+        ]}
+      >
+        <View 
           style={[
-            styles.svg,
-            Platform.OS === 'web' && { pointerEvents: 'none' },
+            styles.gaugeContainer, 
+            { 
+              width: config.width, 
+              height: config.height,
+              transform: [{ scale }],
+              position: scale !== 1 ? 'absolute' : 'relative',
+              // Center the scaled content: transform scales from center, so we need to offset
+              // by half the difference between original and scaled size
+              top: scale !== 1 ? (layoutHeight - config.height) / 2 : undefined,
+              left: scale !== 1 ? (layoutWidth - config.width) / 2 : undefined,
+            }
           ]}
         >
+          <Svg
+            width={config.width}
+            height={config.height}
+            viewBox={DROPLET_VIEWBOX}
+            style={[
+              styles.svg,
+              Platform.OS === 'web' && { pointerEvents: 'none' },
+            ]}
+          >
           <Defs>
             {/* ClipPath for droplet shape - uses exact same DROPLET_PATH as outline */}
             {/* No transform applied here - transform is applied to the group that uses it */}
@@ -349,6 +379,7 @@ function WaterDropGaugeComponent({
             </ThemedText>
           )}
         </View>
+        </View>
       </View>
     </View>
   );
@@ -360,6 +391,12 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  gaugeWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
   },
   gaugeContainer: {
     position: 'relative',
