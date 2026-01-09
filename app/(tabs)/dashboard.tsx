@@ -29,6 +29,7 @@ import {
   getFocusStyle,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { getLocalDateString, getMealTypeFromCurrentTime } from '@/utils/calculations';
 import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
@@ -581,18 +582,22 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
   ];
 
   // Helper to generate 7-day indicator for last 7 calendar days
+  // Returns array where dots[0] = oldest (today-6), dots[6] = today (newest)
   const getWeekIndicator = (lastDayKey: string | null, currentDays: number, status: 'active' | 'broken') => {
     if (!lastDayKey || status === 'broken' || currentDays === 0) {
       // If broken or no streak, all empty
       return Array(7).fill(false);
     }
 
-    // Generate last 7 calendar days (today-6, today-5, ..., today)
-    // Ordered oldest to newest (left to right)
-    const last7Days: string[] = [];
+    // Generate last 7 calendar days in chronological order (oldest to newest)
+    // days[0] = today-6 (oldest), days[6] = today (newest)
+    const days: string[] = [];
     for (let i = 6; i >= 0; i--) {
-      last7Days.push(addDays(todayKey, -i));
+      days.push(addDays(todayKey, -i));
     }
+    // Verify: days[0] should be oldest, days[6] should be today
+    // days[0] = addDays(todayKey, -6) = today-6 ✓
+    // days[6] = addDays(todayKey, -0) = today ✓
 
     // Determine which days are part of the streak
     // lastDayKey is the last day that was part of the streak
@@ -601,14 +606,17 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
     const streakStartDate = new Date(lastDayDate);
     streakStartDate.setDate(streakStartDate.getDate() - (currentDays - 1));
 
-    // For each of the last 7 days, check if it's within the streak range
+    // Build dots array in chronological order (oldest to newest)
+    // dots[0] = status for days[0] (today-6), dots[6] = status for days[6] (today)
     const dots: boolean[] = [];
-    for (const dayKey of last7Days) {
+    for (const dayKey of days) {
       const dayDate = new Date(dayKey + 'T00:00:00');
       const isInStreak = dayDate >= streakStartDate && dayDate <= lastDayDate;
       dots.push(isInStreak);
     }
 
+    // Ensure correct order: dots[0] = oldest, dots[6] = today
+    // If somehow reversed, reverse only at this point (but should already be correct)
     return dots;
   };
 
@@ -681,15 +689,32 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
             const todayLogged = isTodayLogged(lastDayKey);
             const isAtRisk = status === 'active' && !todayLogged;
 
+            const handlePress = () => {
+              if (type === 'login') {
+                // Navigate to home/index page (main calorie tracking page)
+                // Using /(tabs) which defaults to the index tab
+                router.push('/(tabs)' as any);
+              } else if (type === 'food') {
+                // Navigate to Food Diary (Today) with appropriate meal type
+                const todayString = getLocalDateString();
+                const mealType = getMealTypeFromCurrentTime();
+                router.push({
+                  pathname: '/(tabs)/mealtype-log',
+                  params: {
+                    entryDate: todayString,
+                    mealType: mealType,
+                    preloadedEntries: JSON.stringify([]),
+                  },
+                });
+              }
+            };
+
             return (
               <TouchableOpacity
                 key={type}
                 style={[styles.streakRow, { backgroundColor: colors.backgroundSecondary }]}
                 activeOpacity={0.7}
-                onPress={() => {
-                  // Navigate to streaks detail if route exists
-                  // For now, just a placeholder - can be implemented later
-                }}
+                onPress={handlePress}
                 {...getButtonAccessibilityProps(label, t('dashboard.streaks.accessibility_hint', { defaultValue: 'View streak details' }))}
                 {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
               >
@@ -738,27 +763,18 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
                       </ThemedText>
                     )}
                   </View>
-                  <View style={styles.streakRightActions}>
-                    {status === 'active' && (
-                      <View 
-                        style={[
-                          styles.streakActiveIndicator, 
-                          { 
-                            backgroundColor: isAtRisk ? accentColor + '60' : accentColor 
-                          }
-                        ]}
-                      >
-                        <IconSymbol name="flame.fill" size={12} color={colors.textInverse} decorative />
-                      </View>
-                    )}
-                    <IconSymbol 
-                      name="chevron.right" 
-                      size={16} 
-                      color={colors.textMuted} 
-                      style={styles.streakChevron}
-                      decorative 
-                    />
-                  </View>
+                  {status === 'active' && (
+                    <View 
+                      style={[
+                        styles.streakActiveIndicator, 
+                        { 
+                          backgroundColor: isAtRisk ? accentColor + '60' : accentColor 
+                        }
+                      ]}
+                    >
+                      <IconSymbol name="flame.fill" size={12} color={colors.textInverse} decorative />
+                    </View>
+                  )}
                 </View>
                 <View style={[styles.streakWeekIndicator, { borderTopColor: colors.backgroundTertiary }]}>
                   {index === 0 && (
@@ -769,19 +785,28 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
                     </View>
                   )}
                   <View style={styles.streakWeekDotsContainer}>
-                    {weekDots.map((filled, dotIndex) => (
-                      <View
-                        key={dotIndex}
-                        style={[
-                          styles.streakWeekDot,
-                          {
-                            backgroundColor: filled
-                              ? accentColor
-                              : colors.backgroundTertiary,
-                          },
-                        ]}
-                      />
-                    ))}
+                    {/* Render in chronological order: left = oldest, right = today */}
+                    {/* Per user instruction: if array is built newest-first, reverse it at render time */}
+                    {(() => {
+                      // Create copy to avoid mutating source data
+                      const renderDots = [...weekDots];
+                      // Reverse at render time to ensure: left = oldest, right = today
+                      // This fixes the reversed order issue
+                      const reversedDots = renderDots.reverse();
+                      return reversedDots.map((filled, dotIndex) => (
+                        <View
+                          key={dotIndex}
+                          style={[
+                            styles.streakWeekDot,
+                            {
+                              backgroundColor: filled
+                                ? accentColor
+                                : colors.backgroundTertiary,
+                            },
+                          ]}
+                        />
+                      ));
+                    })()}
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1253,20 +1278,12 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     fontStyle: 'italic',
   },
-  streakRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
   streakActiveIndicator: {
     width: 24,
     height: 24,
     borderRadius: BorderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  streakChevron: {
-    marginLeft: Spacing.xs,
   },
   streakWeekIndicator: {
     marginTop: Spacing.xs,
