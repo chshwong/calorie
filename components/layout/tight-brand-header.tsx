@@ -81,7 +81,7 @@ export function TightBrandHeader({
               source={{ uri: avatarUrl }}
               style={[
                 styles.avatarImage,
-                { width: avatarSize, height: avatarSize, borderColor: colors.separator },
+                { width: avatarSize, height: avatarSize, borderColor: colors.separator, marginTop: 5 },
               ]}
               resizeMode="cover"
             />
@@ -94,6 +94,7 @@ export function TightBrandHeader({
                   height: avatarSize,
                   backgroundColor: colors.backgroundSecondary,
                   borderColor: colors.separator,
+                  marginTop: 5,
                 },
               ]}
             >

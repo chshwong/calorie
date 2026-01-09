@@ -276,11 +276,13 @@ const styles = StyleSheet.create({
     width: 34, // Standard header avatar size (larger than TightBrandHeader's 32px for better visibility)
     height: 34,
     borderRadius: 17, // Half of width/height for perfect circle (34/2 = 17)
+    marginTop: 5, // Lower avatar slightly to avoid touching top edge
   },
   avatarPlaceholder: {
     width: 34, // Standard header avatar size (larger than TightBrandHeader's 32px for better visibility)
     height: 34,
     borderRadius: 17, // Half of width/height for perfect circle (34/2 = 17)
+    marginTop: 5, // Lower avatar slightly to avoid touching top edge
   },
 
   dateBar: {
