@@ -122,34 +122,6 @@ export function ExerciseActivitiesChart({
             
             const chipsToShow = dayData.exercises;
             const remaining = dayData.totalCount - chipsToShow.length;
-            const hasExercises = chipsToShow.length > 0;
-            
-            // Calculate dynamic height based on content
-            // Each chip: paddingVertical (2*Spacing.xxs=4px) + text (~12px) + marginBottom (6px) = ~22px
-            // Using 24px per chip for better visual spacing
-            const CHIP_HEIGHT_PX = 24;
-            const PLACEHOLDER_HEIGHT_PX = 18; // Just enough for dash text
-            // Metrics height: calculate based on how many metrics are actually shown
-            let metricsLineCount = 0;
-            if (category === 'cardio_mind_body') {
-              if (showDuration) metricsLineCount++;
-              if (showDistance) metricsLineCount++;
-            }
-            const METRIC_LINE_HEIGHT_PX = 12;
-            const METRIC_GAP_PX = 2;
-            const METRIC_MARGIN_BOTTOM_PX = 4;
-            const metricsHeight = metricsLineCount > 0 
-              ? (metricsLineCount * METRIC_LINE_HEIGHT_PX) + ((metricsLineCount - 1) * METRIC_GAP_PX) + METRIC_MARGIN_BOTTOM_PX
-              : 0;
-            const DAY_LABEL_HEIGHT_PX = 14; // FontSize.xs (10px) + marginTop (Spacing.xxs=4px)
-            const columnPadding = Spacing.xs * 2; // top and bottom padding (8px total)
-            
-            const chipsHeight = hasExercises 
-              ? (chipsToShow.length * CHIP_HEIGHT_PX) + (remaining > 0 ? CHIP_HEIGHT_PX : 0)
-              : PLACEHOLDER_HEIGHT_PX;
-            
-            const dynamicColumnHeight = metricsHeight + chipsHeight + columnPadding;
-            const dynamicDayColumnHeight = dynamicColumnHeight + DAY_LABEL_HEIGHT_PX + Spacing.xxs;
             
             // Create accessibility label for the day column
             const exerciseCount = dayData.totalCount;
@@ -166,7 +138,6 @@ export function ExerciseActivitiesChart({
                 key={dayData.dayKey}
                 style={[
                   styles.exerciseDayColumn,
-                  { minHeight: dynamicDayColumnHeight },
                   showSelectedOutline && isSelected && { borderColor: colors.accentExercise, borderWidth: 2 },
                   getMinTouchTargetStyle(),
                 ]}
@@ -179,7 +150,7 @@ export function ExerciseActivitiesChart({
                 {...(showFocusOutline && Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
               >
                 <View style={[styles.columnContent, { flex: 1, justifyContent: 'flex-end' }]}>
-                  <View style={[styles.exerciseChipsColumn, { minHeight: chipsHeight, maxHeight: chipsHeight }]}>
+                  <View style={styles.exerciseChipsColumn}>
                     {chipsToShow.length === 0 ? (
                       <View style={styles.exerciseChipPlaceholder}>
                         <ThemedText style={[styles.exerciseChipPlaceholderText, { color: colors.textTertiary }]}>
@@ -215,35 +186,36 @@ export function ExerciseActivitiesChart({
                       </>
                     )}
                   </View>
-                  {/* Duration and Distance display right above the date (only for cardio_mind_body) */}
-                  {category === 'cardio_mind_body' && (showDuration || showDistance) && (
-                    <View style={styles.metricsContainer}>
-                      {showDuration && (
-                        <ThemedText style={[styles.metricText, { color: colors.textSecondary }]}>
-                          🕐 {dayData.totalMinutes} {t('units.min')}
-                        </ThemedText>
-                      )}
-                      {showDistance && (
-                        <ThemedText style={[styles.metricText, { color: colors.textSecondary }]}>
-                          {(() => {
-                            // Convert distance based on user preference
-                            let distanceValue = dayData.totalDistanceKm;
-                            if (distanceUnit === 'mi') {
-                              distanceValue = dayData.totalDistanceKm / KM_TO_MILES_CONVERSION;
-                            }
-                            // Round to integer
-                            const roundedDistance = Math.round(distanceValue);
-                            const unitLabel = distanceUnit === 'mi' ? t('units.mi') : t('units.km');
-                            return `📏${roundedDistance} ${unitLabel}`;
-                          })()}
-                        </ThemedText>
-                      )}
-                    </View>
-                  )}
                 </View>
+                {/* Date label as X-axis baseline */}
                 <ThemedText style={[styles.exerciseDayLabel, { color: colors.textSecondary }]}>
                   {weekdayLabel}
                 </ThemedText>
+                {/* Duration and Distance display below the date axis (only for cardio_mind_body) */}
+                {category === 'cardio_mind_body' && (showDuration || showDistance) && (
+                  <View style={styles.belowAxisContainer}>
+                    {showDuration && (
+                      <ThemedText style={[styles.metricText, { color: colors.textSecondary }]}>
+                        🕐{dayData.totalMinutes}m
+                      </ThemedText>
+                    )}
+                    {showDistance && (
+                      <ThemedText style={[styles.metricText, { color: colors.textSecondary }]}>
+                        {(() => {
+                          // Convert distance based on user preference
+                          let distanceValue = dayData.totalDistanceKm;
+                          if (distanceUnit === 'mi') {
+                            distanceValue = dayData.totalDistanceKm / KM_TO_MILES_CONVERSION;
+                          }
+                          // Round to integer
+                          const roundedDistance = Math.round(distanceValue);
+                          const unitLabel = distanceUnit === 'mi' ? t('units.mi') : t('units.km');
+                          return `📏${roundedDistance}${unitLabel}`;
+                        })()}
+                      </ThemedText>
+                    )}
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -268,7 +240,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   exerciseChipsTitle: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
   },
   exerciseChipsGrid: {
@@ -290,26 +262,27 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
   },
-  metricsContainer: {
+  belowAxisContainer: {
     alignItems: 'center',
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.xxs,
+    marginTop: 6, // Small vertical gap below the date axis
     gap: Spacing.xxs, // 2px gap between metric lines
+    width: '100%',
   },
   metricText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    lineHeight: FontSize.sm + 2,
+    fontWeight: FontWeight.regular, // Reduced from medium (500) by 20% to regular (400)
   },
   exerciseChipsColumn: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'flex-end',
     width: '100%',
-    overflow: 'hidden',
   },
   exerciseChip: {
     paddingHorizontal: Spacing.xs,
-    paddingVertical: Spacing.xxs,
+    // Increased to support larger chip text without clipping.
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.chip,
     marginBottom: Spacing.xs + Spacing.xxs, // 6px spacing between chips (4px + 2px)
     alignSelf: 'center',
@@ -318,8 +291,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exerciseChipText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.sm,
+    lineHeight: FontSize.sm + 2,
+    fontWeight: FontWeight.medium, // Reduced from semibold (600) to medium (500) - closest to 20% reduction (480)
     textAlign: 'center',
     includeFontPadding: false,
   },
@@ -332,15 +306,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exerciseChipPlaceholderText: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.base,
+    lineHeight: FontSize.base + 2,
   },
   exerciseDayLabel: {
-    fontSize: FontSize.xs,
-    marginTop: Spacing.xxs,
+    fontSize: FontSize.sm,
+    lineHeight: FontSize.sm + 2,
+    marginTop: Spacing.xs,
     textAlign: 'center',
+    width: '100%',
   },
   exerciseChipsNone: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.base,
+    lineHeight: FontSize.base + 2,
     textAlign: 'center',
     paddingVertical: Spacing.md,
   },

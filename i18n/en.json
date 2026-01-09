@@ -12,14 +12,8 @@
     "error": "Error",
     "success": "Success",
     "ok": "OK",
-    "yes": "Yes",
-    "no": "No",
     "or": "or",
     "email": "Email",
-    "password": "Password",
-    "year": "Year",
-    "month": "Month",
-    "day": "Day",
     "unexpected_error": "An unexpected error occurred. Please try again.",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -28,13 +22,13 @@
     "go_back": "Go Back",
     "not_set": "Not set",
     "no_target": "No target",
-    "less_than_one_percent": "<1%"
+    "less_than_one_percent": "<1%",
+    "search": "Search",
+    "settings": "Settings"
   },
-
   "date": {
     "yday": "Yday"
   },
-
   "nutrition": {
     "calories": "Calories",
     "protein": "Protein",
@@ -58,7 +52,6 @@
     "protein": "Protein",
     "sodium": "Sodium"
   },
-
   "avo_score": {
     "label": "AvoScore",
     "label_per_100g": "AvoScore (per 100g)",
@@ -76,21 +69,17 @@
       "no_macro_data": "No macro data"
     }
   },
-
   "date_guard": {
     "tracking_starts_on": "Tracking starts on {{date}}."
   },
-
   "tour": {
     "overlay": {
       "title": "Quick Tour",
       "skip": "Skip tour"
     },
-    "reset_toast": "Tour guide reset. Go to Food Diary or Meal Log to start again.",
     "home_welcome": {
       "title": "Welcome",
-      "message": "Congratz on starting your fitness journey on AvoVibe!",
-      "cta": "Let's do it!"
+      "message": "Congratz on starting your fitness journey on AvoVibe!"
     },
     "welcome": {
       "get_started": "Get started"
@@ -124,48 +113,30 @@
       "logExerciseBtn": "Can’t find your activity? Tap Log Exercise.\n\nHappy logging!"
     }
   },
-
   "home": {
     "greeting": {
       "morning": "Good Morning",
       "afternoon": "Good Afternoon",
       "evening": "Good Evening"
     },
-    "profile_not_found": {
-      "title": "Profile Not Found",
-      "message": "Your account exists but we couldn't find your profile. This might happen if registration didn't complete properly.",
-      "logout_button": "Logout & Register Again"
-    },
     "stats": {
-      "age": "Age",
-      "years": "years",
-      "height": "Height",
-      "weight": "Weight",
-      "bmi": "BMI",
       "bmi_underweight": "Underweight",
       "bmi_normal": "Normal Weight",
       "bmi_overweight": "Overweight",
       "bmi_obese": "Obese"
     },
     "summary": {
-      "title_today": "Today's Summary",
       "title_other": "Day Summary",
-      "entry_one": "{{count}} entry",
-      "entry_other": "{{count}} entries",
-      "total_calories": "Total Calories",
       "remaining": "remaining",
       "over_budget": "over target",
-      "more_details": "More Details",
       "protein": "Protein",
       "carbs": "Carbs",
-      "fat": "Fat",
       "fiber": "Fiber",
       "saturated_fat": "Sat Fat",
       "trans_fat": "Trans Fat",
       "sugar": "Sugar",
       "sodium": "Sodium",
       "other_limits": "Other limits",
-      "hide_other_limits": "Hide other limits",
       "toggle_other_limits": "Toggle other limits section",
       "loading_entries": "Loading entries..."
     },
@@ -176,8 +147,7 @@
       "previous_day": "Previous day",
       "next_day": "Next day",
       "select_date": "Select Date",
-      "today_button": "Today",
-      "weekdays": ["S", "M", "T", "W", "T", "F", "S"]
+      "today_button": "Today"
     },
     "meal_types": {
       "breakfast": "Breakfast",
@@ -219,45 +189,36 @@
       "cta_fasted": "Fasted",
       "cta_a11y_hint": "Double tap to change today’s status.",
       "not_authenticated": "Please sign in again.",
-
       "confirm_title": "Done for Today?",
       "confirm_message_zero": "0 calories logged.\nIf you’re fasting, you can mark today as Fasted.\n",
       "confirm_message_low": "{{calories}} calories logged, which looks low.\nIf this is correct, mark as Done or Fasted.",
       "confirm_message_ok": "{{calories}} calories logged.\nAre you ready to mark today as done?",
-
       "fasted_secondary_title": "Mark as Fasted?",
       "fasted_secondary_message": "You’ve logged {{calories}} calories today.\nFasting is usually associated with very low intake.\nIf this reflects your intention, you can still mark today as Fasted.",
-
       "change_completed_title": "Today is marked as Completed",
       "change_fasted_title": "Today is marked as Fasted",
       "change_message": "You can reopen today to keep logging or change how today is marked.",
-
       "action_done_for_today": "Done for Today",
       "action_done_for_yesterday": "Done for Yesterday",
       "action_done_for_day": "Done for the Day",
       "action_mark_fasted": "Mark as Fasted",
       "action_keep_logging": "Keep Logging",
       "action_reopen_log": "Reopen Log",
-
       "toast_completed": "Marked done for today.",
       "toast_fasted": "Marked today as fasted.",
       "toast_unknown": "Reopened today.",
-      "toast_error": "Could not update today. Try again."
+      "toast_error": "Could not update today. Try again.",
+      "confirm_title_for_date": "Done for {{date}}?",
+      "weekly_loss_projection": "Weekly loss projection: {{projection}}"
     },
     "accessibility": {
-      "refresh_entries": "Refresh entries",
-      "refresh_hint": "Double tap to refresh calorie entries",
-      "profile_settings": "Profile settings",
-      "profile_hint": "Double tap to open profile settings",
-      "log_food_hint": "Double tap to add or edit food entries for {{mealType}}",
-      "expand_details": "Expand more details",
-      "collapse_details": "Collapse more details",
-      "details_hint": "Double tap to show or hide additional nutrition details",
-      "calendar_select_day": "Select {{day}}"
-    },
-    "admin_button": "ADMIN"
+      "log_food_hint": "Double tap to add or edit food entries for {{mealType}}"
+    }
   },
-
+  "accessibility": {
+    "previous_day": "Previous day",
+    "next_day": "Next day"
+  },
   "burned": {
     "modal": {
       "title_yesterday": "🔥 Calories burned yesterday",
@@ -267,9 +228,6 @@
       "high_value_warning": "Value looks unusually high, please double check",
       "too_high": "Value is too high, please correct"
     },
-    "day": {
-      "net": "Net"
-    },
     "fields": {
       "bmr": "Basal Metabolic Rate (BMR)",
       "active": "Activity",
@@ -277,7 +235,6 @@
       "placeholder": "0"
     },
     "actions": {
-      "reset": "Reset",
       "reset_estimates": "Reset Estimates"
     },
     "errors": {
@@ -286,28 +243,18 @@
       "invalid_number": "Please enter a valid non-negative number.",
       "tdee_below_bmr": "TDEE cannot be below your system BMR.",
       "max_kcal": "Max is 15,000 cal.",
-      "save_failed": "Could not save burned calories.",
-      "reset_failed": "Could not reset burned calories."
-    },
-    "warning": {
-      "title": "Unusually high burn",
-      "body": "6,000+ cal is rare. Double-check your wearable or workout entry.",
-      "cancel": "Cancel",
-      "save_anyway": "Save anyway"
+      "save_failed": "Could not save burned calories."
     },
     "toast": {
       "saved": "Burned calories saved.",
       "reset": "Burned calories reset."
     },
     "week": {
-      "title": "Week",
-      "missed": "Missed",
       "placeholder": "--"
     },
     "energy_balance": {
       "labels": {
         "burned": "🔥 Burned",
-        "eaten": "🍴 Eaten",
         "deficit": "Deficit",
         "surplus": "Surplus"
       },
@@ -315,12 +262,10 @@
         "eaten": "Eaten"
       },
       "accessibility": {
-        "open_burned_modal": "Open Burned Calories",
         "edit_burned": "Edit burned calories"
       }
     }
   },
-
   "food": {
     "menu": {
       "copy_to": "Copy To",
@@ -329,7 +274,11 @@
     },
     "note": {
       "edit": "Edit notes for {{mealType}}",
-      "save_error": "Failed to save note"
+      "save_error": "Failed to save note",
+      "title": "Notes",
+      "label": "Notes",
+      "placeholder": "Add notes for this meal...",
+      "clear": "Clear"
     },
     "copy": {
       "title": "Copy To",
@@ -348,37 +297,19 @@
       "title": "Move To",
       "subtitle": "Choose a date and meal type to move to.",
       "confirm": "Move",
-      "meal_type_label": "Meal Type",
-      "date_label": "Date",
-      "exclude_notes": "Exclude Notes",
-      "override_notes": "Override Notes",
       "same_meal_error": "You can't move into the same meal. Pick another meal or date.",
       "same_date_error": "Cannot move to the same date and meal type",
       "success_toast": "{{count}} item(s) moved to {{mealType}} on {{date}}",
       "error_message": "Unable to move entries. Please try again."
     }
   },
-
   "auth": {
     "login": {
-      "title": "Welcome Back",
-      "subtitle": "Sign in to continue tracking your calories",
       "track_now": "Track now",
       "track_now_aria": "Track now — scroll to sign in",
       "brand_logo_alt": "AvoVibe logo",
-      "brand_name": "AvoVibe",
-      "brand_tagline": "Simple, honest nutrition tracking.",
       "email_label": "Email",
-      "email_placeholder": "Enter your email address",
       "email_placeholder_short": "you@example.com",
-      "password_label": "Password",
-      "password_placeholder": "Enter your password",
-      "remember_email": "Remember email",
-      "forgot_password": "Forgot password?",
-      "sign_in_button": "Sign In",
-      "logging_in": "Logging in...",
-      "no_account": "Don't have an account?",
-      "sign_up": "Sign up",
       "google_sign_in": "Continue with Google",
       "signing_in_google": "Signing in...",
       "magic_link_send": "Email me a sign-in link",
@@ -387,18 +318,9 @@
       "legal_privacy": "Privacy Policy",
       "legal_terms": "Terms",
       "legal_health": "Health Disclaimer",
-      "error_fill_all_fields": "Please fill in all fields",
       "error_invalid_email": "Please enter a valid email address",
-      "error_invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
-      "error_email_not_confirmed": "Please confirm your email address before logging in. Check your inbox (including junk folder) for the confirmation email.",
-      "error_too_many_requests": "Too many login attempts. Please wait a few minutes and try again.",
-      "error_user_not_found": "No account found with this email address. Please register first.",
-      "error_account_removed": "Sorry, your account has been removed.",
       "error_supabase_not_configured": "Supabase is not configured. Please check your .env file.",
       "error_google_sign_in_failed": "Google sign-in failed. Please try again.",
-      "error_facebook_sign_in_failed": "Facebook sign-in failed. Please try again.",
-      "accessibility_show_password": "Show password",
-      "accessibility_hide_password": "Hide password",
       "marketing": {
         "hero_headline_default": "Simple nutrition tracking that stays out of your way.",
         "hero_headline_ca": "Simple nutrition tracking, built for Canadians.",
@@ -413,13 +335,6 @@
         "demo_macros_label": "Macros",
         "demo_macros_value_primary": "Protein 132g",
         "demo_macros_value_secondary": "Fibre 28g",
-        "feature_section_title": "Built to be simple, honest, and fast.",
-        "feature_fast_title": "Fast logging",
-        "feature_fast_body": "Fewer taps to log meals. Designed for everyday use.",
-        "feature_clear_title": "Clear nutrition",
-        "feature_clear_body": "Macros and fibre in one place, without clutter.",
-        "feature_no_paywalls_title": "No paywalls",
-        "feature_no_paywalls_body": "Core features stay free. No subscription traps.",
         "social_no_subscriptions": "Designed for real life",
         "social_no_ads": "Simple insights, no noise",
         "social_private_by_default": "Your data stays yours",
@@ -432,7 +347,6 @@
         "steps_3_body": "Turn what you log into simple, actionable guidance you can stick with."
       }
     },
-
     "callback": {
       "signing_in_title": "Signing you in…",
       "coming_soon_title": "Coming soon",
@@ -446,7 +360,6 @@
       "please_wait": "Please wait…",
       "back_to_login": "Back to login"
     },
-
     "linking": {
       "title": "Link accounts",
       "subtitle_with_target": "An account already exists for this email. To keep one AvoVibe account per email, confirm your existing account to link {{provider}}.",
@@ -470,118 +383,9 @@
       "google_start_failed": "Failed to start Google sign-in. Please try again.",
       "magic_link_send_failed": "Failed to send magic link. Please try again.",
       "link_start_failed": "Failed to start linking. Please try again."
-    },
-
-    "register": {
-      "title": "Create Account",
-      "step1_title": "Create Your Account",
-      "step1_subtitle": "Let's start with your email and a secure password",
-      "step2_title": "Personal Information",
-      "step2_subtitle": "Tell us a bit about yourself",
-      "step3_title": "Physical Information",
-      "step3_subtitle": "Help us calculate your caloric needs",
-      "email_label": "Email",
-      "email_placeholder": "Enter your email address",
-      "password_label": "Password",
-      "password_placeholder": "Create a strong password",
-      "confirm_password_label": "Confirm Password",
-      "confirm_password_placeholder": "Confirm your password",
-      "passwords_match": "Passwords match",
-      "preferred_name_label": "Preferred Name",
-      "preferred_name_placeholder": "Enter your preferred name",
-      "date_of_birth_label": "Date of Birth",
-      "date_of_birth_placeholder": "Select your date of birth",
-      "age_label": "Age: {{age}} years old",
-      "gender_label": "Gender at Birth",
-      "gender_description": "For accuracy on caloric calculations",
-      "gender_male": "Male",
-      "gender_female": "Female",
-      "gender_not_telling": "Not Telling",
-      "gender_not_telling_description": "No problem at all. For caloric calculations, we'll use values based on XX-typical physiology. This is only for estimating energy needs and isn't a statement about gender.",
-      "height_label": "Height",
-      "weight_label": "Weight",
-      "create_account_button": "Create Account",
-      "creating_account": "Creating...",
-      "error_email_required": "Email is required",
-      "error_invalid_email": "Please enter a valid email address",
-      "error_password_required": "Password is required",
-      "error_password_requirements": "Password does not meet all requirements",
-      "error_confirm_password": "Please confirm your password",
-      "error_passwords_not_match": "Passwords do not match",
-      "error_name_required": "Preferred Name is required",
-      "error_name_too_long": "Preferred Name must be 40 characters or less",
-      "error_dob_required": "Date of birth is required",
-      "error_dob_format": "Date of birth must be in YYYY-MM-DD format",
-      "error_dob_future": "Date of birth cannot be in the future",
-      "error_age_minimum": "You must be at least 13 years old",
-      "error_age_maximum": "Date of birth cannot be more than 150 years ago",
-      "error_height_required": "Height is required",
-      "error_weight_required": "Weight is required",
-      "error_height_range": "Height must be between 50 cm and 304.8 cm (approximately 1'8\" to 10'0\")",
-      "error_weight_range": "Weight must be between 45 and 1200 lbs (approximately 20 to 544 kg)",
-      "error_height_weight_required": "Height and Weight are required",
-      "error_rate_limit": "Too many registration attempts. Please wait a few minutes before trying again.",
-      "error_email_exists": "This email is already registered. Please try logging in instead.",
-      "error_failed_create_account": "Failed to create user account. Please try again."
-    },
-
-    "register_confirmation": {
-      "title": "Registration Successful!",
-      "message": "Your account has been created successfully. Please check your email (including your junk or spam folder) to confirm your account before logging in.",
-      "go_to_login": "Go to Login"
-    },
-
-    "forgot_password": {
-      "title": "Reset Password",
-      "description": "Enter your email address and we'll send you a link to reset your password.",
-      "email_label": "Email",
-      "email_placeholder": "Enter your email address",
-      "send_button": "Send Reset Link",
-      "sending": "Sending...",
-      "success_message": "Password reset email sent! Please check your inbox.",
-      "success_alert_title": "Email Sent",
-      "success_alert_message": "If an account exists with this email, you will receive a password reset link shortly. Please check your inbox.",
-      "error_email_required": "Please enter your email address",
-      "error_invalid_email": "Please enter a valid email address",
-      "error_rate_limit": "Too many requests. Please wait a moment and try again.",
-      "accessibility_back": "Back to login"
-    },
-
-    "reset_password": {
-      "title": "Reset Password",
-      "subtitle": "Please enter your new password below.",
-      "new_password_label": "New Password",
-      "new_password_placeholder": "Enter new password",
-      "confirm_password_label": "Confirm Password",
-      "confirm_password_placeholder": "Confirm new password",
-      "update_button": "Update Password",
-      "back_to_login": "Back to Login",
-      "verifying": "Verifying reset link...",
-      "error_fill_all_fields": "Please fill in all fields",
-      "error_passwords_not_match": "Passwords do not match",
-      "error_password_requirements": "Password does not meet all requirements. Please check the requirements below.",
-      "error_same_password": "New password must be different from your current password.",
-      "error_weak_password": "Password is too weak. Please choose a stronger password.",
-      "error_timeout": "Connection timeout. Please check your internet connection and try again.",
-      "error_invalid_link": "This password reset link is invalid or has expired. Please request a new one.",
-      "error_auth_required": "You must click the password reset link from your email to access this page."
-    },
-
-    "password_requirements": {
-      "min_length": "Minimum 10 characters",
-      "has_letter": "At least one letter",
-      "has_uppercase": "At least one uppercase letter",
-      "has_lowercase": "At least one lowercase letter",
-      "has_number": "At least one number",
-      "has_special": "At least one special character",
-      "no_spaces": "No leading or trailing spaces",
-      "not_email": "Doesn't match your email",
-      "not_common": "Not a common password"
     }
   },
-
   "onboarding": {
-    "title": "Your Fitness Setup",
     "header_prefix": "Your ",
     "plan": {
       "title": "Choose your plan",
@@ -632,7 +436,6 @@
       "water_subtitle": "Hydration tracking"
     },
     "goal": {
-      "header": "A clear goal leads to real progress.",
       "title": "What's your goal?",
       "subtitle": "This helps us set your daily targets correctly.",
       "lose_weight": {
@@ -676,7 +479,7 @@
       "error_age_minimum": "You must be at least 13 years old",
       "error_age_maximum": "Please enter a valid date of birth",
       "error_name_required": "Preferred Name is required",
-      "error_name_too_long": "Preferred name must be 40 characters or less"
+      "error_name_invalid": "Invalid name format"
     },
     "sex": {
       "title": "Sex at birth",
@@ -688,7 +491,6 @@
     "height": {
       "title": "What's your height?",
       "subtitle": "Used to fine-tune your daily targets.",
-      "height_label": "Height",
       "height_cm_placeholder": "50-260",
       "height_ft_placeholder": "ft",
       "height_in_placeholder": "in",
@@ -726,9 +528,6 @@
     "current_weight": {
       "title": "What's your current weight?",
       "subtitle": "This is your starting point today.",
-      "weight_label": "Weight",
-      "weight_kg_placeholder": "35-250",
-      "weight_lb_placeholder": "77-550",
       "body_fat_label": "Body Fat % (optional)",
       "body_fat_placeholder": "(e.g., 20)",
       "body_fat_accessibility_label": "Body fat percentage",
@@ -738,16 +537,10 @@
     },
     "goal_weight": {
       "title": "What's your goal weight?",
-      "subtitle": "Knowing your destination helps us keep you on a safe and steady path.",
-      "weight_label": "Goal Weight",
-      "weight_kg_placeholder": "35-250",
-      "weight_lb_placeholder": "77-550",
       "accessibility_label_kg": "Goal weight in kilograms",
       "accessibility_label_lb": "Goal weight in pounds",
       "error_weight_required": "Goal weight is required",
       "error_weight_invalid": "Goal weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)",
-      "error_lose_too_high": "For a fat-loss goal, your goal weight should be lower than your current weight.",
-      "error_gain_too_low": "For a weight-gain goal, your goal weight should be higher than your current weight.",
       "error_maintain_too_different": "For maintaining weight, your goal weight should be very close to your current weight. Consider adjusting your goal type.",
       "goal_weight_error_invalid_number": "Target weight must be a valid number.",
       "goal_weight_error_range_kg": "Target weight must be between {{minKg}} kg and {{maxKg}} kg.",
@@ -770,8 +563,6 @@
       "suggestion_unavailable": "We can't suggest a safe starting target for this goal based on your current stats. Please proceed with care or consider adjusting your goal.",
       "placeholder_example_kg": "(e.g., {{weight}})",
       "placeholder_example_lb": "(e.g., {{weight}})",
-      "nudge_helper_lbs": "Adjust within ±2.5 lb",
-      "nudge_helper_kg": "Adjust within ±1.13 kg",
       "reset_to_current": "Reset to current weight",
       "nudge_disabled": "Adjustment range not available.",
       "placeholder_fallback_kg": "(e.g., 79)",
@@ -779,17 +570,9 @@
     },
     "timeline": {
       "title": "When do you want to reach this goal?",
-      "subtitle": "We'll use this to estimate a safe and realistic pace.",
-      "summary_label": "Trajectory",
       "trajectory_title": "Trajectory",
-      "three_months": "3 months",
-      "six_months": "6 months",
-      "twelve_months": "12 months",
       "no_deadline": "One Day",
-      "custom_date": "Choose a date",
-      "error_select_timeline": "Please select a timeline option",
-      "pace_adjusted": "To keep things safe and sustainable, we've adjusted your pace slightly. You'll still be working steadily toward your goal.",
-      "estimated_completion": "Estimated: about {months} months"
+      "error_select_timeline": "Please select a timeline option"
     },
     "goal_date": {
       "option_easy": "Easy",
@@ -808,16 +591,12 @@
     },
     "calorie_target": {
       "title": "Daily Calorie Target",
-      "subtitle": "Let's calculate your personalized calorie target based on your goals.",
       "coming_soon": "Calorie targets for your goal type are coming soon.",
       "error_missing_data": "Please complete previous steps to calculate your calorie target.",
-      "factors_line": "{{sex}}: {{height}} tall, {{age}}-year young, {{weight}}.",
-      "factors_line_with_bf": "{{sex}}: {{height}} tall, {{age}}-year young, {{weight}} @ {{bodyFat}}% BF.",
       "bmr_range_line": "Your est. BMR: {{lowerBmr}}–{{upperBmr}} cal/day.",
       "activity_range_line": "Being {{activityLabel}}, ",
       "maintenance_range_line": "your estimated maintenance intake:\n{{lowerMaintenance}}–{{upperMaintenance}} cal/day.",
       "estimated_maintenance_range_line": "Estimated maintenance: {{lower}}–{{upper}} cal/day",
-      "lose_context_line": "Weight loss requires a consistent calorie deficit over time.",
       "maintain_context_line": "Based on your body and activity level.",
       "recomp_context_line": "Recomposition works best near maintenance with adequate protein.",
       "gain_context_line": "Weight gain requires a consistent calorie surplus.",
@@ -841,10 +620,6 @@
       "gain_standard_subtitle": "Balanced muscle and weight gain",
       "gain_aggressive_title": "Aggressive gain",
       "gain_aggressive_subtitle": "Faster & \"newbie\" gains, more fat risk",
-      "maintain_warning_low": "Unusually low for maintenance and may lead to weight loss.",
-      "maintain_warning_high": "May lead to gradual weight gain.",
-      "recomp_warning_low": "Too low for effective recomposition. Muscle gain unlikely.",
-      "recomp_warning_high": "Likely to favor weight gain over recomposition.",
       "gain_warning_below_maintenance": "Below maintenance — weight gain unlikely.",
       "gain_warning_high": "Higher fat gain likely.",
       "below_safe_minimum": "Below safe minimum",
@@ -854,21 +629,9 @@
       "unsafe_cannot_select": "This option is unsafe and cannot be selected.",
       "a11y_plan_below_safe_minimum": "This option is below the safe minimum intake.",
       "a11y_select_plan": "Double tap to select {{planTitle}}",
-      "plan_ontime": "On-time",
-      "plan_ontime_desc": "Designed to reach your target date.",
-      "plan_ontime_desc_unsafe": "Cannot safely reach your target date.",
-      "plan_ontime_helper_unsafe": "Choose a later date to enable this option.",
-      "plan_sustainable": "More sustainable",
-      "plan_sustainable_desc": "A steadier pace beats burning out.",
-      "plan_accelerated": "Accelerated",
-      "plan_accelerated_desc": "Tighter daily target.",
       "plan_custom": "Set Custom Pace",
-      "plan_custom_desc": "Set your own target",
-      "below_minimum": "Below recommended minimum intake.",
       "kcal_per_day": "cal/day",
-      "warning_below_recommended": "Below our recommended minimum, proceed with caution",
       "warning_unsafe": "⚠️ Unsafe, consider changing your target date or weight",
-      "warning_critical": "⚠️ This would require an unsafe calorie intake. Choose another target date or weight.",
       "custom_warning_title": "This may slow or stop weight loss",
       "custom_warning_message": "At this calorie level, we estimate you would not lose weight with your current activity level. You may need to be significantly more active for this to work. Your target date would no longer apply.",
       "custom_warning_adjust": "Adjust calories",
@@ -884,9 +647,7 @@
       "carbs": "Total Carbs Limit",
       "sugar": "Sugar Limit",
       "sodium": "Sodium Limit",
-      "water": "Daily Water Target",
-      "error_missing_data": "Please complete previous steps to see suggested targets.",
-      "based_on_calories": "Based on your calorie target of {{calories}} cal/day"
+      "error_missing_data": "Please complete previous steps to see suggested targets."
     },
     "legal": {
       "title": "Legal Agreement",
@@ -919,15 +680,9 @@
     "error_network_waking": "Network is waking up... Please try again.",
     "error_complete_failed": "Failed to complete onboarding. Please try again.",
     "legal_agree_cta": "I Understand and Agree",
-    "step1_title": "Personal Information",
-    "step1_subtitle": "Tell us a bit about yourself",
-    "step2_title": "Physical Information",
-    "step2_subtitle": "Help us calculate your caloric needs",
-    "complete_button": "Start Tracking",
     "saving": "Saving...",
     "error_no_session": "No user session found. Please log in again."
   },
-
   "legal": {
     "title": "Legal & Safety Acknowledgment",
     "subtitle": "Review the Terms of Service, Privacy Policy, and Health & Medical Disclaimer. You must agree before using the app.",
@@ -949,7 +704,6 @@
     "settings_title": "Legal & Safety",
     "refresh": "Refresh"
   },
-
   "settings": {
     "title": "Settings",
     "greeting": "Hello {{name}}!",
@@ -1025,20 +779,11 @@
       "title": "Account",
       "edit_profile": "Edit Profile",
       "edit_profile_subtitle": "Update your personal info, gender, height",
-      "change_password": "Change Password",
       "email_settings": "Email Settings"
     },
     "preferences": {
       "title": "Preferences",
       "language": "Language",
-      "language_english": "English",
-      "language_french": "Français",
-      "units": "Units",
-      "units_metric": "Metric (kg, cm)",
-      "units_imperial": "Imperial (lbs, in)",
-      "water_units": "Water Units",
-      "water_units_metric": "Metric (ml)",
-      "water_units_imperial": "Imperial (fl oz)",
       "dark_mode": "Dark Mode",
       "dark_mode_system": "System",
       "dark_mode_on": "On",
@@ -1052,26 +797,13 @@
       "delete_account_failed": "An unexpected error occurred while deleting your account data. Please contact support.",
       "logout_failed": "Failed to logout. Please try again."
     },
-    "privacy": {
-      "title": "Privacy & Security",
-      "export_data": "Export Data",
-      "export_data_subtitle": "Download your data",
-      "privacy_policy": "Privacy Policy"
-    },
     "about": {
       "title": "About",
       "app_version": "App Version",
-      "legal": "Legal",
-      "legal_subtitle": "Terms, Privacy, and Disclaimer",
-      "terms_of_service": "Terms of Service",
       "help_support": "Help & Support"
     },
     "legal": {
       "title": "Legal"
-    },
-    "admin": {
-      "title": "Admin",
-      "subtitle": "Admin panel and tools"
     },
     "danger_zone": {
       "title": "Danger Zone",
@@ -1104,251 +836,59 @@
     "coming_soon": "Coming Soon",
     "feature_coming_soon": "{{feature}} feature will be available soon."
   },
-
   "edit_profile": {
     "title": "Edit Profile",
-    "subtitle": "Update your personal information",
-    "preferred_name_label": "Preferred Name",
-    "preferred_name_placeholder": "Preferred Name",
-    "date_of_birth_label": "Date of Birth",
-    "date_of_birth_placeholder": "Select Date of Birth",
-    "gender_label": "Gender at Birth",
-    "gender_description": "For accuracy on caloric calculations",
-    "height_label": "Height",
-    "weight_label": "Weight",
-    "save_button": "Save Changes",
-    "loading_profile": "Loading profile...",
-    "profile_not_found_title": "Profile Not Found",
-    "profile_not_found_message": "Your profile could not be loaded. Please try again later.",
-    "go_back": "Go Back",
-    "select_date_title": "Select Date of Birth",
     "error_user_not_authenticated": "User not authenticated",
-    "error_invalid_name": "Please enter a valid name.",
-    "error_name_dob_required": "Preferred Name and Date of Birth are required",
-    "error_update_failed": "Failed to update profile: {{message}}"
+    "error_invalid_name": "Please enter a valid name."
   },
-
-  "my_goals": {
-    "title": "My Goals",
-    "subtitle": "Set your daily nutrition and weight goals",
-    "loading": "Loading goals...",
-    "save_button": "Save Goals",
-    "success_message": "Goals updated successfully",
-    "calories": {
-      "title": "Daily Calories Target",
-      "description": "Set optional lower and/or upper range",
-      "set_maximum": "Set Maximum (cal)",
-      "set_minimum": "Set Minimum (cal)",
-      "placeholder_max": "e.g., 2200",
-      "placeholder_min": "e.g., 1800"
-    },
-    "nutrients": {
-      "title": "Daily Nutrients Target",
-      "description": "Target protein intake per day",
-      "protein": "Set Protein Target (g)",
-      "protein_placeholder": "e.g., 150",
-      "sodium": "Set Max Sodium (mg)",
-      "sodium_placeholder": "e.g., 2300"
-    },
-    "carbs": {
-      "total": "Set Max Total Carbs (g)",
-      "total_placeholder": "e.g., 200",
-      "net": "Set Max Net Carbs (g)",
-      "net_placeholder": "e.g., 150"
-    },
-    "fibre": {
-      "label": "Set Fibre Target (g)",
-      "placeholder": "e.g., 30"
-    },
-    "fats": {
-      "total": "Set Max Total Fat (g)",
-      "total_placeholder": "e.g., 65",
-      "saturated": "Set Max Saturated Fat (g)",
-      "saturated_placeholder": "e.g., 20"
-    },
-    "water": {
-      "label": "Set Water Target (L)",
-      "placeholder": "e.g., 2"
-    },
-    "target_weight": {
-      "title": "Target Weight",
-      "set_target": "Set Target Weight ({{unit}})",
-      "placeholder_lbs": "50 to 800",
-      "placeholder_kg": "23 to 363",
-      "set_date": "Set Target Date",
-      "select_date": "Select Target Date",
-      "select_date_title": "Select Target Date"
-    },
-    "validation": {
-      "lower_range_minimum": "Lower Range must be 0 or higher",
-      "upper_range_maximum": "Upper Range must be 20000 or lower",
-      "lower_less_than_upper": "Lower Range must be smaller than Upper Range",
-      "protein_range": "Protein must be between 20 and 500 grams",
-      "protein_length": "Protein must be 3 characters or less",
-      "total_carbs_range": "Total Carbs must be between 0 and 450 grams",
-      "net_carbs_range": "Net Carbs must be between 0 and 450 grams",
-      "fibre_range": "Fibre target must be between 10 and 240 grams",
-      "total_fat_range": "Total Fat must be between 0 and 150 grams",
-      "saturated_fat_range": "Saturated Fat must be between 0 and 100 grams",
-      "sodium_range": "Max Sodium must be between 0 and 6000 mg",
-      "water_range": "Water target must be between 1 and 10 liters (1000-10000 ml)",
-      "target_weight_range": "Target weight must be between 50 and 800 lbs",
-      "target_date_format": "Target date must be in YYYY-MM-DD format",
-      "target_date_future": "Target date must be in the future",
-      "target_date_max": "Target date must be within 10 years from today"
-    }
-  },
-
   "date_picker": {
     "select_date_of_birth": "Select Date of Birth",
-    "select_year_month": "Select Year and Month",
-    "previous_month": "Previous month",
-    "next_month": "Next month",
-    "weekdays": {
-      "sun": "Sun",
-      "mon": "Mon",
-      "tue": "Tue",
-      "wed": "Wed",
-      "thu": "Thu",
-      "fri": "Fri",
-      "sat": "Sat"
-    }
+    "select_year_month": "Select Year and Month"
   },
-
   "units": {
-    "cm": "cm",
-    "ft_in": "ft/in",
-    "ft": "ft",
-    "in": "in",
     "lbs": "lbs",
     "kg": "kg",
     "kcal": "cal",
     "g": "g",
     "mg": "mg",
-    "ml": "ml",
-    "L": "L",
     "min": "min",
     "km": "km",
     "mi": "mi"
   },
-
-  "accessibility": {
-    "email_address": "Email address",
-    "password": "Password",
-    "show_password": "Show password",
-    "hide_password": "Hide password",
-    "toggle_password_visibility": "Double tap to toggle password visibility",
-    "back": "Back",
-    "close": "Close",
-    "next_step": "Double tap to continue to next step",
-    "previous_step": "Double tap to go back to previous step",
-    "select_date": "Double tap to select your date of birth",
-    "checkbox_checked": "checked",
-    "checkbox_unchecked": "unchecked"
-  },
-
-  "validation": {
-    "required": "This field is required",
-    "invalid_email": "Please enter a valid email address",
-    "password_too_short": "Password must be at least 10 characters",
-    "passwords_must_match": "Passwords must match"
-  },
-
   "alerts": {
-    "configuration_error": "Configuration Error",
     "validation_error": "Validation Error",
-    "login_failed": "Login Failed",
-    "registration_failed": "Registration Failed",
-    "update_failed": "Update Failed",
     "error_title": "Error",
-    "timeout_error": "Timeout Error",
     "success": "Success",
-    "save_failed": "Save Failed",
     "limit_reached": "Limit Reached",
-    "calories_limit_exceeded": "Calories Limit Exceeded",
-    "security_required": "Security Required",
-    "camera_not_supported": "Camera Not Supported",
-    "permission_denied": "Permission Denied",
-    "permission_error": "Permission Error",
-    "camera_permission_required": "Camera Permission Required",
-    "barcode_not_found": "Barcode Not Found",
-    "food_found": "Food Found!"
+    "calories_limit_exceeded": "Calories Limit Exceeded"
   },
-
   "mealtype_log": {
     "title": "Diary",
-    "back": "Back",
     "search_placeholder": "Search for food to log",
     "quick_add": "Quick Add",
     "quick_add_success": "Added {{foodName}} to {{mealType}}",
-    "no_entries": "No entries yet",
-    "add_first_entry": "Tap + to add your first entry",
-    
     "tabs": {
       "frequent": "Frequent",
       "recent": "Recent",
       "custom": "Custom",
-      "bundles": "Bundles",
-      "search": "Search",
-      "manual": "Manual",
-      "favorites": "⭐ Favorites"
+      "bundles": "Bundles"
     },
-    
-    "manual_entry": {
-      "title": "Quick Drop",
-      "hint": "Use more than once? Then create it as Custom!"
-    },
-    
-    "favorites": {
-      "title": "⭐ Favorites",
-      "empty": "Your favorite foods will appear here"
-    },
-    
     "food_log": {
-      "title": "Food Log",
       "title_with_count": "Food Log ({{count}})",
       "details": "Details",
-      "edit": "Edit",
-      "done": "Done",
-      "no_entries": "No entries yet. Add one above!",
       "unknown_food": "Unknown",
       "select_all": "Select All",
       "more_options": "More options",
       "more_options_hint": "Double tap to open menu",
       "exit_selection_mode": "Exit selection mode",
-      "exit_selection_mode_hint": "Double tap to exit selection mode"
+      "exit_selection_mode_hint": "Double tap to exit selection mode",
+      "mass_delete": "Delete Selected",
+      "mass_delete_hint": "Delete selected entries",
+      "mass_delete_disabled_hint": "Select entries to delete"
     },
-    
     "form": {
-      "food_item": "Food(s) you ate",
-      "food_item_required": "Food(s) you ate *",
-      "food_item_placeholder": "e.g. Buffet, candies, curry soup, and more",
-      "quantity": "Quantity",
-      "quantity_required": "Quantity *",
-      "quantity_placeholder": "1",
-      "unit": "Unit",
-      "unit_placeholder": "g",
-      "calories": "Calories (cal)",
-        "calories_required": "Calories *",
-        "calories_placeholder": "625",
-      "protein": "Protein (g)",
-      "protein_placeholder": "0",
-      "carbs": "Carbs (g)",
-      "carbs_placeholder": "0",
-      "fat": "Fat (g)",
-      "fat_placeholder": "0",
-      "fiber": "Fiber (g)",
-      "fiber_placeholder": "0",
-      "saturated_fat": "Sat Fat (g)",
-      "saturated_fat_placeholder": "0",
-      "trans_fat": "Trans Fat (g)",
-      "trans_fat_placeholder": "0",
-      "sugar": "Sugar (g)",
-      "sugar_placeholder": "0",
-      "sodium": "Sodium (mg)",
-      "sodium_placeholder": "0"
+      "food_item_placeholder": "e.g. Buffet, candies, curry soup, and more"
     },
-    
     "portion_guide": {
       "title": "Portion Guide",
       "open_button": "Open Portion Guide",
@@ -1456,7 +996,6 @@
         }
       }
     },
-    
     "macros": {
       "protein_short": "Pro",
       "carbs_short": "Carb",
@@ -1467,36 +1006,16 @@
       "sugar_short": "Sugar",
       "sodium_short": "Sodium"
     },
-    
     "buttons": {
-      "save": "Save",
       "cancel": "Cancel",
-      "delete": "Delete",
-      "edit": "Edit",
-      "add": "Add",
-      "scan_barcode": "Scan Barcode",
-      "create_custom": "Create Custom",
-      "create_bundle": "Create Bundle",
-      "add_bundle": "Add Bundle",
-      "delete_bundle": "Delete Bundle",
-      "saving": "Saving...",
-      "show_macros": "Show Macros",
-      "hide_macros": "Hide Macros",
-      "show_details": "Show Details",
-      "hide_details": "Hide Details",
       "log_food": "Log Food",
       "logging": "Logging...",
       "update_log": "Update Log",
       "updating": "Updating..."
     },
-    
     "bundles": {
-      "title": "Bundles",
       "empty": "Create food bundles for fast multi-entries",
       "hint": "Tap + Create New Bundle to get started",
-      "create_hint": "Create bundles to quickly log multiple foods at once",
-      "example_hint": "i.e., Weekday Protein Breakfast A",
-      "example_desc": "4 whole eggs, 20g Whey, 2 cups skim milk, 1 tbsp olive oil, 5oz ham",
       "limit_reached": "You can create up to 20 bundles. Please delete an existing bundle to create a new one.",
       "added_success": "Added \"{{name}}\" to {{mealType}}!",
       "delete_failed": "Failed to delete bundle: {{error}}",
@@ -1506,55 +1025,26 @@
       "bundles_count": "({{count}}/20 bundles)",
       "loading": "Loading bundles..."
     },
-    
     "custom_foods": {
-      "title": "Custom Foods",
       "empty": "Create your own custom food collection",
-      "create_hint": "Create custom foods for items you eat regularly",
       "create_new": "+ Create New Custom Food",
-      "custom_foods_count": "custom foods",
       "loading": "Loading custom foods..."
     },
-    
     "frequent_foods": {
-      "title": "Frequent Foods",
-      "empty": "No frequent foods yet",
-      "hint": "Foods you log often will appear here",
       "loading": "Loading frequent foods..."
     },
-    
     "recent_foods": {
-      "title": "Recent Foods",
       "empty": "No recent foods found",
       "hint": "Foods you log will appear here",
       "loading": "Loading recent foods..."
     },
-    
-    "search": {
-      "title": "Search Foods",
-      "no_results": "No foods found",
-      "try_different": "Try a different search term"
-    },
-    
     "scanner": {
       "title": "Scan Barcode",
-      "scanning": "Scanning...",
-      "point_camera": "Point camera at barcode",
       "point_at_barcode": "Point your camera at a barcode",
       "try_again": "Try Again",
-      "create_custom": "Create Custom",
-      "barcode_not_found": "No food found for barcode: {{barcode}}\n\nWould you like to try again or create a custom food?",
-      "food_found": "Found: {{name}}{{brand}}",
       "scan_error": "Failed to process barcode: {{error}}\n\nWould you like to try again?",
       "open_failed": "Failed to open scanner: {{error}}",
-      "requesting_permission": "Requesting camera permission...",
-      "permission_required": "Camera permission is required to scan barcodes.",
-      "grant_permission": "Grant Permission",
-      "requesting": "Requesting...",
-      "loading_camera": "Loading camera...",
       "processing": "Processing barcode...",
-      "instructions": "Position the barcode within the frame",
-      "checking_camera": "Checking camera availability...",
       "library_load_failed": "Failed to load barcode scanner library",
       "element_not_found": "Scanner element not found",
       "camera_start_failed": "Failed to start camera",
@@ -1576,31 +1066,18 @@
       "tips_title": "Tips for best results:",
       "tip_1": "Ensure good lighting",
       "tip_2": "Hold camera steady and close",
-      "tip_3": "Make sure barcode is fully visible"
+      "tip_3": "Make sure barcode is fully visible",
+      "use_camera": "Use Camera",
+      "upload_photo": "Upload Photo",
+      "helper_text": "Scan a barcode or upload a photo",
+      "upload_label": "Upload Photo",
+      "manual_entry_label": "Manual Entry",
+      "manual_entry_placeholder": "Enter barcode manually",
+      "invalid_barcode": "Invalid barcode",
+      "barcode_non_numeric": "Barcode must be numeric",
+      "barcode_too_long": "Barcode is too long",
+      "camera_timeout": "Camera timeout"
     },
-    
-    "camera": {
-      "security_required": "Camera access requires a secure connection (HTTPS). Please use HTTPS or localhost.",
-      "not_supported": "Your browser does not support camera access. Please use a modern browser like Chrome, Firefox, or Safari.",
-      "permission_denied": "Camera permission was previously denied.\n\nPlease:\n1. Click the lock/info icon in your browser address bar\n2. Allow camera access\n3. Refresh the page and try again",
-      "permission_error": "Unable to request camera permission. Please check your device settings.",
-      "permission_required_title": "Camera Permission Required",
-      "permission_required_message": "Camera permission is required to scan barcodes.",
-      "permission_required_hint_can_ask": "You can try again.",
-      "permission_required_hint_settings": "Please enable camera permission in your device settings:\n\nSettings > Apps > [This App] > Permissions > Camera",
-      "permission_required_ios": "To scan barcodes, please enable camera access:\n\n1. Open Settings\n2. Scroll down and tap on this app\n3. Enable Camera access",
-      "permission_required_android": "To scan barcodes, this app needs camera permission.\n\nPlease tap \"Allow\" when prompted.",
-      "permission_request_failed": "Failed to request camera permission.\n\n{{error}}",
-      "camera_error_title": "Camera Error",
-      "camera_error_message": "Failed to access camera.\n\nError: {{errorName}}\nMessage: {{errorMessage}}\n\nPlease check your browser settings and ensure camera access is allowed.",
-      "request_timeout_title": "Request Timeout",
-      "request_timeout_message": "Camera permission request timed out.\n\nThis usually means:\n1. The permission dialog didn't appear\n2. Your browser blocked the request\n3. Camera is already in use\n\nPlease check your browser settings and try again.",
-      "no_camera_found_title": "No Camera Found",
-      "no_camera_found_message": "No camera found on this device.",
-      "camera_in_use_title": "Camera In Use",
-      "camera_in_use_message": "Camera is already in use by another application. Please close other apps using the camera and try again."
-    },
-    
     "delete_entry": {
       "title": "Delete Entry",
       "title_question": "Delete entry?",
@@ -1609,7 +1086,6 @@
       "message_cannot_undo": "This can't be undone.",
       "confirm": "Delete",
       "cancel": "Cancel",
-      "success": "Entry deleted successfully",
       "success_multiple": "Deleted {{count}} {{entries}} successfully!",
       "entry_singular": "entry",
       "entry_plural": "entries",
@@ -1618,7 +1094,6 @@
       "deleting": "Deleting entry",
       "deleted": "Deleted"
     },
-    
     "delete_custom_food": {
       "title": "Delete Custom Food",
       "bundle_warning_title": "Found in Bundles",
@@ -1628,23 +1103,19 @@
       "confirm": "Delete",
       "cancel": "Cancel"
     },
-    
     "delete_bundle": {
       "title": "Delete Bundle",
       "message": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
       "message_generic": "Are you sure you want to delete this bundle? This action cannot be undone."
     },
-    
     "add_bundle": {
       "title": "Add Bundle to Meal",
       "message": "Add all {{count}} entries from \"{{name}}\" to your food log?",
       "message_generic": "Add all entries to your food log?",
       "confirm": "Add",
-      "button": "+ to Log",
       "label": "Add bundle to food log",
       "hint": "Double tap to add this bundle to your food log"
     },
-    
     "mass_delete": {
       "title": "Delete Entries",
       "message": "Are you sure to delete the {{count}} selected {{items}}?",
@@ -1652,7 +1123,6 @@
       "item_plural": "items",
       "cancel_no": "No"
     },
-    
     "errors": {
       "user_not_authenticated": "User not authenticated.",
       "user_not_found": "User not found",
@@ -1668,30 +1138,24 @@
       "carbs_invalid": "Carbs value is invalid.",
       "fat_invalid": "Fat value is invalid.",
       "fiber_invalid": "Fiber value is invalid.",
+      "food_not_found": "Food not found",
       "protein_too_large": "Protein value is too large. Maximum allowed: {{max}}g.",
       "carbs_too_large": "Carbs value is too large. Maximum allowed: {{max}}g.",
       "fat_too_large": "Fat value is too large. Maximum allowed: {{max}}g.",
-      "calories_limit_exceeded": "This entry would add {{calories}} cal, bringing your {{mealType}} total to {{total}} cal.\n\nThat exceeds the single-meal safety limit of {{limit}} cal.\n\nIf this is intentional, please split into multiple entries.",
       "fix_errors": "Please fix the errors shown in red above before saving.",
-      "save_failed_checklist": "Unable to save the entry. Please check:\n\n• Food name is not empty\n• Quantity is a valid number\n• Calories is a valid number\n\nIf the problem persists, try refreshing the page.",
       "save_unexpected": "An unexpected error occurred while saving: {{error}}",
-      "delete_custom_failed": "Failed to delete custom food: {{error}}",
       "item_name_required": "Please enter a food item name",
       "quantity_required": "Please enter a valid quantity",
       "calories_required": "Please enter calories",
       "calories_exceed_5000_limit": "Cannot exceed 5,000 cal per entry.",
       "quick_add_failed": "Failed to quick add: {{error}}"
     },
-    
     "success": {
       "entry_saved": "Food entry {{action}} successfully!",
       "action_saved": "saved",
       "action_updated": "updated"
     },
-    
     "calendar": {
-      "previous_month": "Previous month",
-      "next_month": "Next month",
       "today": "Today",
       "yesterday": "Yesterday",
       "months": {
@@ -1709,75 +1173,54 @@
         "dec": "Dec"
       }
     },
-    
     "meal_types": {
       "breakfast": "Breakfast",
       "lunch": "Lunch",
       "dinner": "Dinner",
       "snack": "Snack"
     },
-    
-    "multi_select": {
-      "items_selected": "{{count}} selected",
-      "delete_selected": "Delete Selected"
-    },
-    
     "accessibility": {
-      "searching": "Searching for food",
       "scan_barcode": "Scan barcode",
       "frequent_tab": "Frequent foods tab",
       "recent_tab": "Recent foods tab",
       "custom_tab": "Custom foods tab",
       "bundles_tab": "Food bundles tab",
       "manual_tab": "Manual entry tab",
-      "favorite_tab": "Favorite foods tab",
       "quick_add_hint": "Double tap to add with default serving"
     },
-    
     "tap_to_expand": "Tap to expand",
     "expand_content": "Expand content",
     "expand_content_hint": "Double tap to expand the tab content"
   },
-  
   "create_custom_food": {
     "title_create": "Create Custom Food",
     "title_edit": "Edit Custom Food",
     "title_clone": "Clone Custom Food",
     "loading": "Loading food data...",
-    "back": "← Back",
-    
     "step1_title": "Step 1: Your Food's Name",
     "serving_type_toggle": {
       "weight_based": "Weight-Based",
       "volume_based": "Volume-Based"
     },
-    
     "required_section": {
       "food_name_label": "Food Name *",
       "food_name_placeholder": "e.g., Dad's homemade protein bar"
     },
     "characters_count": "{{count}}/{{max}} characters",
-    
     "weight_serving": {
-      "title": "Weight-Based Serving *",
-      "description": "Enter nutritional information based on weight. This is required for accurate calculations.",
       "quantity_label": "Quantity *",
       "quantity_placeholder": "100",
       "unit_label": "Unit *",
       "calories_label": "Calories (cal) *",
       "calories_placeholder": "0"
     },
-    
     "volume_serving": {
-      "title": "Volume-Based Serving *",
-      "description": "Enter nutritional information based on volume. This is required for accurate calculations.",
       "quantity_label": "Quantity *",
       "quantity_placeholder": "1",
       "unit_label": "Unit *",
       "calories_label": "Calories (cal) *",
       "calories_placeholder": "0"
     },
-    
     "macronutrients": {
       "title": "Macronutrients (g)",
       "protein": "Protein",
@@ -1785,7 +1228,6 @@
       "fat": "Fat",
       "fiber": "Fiber"
     },
-    
     "other_nutrients": {
       "title": "Other Nutrients",
       "saturated_fat": "Sat Fat (g)",
@@ -1794,14 +1236,10 @@
       "sodium": "Sodium (mg)",
       "placeholder": "0"
     },
-    
     "optional_section": {
-      "title": "Optional Information",
-      "subtitle": "These fields are optional and can be added later",
       "brand_label": "Brand",
       "brand_placeholder": "e.g., My Kitchen"
     },
-    
     "buttons": {
       "cancel": "Cancel",
       "create": "Create Food",
@@ -1811,7 +1249,6 @@
       "updating": "Updating...",
       "cloning": "Cloning..."
     },
-    
     "validation": {
       "name_required": "Enter a meaningful name :)",
       "name_too_long": "Food name cannot exceed {{max}} characters. Current: {{current}} characters.",
@@ -1846,7 +1283,6 @@
       "invalid_calories": "Invalid calories: {{value}}",
       "fix_errors": "Please fix the errors before saving."
     },
-    
     "errors": {
       "load_failed": "Failed to load food data for editing",
       "load_error": "Failed to load food: {{error}}",
@@ -1861,50 +1297,25 @@
       "save_failed": "Failed to create custom food. Please try again."
     }
   },
-
   "create_bundle": {
     "title_create": "Create Food Bundle",
     "title_edit": "Edit Food Bundle",
     "loading": "Loading bundle...",
-    
     "step1_title": "Step 1: Name the Bundle",
-    "bundle_name_label": "Bundle Name",
     "bundle_name_placeholder": "e.g., Morning Protein Shake",
     "characters_count": "{{count}}/40 characters",
-    
     "step2_title": "Step 2: Search and add food to Bundle (at least 2 items required)",
     "search_placeholder": "Search for food to add",
-    
-    "quantity_label": "Quantity",
-    "serving_label": "Serving",
-    "select_serving": "Select serving",
-    "total_kcal": "Total cal",
-    "add_to_bundle": "Add to Bundle",
-    
-    "bundle_items_title": "Bundle Items ({{count}})",
-    "details_toggle": "Details",
     "unknown_item": "Unknown",
-    
     "bundle_summary_title": "Bundle Summary",
-    
     "cancel_button": "Cancel",
     "create_button": "Create Bundle",
     "update_button": "Update Bundle",
-    
     "remove_item_title": "Remove Item",
     "remove_item_message": "Are you sure you want to remove \"{{name}}\" from the bundle?",
     "remove_item_message_generic": "Are you sure you want to remove this item from the bundle?",
     "remove_button": "Remove",
-    
-    "source_custom": "Custom",
-    "source_database": "Database",
-    "source_manual": "Manual",
-    
     "macros": {
-      "protein_short": "Pro",
-      "carbs_short": "Carb",
-      "fat_short": "Fat",
-      "fiber_short": "Fib",
       "saturated_fat_short": "Sat Fat",
       "sugar_short": "Sugar",
       "sodium_short": "Sodium",
@@ -1913,20 +1324,12 @@
       "fat": "Fat",
       "fiber": "Fiber"
     },
-    
     "errors": {
       "load_bundle_failed": "Failed to load bundle",
       "load_items_failed": "Failed to load bundle items",
       "load_bundle_error": "Failed to load bundle: {{error}}",
-      "load_food_failed": "Failed to load food",
-      "select_food_and_serving": "Please select a food and serving",
-      "enter_valid_quantity": "Please enter a valid quantity",
-      "quantity_greater_than_zero": "Quantity must be greater than 0",
-      "quantity_exceeds_limit": "Quantity cannot exceed {{max}}. Please reduce the quantity or split into multiple entries.",
-      "calories_exceed_limit": "Calories ({{calories}} cal) exceed the {{max}} cal limit per entry. Reduce quantity or split into {{entries}} entries.",
       "enter_bundle_name": "Please enter a bundle name",
       "bundle_name_too_long": "Bundle name must be 40 characters or less",
-      "add_at_least_one_food": "Please add at least one food to the bundle",
       "add_at_least_two_foods": "Please add at least 2 foods to create a bundle",
       "bundle_limit_reached_title": "Bundle Limit Reached",
       "bundle_limit_reached_message": "You have reached the maximum limit of 20 bundles.\n\nTo create a new bundle:\n• Delete an existing bundle from the Bundle tab\n• Or edit an existing bundle instead of creating a new one",
@@ -1936,125 +1339,55 @@
       "save_bundle_failed": "Failed to save bundle: {{error}}"
     }
   },
-
   "scanned_item": {
-    "title": "Scanned Item",
-    "barcode_detected": "Barcode Detected!",
     "ean13_code": "EAN-13 Code",
-    "next_step_info": "This barcode will be used to search for product information.",
-    "continue": "Continue",
-    "continue_hint": "Search for product information",
-    "scan_another": "Scan Another",
-    "scan_another_hint": "Go back to scan a different barcode",
-    "adding_to": "Adding to",
     "invalid_barcode_title": "Invalid Barcode",
     "invalid_barcode_message": "The scanned code \"{{code}}\" is not a valid barcode.\n\n{{error}}\n\nPlease try scanning again with a valid product barcode.",
     "looking_up": "Looking up product...",
     "found_in_database": "Found in Database!",
-    "product_found": "Product Found!",
-    "source_canonical": "Canonical Food",
-    "source_openfoodfacts": "From OpenFoodFacts",
-    "source_cached": "Cached Data",
     "unknown_product": "Unknown Product",
     "per_serving": "Per",
     "per_100g": "Per 100g/ml",
     "typical_serving": "Typical serving",
-    "add_to_meal": "Add to Meal",
-    "save_as_custom": "Save as Custom Food",
-    "save_info": "Saving will add this to your custom foods for easy access in the future.",
     "not_found_title": "Product Not Found",
     "not_found_description": "This product was not found in our databases.",
     "scanned_barcode": "Scanned Barcode",
     "scanned_code": "Scanned Code",
-    "create_custom": "Create Custom Food",
     "try_again": "Try Again",
-    "use_this_food": "Use This Food",
-    "use_this_food_hint": "Add this food to your meal",
     "log_it": "Log it",
     "log_it_hint": "Add this food to your meal",
-    "use_once": "Use Once",
-    "use_once_hint": "Log this food without saving it",
-    "use_once_info": "\"Use Once\" logs without saving. \"Save as Custom\" adds to your foods for future use.",
-    "save_as_custom_hint": "Save this food for easy access in the future",
-    "found_from_source": "Found from {{source}}",
     "found_on": "Found on",
     "save_and_log": "Save as Custom and Log Food",
     "save_and_log_hint": "Save this food and log it in your meal",
-    "log_as_manual": "1-time Log (Manual)",
-    "log_as_manual_hint": "Log this food once without saving it",
     "log_existing_custom": "Log my existing Custom food",
     "log_existing_custom_hint": "Log your existing custom food",
     "already_saved_as_custom": "You previously saved it as Custom already!"
   },
-
   "exercise": {
-    "title": "Exercise",
-    "today_title": "Today's Exercise",
     "quick_add_title": "Quick Add",
     "recent_days_title": "Last 7 days",
     "summary": {
-      "total": "Total: {{minutes}} min ({{count}} {{activities}})",
-      "activity_one": "activity",
-      "activity_other": "activities",
       "no_exercises": "No exercises logged yet"
-    },
-    "entry": {
-      "format_with_minutes": "{{name}} – {{minutes}} min",
-      "format_no_minutes": "{{name}}"
-    },
-    "recent_days": {
-      "format": "{{day}} – {{minutes}} min ({{count}} {{activities}})",
-      "format_no_exercises": "{{day}} – 0 min",
-      "activity_one": "activity",
-      "activity_other": "activities"
     },
     "form": {
       "title": "Add Exercise",
       "title_edit": "Edit Exercise",
       "name_label": "Exercise Name",
-      "name_placeholder": "e.g., Walking",
       "name_required": "Exercise name is required",
       "name_max_length": "Exercise name must be 30 characters or less",
-      "minutes_label": "Minutes (optional)",
-      "minutes_placeholder": "e.g., 30",
       "minutes_range": "Minutes must be between 0 and 999",
       "notes_label": "Notes (optional)",
       "notes_placeholder": "Add any notes about this exercise...",
       "notes_helper": "Optional notes (max 200 characters)",
       "notes_max_length": "Notes must be 200 characters or less",
       "select_category": "Please select a category",
-      "save": "Save",
-      "cancel": "Cancel",
-      "saving": "Saving...",
       "error_save_failed": "Failed to save exercise: {{error}}"
     },
     "quick_add": {
       "add_custom": "Log Exercise",
-      "add_custom_hint": "Double tap to add a custom exercise",
       "your_recent_frequent": "Your recent & frequent",
-      "common_exercises": "Common exercises",
       "common_cardio_mind_body": "Common Cardio & Mind-Body",
-      "common_strength": "Common Strength Workouts",
-      "common_exercises_list": {
-        "walking": "🚶‍♂️ Walking",
-        "running": "🏃‍♂️ Running",
-        "jogging": "🏃‍♂️ Jogging",
-        "gym_workout": "🏋️‍♂️ Gym Workout",
-        "cycling": "🚴‍♂️ Cycling",
-        "swimming": "🏊‍♂️ Swimming",
-        "yoga": "🧘‍♂️ Yoga",
-        "stretching": "🤸‍♂️ Stretching",
-        "hiit": "⚡ HIIT",
-        "barbell_row": "🏋️‍♂️ Barbell Row",
-        "bench_press": "🏋️‍♂️ Bench Press",
-        "biceps": "💪 Biceps",
-        "chest": "💪 Chest",
-        "deadlift": "🏋️‍♂️ Deadlift",
-        "lat_pulldown": "⬇️ Lat Pulldown",
-        "overhead_press": "⬆️ Overhead Press",
-        "squat": "🏋️‍♂️ Squat",
-        "triceps": "💪 Triceps"
-      }
+      "common_strength": "Common Strength Workouts"
     },
     "delete": {
       "title": "Delete Exercise",
@@ -2062,15 +1395,8 @@
       "message_generic": "Are you sure you want to delete this exercise?",
       "confirm": "Delete",
       "cancel": "Cancel",
-      "success": "Exercise deleted successfully",
       "success_single": "{{name}} removed.",
       "error": "Failed to delete exercise: {{error}}"
-    },
-    "edit": {
-      "hint": "Double tap to edit this exercise"
-    },
-    "delete_button": {
-      "hint": "Double tap to delete this exercise"
     },
     "chip": {
       "add_min": "+min",
@@ -2083,13 +1409,10 @@
       "edit_sets": "Edit sets",
       "edit_reps_with_value": "Edit reps: {{value}}",
       "edit_intensity_with_value": "Edit intensity: {{value}}",
-      "edit_distance": "Edit distance ({{unit}})",
-      "delete_exercise": "Delete exercise"
+      "edit_distance": "Edit distance ({{unit}})"
     },
     "settings": {
       "title": "Exercise Settings",
-      "distance_unit": "Distance Unit",
-      "distance_unit_description": "Choose how distance is displayed for cardio exercises",
       "kilometers": "Kilometers (km)",
       "miles": "Miles (mi)",
       "cancel": "Cancel",
@@ -2106,21 +1429,13 @@
         "reps_range": "Reps Range"
       }
     },
-    "loading": "Loading exercises...",
-    "error": "Failed to load exercises",
     "clone": {
       "title": "Clone today's exercises",
       "subtitle": "Choose a date to copy today's exercises to.",
-      "confirm": "Clone",
-      "accessibility_label": "Clone today's exercises to another date",
       "toast_cloning": "Cloning…",
-      "success_title": "Cloned",
-      "success_message": "{{count}} {{items}} added to {{date}}",
       "success_toast": "{{count}} {{items}} cloned to {{date}}.",
       "item_one": "exercise",
       "item_other": "exercises",
-      "no_entries_title": "No Entries",
-      "no_entries_message": "There are no entries to clone for this date.",
       "nothing_to_copy": "Nothing to copy for this day.",
       "error_title": "Clone Failed",
       "error_message": "Failed to clone entries: {{error}}",
@@ -2128,7 +1443,9 @@
       "edit_mode": {
         "select_all": "Select all",
         "exit_edit_mode": "Exit clone edit mode",
-        "enter_edit_mode": "Enter clone edit mode"
+        "enter_edit_mode": "Enter clone edit mode",
+        "clone_button": "Clone",
+        "delete_button": "Delete"
       },
       "mass_delete": {
         "title": "Delete Selected",
@@ -2151,25 +1468,9 @@
       "nothing_to_copy": "Nothing to copy for this day."
     }
   },
-
   "dashboard": {
-    "title": "Dashboard",
-    "today_summary": "Today's Summary",
     "body": {
-      "age": {
-        "label": "Age",
-        "unit": "years"
-      },
-      "height": {
-        "label": "Height",
-        "unit": "cm"
-      },
-      "weight": {
-        "label": "Weight",
-        "unit": "lbs"
-      },
       "bmi": {
-        "label": "BMI",
         "no_data": "No data",
         "classification": {
           "underweight": "Underweight",
@@ -2180,28 +1481,12 @@
       }
     },
     "snapshot": {
-      "food": "Food",
       "ex": "Move & Groove",
-      "meds": "Meds",
-      "kcal": "cal",
-      "min": "min",
       "items": "items",
-      "status_ok": "OK",
-      "status_low": "Low",
-      "status_high": "High",
-      "status_done": "Done",
-      "status_all": "All",
       "status_none": "None"
     },
     "food": {
       "title": "Food",
-      "calories": "{{calories}} cal",
-      "entries": "{{count}} {{entries}}",
-      "entry_one": "entry",
-      "entry_other": "entries",
-      "fiber": "Fiber",
-      "sugar": "Sugar",
-      "chart_7d": "7d cal",
       "chart_cal_in_vs_out": "Last 7 days - Eaten vs. Burned",
       "chart_in_zone": "In Target",
       "chart_under": "Under",
@@ -2210,79 +1495,39 @@
       "chart_bar_accessibility": "{{date}}: {{caloriesIn}} calories eaten ({{zone}}), {{caloriesOut}} calories burned",
       "chart_bar_hint": "Double tap to select this date",
       "avg": "Avg",
-      "remaining": "left",
       "goal": "Goal",
-      "consumed": "Food",
-      "carbs": "Carbs",
-      "fat": "Fat",
-      "protein": "Protein",
-      "left": "left",
       "accessibility_hint": "Double tap to view food log for this date"
     },
     "exercise": {
-      "title": "Exercise",
-      "minutes": "{{minutes}} min",
-      "activities": "{{count}} {{activities}}",
       "activity_one": "activity",
       "activity_other": "activities",
       "no_exercises": "No exercises logged today",
-      "main": "Main",
-      "chart_7d": "7d min",
-      "streak": "Ex streak",
       "last_days": "Last {{days}} days",
       "accessibility_hint": "Double tap to view exercise log for this date"
     },
-    "loading": "Loading",
     "meds": {
       "title": "Supplements & Meds",
-      "items": "{{count}} {{items}}",
-      "item_one": "item",
-      "item_other": "items",
-      "no_meds": "No meds logged today",
       "last": "Last: {{name}}{{dose}}",
       "med": "med",
       "supp": "supp",
-      "chart_7d": "7d",
       "accessibility_hint": "Double tap to view medication log for this date",
       "a11y_day_label": "{{day}} meds summary",
       "a11y_day_hint": "Double tap to open meds log for this day"
     },
     "streaks": {
       "title": "Streaks",
-      "log_streak": "Log streak",
       "best": "Best",
-      "next": "Next",
-      "chart_5w": "5w",
-      "score_legend": "Score: 0 none · 3 full",
       "login": "Login",
       "food": "Food",
       "days": "d",
       "active": "Active",
       "broken": "Broken"
-    },
-    "insights": {
-      "title": "Insights",
-      "protein_low": "Protein low: avg -{{percent}}% vs goal this wk.",
-      "exercise_pattern": "You move more {{days}}.",
-      "meds_adherence": "Meds logged {{days}} / {{total}} days.",
-      "empty": "No tips yet. Keep logging."
-    },
-    "quick": {
-      "title": "Quick",
-      "add_food": "+ Food",
-      "add_ex": "+ Ex",
-      "add_med": "+ Med",
-      "scan": "Scan"
     }
   },
-
   "meds": {
-    "title": "Meds",
-    "today_title": "Today's 💊",
     "quick_add_title": "Quick Add",
     "recent_days_title": "Last 7 days",
     "summary": {
-      "total": "Total: {{count}} {{items}} ({{med_count}} {{med}}, {{supp_count}} {{supp}})",
       "item_one": "item",
       "item_other": "items",
       "med_one": "med",
@@ -2292,15 +1537,8 @@
       "no_meds": "No meds / supplements logged yet",
       "none": "None"
     },
-    "entry": {
-      "format_with_dose": "{{name}} – {{dose}}",
-      "format_no_dose": "{{name}}"
-    },
     "recent_days": {
-      "format": "{{day}} – {{count}} {{items}}",
-      "format_no_meds": "{{day}} – 0 {{items}}",
-      "item_one": "item",
-      "item_other": "items"
+      "format_no_meds": "{{day}} – 0 {{items}}"
     },
     "form": {
       "title": "Add Med",
@@ -2312,7 +1550,6 @@
       "type_label": "Type",
       "type_med": "Med",
       "type_supp": "Supp",
-      "type_other": "Other",
       "dose_label": "Dose",
       "dose_amount_placeholder": "Amount",
       "dose_unit_placeholder": "Unit",
@@ -2322,14 +1559,10 @@
       "notes_placeholder": "Add a note...",
       "notes_helper": "Optional note (max 200 characters)",
       "notes_max_length": "Note must be 200 characters or less",
-      "save": "Save",
-      "cancel": "Cancel",
-      "saving": "Saving...",
       "error_save_failed": "Failed to save med: {{error}}"
     },
     "quick_add": {
       "add_custom": "Log New",
-      "add_custom_hint": "Double tap to add a custom med",
       "recent_freq": "RECENT & FREQ",
       "common": "COMMON",
       "common_meds_list": {
@@ -2358,35 +1591,17 @@
       "message_generic": "Are you sure you want to delete this med?",
       "confirm": "Delete",
       "cancel": "Cancel",
-      "success": "Med deleted successfully",
       "success_single": "{{name}} removed.",
       "error": "Failed to delete item: {{error}}"
-    },
-    "preferences": {
-      "title": "Meds Preferences",
-      "primary_section": "Show First",
-      "hide_when_empty": "Hide When Empty",
-      "hide_when_empty_hint": "Hide sections only when they have no items",
-      "hide_med": "Hide Med section when empty",
-      "hide_supp": "Hide Supp section when empty",
-      "section": {
-        "toggle_med": "Toggle Medications section",
-        "toggle_supp": "Toggle Supplements section"
-      }
     },
     "clone": {
       "title": "Clone today's intake",
       "subtitle": "Choose a date to copy today's pills/supplements to.",
       "confirm": "Clone",
-      "accessibility_label": "Clone today's intake to another date",
       "toast_cloning": "Cloning…",
-      "success_title": "Cloned",
-      "success_message": "{{count}} {{items}} added to {{date}}",
       "success_toast": "{{count}} {{items}} cloned to {{date}}.",
       "item_one": "item",
       "item_other": "items",
-      "no_entries_title": "No Entries",
-      "no_entries_message": "There are no entries to clone for this date.",
       "nothing_to_copy": "Nothing to copy for this day.",
       "error_title": "Clone Failed",
       "error_message": "Failed to clone entries: {{error}}",
@@ -2419,9 +1634,7 @@
       "nothing_to_copy": "Nothing to copy for this day."
     }
   },
-
   "tabs": {
-    "log": "Log",
     "exercise": "Exercise",
     "meds": "Meds / Supplements",
     "weight": "Weight",
@@ -2429,25 +1642,23 @@
     "dashboard": "Dashboard",
     "more": "More"
   },
-
   "quick_add": {
     "log_food": "Log Food",
     "log_exercise": "Log Exercise",
     "log_med_supp": "Log Med/Supp",
     "log_water": "Log Water",
     "enter_weight": "Log Weight",
-    "scan_barcode": "Scan Barcode"
+    "scan_barcode": "Scan Barcode",
+    "log_now": "Log Now"
   },
-
   "water": {
     "dashboard": {
       "title": "Water",
-      "ml": "ml",
-      "goal": "Goal: {{goal}} ml",
-      "set_goal": "Set Goal",
       "card_label": "Water: {{ml}} / {{goal}} ml"
     },
-    "today_title": "Today's Water",
+    "set_goal": {
+      "error": "Failed to set water goal"
+    },
     "ml": "ml",
     "floz": "fl oz",
     "cup": "cup",
@@ -2460,15 +1671,7 @@
       "goal": "Daily Water Goal",
       "save": "Save",
       "cancel": "Cancel",
-      "goal_out_of_range": "Goal must be between {{min}} and {{max}} ml",
       "goal_required": "Goal is required"
-    },
-    "summary": {
-      "goal": "Goal: {{goal}} ml"
-    },
-    "adjust": {
-      "minus50": "-50 ml",
-      "minus100": "-100 ml"
     },
     "edit_total": {
       "title": "Water Consumed",
@@ -2478,8 +1681,6 @@
       "error": "Failed to update total"
     },
     "custom_button": "+ Custom",
-    "goal_limit_error": "Goal must be between {{min}} ml and {{max}} ml",
-    "quick_add_title": "Quick Add",
     "quick_presets": {
       "small": "Small",
       "cup": "Cup",
@@ -2494,7 +1695,6 @@
     },
     "custom_input": "Custom",
     "custom_input_label": "Amount ({{unit}})",
-    "custom_input_error": "Please enter a valid amount",
     "custom_input_error_invalid": "Please enter a valid amount",
     "error": {
       "max_total_exceeded_title": "Maximum Total Exceeded",
@@ -2505,14 +1705,7 @@
     "chart": {
       "goal_label": "Goal {{value}}",
       "empty_message": "Log some water to see your history"
-    },
-    "set_goal": {
-      "title": "Set Water Goal",
-      "message": "Enter your daily water goal in {{unit}}",
-      "button": "Set Goal",
-      "invalid": "Please enter a valid goal amount"
-    },
-    "edit_goal": "Edit Goal"
+    }
   },
   "quick_log": {
     "header_title": "🍴 Diary",
@@ -2530,6 +1723,7 @@
       "title": "Weight",
       "card_label": "Weight: {{weight}}",
       "no_data": "No weight data",
+      "no_weigh_ins": "No weigh-ins",
       "log_weight": "Log Weight",
       "body_fat": "body fat",
       "accessibility_hint": "Double tap to view weight log"
@@ -2549,4 +1743,3 @@
     }
   }
 }
-

@@ -23,7 +23,7 @@ const BMI_CATEGORIES: Array<{ maxBmi: number; category: BMICategory }> = [
     category: {
       label: 'Underweight',
       labelKey: 'home.stats.bmi_underweight',
-      color: '#3B82F6',
+      tone: 'info',
     },
   },
   {
@@ -31,7 +31,7 @@ const BMI_CATEGORIES: Array<{ maxBmi: number; category: BMICategory }> = [
     category: {
       label: 'Normal Weight',
       labelKey: 'home.stats.bmi_normal',
-      color: '#10B981',
+      tone: 'success',
     },
   },
   {
@@ -39,7 +39,7 @@ const BMI_CATEGORIES: Array<{ maxBmi: number; category: BMICategory }> = [
     category: {
       label: 'Overweight/Muscular',
       labelKey: 'home.stats.bmi_overweight',
-      color: '#F59E0B',
+      tone: 'warning',
     },
   },
   {
@@ -47,7 +47,7 @@ const BMI_CATEGORIES: Array<{ maxBmi: number; category: BMICategory }> = [
     category: {
       label: 'Obese',
       labelKey: 'home.stats.bmi_obese',
-      color: '#EF4444',
+      tone: 'error',
     },
   },
 ];

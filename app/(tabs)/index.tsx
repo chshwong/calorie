@@ -1487,7 +1487,7 @@ export default function FoodLogHomeScreen() {
                               `Open menu for ${mealTypeLabel}`
                             )}
                           >
-                            <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} />
+                            <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} decorative />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1619,28 +1619,33 @@ export default function FoodLogHomeScreen() {
         animationType="fade"
         onRequestClose={() => setThreeDotMealMenuVisible({ mealType: null })}
       >
-        <TouchableOpacity
+        {/* Use a non-button overlay container to avoid nested <button> on web (AODA/WCAG + hydration-safe). */}
+        <View
           style={[styles.threeDotMealMenuOverlay, { backgroundColor: colors.overlay }]}
-          activeOpacity={1}
-          onPress={() => setThreeDotMealMenuVisible({ mealType: null })}
+          accessible={false}
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={() => setThreeDotMealMenuVisible({ mealType: null })}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
+          {/* Stop outside-click closing when interacting with the menu content */}
+          <View
+            accessibilityViewIsModal={true}
+            accessibilityRole="dialog"
+            onStartShouldSetResponder={() => true}
           >
             <View style={[styles.threeDotMealMenuContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {/* Close button header */}
               <View style={styles.threeDotMealMenuHeader}>
                 <TouchableOpacity
-                  style={[styles.threeDotMealMenuCloseButton, getMinTouchTargetStyle()]}
+                  style={[
+                    styles.threeDotMealMenuCloseButton,
+                    getMinTouchTargetStyle(),
+                    Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                  ]}
                   onPress={() => setThreeDotMealMenuVisible({ mealType: null })}
                   activeOpacity={0.7}
-                  {...getButtonAccessibilityProps(
-                    t('common.close'),
-                    t('common.close_hint')
-                  )}
+                  {...getButtonAccessibilityProps(t('common.close'), t('common.close_hint'))}
                 >
-                  <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
+                  <IconSymbol name="xmark" size={20} color={colors.textSecondary} decorative />
                 </TouchableOpacity>
               </View>
               {threeDotMealMenuVisible.mealType && (() => {
@@ -1648,9 +1653,8 @@ export default function FoodLogHomeScreen() {
                 const currentMealType = threeDotMealMenuVisible.mealType;
                 const mealTypeEntries = groupedEntries[currentMealType as keyof typeof groupedEntries]?.entries ?? [];
                 const mealMeta = dataByMealType[currentMealType];
-                const hasAnythingToCopy = 
-                  mealTypeEntries.length > 0 ||
-                  (mealMeta?.note?.trim()?.length ?? 0) > 0;
+                const hasAnythingToCopy =
+                  mealTypeEntries.length > 0 || (mealMeta?.note?.trim()?.length ?? 0) > 0;
 
                 return (
                   <>
@@ -1690,19 +1694,20 @@ export default function FoodLogHomeScreen() {
                       )}
                     >
                       <View style={styles.threeDotMealMenuItemWithIcon}>
-                        <IconSymbol 
-                          name="doc.on.doc" 
-                          size={16} 
-                          color={hasAnythingToCopy ? colors.text : colors.textSecondary} 
+                        <IconSymbol
+                          name="doc.on.doc"
+                          size={16}
+                          color={hasAnythingToCopy ? colors.text : colors.textSecondary}
+                          decorative
                         />
-                        <ThemedText 
+                        <ThemedText
                           style={[
-                            styles.threeDotMealMenuItemText, 
-                            { 
+                            styles.threeDotMealMenuItemText,
+                            {
                               color: hasAnythingToCopy ? colors.text : colors.textSecondary,
                               marginLeft: Spacing.sm,
                               opacity: hasAnythingToCopy ? 1 : 0.5,
-                            }
+                            },
                           ]}
                         >
                           {t('food.menu.copy_to')}
@@ -1728,19 +1733,20 @@ export default function FoodLogHomeScreen() {
                       )}
                     >
                       <View style={styles.threeDotMealMenuItemWithIcon}>
-                        <IconSymbol 
-                          name="doc.on.doc" 
-                          size={16} 
-                          color={hasAnythingToCopy ? colors.text : colors.textSecondary} 
+                        <IconSymbol
+                          name="doc.on.doc"
+                          size={16}
+                          color={hasAnythingToCopy ? colors.text : colors.textSecondary}
+                          decorative
                         />
-                        <ThemedText 
+                        <ThemedText
                           style={[
-                            styles.threeDotMealMenuItemText, 
-                            { 
+                            styles.threeDotMealMenuItemText,
+                            {
                               color: hasAnythingToCopy ? colors.text : colors.textSecondary,
                               marginLeft: Spacing.sm,
                               opacity: hasAnythingToCopy ? 1 : 0.5,
-                            }
+                            },
                           ]}
                         >
                           {t('food.menu.move_to')}
@@ -1768,8 +1774,8 @@ export default function FoodLogHomeScreen() {
                 );
               })()}
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
 

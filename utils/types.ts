@@ -100,7 +100,14 @@ export interface BMICategory {
   label: string;
   /** i18n key for the label */
   labelKey: string;
-  color: string;
+  /**
+   * Semantic tone for UI (colors should come from theme tokens, not hardcoded hex values).
+   * - info: underweight
+   * - success: normal
+   * - warning: overweight
+   * - error: obese
+   */
+  tone: 'info' | 'success' | 'warning' | 'error';
 }
 
 // ============================================================================

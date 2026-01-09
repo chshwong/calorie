@@ -193,6 +193,32 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
           
           {/* BMI chip overlay - absolute positioned to the right */}
           {bmi !== null && bmiCategory && (
+            (() => {
+              const isLight = colorScheme === 'light';
+
+              // Theme-driven semantic styling (no hardcoded colors in component)
+              const toneTextColor =
+                bmiCategory.tone === 'warning' && isLight
+                  ? colors.warningText
+                  : bmiCategory.tone === 'success'
+                  ? colors.success
+                  : bmiCategory.tone === 'error'
+                  ? colors.error
+                  : colors.info;
+
+              const toneSurfaceColor =
+                bmiCategory.tone === 'warning' && isLight
+                  ? colors.warningSurface
+                  : bmiCategory.tone === 'success'
+                  ? colors.successLight
+                  : bmiCategory.tone === 'error'
+                  ? colors.errorLight
+                  : colors.infoLight;
+
+              const toneBorderColor =
+                bmiCategory.tone === 'warning' && isLight ? colors.warningBorder : colors.border;
+
+              return (
             <View
               style={[
                 styles.bmiChip,
@@ -202,22 +228,24 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
                   top: '50%',
                   // Approximate half-height for vertical centering (chip height ~36px)
                   transform: [{ translateY: -(Spacing.xl - Nudge.px2) }],
-                  backgroundColor: bmiCategory.color + '12', // 12 hex = ~7% opacity
-                  borderWidth: colorScheme === 'light' ? 1 : 0,
-                  borderColor: colorScheme === 'light' ? colors.border : 'transparent',
+                  backgroundColor: toneSurfaceColor,
+                  borderWidth: isLight ? 1 : 0,
+                  borderColor: isLight ? toneBorderColor : 'transparent',
                   zIndex: 10,
                 },
               ]}
             >
-              <ThemedText style={[styles.bmiChipValue, { color: bmiCategory.color }]}>
+              <ThemedText style={[styles.bmiChipValue, { color: toneTextColor }]}>
                 {bmi.toFixed(1)}
               </ThemedText>
               {bmiLabel && (
-                <ThemedText style={[styles.bmiChipLabel, { color: bmiCategory.color }]}>
+                <ThemedText style={[styles.bmiChipLabel, { color: toneTextColor }]}>
                   {t(bmiLabel)}
                 </ThemedText>
               )}
             </View>
+              );
+            })()
           )}
         </View>
 

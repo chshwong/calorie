@@ -206,6 +206,13 @@ export const Colors = {
     
     // Semantic (spread from SemanticColors)
     ...SemanticColors,
+    /**
+     * Higher-contrast semantic surfaces/text for light mode chips/badges.
+     * Keep using semantic hue (amber) but ensure WCAG-friendly contrast.
+     */
+    warningSurface: '#FEF3C7', // amber-100
+    warningText: '#92400E', // amber-800
+    warningBorder: '#FCD34D', // amber-300
   },
   dark: {
     // Text
@@ -304,6 +311,10 @@ export const Colors = {
     // Override info color for dark mode - brighter blue for better contrast on dark backgrounds
     info: '#60A5FA', // Brighter blue-400 for dark mode (meets WCAG 4.5:1 contrast)
     infoLight: '#60A5FA20', // Light variant with same opacity pattern
+    // Keep dark-mode appearance unchanged; these tokens are primarily for light-mode readability.
+    warningSurface: '#F59E0B20',
+    warningText: '#F59E0B',
+    warningBorder: '#F59E0B40',
   },
 };
 

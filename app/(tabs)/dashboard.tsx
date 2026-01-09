@@ -55,15 +55,9 @@ type DashboardFoodSectionProps = {
 
 function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect }: DashboardFoodSectionProps) {
   const { t } = useTranslation();
-  const router = useRouter();
   const foodSummary = useDailyFoodSummary(dateString);
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
   const { data: userConfig } = useUserConfig();
-  
-  // Handle date selection from chart - navigate to Food Log page with selected date
-  const handleFoodChartDateSelect = useCallback((selectedDateString: string) => {
-    router.push(`/?date=${selectedDateString}`);
-  }, [router]);
 
   // Helper function to get goal label
   const getGoalLabel = () => {
@@ -122,6 +116,14 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
           </View>
         </TouchableOpacity>
 
+          {/* Make the gauge area tappable so it behaves like "open Food Log for this date". */}
+          <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={getMinTouchTargetStyle()}
+            {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+            {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
+          >
           <View style={styles.caloriesRow}>
             <View style={styles.foodChipsOverlay} pointerEvents="box-none">
               <View style={styles.foodChipsColumn}>
@@ -149,6 +151,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               showLabel
             />
           </View>
+          </TouchableOpacity>
 
           {/* Cals in vs out Chart */}
           <View style={styles.chartSection}>
@@ -161,7 +164,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               todayDateString={getTodayKey()}
               yesterdayDateString={getYesterdayKey()}
               useYdayLabel
-              onBarPress={handleFoodChartDateSelect}
+              onBarPress={onDateSelect}
               height={isSmallScreen ? 105 : isMobile ? 120 : 128}
             />
             {weeklyCalInVsOut.data.length > 0 && (
@@ -727,7 +730,7 @@ export default function DashboardScreen() {
           return isToday
             ? `${t('common.today')}, ${formattedDate}`
             : selectedDate.getTime() === yesterday.getTime()
-            ? `${t('date.yday')}, ${formattedDate}`
+            ? `${t('common.yesterday')}, ${formattedDate}`
             : formattedDate;
         })()}
         rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
