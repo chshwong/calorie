@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import Svg, { Path, Text as SvgText, Circle, TSpan, G } from 'react-native-svg';
-import { Colors, FontFamilies, FontSize, Nudge, Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTranslation } from 'react-i18next';
-import { ensureContrast } from '@/theme/contrast';
 import { MACRO_GAUGE_TEXT } from '@/components/MacroGauge';
+import { Colors, FontFamilies, FontSize, Nudge } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ensureContrast } from '@/theme/contrast';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform, StyleSheet, View } from 'react-native';
+import Svg, { Circle, G, Path, Text as SvgText, TSpan } from 'react-native-svg';
 
 type GoalType = 'lose' | 'maintain' | 'recomp' | 'gain';
 
@@ -216,7 +216,8 @@ export function AvocadoGauge({
   // Tip label positioning (adjusted to use available white space at top)
   // Offset horizontally toward exterior to avoid overlapping center label
   const isLeftSide = tip.x < PATH_CX;
-  const horizontalOffset = 18; // Offset distance toward exterior
+  const isLowerHalf = tip.y >= 95; // Check if tip is in lower half of avocado
+  const horizontalOffset = isLowerHalf ? 13 : 18; // 5px closer when in lower half to avoid edge clipping
   const tipLabelX = isLeftSide ? tip.x - horizontalOffset : tip.x + horizontalOffset;
   
   // Position label above the tip, accounting for stroke path thickness
@@ -368,7 +369,7 @@ export function AvocadoGauge({
         {fillT > 0 && (
           <G>
             <Circle cx={tip.x} cy={tip.y} r={4} fill={lineColor} />
-            {/* Text halo (drawn first for contrast) - increased strokeWidth to 8 for maximum visibility */}
+            {/* Text halo (drawn first for contrast) */}
             <SvgText
               x={tipLabelX}
               y={tipLabelY}
@@ -376,7 +377,7 @@ export function AvocadoGauge({
               fontFamily={FontFamilies.regular}
               fill={bgForContrast}
               stroke={bgForContrast}
-              strokeWidth={8}
+              strokeWidth={4}
               strokeLinejoin="round"
               textAnchor="middle"
             >

@@ -185,7 +185,7 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
             {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
             {...getButtonAccessibilityProps(accessibilityLabel, t('weight.dashboard.accessibility_hint'))}
           >
-            <IconSymbol name="scale.bathroom" size={20} color={accentColor} />
+            <IconSymbol name="scale.bathroom" size={20} color={accentColor} decorative />
             <ThemedText type="subtitle" style={[styles.title, { color: colors.text }]}>
               {t('weight.dashboard.title')}
             </ThemedText>

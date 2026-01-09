@@ -189,7 +189,7 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <IconSymbol name="drop.fill" size={20} color={accentColor} />
+            <IconSymbol name="drop.fill" size={20} color={accentColor} decorative />
             <ThemedText type="subtitle" style={[styles.title, { color: colors.text }]}>
               {t('water.dashboard.title')}
             </ThemedText>

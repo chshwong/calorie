@@ -93,6 +93,7 @@ export function ExerciseActivitiesChart({
             name={icon.name as any}
             size={icon.size || 16}
             color={colors.accentExercise}
+            decorative
           />
         ))}
         <ThemedText style={[styles.exerciseChipsTitle, { color: colors.text }]}>
@@ -195,12 +196,28 @@ export function ExerciseActivitiesChart({
                 {category === 'cardio_mind_body' && (showDuration || showDistance) && (
                   <View style={styles.belowAxisContainer}>
                     {showDuration && (
-                      <ThemedText style={[styles.metricText, { color: colors.textSecondary }]}>
+                      <ThemedText 
+                        style={[styles.metricText, { color: colors.textSecondary }]}
+                        accessibilityLabel={t('dashboard.exercise.duration', { minutes: dayData.totalMinutes })}
+                      >
                         🕐{dayData.totalMinutes}m
                       </ThemedText>
                     )}
                     {showDistance && (
-                      <ThemedText style={[styles.metricText, { color: colors.textSecondary }]}>
+                      <ThemedText 
+                        style={[styles.metricText, { color: colors.textSecondary }]}
+                        accessibilityLabel={(() => {
+                          // Convert distance based on user preference
+                          let distanceValue = dayData.totalDistanceKm;
+                          if (distanceUnit === 'mi') {
+                            distanceValue = dayData.totalDistanceKm / KM_TO_MILES_CONVERSION;
+                          }
+                          // Round to integer
+                          const roundedDistance = Math.round(distanceValue);
+                          const unitLabel = distanceUnit === 'mi' ? t('units.mi') : t('units.km');
+                          return t('dashboard.exercise.distance', { value: roundedDistance, unit: unitLabel });
+                        })()}
+                      >
                         {(() => {
                           // Convert distance based on user preference
                           let distanceValue = dayData.totalDistanceKm;
@@ -311,6 +328,7 @@ const styles = StyleSheet.create({
   },
   exerciseDayLabel: {
     fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
     lineHeight: FontSize.sm + 2,
     marginTop: Spacing.xs,
     textAlign: 'center',

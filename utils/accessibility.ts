@@ -6,8 +6,9 @@ import { Platform } from 'react-native';
 
 /**
  * Minimum touch target size for WCAG 2.0 AA compliance (44x44 points)
+ * WCAG 2.5.5 Target Size (Enhanced) requires at least 44x44 CSS pixels
  */
-export const MIN_TOUCH_TARGET_SIZE = 26;
+export const MIN_TOUCH_TARGET_SIZE = 44;
 
 /**
  * Accessibility roles for React Native components

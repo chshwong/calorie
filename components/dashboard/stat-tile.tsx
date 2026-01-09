@@ -103,7 +103,7 @@ export function StatTile({ icon, label, value, status, accentColor, onPress }: S
             />
           )}
           <View style={styles.content}>
-            <IconSymbol name={icon as any} size={26} color={accentColor} />
+            <IconSymbol name={icon as any} size={26} color={accentColor} decorative />
             <ThemedText style={[styles.label, { color: colors.textMuted }]}>
               {label}
             </ThemedText>

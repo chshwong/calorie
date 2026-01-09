@@ -67,7 +67,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
       case 'maintain':
         return t('onboarding.goal.maintain_weight.label');
       case 'recomp':
-        return 'Body Recomposition';
+        return t('onboarding.goal.recomp.label');
       case 'gain':
         return t('onboarding.goal.gain_weight.label');
       default:
@@ -81,7 +81,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
         <PremiumCard>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <IconSymbol name="fork.knife" size={20} color={colors.accentFood} />
+              <IconSymbol name="fork.knife" size={20} color={colors.accentFood} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.food.title')}
               </ThemedText>
@@ -108,7 +108,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
         >
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <IconSymbol name="fork.knife" size={20} color={colors.accentFood} />
+              <IconSymbol name="fork.knife" size={20} color={colors.accentFood} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.food.title')}
               </ThemedText>
@@ -237,7 +237,7 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
         <PremiumCard>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <IconSymbol name="figure.run" size={20} color={colors.accentExercise} />
+              <IconSymbol name="figure.run" size={20} color={colors.accentExercise} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.snapshot.ex')}
               </ThemedText>
@@ -264,7 +264,7 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
         >
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <IconSymbol name="figure.run" size={20} color={colors.accentExercise} />
+              <IconSymbol name="figure.run" size={20} color={colors.accentExercise} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.snapshot.ex')}
               </ThemedText>
@@ -380,7 +380,7 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
         <PremiumCard>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <IconSymbol name="pills.fill" size={20} color={colors.accentMeds} />
+              <IconSymbol name="pills.fill" size={20} color={colors.accentMeds} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.meds.title')}
               </ThemedText>
@@ -407,7 +407,7 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
         >
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <IconSymbol name="pills.fill" size={20} color={colors.accentMeds} />
+              <IconSymbol name="pills.fill" size={20} color={colors.accentMeds} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.meds.title')}
               </ThemedText>
@@ -424,7 +424,10 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
             </ThemedText>
             {lastItemName && (
               <ThemedText style={[styles.medsLast, { color: colors.textSubtle }]}>
-                {t('dashboard.meds.last')}: {lastItemName}{lastItemDose ? ` – ${lastItemDose}` : ''}
+                {t('dashboard.meds.last', { 
+                  name: lastItemName, 
+                  dose: lastItemDose ? ` – ${lastItemDose}` : '' 
+                })}
               </ThemedText>
             )}
           </View>
@@ -571,7 +574,7 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
             return (
               <View key={type} style={[styles.streakRow, { backgroundColor: colors.backgroundSecondary }]}>
                 <View style={styles.streakLeft}>
-                  <IconSymbol name={icon as any} size={20} color={colors.text} />
+                  <IconSymbol name={icon as any} size={20} color={colors.text} decorative />
                   <ThemedText style={[styles.streakLabel, { color: colors.text }]}>
                     {label}
                   </ThemedText>

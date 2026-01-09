@@ -8,6 +8,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Colors, FontSize, ModuleThemes, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -201,6 +202,22 @@ export function HorizontalBarChart({
             // Original placement logic - check if label can fit outside
             const canFitOutside = barW + OUTSIDE_GAP + EST_LABEL_W <= plotWidth;
             
+            // Format date for accessibility label
+            const dateLabel = formatDateLabel(item.date);
+            const valueLabel = isZero 
+              ? t('water.chart.no_intake', { defaultValue: 'No intake' })
+              : labelText || '';
+            const accessibilityLabel = valueLabel 
+              ? t('water.chart.bar_accessibility', { 
+                  date: dateLabel, 
+                  value: valueLabel,
+                  defaultValue: '{{date}}, {{value}}'
+                })
+              : dateLabel;
+            const accessibilityHint = onRowPress 
+              ? t('water.chart.bar_hint', { defaultValue: 'Double tap to view details for this day' })
+              : undefined;
+
             return (
               <Pressable
                 key={item.date}
@@ -210,6 +227,7 @@ export function HorizontalBarChart({
                     top,
                     height: rowHeight,
                   },
+                  onRowPress && getMinTouchTargetStyle(),
                   Platform.OS === 'web' && ({
                     outlineStyle: 'none' as const,
                     outlineWidth: 0,
@@ -217,8 +235,11 @@ export function HorizontalBarChart({
                 ]}
                 onPress={() => onRowPress?.(item.date)}
                 android_ripple={null}
-                hitSlop={Spacing.xs}
+                hitSlop={Spacing.sm}
                 accessibilityRole={onRowPress ? 'button' : 'none'}
+                accessibilityLabel={accessibilityLabel}
+                accessibilityHint={accessibilityHint}
+                {...(Platform.OS === 'web' && onRowPress && getFocusStyle(color || waterTheme.accent))}
               >
                 {/* Horizontal bar or zero marker */}
                 <View style={styles.barContainer}>

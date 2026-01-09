@@ -1503,7 +1503,9 @@
       "activity_other": "activities",
       "no_exercises": "No exercises logged today",
       "last_days": "Last {{days}} days",
-      "accessibility_hint": "Double tap to view exercise log for this date"
+      "accessibility_hint": "Double tap to view exercise log for this date",
+      "duration": "{{minutes}} minutes",
+      "distance": "{{value}} {{unit}}"
     },
     "meds": {
       "title": "Supplements & Meds",
@@ -1704,7 +1706,10 @@
     "history_title": "Last 7 Days",
     "chart": {
       "goal_label": "Goal {{value}}",
-      "empty_message": "Log some water to see your history"
+      "empty_message": "Log some water to see your history",
+      "bar_accessibility": "{{date}}, {{value}}",
+      "bar_hint": "Double tap to view details for this day",
+      "no_intake": "No intake"
     }
   },
   "quick_log": {

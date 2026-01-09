@@ -112,8 +112,17 @@ export function CircularStat({
   // We'll use a simplified approach with a progress bar style visualization
   const progressPercent = progress * 100;
   
+  // Create accessibility label for the circular stat
+  const accessibilityLabel = max !== null
+    ? `${label}: ${Math.round(displayValue)} of ${Math.round(max)}`
+    : `${label}: ${Math.round(displayValue)}`;
+  
   return (
-    <View style={styles.container}>
+    <View 
+      style={styles.container}
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
       <View style={[styles.circleContainer, { width: radius * 2, height: radius * 2 }]}>
         {/* Background track circle */}
         <View
