@@ -58,17 +58,16 @@ export function BarChart({
   const waterTheme = ModuleThemes.water;
   
   // Calculate scaleMax: max of daily values and goal
-  // If maxValue is provided, use it (parent already calculated max of daily and goal)
+  // If maxValue is provided, use it directly (parent already calculated max of daily and goal)
   // Otherwise, calculate from data
   const maxDay = Math.max(...data.map(d => d.value), 0);
   const goal = goalValue || 0;
   const scaleMax = maxValue ? maxValue : Math.max(maxDay, goal, 1);
   
-  // Add headroom factor (1.08 = 8% padding) so tallest bar/goal doesn't clip
-  // This makes bars use ~92.6% of plot height (1/1.08 ≈ 0.926)
-  // The tallest bar/goal will reach ~92.6% of plotHeight, leaving small top padding
-  const headroomFactor = 1.08;
-  const effectiveMax = scaleMax * headroomFactor;
+  // When maxValue is provided, treat it as the actual top of the plot (no extra headroom)
+  // When maxValue is NOT provided, we can apply a small headroom factor for auto-scaling
+  // Use scaleMax directly when maxValue is provided, otherwise apply minimal headroom
+  const effectiveMax = maxValue ? scaleMax : scaleMax * 1.02; // Only 2% headroom for auto-scaling
 
   // Reserve space within the chart for labels without affecting the plot scaling.
   // - topInset: lets value labels above bars remain visible (they can overflow upward into this space)
@@ -76,7 +75,10 @@ export function BarChart({
   // Keep label headroom constant; scale is controlled via effectiveMax (no layout changes).
   const topInset = Spacing['4xl'];
   const xAxisHeight = showLabels ? (FontSize.xs + Spacing.md) : 0;
-  const plotHeight = Math.max(height - topInset - xAxisHeight, 1);
+  const rawPlotHeight = Math.max(height - topInset - xAxisHeight, 1);
+  // Apply tiny 2% pixel-based padding at top (not by inflating scaleMax)
+  // This gives a small visual buffer while keeping scaling accurate
+  const plotHeight = rawPlotHeight - Math.max(Math.round(rawPlotHeight * 0.02), 2);
   const goalLabelHaloRadius = Spacing.sm - Spacing.xs; // 8 - 4 = 4 (token-based)
   
   // Check if all data is empty (all values are 0)

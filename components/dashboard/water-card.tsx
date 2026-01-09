@@ -4,7 +4,7 @@
  * Displays today's water intake with circular progress indicator
  */
 
-import { BarChart } from '@/components/charts/bar-chart';
+import { HorizontalBarChart } from '@/components/charts/horizontal-bar-chart';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
@@ -44,11 +44,11 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
   
-  // Get unit preference (default to metric)
-  const unitPreference = (profile?.water_unit_preference as 'metric' | 'imperial') || 'metric';
-  
   // Get profile water unit and goal
   const profileWaterUnit = (profile?.water_unit as WaterUnit) || 'ml';
+  
+  // Get unit preference for display (use profile water unit)
+  const unitPreference = profileWaterUnit;
   const profileGoalMl = profile?.water_goal_ml || null;
   const profileGoalInUnit = profileGoalMl ? fromMl(profileGoalMl, profileWaterUnit) : null;
   const profileEffectiveGoal = getEffectiveGoal(profileWaterUnit, profileGoalInUnit);
@@ -205,14 +205,44 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
               </ThemedText>
             </View>
           ) : (
-            <>
+            <View style={styles.mainContent}>
+              {/* Left: Horizontal chart */}
+              <View style={styles.chartColumn}>
+                <View style={styles.rangeTitleRow}>
+                  <ThemedText style={[styles.rangeTitle, { color: colors.text }]}>
+                    {t('common.last_7_days')}
+                  </ThemedText>
+                </View>
+                <HorizontalBarChart
+                  data={historyData}
+                  maxValue={chartMax}
+                  goalValue={chartGoalMl}
+                  goalDisplayValue={goalDisplayValue}
+                  todayDateString={todayDateString}
+                  yesterdayDateString={yesterdayDateString}
+                  useYdayLabel
+                  color={accentColor}
+                  width={180}
+                  onRowPress={(dateString) => {
+                    router.push({
+                      pathname: '/(tabs)/water',
+                      params: { date: dateString },
+                    } as any);
+                  }}
+                />
+              </View>
+              
+              {/* Right: Droplet gauge */}
               <Pressable
                 onPress={handleDropPress}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
                 android_ripple={null}
                 hitSlop={Spacing.sm}
-                style={Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : undefined}
+                style={[
+                  styles.dropletColumn,
+                  Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : undefined,
+                ]}
                 {...getButtonAccessibilityProps(accessibilityLabel)}
               >
                 <WaterDropGauge
@@ -223,34 +253,7 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
                   variant="dashboard"
                 />
               </Pressable>
-              <View style={styles.chartContainer}>
-                <View style={styles.rangeTitleRow}>
-                  <ThemedText style={[styles.rangeTitle, { color: colors.text }]}>
-                    {t('common.last_7_days')}
-                  </ThemedText>
-                </View>
-                <BarChart
-                  data={historyData}
-                  maxValue={chartMax}
-                  goalValue={chartGoalMl}
-                  goalDisplayValue={goalDisplayValue}
-                  selectedDate={selectedDateString}
-                  todayDateString={todayDateString}
-                  yesterdayDateString={yesterdayDateString}
-                  useYdayLabel
-                  colorScale={() => accentColor}
-                  height={120}
-                  showLabels={true}
-                  emptyMessage={t('water.chart.empty_message')}
-                  onBarPress={(dateString) => {
-                    router.push({
-                      pathname: '/(tabs)/water',
-                      params: { date: dateString },
-                    } as any);
-                  }}
-                />
-              </View>
-            </>
+            </View>
           )}
         </View>
     </Animated.View>
@@ -290,9 +293,20 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: FontSize.sm,
   },
-  chartContainer: {
+  mainContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     width: '100%',
-    marginTop: Spacing.sm,
+    gap: Spacing.md,
+  },
+  chartColumn: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  dropletColumn: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rangeTitleRow: {
     flexDirection: 'row',
