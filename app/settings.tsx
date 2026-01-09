@@ -423,14 +423,6 @@ export default function SettingsScreen() {
               appRouter.push('/edit-profile');
             }}
           />
-          <SettingItem
-            icon="envelope.fill"
-            title={t('settings.account.email_settings')}
-            onPress={() => {
-              // TODO: Navigate to email settings screen
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.account.email_settings') }));
-            }}
-          />
         </SettingSection>
 
         {/* Preferences */}

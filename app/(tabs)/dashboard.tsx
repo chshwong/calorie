@@ -356,6 +356,19 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
     ? `${lastItem.dose_amount} ${lastItem.dose_unit}`
     : null;
 
+  // Format "Logged" summary text based on selected date
+  const loggedSummaryText = useMemo(() => {
+    if (dateString === todayKey) {
+      return `Logged today: ${totalItems}`;
+    } else if (dateString === yesterdayKey) {
+      return `Logged yday: ${totalItems}`;
+    } else {
+      const date = new Date(dateString + 'T00:00:00');
+      const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+      return `Logged on ${dayLabel}: ${totalItems}`;
+    }
+  }, [dateString, todayKey, yesterdayKey, totalItems]);
+
   // Build weekly adherence data (matching original logic)
   const days = 7;
   const endDate = new Date(dateString + 'T00:00:00');
@@ -435,8 +448,8 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
         </TouchableOpacity>
 
           <View style={styles.medsToday}>
-            <ThemedText style={[styles.medsValue, { color: colors.text }]}>
-              {totalItems} {t('dashboard.snapshot.items')}
+            <ThemedText style={[styles.medsLoggedSummary, { color: colors.textSecondary }]}>
+              {loggedSummaryText}
             </ThemedText>
             <ThemedText style={[styles.medsSubtext, { color: colors.textMuted }]}>
               {medCount} {t('dashboard.meds.med')} · {suppCount} {t('dashboard.meds.supp')}
@@ -958,6 +971,11 @@ const styles = StyleSheet.create({
   medsToday: {
     alignItems: 'center',
     marginBottom: Layout.chartGapCompact,
+  },
+  medsLoggedSummary: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    marginBottom: 4,
   },
   medsValue: {
     fontSize: FontSize['2xl'],
