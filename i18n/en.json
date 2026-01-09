@@ -2211,7 +2211,8 @@
       "carbs": "Carbs",
       "fat": "Fat",
       "protein": "Protein",
-      "left": "left"
+      "left": "left",
+      "accessibility_hint": "Double tap to view food log for this date"
     },
     "exercise": {
       "title": "Exercise",
@@ -2223,7 +2224,8 @@
       "main": "Main",
       "chart_7d": "7d min",
       "streak": "Ex streak",
-      "last_days": "Last {{days}} days"
+      "last_days": "Last {{days}} days",
+      "accessibility_hint": "Double tap to view exercise log for this date"
     },
     "loading": "Loading",
     "meds": {
@@ -2235,7 +2237,8 @@
       "last": "Last: {{name}}{{dose}}",
       "med": "med",
       "supp": "supp",
-      "chart_7d": "7d"
+      "chart_7d": "7d",
+      "accessibility_hint": "Double tap to view medication log for this date"
     },
     "streaks": {
       "title": "Streaks",

@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
 import { useUserConfig } from '@/hooks/use-user-config';
-import { getFocusStyle } from '@/utils/accessibility';
+import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
@@ -147,6 +147,16 @@ export function ExerciseActivitiesChart({
             const dynamicColumnHeight = metricsHeight + chipsHeight + columnPadding;
             const dynamicDayColumnHeight = dynamicColumnHeight + DAY_LABEL_HEIGHT_PX + Spacing.xxs;
             
+            // Create accessibility label for the day column
+            const exerciseCount = dayData.totalCount;
+            const exerciseLabel = exerciseCount === 0
+              ? t('dashboard.exercise.no_exercises')
+              : exerciseCount === 1
+              ? t('dashboard.exercise.activity_one')
+              : t('dashboard.exercise.activity_other');
+            const accessibilityLabel = `${weekdayLabel}, ${exerciseCount} ${exerciseLabel}`;
+            const accessibilityHint = t('dashboard.food.chart_bar_hint');
+            
             return (
               <TouchableOpacity
                 key={dayData.dayKey}
@@ -154,11 +164,13 @@ export function ExerciseActivitiesChart({
                   styles.exerciseDayColumn,
                   { minHeight: dynamicDayColumnHeight },
                   isSelected && { borderColor: colors.accentExercise, borderWidth: 2 },
+                  getMinTouchTargetStyle(),
                 ]}
                 onPress={() => {
                   router.push(`/exercise?date=${dayData.dayKey}`);
                 }}
                 activeOpacity={0.7}
+                {...getButtonAccessibilityProps(accessibilityLabel, accessibilityHint)}
                 {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
               >
                 <View style={[styles.columnContent, { flex: 1, justifyContent: 'flex-end' }]}>

@@ -106,6 +106,8 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.7}
+        style={getMinTouchTargetStyle()}
+        {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
         {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
       >
         <PremiumCard>
@@ -256,6 +258,8 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.7}
+        style={getMinTouchTargetStyle()}
+        {...getButtonAccessibilityProps(t('dashboard.snapshot.ex'), t('dashboard.exercise.accessibility_hint'))}
         {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
       >
         <PremiumCard>
@@ -389,6 +393,8 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.7}
+        style={getMinTouchTargetStyle()}
+        {...getButtonAccessibilityProps(t('dashboard.meds.title'), t('dashboard.meds.accessibility_hint'))}
         {...(Platform.OS === 'web' && getFocusStyle(colors.accentMeds))}
       >
         <PremiumCard>
