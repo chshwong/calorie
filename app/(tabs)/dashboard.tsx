@@ -15,9 +15,8 @@ import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/c
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-    useDailyFoodSummary,
-    useWeeklyCalInVsOut,
-    useWeeklyFoodCalories,
+  useDailyFoodSummary,
+  useWeeklyCalInVsOut,
 } from '@/hooks/use-dashboard-data';
 import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useMedLogsForDate, useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
@@ -26,9 +25,9 @@ import { useStreakState } from '@/hooks/use-streak-state';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import {
-    getButtonAccessibilityProps,
-    getFocusStyle,
-    getMinTouchTargetStyle,
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';
 import { addDays, toDateKey } from '@/utils/dateKey';
@@ -57,10 +56,25 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
   const { t } = useTranslation();
   const foodSummary = useDailyFoodSummary(dateString);
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
-  const { data: userConfig } = useUserConfig();
 
-  // Helper function to get goal label
-  const getGoalLabel = () => {
+  // Calculate averages, excluding days with no value (0 or invalid) - memoized for performance
+  const avgStats = useMemo(() => {
+    if (weeklyCalInVsOut.data.length === 0) return null;
+    const eatenValues = weeklyCalInVsOut.data.filter(d => d.caloriesIn > 0).map(d => d.caloriesIn);
+    const burnedValues = weeklyCalInVsOut.data.filter(d => d.caloriesOut > 0).map(d => d.caloriesOut);
+    
+    const avgEaten = eatenValues.length > 0 
+      ? Math.round(eatenValues.reduce((sum, val) => sum + val, 0) / eatenValues.length)
+      : 0;
+    const avgBurned = burnedValues.length > 0
+      ? Math.round(burnedValues.reduce((sum, val) => sum + val, 0) / burnedValues.length)
+      : 0;
+    
+    return { avgEaten, avgBurned };
+  }, [weeklyCalInVsOut.data]);
+
+  // Helper function to get goal label - memoized to avoid recreation on every render
+  const getGoalLabel = useMemo(() => {
     switch (goalType) {
       case 'lose':
         return t('onboarding.goal.lose_weight.label');
@@ -73,7 +87,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
       default:
         return t('dashboard.food.goal'); // Fallback to generic "Goal" if goalType is unknown
     }
-  };
+  }, [goalType, t]);
 
   if (weeklyCalInVsOut.isLoading) {
     return (
@@ -129,13 +143,13 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               <View style={styles.foodChipsColumn}>
                 <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
                   <ThemedText style={[styles.foodChipText, { color: colors.textSecondary }]}>
-                    {getGoalLabel()}
+                    Goal: {getGoalLabel}
                   </ThemedText>
                 </View>
 
                 <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
                   <ThemedText style={[styles.foodChipText, { color: colors.textSecondary }]}>
-                    {Number(foodSummary.caloriesGoal).toLocaleString('en-US')} {t('units.kcal')}/day
+                    Aim: {Number(foodSummary.caloriesGoal).toLocaleString('en-US')} {t('units.kcal')}/day
                   </ThemedText>
                 </View>
               </View>
@@ -167,9 +181,9 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               onBarPress={onDateSelect}
               height={isSmallScreen ? 105 : isMobile ? 120 : 128}
             />
-            {weeklyCalInVsOut.data.length > 0 && (
-              <ThemedText style={[styles.chartSubtitle, { color: colors.textSubtle }]}>
-                {t('dashboard.food.avg')}: {Math.round(weeklyCalInVsOut.data.reduce((sum, d) => sum + d.caloriesIn, 0) / weeklyCalInVsOut.data.length)} {t('units.kcal')}
+            {avgStats && (
+              <ThemedText style={[styles.chartSubtitle, { color: colors.textSecondary }]}>
+                Avg 🥑: {avgStats.avgEaten} {t('units.kcal')}/day  ·  Avg 🔥: {avgStats.avgBurned} {t('units.kcal')}/day
               </ThemedText>
             )}
           </View>
@@ -191,8 +205,6 @@ type DashboardExerciseSectionProps = {
 function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile, onPress, onDateSelect }: DashboardExerciseSectionProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user } = useAuth();
-  const { data: userConfig } = useUserConfig();
   const { data: logs = [], isLoading } = useExerciseLogsForDate(dateString);
   
   // Determine number of days to show based on screen width and orientation
@@ -672,7 +684,6 @@ export default function DashboardScreen() {
 
   // Dashboard data hooks - using module hooks directly
   const foodSummary = useDailyFoodSummary(selectedDateString);
-  const weeklyFood = useWeeklyFoodCalories(selectedDateString, 7);
 
 
   // Handle date selection from charts
@@ -682,6 +693,29 @@ export default function DashboardScreen() {
       navigateWithDate(date);
     }
   };
+
+  // Format date for display (same logic as index.tsx) - memoized for performance
+  const formattedDateText = useMemo(() => {
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const yesterday = new Date(todayDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const currentYear = todayDate.getFullYear();
+    const selectedYear = selectedDate.getFullYear();
+    const isCurrentYear = selectedYear === currentYear;
+    const dateOptions: Intl.DateTimeFormatOptions = {
+      ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
+      month: 'short',
+      day: 'numeric',
+      ...(isCurrentYear ? {} : { year: 'numeric' }),
+    };
+    const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
+    return isToday
+      ? `${t('common.today')}, ${formattedDate}`
+      : selectedDate.getTime() === yesterday.getTime()
+      ? `${t('common.yesterday')}, ${formattedDate}`
+      : formattedDate;
+  }, [selectedDate, isToday, t]);
 
 
   if (!user) {
@@ -714,28 +748,7 @@ export default function DashboardScreen() {
         />
       )}
       <CollapsibleModuleHeader
-        dateText={(() => {
-          // Format date for display (same logic as index.tsx)
-          const todayDate = new Date();
-          todayDate.setHours(0, 0, 0, 0);
-          const yesterday = new Date(todayDate);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const currentYear = todayDate.getFullYear();
-          const selectedYear = selectedDate.getFullYear();
-          const isCurrentYear = selectedYear === currentYear;
-          const dateOptions: Intl.DateTimeFormatOptions = {
-            ...(isToday || selectedDate.getTime() === yesterday.getTime() ? {} : { weekday: 'short' }),
-            month: 'short',
-            day: 'numeric',
-            ...(isCurrentYear ? {} : { year: 'numeric' }),
-          };
-          const formattedDate = selectedDate.toLocaleDateString('en-US', dateOptions);
-          return isToday
-            ? `${t('common.today')}, ${formattedDate}`
-            : selectedDate.getTime() === yesterday.getTime()
-            ? `${t('common.yesterday')}, ${formattedDate}`
-            : formattedDate;
-        })()}
+        dateText={formattedDateText}
         rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
         preferredName={effectiveProfile?.first_name ?? undefined}
         rightAction={
@@ -918,7 +931,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.chip,
   },
   foodChipText: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
   },
   // Exercise styles

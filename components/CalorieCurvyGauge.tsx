@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Text as SvgText, Circle, TSpan } from 'react-native-svg';
+import { MACRO_GAUGE_TEXT } from '@/components/MacroGauge';
 import { Colors, FontFamilies, FontSize, Nudge, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { MACRO_GAUGE_TEXT } from '@/components/MacroGauge';
-import { useTranslation } from 'react-i18next';
 import { ensureContrast } from '@/theme/contrast';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Path, Text as SvgText, TSpan } from 'react-native-svg';
 
 type GoalType = 'lose' | 'maintain' | 'recomp' | 'gain';
 
@@ -165,7 +165,7 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
           strokeLinejoin="round"
           textAnchor="middle"
         >
-          <TSpan x={tipLabelX}>{`${consumedRounded} ${calUnit}`}</TSpan>
+          <TSpan x={tipLabelX}>🥪{`${consumedRounded}`}</TSpan>
           {percentDisplay != null ? (
             <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
           ) : null}
@@ -180,7 +180,7 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
           fill={colors.textSecondary}
           textAnchor="middle"
         >
-          <TSpan x={tipLabelX}>{`${consumedRounded} ${calUnit}`}</TSpan>
+          <TSpan x={tipLabelX}>🥪{`${consumedRounded}`}</TSpan>
           {percentDisplay != null ? (
             <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
           ) : null}

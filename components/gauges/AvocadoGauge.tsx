@@ -264,7 +264,7 @@ export function AvocadoGauge({
   const pitTransformY = pitCenterY - 208.81 * pitScale;
 
   return (
-    <View style={[styles.wrap, { width: size, height }]}>
+    <View style={[styles.wrap, { width: size, height, zIndex: 10 }]}>
       <Svg
         width={size}
         height={height}
@@ -333,6 +333,7 @@ export function AvocadoGauge({
               <TSpan
                 x={PATH_CX}
                 dy={MACRO_GAUGE_TEXT.value.md.fontSize + 2} // next line
+                fontSize={FontSize.sm}
                 fill={bgForContrast}
               >
                 {isOverBudget ? t('home.summary.over_budget') : t('home.summary.remaining')}
@@ -357,6 +358,7 @@ export function AvocadoGauge({
               <TSpan
                 x={PATH_CX}
                 dy={MACRO_GAUGE_TEXT.value.md.fontSize + 2} // next line
+                fontSize={FontSize.sm}
                 fill={colors.textSecondary}
               >
                 {isOverBudget ? t('home.summary.over_budget') : t('home.summary.remaining')}
@@ -381,7 +383,7 @@ export function AvocadoGauge({
               strokeLinejoin="round"
               textAnchor="middle"
             >
-              <TSpan x={tipLabelX}>{consumedRounded}</TSpan>
+              <TSpan x={tipLabelX}>🥪{consumedRounded}</TSpan>
               {percentDisplay != null ? (
                 <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
               ) : null}
@@ -395,7 +397,7 @@ export function AvocadoGauge({
               fill={colors.textSecondary}
               textAnchor="middle"
             >
-              <TSpan x={tipLabelX}>{consumedRounded}</TSpan>
+              <TSpan x={tipLabelX}>🥪{consumedRounded}</TSpan>
               {percentDisplay != null ? (
                 <TSpan x={tipLabelX} dy={tipLabelFontSize + 2}>{`${percentDisplay}%`}</TSpan>
               ) : null}
