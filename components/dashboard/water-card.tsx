@@ -4,25 +4,23 @@
  * Displays today's water intake with circular progress indicator
  */
 
-import { View, StyleSheet, TouchableOpacity, Platform, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { BarChart } from '@/components/charts/bar-chart';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
-import { BarChart } from '@/components/charts/bar-chart';
-import { Colors, BorderRadius, Shadows, Spacing, FontSize } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, ModuleThemes, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useWaterDaily } from '@/hooks/use-water-logs';
 import { useUserConfig } from '@/hooks/use-user-config';
-import { formatWaterValue, WaterUnit, fromMl, toMl, getEffectiveGoal } from '@/utils/waterUnits';
-import { ModuleThemes } from '@/constants/theme';
-import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
-import { getLastNDays, getDateString } from '@/utils/calculations';
-import { getYesterdayKey } from '@/utils/dateTime';
-import { Animated } from 'react-native';
-import { useRef, useMemo } from 'react';
+import { useWaterDaily } from '@/hooks/use-water-logs';
 import type { WaterDaily } from '@/lib/services/waterLogs';
+import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { getDateString, getLastNDays } from '@/utils/calculations';
+import { getYesterdayKey } from '@/utils/dateTime';
+import { formatWaterValue, fromMl, getEffectiveGoal, toMl, WaterUnit } from '@/utils/waterUnits';
+import { useRouter } from 'expo-router';
+import { useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Animated, Platform, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type WaterCardProps = {
   dateString?: string;
@@ -282,8 +280,8 @@ const styles = StyleSheet.create({
   },
   content: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.xs,
+    justifyContent: 'flex-start',
+    paddingVertical: 0,
   },
   loadingContainer: {
     paddingVertical: Spacing.lg,

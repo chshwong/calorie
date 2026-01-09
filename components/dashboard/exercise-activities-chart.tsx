@@ -291,9 +291,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exerciseChipText: {
-    fontSize: FontSize.sm,
-    lineHeight: FontSize.sm + 2,
-    fontWeight: FontWeight.medium, // Reduced from semibold (600) to medium (500) - closest to 20% reduction (480)
+    fontSize: FontSize.sm - 1, // Reduced by 1pt from 12 to 11
+    lineHeight: (FontSize.sm - 1) + 2, // Adjusted lineHeight to match
+    fontWeight: 375 as any, // Reduced from medium (500) by 25% to 375
     textAlign: 'center',
     includeFontPadding: false,
   },

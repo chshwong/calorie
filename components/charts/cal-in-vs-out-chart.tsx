@@ -73,13 +73,13 @@ export function CalInVsOutChart({
 
   // Minimal top inset - collapsed to minimize space, similar to exercise charts
   const topInset = 0; // No top inset - bars can reach closer to legend
-  const xAxisHeight = showLabels ? (FontSize.xs + Spacing.xs) : 0;
+  const xAxisHeight = showLabels ? (FontSize.sm + Spacing.xs) : 0;
   const yAxisWidth = 40; // Width for Y-axis labels
   const plotHeight = Math.max(height - topInset - xAxisHeight, 1);
   
   // Y-axis label vertical alignment offsets
-  const BASE_LABEL_OFFSET = Math.round(FontSize.xs * 0.35)+6;
-  const ZERO_EXTRA_OFFSET = Math.round(FontSize.xs * 0.35)-4;
+  const BASE_LABEL_OFFSET = Math.round(FontSize.sm * 0.35)+6;
+  const ZERO_EXTRA_OFFSET = Math.round(FontSize.sm * 0.35)-4;
 
   // Calculate Y-axis points: 0, and conditionally labels based on maxValue
   // If maxValue > 10000: labels at every 1.5k increment starting at 1.5k
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   legendText: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
   },
   chartContainer: {
     position: 'relative',
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   yAxisLabel: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     textAlign: 'right',
   },
   yAxisLine: {
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     marginLeft: -2, // Overlap slightly with cal-in bar
   },
   barLabel: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     marginTop: Spacing.xs,
     textAlign: 'center',
   },

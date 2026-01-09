@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm, // Reduced spacing before macro gauges
   },
   chartTitle: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     marginBottom: Layout.chartGapCompact,
   },
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chartSubtitle: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     marginTop: Layout.rowGapCompact,
     textAlign: 'center',
   },

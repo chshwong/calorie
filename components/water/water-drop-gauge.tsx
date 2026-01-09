@@ -11,20 +11,20 @@
  * - All geometry constants grouped at top
  */
 
-import React, { memo, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, ModuleThemes, FontSize, FontWeight, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
-import Svg, { Path, Rect, Line, Defs, ClipPath, G, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
+import { Colors, FontSize, FontWeight, ModuleThemes, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { formatWaterAmount, getAlternateUnit } from '@/utils/waterDisplayFormat';
+import { WaterUnit, formatWaterValue, fromMl, getEffectiveGoalMl } from '@/utils/waterUnits';
+import React, { memo, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated, {
+  useAnimatedProps,
   useSharedValue,
   withTiming,
-  useAnimatedProps,
 } from 'react-native-reanimated';
-import { WaterUnit, formatWaterValue, fromMl, getEffectiveGoalMl } from '@/utils/waterUnits';
-import { formatWaterAmount, getAlternateUnit } from '@/utils/waterDisplayFormat';
+import Svg, { ClipPath, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
@@ -35,8 +35,8 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 // Normalized viewBox dimensions (100 units wide, 140 units tall)
 const DROPLET_VIEWBOX = '0 0 100 140';
 
-// Scale factor to prevent clipping (85% of original size)
-const DROPLET_SCALE = 0.85;
+// Scale factor to prevent clipping (95% of original size)
+const DROPLET_SCALE = 0.95;
 
 // Calculate translate values to center the scaled droplet
 // translateX = viewBoxWidth * (1 - scale) / 2
