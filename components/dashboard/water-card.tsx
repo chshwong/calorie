@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end', // Align bottoms: droplet bottom aligns with chart bottom
     justifyContent: 'space-between',
     width: '100%',
     gap: Spacing.md,

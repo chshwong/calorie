@@ -182,9 +182,24 @@ export function HorizontalBarChart({
 
           {/* Horizontal bars */}
           {data.map((item, index) => {
-            const barWidth = (item.value / scaleMax) * plotWidth;
+            const isZero = item.value === 0;
+            const barW = isZero ? 0 : (item.value / scaleMax) * plotWidth;
             const barOpacity = !hasData && item.value === 0 ? 0.3 : 1;
             const top = index * rowHeight; // top is relative to plotArea, which already has headerH offset
+            
+            // Label placement logic - show labels for values >= 25 ml
+            const labelText = isZero ? '' : (item.displayValue || '');
+            const valueMl = item.value; // Value in ml
+            const MIN_VALUE_FOR_LABEL = 25; // Show label for values >= 25 ml
+            const OUTSIDE_GAP = 6;
+            const INSIDE_PADDING = 8;
+            const EST_LABEL_W = 52; // Estimated label width
+            
+            // Show label if value >= 25 ml (not based on bar width)
+            const shouldShowLabel = !isZero && labelText && valueMl >= MIN_VALUE_FOR_LABEL;
+            
+            // Original placement logic - check if label can fit outside
+            const canFitOutside = barW + OUTSIDE_GAP + EST_LABEL_W <= plotWidth;
             
             return (
               <Pressable
@@ -205,39 +220,74 @@ export function HorizontalBarChart({
                 hitSlop={Spacing.xs}
                 accessibilityRole={onRowPress ? 'button' : 'none'}
               >
-                {/* Value label on bar (if space allows) */}
-                {item.displayValue && barWidth > 50 && (
+                {/* Horizontal bar or zero marker */}
+                <View style={styles.barContainer}>
+                  {isZero ? (
+                    // Zero marker: thin line to indicate no intake
+                    <View
+                      style={[
+                        styles.zeroMarker,
+                        {
+                          backgroundColor: colors.textTertiary || colors.textSecondary,
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <Animated.View
+                      style={[
+                        styles.bar,
+                        {
+                          width: animated && animatedWidthsRef.current[index]
+                            ? animatedWidthsRef.current[index].interpolate({
+                                inputRange: [0, scaleMax],
+                                outputRange: [0, plotWidth],
+                              })
+                            : barW,
+                          backgroundColor: barColor,
+                          opacity: barOpacity,
+                        },
+                      ]}
+                    >
+                      {/* Inside label (when bar is long) */}
+                      {shouldShowLabel && !canFitOutside && (
+                        <ThemedText
+                          numberOfLines={1}
+                          ellipsizeMode="clip"
+                          style={[
+                            styles.barValueLabelInside,
+                            {
+                              color: '#fff',
+                              left: 0,
+                              right: INSIDE_PADDING,
+                              textAlign: 'right',
+                            },
+                          ]}
+                        >
+                          {labelText}
+                        </ThemedText>
+                      )}
+                    </Animated.View>
+                  )}
+                </View>
+                
+                {/* Outside label (when there's space) */}
+                {shouldShowLabel && canFitOutside && (
                   <ThemedText
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
                     style={[
-                      styles.barValueLabel,
+                      styles.barValueLabelOutside,
                       {
                         color: colors.text,
-                        left: barWidth + Spacing.xs,
+                        marginLeft: OUTSIDE_GAP,
+                        maxWidth: plotWidth - (barW + OUTSIDE_GAP),
+                        ...(Platform.OS === 'android' && { includeFontPadding: false }),
                       },
                     ]}
                   >
-                    {item.displayValue}
+                    {labelText}
                   </ThemedText>
                 )}
-                
-                {/* Horizontal bar */}
-                <View style={styles.barContainer}>
-                  <Animated.View
-                    style={[
-                      styles.bar,
-                      {
-                        width: animated && animatedWidthsRef.current[index]
-                          ? animatedWidthsRef.current[index].interpolate({
-                              inputRange: [0, scaleMax],
-                              outputRange: [0, plotWidth],
-                            })
-                          : barWidth,
-                        backgroundColor: barColor,
-                        opacity: barOpacity,
-                      },
-                    ]}
-                  />
-                </View>
               </Pressable>
             );
           })}
@@ -311,10 +361,12 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   barContainer: {
     height: '60%',
     justifyContent: 'center',
+    alignSelf: 'center',
     minWidth: 4, // Minimum visible bar
   },
   bar: {
@@ -323,11 +375,31 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderTopLeftRadius: BorderRadius.sm,
     borderBottomLeftRadius: BorderRadius.sm,
+    position: 'relative', // For inside label positioning
   },
-  barValueLabel: {
+  zeroMarker: {
+    width: 8,
+    height: 2,
+    borderRadius: 1,
+    opacity: 0.5,
+    alignSelf: 'center',
+  },
+  barValueLabelOutside: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    lineHeight: FontSize.xs + 2,
+    alignSelf: 'center',
+  },
+  barValueLabelInside: {
     position: 'absolute',
     fontSize: FontSize.xs,
     fontWeight: '600',
+    lineHeight: FontSize.xs + 2,
+    top: '50%',
+    transform: [{ translateY: -(FontSize.xs / 2) - 1 }],
+    right: 8, // INSIDE_PADDING
+    textAlign: 'right',
+    ...(Platform.OS === 'android' && { includeFontPadding: false }),
   },
   labelsContainer: {
     position: 'absolute',
