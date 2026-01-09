@@ -60,7 +60,11 @@ export function HorizontalBarChart({
   
   // Row height for each day
   const rowHeight = 20;
+  const barHeight = rowHeight * 0.6; // Bar thickness is 60% of row height
   const labelWidth = 40; // Width for day labels
+  
+  // Shift the entire bar layer up to align with day labels
+  const BAR_LAYER_SHIFT_Y = Math.round(rowHeight * 0.6); // ~4px shift up
   
   // Calculate goal line position (vertical line) - needed for gutter calculation
   const goalLineX =
@@ -166,8 +170,19 @@ export function HorizontalBarChart({
           </View>
         )}
 
-        {/* Plot area - shifted down by headerH */}
-        <View style={[styles.plotArea, { width: plotWidth, left: labelWidth, top: headerH, bottom: 0 }]}>
+        {/* Plot area - shifted down by headerH, then shifted up to align with labels */}
+        <View 
+          style={[
+            styles.plotArea, 
+            { 
+              width: plotWidth, 
+              left: labelWidth, 
+              top: headerH, 
+              bottom: 0,
+              transform: [{ translateY: -BAR_LAYER_SHIFT_Y }],
+            }
+          ]}
+        >
           {/* Goal line (vertical dashed line) */}
           {goalLineX !== null && (
             <View
@@ -242,7 +257,14 @@ export function HorizontalBarChart({
                 {...(Platform.OS === 'web' && onRowPress && getFocusStyle(color || waterTheme.accent))}
               >
                 {/* Horizontal bar or zero marker */}
-                <View style={styles.barContainer}>
+                <View
+                  style={[
+                    styles.barContainer,
+                    {
+                      height: barHeight, // 60% of rowHeight, centered by barRow's alignItems: 'center'
+                    },
+                  ]}
+                >
                   {isZero ? (
                     // Zero marker: thin line to indicate no intake
                     <View
@@ -250,6 +272,7 @@ export function HorizontalBarChart({
                         styles.zeroMarker,
                         {
                           backgroundColor: colors.textTertiary || colors.textSecondary,
+                          height: Math.min(2, barHeight * 0.3), // Thinner than bars, max 2px
                         },
                       ]}
                     />
@@ -385,7 +408,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   barContainer: {
-    height: '60%',
+    // height is set inline based on barHeight (60% of rowHeight)
+    // Centered vertically by barRow's alignItems: 'center'
     justifyContent: 'center',
     alignSelf: 'center',
     minWidth: 4, // Minimum visible bar
@@ -400,7 +424,7 @@ const styles = StyleSheet.create({
   },
   zeroMarker: {
     width: 8,
-    height: 2,
+    // height is set inline: min(2px, barHeight * 0.3)
     borderRadius: 1,
     opacity: 0.5,
     alignSelf: 'center',

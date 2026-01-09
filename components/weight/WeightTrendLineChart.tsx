@@ -1,9 +1,9 @@
 import { ThemedText } from '@/components/themed-text';
-import { Colors, FontSize, Spacing } from '@/constants/theme';
+import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { buildFitbitPathD } from '@/lib/derive/weight-trend-path';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
-import { buildFitbitPathD } from '@/lib/derive/weight-trend-path';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -385,9 +385,18 @@ export function WeightTrendLineChart({
               const left = dotX - labelW / 2;
               const text = enhancedGetLabel(idx);
               if (!text) return null;
+              const dayKey = dayKeys?.[idx];
+              const isToday = todayDateString && dayKey === todayDateString;
               return (
                 <View key={idx} style={[styles.labelItem, { left, width: labelW }]}>
-                  <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>{text}</ThemedText>
+                  <ThemedText 
+                    style={[
+                      { color: colors.textSecondary, fontSize: FontSize.sm },
+                      isToday && styles.labelToday
+                    ]}
+                  >
+                    {text}
+                  </ThemedText>
                 </View>
               );
             })}
@@ -468,6 +477,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     alignItems: 'center',
+  },
+  labelToday: {
+    fontWeight: FontWeight.bold,
   },
 });
 
