@@ -461,15 +461,15 @@ const styles = StyleSheet.create({
   barsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     height: '100%',
-    paddingHorizontal: Spacing.xs,
+    paddingHorizontal: Spacing.xs / 4,
   },
   barWrapper: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginHorizontal: Spacing.xs / 2,
+    marginHorizontal: - Spacing.xs ,
     position: 'relative',
     // Ensure minimum touch target size for WCAG 2.0 AA compliance (44x44pt)
     minHeight: 44,
@@ -517,14 +517,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-around',
-    paddingHorizontal: Spacing.xs,
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xs / 2,
     paddingTop: Spacing.xs,
   },
   xAxisLabelCell: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: Spacing.xs / 2,
+    marginHorizontal: Spacing.xs / 4,
   },
 });
 
