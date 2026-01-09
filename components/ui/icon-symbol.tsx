@@ -56,6 +56,7 @@ const MAPPING = {
   'figure.walk': { type: 'community', name: 'walk' },
   'figure.run.circle': { type: 'community', name: 'run' },
   'dumbbell.fill': { type: 'community', name: 'dumbbell' },
+  'scale.bathroom': { type: 'community', name: 'scale-bathroom' },
   'bicycle': { type: 'community', name: 'bicycle' },
   'figure.pool.swim': { type: 'community', name: 'swim' },
   'figure.yoga': { type: 'community', name: 'yoga' },

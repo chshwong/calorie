@@ -3,9 +3,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, Layout, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { DailyLatestWeightRow } from '@/lib/derive/daily-latest-weight';
-import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
+import { buildWeightSeriesForDayKeys } from '@/lib/derive/weight-chart-series';
+import { toDateKey } from '@/utils/dateKey';
 import { buildDayKeysInclusive, pickSparseLabelIndices, subtractMonthsClamped, subtractYearsClamped } from '@/utils/dateRangeMath';
+import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
 import React, { memo, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { WeightTrendLineChart } from './WeightTrendLineChart';
 
@@ -31,8 +34,14 @@ type Props = {
 };
 
 export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLatest, selectedDate, todayLocal, unit }: Props) {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  
+  // Calculate today and yesterday date strings
+  const todayDateString = useMemo(() => getTodayKey(), []);
+  const yesterdayDateString = useMemo(() => getYesterdayKey(), []);
+  const selectedDateString = useMemo(() => toDateKey(selectedDate), [selectedDate]);
 
   const [pageWidth, setPageWidth] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -121,26 +130,7 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
       const { start, end } = card.getRange();
       const dayKeys = buildDayKeysInclusive(start, end);
 
-      // Values are "latest per day", but we carry forward the last known weight within the range
-      // (no averaging) to match the existing UX where missing days show the last known weight.
-      const values: number[] = [];
-      let lastKnown: number | null = null;
-      for (const key of dayKeys) {
-        const row = dailyMap.get(key);
-        if (row && row.weight_lb !== null && row.weight_lb !== undefined) {
-          const wLb = row.weight_lb;
-          const v = unit === 'kg' ? roundTo1(lbToKg(wLb)) : roundTo1(wLb);
-          const safe = Number.isFinite(v) ? v : NaN;
-          values.push(safe);
-          if (Number.isFinite(safe)) lastKnown = safe;
-          continue;
-        }
-        if (lastKnown !== null) {
-          values.push(lastKnown);
-        } else {
-          values.push(NaN);
-        }
-      }
+      const values = buildWeightSeriesForDayKeys({ dayKeys, dailyMap, unit });
 
       let labelIndices: number[] = [];
       if (card.labelSpec.kind === '7d') {
@@ -161,8 +151,14 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
         const d = new Date(`${key}T00:00:00`);
 
         if (card.id === '7d') {
-          const w = d.toLocaleDateString('en-US', { weekday: 'short' });
-          return w ? w[0] : '';
+          // Use Today/Yesterday/weekday for 7-day card
+          if (key === todayDateString) {
+            return t('common.today');
+          }
+          if (key === yesterdayDateString) {
+            return t('common.yesterday');
+          }
+          return d.toLocaleDateString('en-US', { weekday: 'short' });
         }
 
         const isStartOrEnd = idx === startIdx || idx === endIdx;
@@ -184,7 +180,7 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
     }
 
     return out;
-  }, [cards, dailyMap, unit]);
+  }, [cards, dailyMap, unit, todayDateString, yesterdayDateString, t]);
 
   const formatRange = (start: Date, end: Date) => {
     const s = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -263,7 +259,21 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
                   </ThemedText>
                 </View>
 
-                <WeightTrendLineChart values={ds.values} labelIndices={ds.labelIndices} getLabel={ds.getLabel} height={200} />
+                <WeightTrendLineChart 
+                  values={ds.values} 
+                  labelIndices={ds.labelIndices} 
+                  getLabel={ds.getLabel} 
+                  height={200}
+                  // Pass new props for 7-day card only
+                  {...(item.id === '7d' ? {
+                    dayKeys: ds.dayKeys,
+                    todayDateString,
+                    yesterdayDateString,
+                    selectedDateString,
+                    dailyMap,
+                    unit,
+                  } : {})}
+                />
               </View>
             </View>
           );

@@ -37,6 +37,8 @@ type CalInVsOutChartProps = {
   data: CalInVsOutData[];
   selectedDate?: string;
   todayDateString?: string;
+  yesterdayDateString?: string;
+  useYdayLabel?: boolean; // Dashboard-only: show "Yday" instead of "Yesterday"
   onBarPress?: (date: string) => void;
   height?: number;
   showLabels?: boolean;
@@ -47,6 +49,8 @@ export function CalInVsOutChart({
   data,
   selectedDate,
   todayDateString,
+  yesterdayDateString,
+  useYdayLabel = false,
   onBarPress,
   height = 120,
   showLabels = true,
@@ -206,6 +210,9 @@ export function CalInVsOutChart({
   const formatDateLabel = (dateString: string) => {
     if (todayDateString && dateString === todayDateString) {
       return t('common.today');
+    }
+    if (yesterdayDateString && dateString === yesterdayDateString) {
+      return useYdayLabel ? t('date.yday') : t('common.yesterday');
     }
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short' });

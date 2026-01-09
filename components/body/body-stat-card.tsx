@@ -81,7 +81,9 @@ export function BodyStatCard({
 const styles = StyleSheet.create({
   card: {
     borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
+    // Reduce vertical padding to make cards as short as possible.
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
     minWidth: 80,
     flex: 1,
     alignItems: 'center',
@@ -90,19 +92,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.xxs,
     textAlign: 'center',
   },
   value: {
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.xxs,
+    marginBottom: Spacing.none,
     textAlign: 'center',
   },
   unit: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.regular,
-    marginBottom: Spacing.xxs,
+    marginBottom: Spacing.none,
     textAlign: 'center',
   },
   subLabel: {

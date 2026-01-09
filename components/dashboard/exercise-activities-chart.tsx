@@ -3,6 +3,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
@@ -17,12 +18,14 @@ type ExerciseActivitiesChartProps = {
   dateString: string;
   colors: typeof Colors.light | typeof Colors.dark;
   recentDays: string[];
-  recentDaysLogs: Array<{ data: Array<{ name: string; category: string; minutes?: number | null; distance_km?: number | null }> }>;
+  recentDaysLogs: Array<{ data?: Array<{ name: string; category: string; minutes?: number | null; distance_km?: number | null }> }>;
   category: 'strength' | 'cardio_mind_body';
   titleIcons: Array<{ name: string; size?: number }>;
   titleText: string;
   isWide: boolean;
   showTopBorder?: boolean;
+  showSelectedOutline?: boolean;
+  showFocusOutline?: boolean;
 };
 
 export function ExerciseActivitiesChart({
@@ -35,6 +38,8 @@ export function ExerciseActivitiesChart({
   titleText,
   isWide,
   showTopBorder = true,
+  showSelectedOutline = true,
+  showFocusOutline = true,
 }: ExerciseActivitiesChartProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -106,15 +111,14 @@ export function ExerciseActivitiesChart({
             const date = new Date(dayData.dayKey + 'T00:00:00');
             const todayKey = getTodayKey();
             const yesterdayKey = getYesterdayKey();
-            
-            let weekdayLabel: string;
-            if (dayData.dayKey === todayKey) {
-              weekdayLabel = t('common.today');
-            } else if (dayData.dayKey === yesterdayKey) {
-              weekdayLabel = t('common.yesterday');
-            } else {
-              weekdayLabel = date.toLocaleDateString(undefined, { weekday: 'short' });
-            }
+
+            const weekdayLabel = getDashboardDayLabel({
+              dateKey: dayData.dayKey,
+              todayKey,
+              yesterdayKey,
+              t,
+              getWeekdayLabel: () => date.toLocaleDateString(undefined, { weekday: 'short' }),
+            });
             
             const chipsToShow = dayData.exercises;
             const remaining = dayData.totalCount - chipsToShow.length;
@@ -163,15 +167,16 @@ export function ExerciseActivitiesChart({
                 style={[
                   styles.exerciseDayColumn,
                   { minHeight: dynamicDayColumnHeight },
-                  isSelected && { borderColor: colors.accentExercise, borderWidth: 2 },
+                  showSelectedOutline && isSelected && { borderColor: colors.accentExercise, borderWidth: 2 },
                   getMinTouchTargetStyle(),
                 ]}
-                onPress={() => {
+                onPress={(e) => {
+                  e?.stopPropagation?.();
                   router.push(`/exercise?date=${dayData.dayKey}`);
                 }}
                 activeOpacity={0.7}
                 {...getButtonAccessibilityProps(accessibilityLabel, accessibilityHint)}
-                {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
+                {...(showFocusOutline && Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
               >
                 <View style={[styles.columnContent, { flex: 1, justifyContent: 'flex-end' }]}>
                   <View style={[styles.exerciseChipsColumn, { minHeight: chipsHeight, maxHeight: chipsHeight }]}>

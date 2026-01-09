@@ -4,21 +4,25 @@
  * Displays today's water intake with circular progress indicator
  */
 
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { WaterDropGauge } from '@/components/water/water-drop-gauge';
+import { BarChart } from '@/components/charts/bar-chart';
 import { Colors, BorderRadius, Shadows, Spacing, FontSize } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useWaterDaily, useWaterDailyForDate } from '@/hooks/use-water-logs';
+import { useWaterDaily } from '@/hooks/use-water-logs';
 import { useUserConfig } from '@/hooks/use-user-config';
-import { formatWaterDisplay, WaterUnit, fromMl, toMl, getEffectiveGoal } from '@/utils/waterUnits';
+import { formatWaterValue, WaterUnit, fromMl, toMl, getEffectiveGoal } from '@/utils/waterUnits';
 import { ModuleThemes } from '@/constants/theme';
-import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { getLastNDays, getDateString } from '@/utils/calculations';
+import { getYesterdayKey } from '@/utils/dateTime';
 import { Animated } from 'react-native';
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
+import type { WaterDaily } from '@/lib/services/waterLogs';
 
 type WaterCardProps = {
   dateString?: string;
@@ -33,16 +37,24 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Get water data - use dateString if provided, otherwise use today
-  const waterQuery = dateString 
-    ? useWaterDailyForDate(dateString)
-    : useWaterDaily({ daysBack: 0 });
-  const todayWater = waterQuery.data;
-  const isLoading = waterQuery.isLoading;
+  // Fetch last 14 days for chart history
+  const selectedDateString = dateString || getDateString(new Date());
+  const { todayWater, history, isLoading } = useWaterDaily({ 
+    daysBack: 14,
+    targetDateString: selectedDateString,
+  });
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
   
   // Get unit preference (default to metric)
   const unitPreference = (profile?.water_unit_preference as 'metric' | 'imperial') || 'metric';
+  
+  // Get profile water unit and goal
+  const profileWaterUnit = (profile?.water_unit as WaterUnit) || 'ml';
+  const profileGoalMl = profile?.water_goal_ml || null;
+  const profileGoalInUnit = profileGoalMl ? fromMl(profileGoalMl, profileWaterUnit) : null;
+  const profileEffectiveGoal = getEffectiveGoal(profileWaterUnit, profileGoalInUnit);
+  const chartGoalMl = profileEffectiveGoal.goalMl; // Profile goal for chart (in ml)
   
   // Get today's values
   // Always read goal from water_daily.goal_ml (per-day snapshot)
@@ -53,11 +65,67 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
   const storedGoalInUnit = storedGoalMl ? fromMl(storedGoalMl, activeWaterUnit) : null;
   const { goalMl } = getEffectiveGoal(activeWaterUnit, storedGoalInUnit);
   
-  // Format display
-  const display = formatWaterDisplay(totalMl, unitPreference);
+  // Prepare history data for chart (last 7 calendar days including today)
+  // Generate exactly 7 days, ordered oldest to newest (left to right)
+  const selectedDate = dateString ? new Date(dateString + 'T00:00:00') : new Date();
+  selectedDate.setHours(0, 0, 0, 0);
+  const last7Days = getLastNDays(selectedDate, 7);
   
-  // Calculate progress percentage
-  const progress = goalMl > 0 ? Math.min(100, Math.round((totalMl / goalMl) * 100)) : 0;
+  // Create a map of existing water data by date for quick lookup
+  // IMPORTANT: Include todayWater in the map so today's value is always included
+  const waterDataMap = useMemo(() => {
+    const map = new Map<string, WaterDaily>();
+    // First add today's water (from the same source as the droplet card)
+    if (todayWater) {
+      map.set(todayWater.date, todayWater);
+    }
+    // Then add history entries
+    if (history) {
+      history.forEach((water) => {
+        map.set(water.date, water);
+      });
+    }
+    return map;
+  }, [todayWater, history]);
+  
+  // Build chart data for last 7 days
+  // Chart uses ml internally for consistent scaling, but displays values in profile's unit
+  const historyData = useMemo(() => {
+    return last7Days.map((dateString) => {
+      const water = waterDataMap.get(dateString);
+      if (water) {
+        const waterUnit = (water.water_unit as WaterUnit) || 'ml';
+        const totalMl = toMl(water.total || 0, waterUnit);
+        const totalInProfileUnit = fromMl(totalMl, profileWaterUnit);
+        const displayValue = formatWaterValue(totalInProfileUnit, profileWaterUnit);
+        return {
+          date: dateString,
+          value: totalMl, // Use ml for chart calculations (consistent scale)
+          displayValue, // Formatted string for label in profile's unit
+        };
+      } else {
+        // No data for this day - show 0 but still render bar
+        return {
+          date: dateString,
+          value: 0,
+          displayValue: formatWaterValue(0, profileWaterUnit),
+        };
+      }
+    });
+  }, [last7Days, waterDataMap, profileWaterUnit]);
+  
+  // Calculate dynamic y-axis max: align goal line with bars when equal (no extra padding)
+  const maxDailyValue = Math.max(...historyData.map(d => d.value), 0);
+  const chartMax = Math.max(maxDailyValue, chartGoalMl, 1);
+  
+  // Calculate goal display value in profile's unit for reference line label (always use profile unit)
+  const chartGoalInProfileUnit = fromMl(chartGoalMl, profileWaterUnit);
+  const goalDisplayValue = t('water.chart.goal_label', { 
+    value: formatWaterValue(chartGoalInProfileUnit, profileWaterUnit)
+  });
+  
+  const todayDateString = getDateString(new Date());
+  const yesterdayDateString = getYesterdayKey();
   
   // Water accent color from module theme
   const waterTheme = ModuleThemes.water;
@@ -69,6 +137,15 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
     } else {
       router.push('/(tabs)/water');
     }
+  };
+
+  const handleDropPress = () => {
+    // On dashboard, caller passes a date-aware onPress. Fall back to a date-aware route.
+    if (onPress) {
+      onPress();
+      return;
+    }
+    router.push(`/water?date=${selectedDateString}`);
   };
 
   const handlePressIn = () => {
@@ -89,34 +166,38 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
     }).start();
   };
 
+  const accessibilityLabel = t('water.dashboard.card_label', { ml: totalMl, goal: goalMl });
 
   return (
-    <TouchableOpacity
-      onPress={handlePress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-      {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
-      {...getButtonAccessibilityProps(t('water.dashboard.card_label', { ml: totalMl, goal: goalMl }))}
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          transform: [{ scale: scaleAnim }],
+          backgroundColor: colors.card,
+          ...Shadows.card,
+        },
+      ]}
     >
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            transform: [{ scale: scaleAnim }],
-            backgroundColor: colors.card,
-            ...Shadows.card,
-          },
-        ]}
+      {/* Header-only button to avoid nested <button> hydration errors on web (chart bars are interactive). */}
+      <TouchableOpacity
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.7}
+        style={getMinTouchTargetStyle()}
+        {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
+        {...getButtonAccessibilityProps(accessibilityLabel)}
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <IconSymbol name="drop.fill" size={20} color={accentColor} />
-            <ThemedText style={[styles.title, { color: colors.text }]}>
+            <ThemedText type="subtitle" style={[styles.title, { color: colors.text }]}>
               {t('water.dashboard.title')}
             </ThemedText>
           </View>
         </View>
+      </TouchableOpacity>
 
         <View style={styles.content}>
           {isLoading ? (
@@ -127,36 +208,53 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
             </View>
           ) : (
             <>
-              <WaterDropGauge
-                totalMl={totalMl}
-                goalMl={goalMl}
-                unitPreference={unitPreference}
-                size="medium"
-              />
-              <View style={styles.stats}>
-                {goalMl > 0 ? (
-                  <ThemedText style={[styles.secondaryText, { color: colors.textSecondary }]}>
-                    {t('water.dashboard.goal', { goal: goalMl })} • {progress}%
+              <Pressable
+                onPress={handleDropPress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                android_ripple={null}
+                hitSlop={Spacing.sm}
+                style={Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : undefined}
+                {...getButtonAccessibilityProps(accessibilityLabel)}
+              >
+                <WaterDropGauge
+                  totalMl={totalMl}
+                  goalMl={goalMl}
+                  unitPreference={unitPreference}
+                  size="medium"
+                />
+              </Pressable>
+              <View style={styles.chartContainer}>
+                <View style={styles.rangeTitleRow}>
+                  <ThemedText style={[styles.rangeTitle, { color: colors.text }]}>
+                    {t('common.last_7_days')}
                   </ThemedText>
-                ) : (
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      router.push('/(tabs)/water');
-                    }}
-                    {...getButtonAccessibilityProps(t('water.dashboard.set_goal'))}
-                  >
-                    <ThemedText style={[styles.setGoalText, { color: accentColor }]}>
-                      {t('water.dashboard.set_goal')}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
+                </View>
+                <BarChart
+                  data={historyData}
+                  maxValue={chartMax}
+                  goalValue={chartGoalMl}
+                  goalDisplayValue={goalDisplayValue}
+                  selectedDate={selectedDateString}
+                  todayDateString={todayDateString}
+                  yesterdayDateString={yesterdayDateString}
+                  useYdayLabel
+                  colorScale={() => accentColor}
+                  height={120}
+                  showLabels={true}
+                  emptyMessage={t('water.chart.empty_message')}
+                  onBarPress={(dateString) => {
+                    router.push({
+                      pathname: '/(tabs)/water',
+                      params: { date: dateString },
+                    } as any);
+                  }}
+                />
               </View>
             </>
           )}
         </View>
-      </Animated.View>
-    </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -178,8 +276,9 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   title: {
-    fontSize: FontSize.sm,
-    fontWeight: '600',
+    // Match dashboard card titles (e.g., "Weight", "Move & Groove")
+    fontSize: FontSize.lg,
+    fontWeight: '700',
   },
   content: {
     alignItems: 'center',
@@ -192,20 +291,17 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: FontSize.sm,
   },
-  stats: {
-    alignItems: 'center',
+  chartContainer: {
+    width: '100%',
     marginTop: Spacing.sm,
-    gap: Spacing.xs / 2,
   },
-  primaryText: {
-    fontSize: FontSize.base,
-    fontWeight: '600',
+  rangeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
   },
-  secondaryText: {
-    fontSize: FontSize.xs,
-  },
-  setGoalText: {
-    fontSize: FontSize.xs,
+  rangeTitle: {
+    fontSize: FontSize.sm,
     fontWeight: '600',
   },
 });

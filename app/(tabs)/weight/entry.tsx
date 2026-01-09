@@ -581,17 +581,6 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
             )}
 
             <View style={styles.footerButtons}>
-              <TouchableOpacity
-                style={[styles.cancelButton, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-                onPress={handleClose}
-                disabled={saveMutation.isPending}
-                {...getButtonAccessibilityProps('Cancel')}
-              >
-                <ThemedText style={[styles.cancelButtonText, { color: colors.text }]}>
-                  Cancel
-                </ThemedText>
-              </TouchableOpacity>
-
               {isEditMode && (
                 <Pressable
                   onPress={confirmAndDelete}
@@ -600,8 +589,8 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
                     styles.deleteButton,
                     {
                       backgroundColor: 'transparent',
-                      borderWidth: 1,
-                      borderColor: colors.border,
+                      borderWidth: 0,
+                      borderColor: 'transparent',
                       borderRadius: BorderRadius.full,
                       paddingVertical: Spacing.md,
                       paddingHorizontal: Spacing.md,
@@ -615,6 +604,17 @@ const [webTimeInput, setWebTimeInput] = useState(formatTimeInputValue(new Date()
                   <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
                 </Pressable>
               )}
+
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+                onPress={handleClose}
+                disabled={saveMutation.isPending}
+                {...getButtonAccessibilityProps('Cancel')}
+              >
+                <ThemedText style={[styles.cancelButtonText, { color: colors.text }]}>
+                  Cancel
+                </ThemedText>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[

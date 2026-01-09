@@ -23,9 +23,14 @@
     "unexpected_error": "Une erreur inattendue s'est produite. Veuillez réessayer.",
     "today": "Aujourd'hui",
     "yesterday": "Hier",
+    "last_7_days": "7 derniers jours",
     "go_back": "Retour",
     "not_set": "Non défini",
     "no_target": "Aucun objectif"
+  },
+
+  "date": {
+    "yday": "Hier"
   },
 
   "nutrition": {
@@ -1848,7 +1853,7 @@
     },
     "loading": "Chargement...",
     "meds": {
-      "title": "Médicaments",
+      "title": "Suppléments & Médicaments",
       "items": "{{count}} {{items}}",
       "item_one": "élément",
       "item_other": "éléments",
@@ -1856,7 +1861,9 @@
       "last": "Dernier : {{name}}{{dose}}",
       "med": "méd",
       "supp": "supp",
-      "chart_7d": "7j"
+      "chart_7d": "7j",
+      "a11y_day_label": "{{day}} résumé des médicaments",
+      "a11y_day_hint": "Appuyez deux fois pour ouvrir le journal des médicaments pour ce jour"
     },
     "streaks": {
       "title": "Séries",

@@ -23,11 +23,16 @@
     "unexpected_error": "An unexpected error occurred. Please try again.",
     "today": "Today",
     "yesterday": "Yesterday",
+    "last_7_days": "Last 7 days",
     "add": "Add",
     "go_back": "Go Back",
     "not_set": "Not set",
     "no_target": "No target",
     "less_than_one_percent": "<1%"
+  },
+
+  "date": {
+    "yday": "Yday"
   },
 
   "nutrition": {
@@ -139,7 +144,7 @@
       "bmi": "BMI",
       "bmi_underweight": "Underweight",
       "bmi_normal": "Normal Weight",
-      "bmi_overweight": "Overweight/Muscular",
+      "bmi_overweight": "Overweight",
       "bmi_obese": "Obese"
     },
     "summary": {
@@ -2169,7 +2174,7 @@
         "classification": {
           "underweight": "Underweight",
           "normal": "Normal Weight",
-          "overweight": "Overweight/Muscular",
+          "overweight": "Overweight",
           "obese": "Obese"
         }
       }
@@ -2229,7 +2234,7 @@
     },
     "loading": "Loading",
     "meds": {
-      "title": "Meds",
+      "title": "Supplements & Meds",
       "items": "{{count}} {{items}}",
       "item_one": "item",
       "item_other": "items",
@@ -2238,7 +2243,9 @@
       "med": "med",
       "supp": "supp",
       "chart_7d": "7d",
-      "accessibility_hint": "Double tap to view medication log for this date"
+      "accessibility_hint": "Double tap to view medication log for this date",
+      "a11y_day_label": "{{day}} meds summary",
+      "a11y_day_hint": "Double tap to open meds log for this day"
     },
     "streaks": {
       "title": "Streaks",
@@ -2519,6 +2526,14 @@
     }
   },
   "weight": {
+    "dashboard": {
+      "title": "Weight",
+      "card_label": "Weight: {{weight}}",
+      "no_data": "No weight data",
+      "log_weight": "Log Weight",
+      "body_fat": "body fat",
+      "accessibility_hint": "Double tap to view weight log"
+    },
     "fab": {
       "log_weight": "+ Log weight",
       "log_weight_a11y": "Log weight"

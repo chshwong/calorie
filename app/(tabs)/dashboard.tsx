@@ -1,42 +1,42 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Dimensions, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CalInVsOutChart } from '@/components/charts/cal-in-vs-out-chart';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
-import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { ExerciseActivitiesChart } from '@/components/dashboard/exercise-activities-chart';
+import { PremiumCard } from '@/components/dashboard/premium-card';
+import { WaterCard } from '@/components/dashboard/water-card';
+import { WeightCard } from '@/components/dashboard/weight-card';
+import { AvocadoGauge } from '@/components/gauges/AvocadoGauge';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
-import { PremiumCard } from '@/components/dashboard/premium-card';
-import { CalInVsOutChart } from '@/components/charts/cal-in-vs-out-chart';
-import { ExerciseActivitiesChart } from '@/components/dashboard/exercise-activities-chart';
-import { BodyStatsRow } from '@/components/body/body-stats-row';
-import { WaterCard } from '@/components/dashboard/water-card';
-import { AvocadoGauge } from '@/components/gauges/AvocadoGauge';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useSelectedDate } from '@/hooks/use-selected-date';
-import { useUserConfig } from '@/hooks/use-user-config';
 import {
-  useDailyFoodSummary,
-  useWeeklyFoodCalories,
-  useWeeklyCalInVsOut,
+    useDailyFoodSummary,
+    useWeeklyCalInVsOut,
+    useWeeklyFoodCalories,
 } from '@/hooks/use-dashboard-data';
 import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useMedLogsForDate, useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
-import { useWaterDailyForDate } from '@/hooks/use-water-logs';
+import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useStreakState } from '@/hooks/use-streak-state';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import {
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle,
+} from '@/utils/accessibility';
+import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
-import {
-  getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
-  getFocusStyle,
-} from '@/utils/accessibility';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Dimensions, Platform, Pressable, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 // Presentational Components
 
@@ -103,14 +103,15 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
 
   return (
     <DashboardSectionContainer>
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.7}
-        style={getMinTouchTargetStyle()}
-        {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
-        {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
-      >
-        <PremiumCard>
+      <PremiumCard>
+        {/* Header-only button to avoid nested <button> hydration errors on web (chart bars are interactive). */}
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.7}
+          style={getMinTouchTargetStyle()}
+          {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+          {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
+        >
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
               <IconSymbol name="fork.knife" size={20} color={colors.accentFood} />
@@ -119,6 +120,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               </ThemedText>
             </View>
           </View>
+        </TouchableOpacity>
 
           <View style={styles.caloriesRow}>
             <View style={styles.foodChipsOverlay} pointerEvents="box-none">
@@ -157,6 +159,8 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
               data={weeklyCalInVsOut.data}
               selectedDate={dateString}
               todayDateString={getTodayKey()}
+              yesterdayDateString={getYesterdayKey()}
+              useYdayLabel
               onBarPress={handleFoodChartDateSelect}
               height={isSmallScreen ? 105 : isMobile ? 120 : 128}
             />
@@ -167,16 +171,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
             )}
           </View>
 
-        </PremiumCard>
-      </TouchableOpacity>
-    </DashboardSectionContainer>
-  );
-}
-
-function DashboardBodyStatsSection() {
-  return (
-    <DashboardSectionContainer>
-      <BodyStatsRow />
+      </PremiumCard>
     </DashboardSectionContainer>
   );
 }
@@ -255,14 +250,15 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
 
   return (
     <DashboardSectionContainer>
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.7}
-        style={getMinTouchTargetStyle()}
-        {...getButtonAccessibilityProps(t('dashboard.snapshot.ex'), t('dashboard.exercise.accessibility_hint'))}
-        {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
-      >
-        <PremiumCard>
+      <PremiumCard>
+        {/* Header-only button to avoid nested <button> hydration errors on web (day columns are interactive). */}
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.7}
+          style={getMinTouchTargetStyle()}
+          {...getButtonAccessibilityProps(t('dashboard.snapshot.ex'), t('dashboard.exercise.accessibility_hint'))}
+          {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
+        >
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
               <IconSymbol name="figure.run" size={20} color={colors.accentExercise} />
@@ -271,6 +267,7 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
               </ThemedText>
             </View>
           </View>
+        </TouchableOpacity>
 
           {/* Cardio/Mind-body Activities Chart */}
           <ExerciseActivitiesChart
@@ -286,6 +283,8 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
             titleText="Cardio & Mind-Body"
             isWide={isWide}
             showTopBorder={false}
+            showSelectedOutline={false}
+            showFocusOutline={false}
           />
           
           {/* Strength Activities Chart */}
@@ -301,9 +300,10 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
             ]}
             titleText="Strength Activities"
             isWide={isWide}
+            showSelectedOutline={false}
+            showFocusOutline={false}
           />
-        </PremiumCard>
-      </TouchableOpacity>
+      </PremiumCard>
     </DashboardSectionContainer>
   );
 }
@@ -317,9 +317,12 @@ type DashboardMedsSectionProps = {
 
 function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: DashboardMedsSectionProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { user } = useAuth();
   const { data: logs = [], isLoading } = useMedLogsForDate(dateString);
   const { data: weeklySummary = [] } = useMedSummaryForRecentDays(7);
+  const todayKey = getTodayKey();
+  const yesterdayKey = getYesterdayKey();
 
   // Calculate summary inline
   const totalItems = logs.length;
@@ -390,14 +393,15 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
 
   return (
     <DashboardSectionContainer>
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.7}
-        style={getMinTouchTargetStyle()}
-        {...getButtonAccessibilityProps(t('dashboard.meds.title'), t('dashboard.meds.accessibility_hint'))}
-        {...(Platform.OS === 'web' && getFocusStyle(colors.accentMeds))}
-      >
-        <PremiumCard>
+      <PremiumCard>
+        {/* Header-only button to avoid nested <button> hydration errors on web (adherence dots are interactive). */}
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.7}
+          style={getMinTouchTargetStyle()}
+          {...getButtonAccessibilityProps(t('dashboard.meds.title'), t('dashboard.meds.accessibility_hint'))}
+          {...(Platform.OS === 'web' && getFocusStyle(colors.accentMeds))}
+        >
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
               <IconSymbol name="pills.fill" size={20} color={colors.accentMeds} />
@@ -406,6 +410,7 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
               </ThemedText>
             </View>
           </View>
+        </TouchableOpacity>
 
           <View style={styles.medsToday}>
             <ThemedText style={[styles.medsValue, { color: colors.text }]}>
@@ -422,39 +427,59 @@ function DashboardMedsSection({ dateString, colors, onPress, onDateSelect }: Das
           </View>
 
           <View style={styles.chartSection}>
-            <ThemedText style={[styles.chartTitle, { color: colors.text }]}>
-              {t('dashboard.meds.chart_7d')}
-            </ThemedText>
+            <View style={styles.rangeTitleRow}>
+              <ThemedText style={[styles.rangeTitle, { color: colors.text }]}>
+                {t('common.last_7_days')}
+              </ThemedText>
+            </View>
             <View style={styles.adherenceRow}>
               {weeklyData.map((day) => {
                 const date = new Date(day.date + 'T00:00:00');
                 const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
-                const isSelected = dateString === day.date;
+                const displayLabel = getDashboardDayLabel({
+                  dateKey: day.date,
+                  todayKey,
+                  yesterdayKey,
+                  t,
+                  getWeekdayLabel: () => dayLabel.charAt(0),
+                });
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={day.date}
                     style={[
                       styles.adherenceDot,
                       {
                         backgroundColor: day.hasAnyBoolean ? colors.accentMeds : colors.backgroundSecondary,
-                        borderColor: isSelected ? colors.accentMeds : 'transparent',
-                        borderWidth: isSelected ? 2 : 0,
                       },
+                      Platform.OS === 'web' && ({ outlineStyle: 'none', outlineWidth: 0 } as any),
                     ]}
-                    onPress={() => onDateSelect(day.date)}
-                    activeOpacity={0.7}
-                    {...getButtonAccessibilityProps(`${dayLabel}, ${day.hasAnyBoolean ? 'has meds' : 'no meds'}`)}
+                    onPress={(e: any) => {
+                      e?.stopPropagation?.();
+                      router.push({ pathname: '/meds', params: { date: day.date } } as any);
+                    }}
+                    android_ripple={null}
+                    {...getButtonAccessibilityProps(
+                      t('dashboard.meds.a11y_day_label', {
+                        day: getDashboardDayLabel({
+                          dateKey: day.date,
+                          todayKey,
+                          yesterdayKey,
+                          t,
+                          getWeekdayLabel: () => dayLabel,
+                        }),
+                      }),
+                      t('dashboard.meds.a11y_day_hint')
+                    )}
                   >
                     <ThemedText style={[styles.adherenceLabel, { color: day.hasAnyBoolean ? colors.textInverse : colors.textSecondary }]}>
-                      {dayLabel.charAt(0)}
+                      {displayLabel}
                     </ThemedText>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </View>
           </View>
-        </PremiumCard>
-      </TouchableOpacity>
+      </PremiumCard>
     </DashboardSectionContainer>
   );
 }
@@ -464,6 +489,20 @@ type DashboardWaterSectionProps = {
   colors: typeof Colors.light | typeof Colors.dark;
   onPress?: () => void;
 };
+
+type DashboardWeightSectionProps = {
+  dateString: string;
+  colors: typeof Colors.light | typeof Colors.dark;
+  onPress?: () => void;
+};
+
+function DashboardWeightSection({ dateString, onPress }: DashboardWeightSectionProps) {
+  return (
+    <DashboardSectionContainer>
+      <WeightCard dateString={dateString} onPress={onPress} />
+    </DashboardSectionContainer>
+  );
+}
 
 function DashboardWaterSection({ dateString, onPress }: DashboardWaterSectionProps) {
   return (
@@ -688,7 +727,7 @@ export default function DashboardScreen() {
           return isToday
             ? `${t('common.today')}, ${formattedDate}`
             : selectedDate.getTime() === yesterday.getTime()
-            ? `${t('common.yesterday')}, ${formattedDate}`
+            ? `${t('date.yday')}, ${formattedDate}`
             : formattedDate;
         })()}
         rightAvatarUri={effectiveProfile?.avatar_url ?? undefined}
@@ -722,12 +761,6 @@ export default function DashboardScreen() {
       >
         {/* Desktop Container for Header and Content */}
         <DesktopPageContainer>
-        {/* Dashboard: Under Under Construction */}
-        <View style={styles.constructionBanner}>
-          <ThemedText style={[styles.constructionText, { color: colors.textSecondary }]}>
-            Dashboard: Under Construction
-          </ThemedText>
-        </View>
 
         {/* Food Section - Full Width */}
         <DashboardFoodSection
@@ -740,11 +773,14 @@ export default function DashboardScreen() {
           onDateSelect={handleDateSelect}
         />
 
-        {/* Body Stats Section - Full Width */}
-        <DashboardBodyStatsSection />
-
         {/* Module Grid - 2 columns on desktop, single column on mobile */}
         <View style={[styles.moduleGrid, isMobile && styles.moduleGridMobile]}>
+          <DashboardWeightSection
+            dateString={selectedDateString}
+            colors={colors}
+            onPress={() => router.push(`/weight?date=${selectedDateString}`)}
+          />
+
           <DashboardExerciseSection
             dateString={selectedDateString}
             colors={colors}
@@ -787,16 +823,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  constructionBanner: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    alignItems: 'center',
-  },
-  constructionText: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -834,6 +860,16 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
     marginBottom: Layout.chartGapCompact,
+  },
+  // Match Water dashboard mini chart title style ("Last 7 days")
+  rangeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  rangeTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
   chartSubtitle: {
     fontSize: FontSize.xs,

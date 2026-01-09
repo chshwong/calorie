@@ -8,10 +8,9 @@
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Colors, FontSize, FontWeight, ModuleThemes, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getFocusStyle } from '@/utils/accessibility';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Pressable, View } from 'react-native';
 
 type BarData = {
   date: string;
@@ -27,6 +26,8 @@ type BarChartProps = {
   goalDisplayValue?: string; // Formatted goal value for label (e.g., "Goal 2000 ml")
   selectedDate?: string;
   todayDateString?: string; // Date string for today (YYYY-MM-DD format) to show "Today" label
+  yesterdayDateString?: string; // Date string for yesterday (YYYY-MM-DD format)
+  useYdayLabel?: boolean; // Dashboard-only: show "Yday" instead of "Yesterday"
   onBarPress?: (date: string) => void;
   colorScale?: (value: number, maxValue: number) => string;
   height?: number;
@@ -42,6 +43,8 @@ export function BarChart({
   goalDisplayValue,
   selectedDate,
   todayDateString,
+  yesterdayDateString,
+  useYdayLabel = false,
   onBarPress,
   colorScale,
   height = 120,
@@ -54,15 +57,23 @@ export function BarChart({
   const { t } = useTranslation();
   const waterTheme = ModuleThemes.water;
   
-  // Calculate max value if not provided
-  // Use provided maxValue (parent can add padding if desired) or compute from data without extra headroom
-  const calculatedMax = maxValue || Math.max(...data.map(d => d.value), goalValue || 0, 1);
-  const chartMax = maxValue ? maxValue : Math.max(calculatedMax, 1);
+  // Calculate scaleMax: max of daily values and goal
+  // If maxValue is provided, use it (parent already calculated max of daily and goal)
+  // Otherwise, calculate from data
+  const maxDay = Math.max(...data.map(d => d.value), 0);
+  const goal = goalValue || 0;
+  const scaleMax = maxValue ? maxValue : Math.max(maxDay, goal, 1);
+  
+  // Add headroom factor (1.08 = 8% padding) so tallest bar/goal doesn't clip
+  // This makes bars use ~92.6% of plot height (1/1.08 ≈ 0.926)
+  // The tallest bar/goal will reach ~92.6% of plotHeight, leaving small top padding
+  const headroomFactor = 1.08;
+  const effectiveMax = scaleMax * headroomFactor;
 
   // Reserve space within the chart for labels without affecting the plot scaling.
   // - topInset: lets value labels above bars remain visible (they can overflow upward into this space)
   // - xAxisHeight: dedicated row for day labels, so it doesn't shrink the plot area and break scaling
-  // Extra headroom for multi-line value labels above tall bars
+  // Keep label headroom constant; scale is controlled via effectiveMax (no layout changes).
   const topInset = Spacing['4xl'];
   const xAxisHeight = showLabels ? (FontSize.xs + Spacing.md) : 0;
   const plotHeight = Math.max(height - topInset - xAxisHeight, 1);
@@ -125,16 +136,21 @@ export function BarChart({
   const formatDateLabel = (dateString: string) => {
     // Check if this date is today
     if (todayDateString && dateString === todayDateString) {
-      return 'Today';
+      return t('common.today');
+    }
+    if (yesterdayDateString && dateString === yesterdayDateString) {
+      return useYdayLabel ? t('date.yday') : t('common.yesterday');
     }
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short' });
   };
 
-  // Calculate goal line position
-  const goalLineBottom = goalValue !== undefined && goalValue > 0 
-    ? (goalValue / chartMax) * plotHeight 
-    : null;
+  // Calculate goal line position using the SAME scale as bars:
+  // offset from bottom = (goal / effectiveMax) * plotHeight
+  const goalLineBottom =
+    goalValue !== undefined && goalValue > 0
+      ? (goalValue / effectiveMax) * plotHeight
+      : null;
 
   return (
     <View style={styles.container}>
@@ -144,18 +160,25 @@ export function BarChart({
           {/* Bars */}
           <View style={styles.barsContainer}>
             {data.map((item, index) => {
-              const barHeight = (item.value / chartMax) * plotHeight;
-              const isSelected = selectedDate === item.date;
+              // Use effectiveMax for scaling so bars use ~90-95% of plot height
+              const barHeight = (item.value / effectiveMax) * plotHeight;
               const barOpacity = !hasData && item.value === 0 ? 0.3 : 1;
               const valueLabelBottom = barHeight + Spacing.xs;
               
               return (
-                <TouchableOpacity
+                <Pressable
                   key={item.date}
-                  style={styles.barWrapper}
+                  style={[
+                    styles.barWrapper,
+                    Platform.OS === 'web' && {
+                      outlineStyle: 'none',
+                      outlineWidth: 0,
+                    },
+                  ]}
                   onPress={() => onBarPress?.(item.date)}
-                  activeOpacity={0.7}
-                  {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+                  android_ripple={null}
+                  hitSlop={Spacing.sm}
+                  accessibilityRole={onBarPress ? 'button' : 'none'}
                 >
                   {/* Value label above bar (always) */}
                   {item.displayValue && (
@@ -177,19 +200,17 @@ export function BarChart({
                         {
                           height: animated && animatedHeightsRef.current[index] 
                             ? animatedHeightsRef.current[index].interpolate({
-                                inputRange: [0, chartMax],
+                                inputRange: [0, effectiveMax],
                                 outputRange: [0, plotHeight],
                               })
                             : barHeight,
-                          backgroundColor: getColor(item.value, chartMax),
-                          borderColor: isSelected ? colors.tint : 'transparent',
-                          borderWidth: isSelected ? 2 : 0,
+                          backgroundColor: getColor(item.value, effectiveMax),
                           opacity: barOpacity,
                         },
                       ]}
                     />
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </View>
