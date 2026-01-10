@@ -1073,9 +1073,9 @@ export default function FoodLogHomeScreen() {
       <Pressable
         onPress={() => cycleMealViewMode(mealType)}
         hitSlop={10}
-        style={[
+        style={({ pressed }) => [
           styles.mealViewToggle,
-          colorScheme === 'dark' ? { backgroundColor: 'rgba(255,255,255,0.08)' } : { backgroundColor: 'transparent' },
+          pressed && { opacity: 0.6 },
         ]}
         accessibilityRole="button"
         accessibilityLabel={a11y}
@@ -3119,13 +3119,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mealViewToggle: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   mealViewToggleInner: {
     flexDirection: 'row',
