@@ -1061,25 +1061,37 @@ export default function FoodLogHomeScreen() {
       mode === 'collapsed' ? '▢' :
       mode === 'semi' ? '≡' :
       '☰';
-    const chevron = mode === 'expanded' ? '⏶' : '⏷';
 
     const a11y =
       mode === 'collapsed' ? 'Show summary' :
       mode === 'semi' ? 'Show details' :
       'Collapse meal';
 
+    const toggleColor = colorScheme === 'dark' ? '#FFFFFF' : colors.textSecondary;
+
     return (
       <Pressable
         onPress={() => cycleMealViewMode(mealType)}
         hitSlop={10}
-        style={styles.mealViewToggle}
+        style={[
+          styles.mealViewToggle,
+          colorScheme === 'dark' ? { backgroundColor: 'rgba(255,255,255,0.08)' } : { backgroundColor: 'transparent' },
+        ]}
         accessibilityRole="button"
         accessibilityLabel={a11y}
       >
-        <Text style={styles.mealViewToggleText}>{icon}{chevron}</Text>
+        <View style={styles.mealViewToggleInner}>
+          <Text style={[styles.mealViewToggleIcon, { color: toggleColor }]}>{icon}</Text>
+          <IconSymbol
+            name={mode === 'expanded' ? 'chevron.up' : 'chevron.down'}
+            size={16}
+            color={toggleColor}
+            decorative
+          />
+        </View>
       </Pressable>
     );
-  }, [cycleMealViewMode]);
+  }, [cycleMealViewMode, colorScheme, colors.textSecondary]);
 
   // Construct greeting text
   const hour = new Date().getHours();
@@ -3114,6 +3126,20 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  mealViewToggleInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  mealViewToggleIcon: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 16,
+    ...Platform.select({
+      web: { fontFamily: 'ui-sans-serif, system-ui' }, // avoid emoji font fallback on web
+      default: {},
+    }),
   },
   mealViewToggleText: {
     fontSize: 13,
