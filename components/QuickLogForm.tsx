@@ -12,7 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, SemanticColors } from '@/constants/theme';
-import { RANGES } from '@/constants/constraints';
+import { FOOD_ENTRY, RANGES, TEXT_LIMITS } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getCurrentDateTimeUTC } from '@/utils/calculations';
 import { deleteEntry as deleteEntryService, createEntry as createEntryService, updateEntry as updateEntryService } from '@/lib/services/calorieEntries';
@@ -42,10 +42,6 @@ type QuickLogFormProps = {
   registerSubmit?: (submitFn: () => void) => void; // register submit function for header button
 };
 
-// Database constraints
-const MAX_QUANTITY = 100000;
-const MAX_CALORIES = RANGES.CALORIES_KCAL.MAX;
-const MAX_MACRO = 9999.99;
 const ENTRIES_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS;
 
 
@@ -201,15 +197,15 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     const parsedQuantity = parseFloat(quantity);
     if (!quantity || isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) {
       isValid = false;
-    } else if (parsedQuantity > MAX_QUANTITY) {
-      setQuantityError(`Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}. Please reduce the quantity or split into multiple entries.`);
+    } else if (parsedQuantity > FOOD_ENTRY.QUANTITY.MAX) {
+      setQuantityError(`Serving size cannot exceed ${FOOD_ENTRY.QUANTITY.MAX.toLocaleString()}. Please reduce the quantity or split into multiple entries.`);
       isValid = false;
     }
     
     const parsedCalories = parseFloat(calories);
     if (!calories || calories.trim() === '' || isNaN(parsedCalories) || !isFinite(parsedCalories) || parsedCalories < 0) {
       isValid = false;
-    } else if (parsedCalories > MAX_CALORIES) {
+    } else if (parsedCalories > RANGES.CALORIES_KCAL.MAX) {
       setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
       isValid = false;
     }
@@ -219,8 +215,8 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       if (isNaN(parsedProtein) || !isFinite(parsedProtein)) {
         setProteinError(t('mealtype_log.errors.protein_invalid'));
         isValid = false;
-      } else if (parsedProtein > MAX_MACRO) {
-        setProteinError(`Protein cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+      } else if (parsedProtein > FOOD_ENTRY.MACRO_G.MAX) {
+        setProteinError(`Protein cannot exceed ${FOOD_ENTRY.MACRO_G.MAX.toLocaleString()}g`);
         isValid = false;
       }
     }
@@ -230,8 +226,8 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       if (isNaN(parsedCarbs) || !isFinite(parsedCarbs)) {
         setCarbsError(t('mealtype_log.errors.carbs_invalid'));
         isValid = false;
-      } else if (parsedCarbs > MAX_MACRO) {
-        setCarbsError(`Carbs cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+      } else if (parsedCarbs > FOOD_ENTRY.MACRO_G.MAX) {
+        setCarbsError(`Carbs cannot exceed ${FOOD_ENTRY.MACRO_G.MAX.toLocaleString()}g`);
         isValid = false;
       }
     }
@@ -241,8 +237,8 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       if (isNaN(parsedFat) || !isFinite(parsedFat)) {
         setFatError(t('mealtype_log.errors.fat_invalid'));
         isValid = false;
-      } else if (parsedFat > MAX_MACRO) {
-        setFatError(`Fat cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+      } else if (parsedFat > FOOD_ENTRY.MACRO_G.MAX) {
+        setFatError(`Fat cannot exceed ${FOOD_ENTRY.MACRO_G.MAX.toLocaleString()}g`);
         isValid = false;
       }
     }
@@ -252,8 +248,8 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       if (isNaN(parsedFiber) || !isFinite(parsedFiber)) {
         setFiberError(t('mealtype_log.errors.fiber_invalid'));
         isValid = false;
-      } else if (parsedFiber > MAX_MACRO) {
-        setFiberError(`Fiber cannot exceed ${MAX_MACRO.toLocaleString()}g`);
+      } else if (parsedFiber > FOOD_ENTRY.MACRO_G.MAX) {
+        setFiberError(`Fiber cannot exceed ${FOOD_ENTRY.MACRO_G.MAX.toLocaleString()}g`);
         isValid = false;
       }
     }
@@ -272,28 +268,28 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     
     const parsedQuantity = parseFloat(quantity);
     if (!quantity || isNaN(parsedQuantity) || !isFinite(parsedQuantity) || parsedQuantity <= 0) return false;
-    if (parsedQuantity > MAX_QUANTITY) return false;
+    if (parsedQuantity > FOOD_ENTRY.QUANTITY.MAX) return false;
     
     const parsedCalories = parseFloat(calories);
     if (!calories || calories.trim() === '' || isNaN(parsedCalories) || !isFinite(parsedCalories) || parsedCalories < 0) return false;
-    if (parsedCalories > MAX_CALORIES) return false;
+    if (parsedCalories > RANGES.CALORIES_KCAL.MAX) return false;
     
     // Check macros if provided
     if (protein) {
       const parsedProtein = parseFloat(protein);
-      if (isNaN(parsedProtein) || !isFinite(parsedProtein) || parsedProtein > MAX_MACRO) return false;
+      if (isNaN(parsedProtein) || !isFinite(parsedProtein) || parsedProtein > FOOD_ENTRY.MACRO_G.MAX) return false;
     }
     if (carbs) {
       const parsedCarbs = parseFloat(carbs);
-      if (isNaN(parsedCarbs) || !isFinite(parsedCarbs) || parsedCarbs > MAX_MACRO) return false;
+      if (isNaN(parsedCarbs) || !isFinite(parsedCarbs) || parsedCarbs > FOOD_ENTRY.MACRO_G.MAX) return false;
     }
     if (fat) {
       const parsedFat = parseFloat(fat);
-      if (isNaN(parsedFat) || !isFinite(parsedFat) || parsedFat > MAX_MACRO) return false;
+      if (isNaN(parsedFat) || !isFinite(parsedFat) || parsedFat > FOOD_ENTRY.MACRO_G.MAX) return false;
     }
     if (fiber) {
       const parsedFiber = parseFloat(fiber);
-      if (isNaN(parsedFiber) || !isFinite(parsedFiber) || parsedFiber > MAX_MACRO) return false;
+      if (isNaN(parsedFiber) || !isFinite(parsedFiber) || parsedFiber > FOOD_ENTRY.MACRO_G.MAX) return false;
     }
     
     return true;
@@ -355,16 +351,16 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       return false;
     }
     
-    if (parsedQuantity > MAX_QUANTITY) {
-      const errorMsg = `Serving size cannot exceed ${MAX_QUANTITY.toLocaleString()}. Please reduce the quantity or split into multiple entries.`;
+    if (parsedQuantity > FOOD_ENTRY.QUANTITY.MAX) {
+      const errorMsg = `Serving size cannot exceed ${FOOD_ENTRY.QUANTITY.MAX.toLocaleString()}. Please reduce the quantity or split into multiple entries.`;
       setQuantityError(errorMsg);
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: MAX_QUANTITY.toLocaleString() }));
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.serving_too_large', { value: parsedQuantity.toLocaleString(), max: FOOD_ENTRY.QUANTITY.MAX.toLocaleString() }));
       setLoading(false);
       return false;
     }
     
     const caloriesValue = Number(parsedCalories);
-    const maxCaloriesValue = Number(MAX_CALORIES);
+    const maxCaloriesValue = Number(RANGES.CALORIES_KCAL.MAX);
     
     if (caloriesValue > maxCaloriesValue) {
       setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
@@ -373,16 +369,16 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     }
 
     // Check macros if they exist
-    if (protein && parseFloat(protein) > MAX_MACRO) {
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.protein_too_large', { max: MAX_MACRO.toLocaleString() }));
+    if (protein && parseFloat(protein) > FOOD_ENTRY.MACRO_G.MAX) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.protein_too_large', { max: FOOD_ENTRY.MACRO_G.MAX.toLocaleString() }));
       return false;
     }
-    if (carbs && parseFloat(carbs) > MAX_MACRO) {
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.carbs_too_large', { max: MAX_MACRO.toLocaleString() }));
+    if (carbs && parseFloat(carbs) > FOOD_ENTRY.MACRO_G.MAX) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.carbs_too_large', { max: FOOD_ENTRY.MACRO_G.MAX.toLocaleString() }));
       return false;
     }
-    if (fat && parseFloat(fat) > MAX_MACRO) {
-      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fat_too_large', { max: MAX_MACRO.toLocaleString() }));
+    if (fat && parseFloat(fat) > FOOD_ENTRY.MACRO_G.MAX) {
+      Alert.alert(t('alerts.validation_error'), t('mealtype_log.errors.fat_too_large', { max: FOOD_ENTRY.MACRO_G.MAX.toLocaleString() }));
       return false;
     }
 
@@ -478,7 +474,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       }
 
       // Final validation check
-      if (parsedCalories > MAX_CALORIES) {
+      if (parsedCalories > RANGES.CALORIES_KCAL.MAX) {
         setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
         setLoading(false);
         return false;
@@ -518,15 +514,15 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
         const errorMsg = error.message || '';
         const errorCode = (error as any).code || '';
         
-        if (errorCode === '23514' || errorMsg.includes('calories_kcal_check') || errorMsg.includes('calories_kcal') || (errorMsg.includes('check') && (errorMsg.includes(MAX_CALORIES.toString()) || errorMsg.includes('calories')))) {
+        if (errorCode === '23514' || errorMsg.includes('calories_kcal_check') || errorMsg.includes('calories_kcal') || (errorMsg.includes('check') && (errorMsg.includes(RANGES.CALORIES_KCAL.MAX.toString()) || errorMsg.includes('calories')))) {
           const currentCalories = parsedCalories || 0;
-          const suggestedQty = parsedQuantity ? Math.floor((MAX_CALORIES / currentCalories) * parsedQuantity * 10) / 10 : 0;
+          const suggestedQty = parsedQuantity ? Math.floor((RANGES.CALORIES_KCAL.MAX / currentCalories) * parsedQuantity * 10) / 10 : 0;
           errorMessage = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
             `Current: ${currentCalories.toLocaleString()} calories\n` +
-            `Maximum: ${MAX_CALORIES.toLocaleString()} calories per entry\n\n` +
+            `Maximum: ${RANGES.CALORIES_KCAL.MAX.toLocaleString()} calories per entry\n\n` +
             `SOLUTIONS:\n` +
             `• Reduce quantity to ${suggestedQty} (instead of ${parsedQuantity || 'current'})\n` +
-            `• Split into ${Math.ceil(currentCalories / MAX_CALORIES)} separate entries`;
+            `• Split into ${Math.ceil(currentCalories / RANGES.CALORIES_KCAL.MAX)} separate entries`;
           setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
         } else if (errorMsg.includes('numeric') || errorMsg.includes('value too large') || errorMsg.includes('out of range') || errorCode === '22003') {
           errorMessage = 'The calculated values are too large. Please reduce the quantity or split into multiple entries.';
@@ -582,13 +578,13 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     try {
       // Check calories before even calling saveEntry
       const currentCalories = parseFloat(calories);
-      if (!isNaN(currentCalories) && currentCalories > MAX_CALORIES) {
+      if (!isNaN(currentCalories) && currentCalories > RANGES.CALORIES_KCAL.MAX) {
         const errorMsg = `⚠️ CALORIES LIMIT EXCEEDED\n\n` +
           `Current: ${currentCalories.toLocaleString()} calories\n` +
-          `Maximum: ${MAX_CALORIES.toLocaleString()} calories per entry\n\n` +
+          `Maximum: ${RANGES.CALORIES_KCAL.MAX.toLocaleString()} calories per entry\n\n` +
           `SOLUTIONS:\n` +
           `• Reduce the quantity\n` +
-          `• Split into ${Math.ceil(currentCalories / MAX_CALORIES)} separate entries`;
+          `• Split into ${Math.ceil(currentCalories / RANGES.CALORIES_KCAL.MAX)} separate entries`;
         
         setCaloriesError(t('mealtype_log.errors.calories_exceed_5000_limit'));
         Alert.alert(t('alerts.calories_limit_exceeded'), errorMsg);
@@ -721,7 +717,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                   { 
                     borderBottomColor: itemNameError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
                     borderBottomWidth: 1,
-                    color: '#000000',
+                    color: isDark ? colors.inputTextDark : '#000000',
                     ...(Platform.OS === 'web' ? { 
                       outlineWidth: 0,
                     } : {}),
@@ -730,7 +726,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
                 placeholder={t('mealtype_log.form.food_item_placeholder')}
                 placeholderTextColor={colors.textTertiary}
                 value={itemName}
-                maxLength={40}
+                maxLength={TEXT_LIMITS.BUNDLES_NAME.MAX_LEN}
                 onChangeText={setItemName}
                 autoCapitalize="words"
                 autoFocus
@@ -831,12 +827,12 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
           }
           caloriesInput={
             <View>
-              <View style={styles.nutritionLabelInputWithUnit}>
+              <View style={[styles.nutritionLabelInputWithUnit, styles.quickLogCaloriesContainer]}>
                 <NumberInput
                   style={[
                     styles.nutritionLabelInput,
                     styles.nutritionLabelCaloriesInput,
-                    styles.nutritionLabelNumericInput,
+                    styles.quickLogCaloriesInputNumeric,
                     { 
                       borderBottomColor: caloriesError ? '#EF4444' : 'rgba(0, 0, 0, 0.2)', 
                       borderBottomWidth: 1,
@@ -1356,6 +1352,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     width: 80, // Fixed width container for input + unit (w-20 equivalent)
     gap: 4,
+  },
+  // Quick Log-specific overrides (Issue 1: Calories input width)
+  quickLogCaloriesContainer: {
+    width: 100, // Increased from 80 to accommodate wider calories input (~25% wider)
+  },
+  quickLogCaloriesInputNumeric: {
+    width: 90, // Override the 30px width from nutritionLabelNumericInput, increased by ~25%
+    textAlign: 'right',
   },
   nutritionLabelUnit: {
     fontSize: 14,

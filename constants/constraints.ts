@@ -1,6 +1,6 @@
 // src/constants/constraints.ts
 
-import { DB_MIN_WEIGHT_LB, DB_MAX_WEIGHT_LB, LB_PER_KG, lbToKg } from '@/lib/domain/weight-constants';
+import { DB_MAX_WEIGHT_LB, DB_MIN_WEIGHT_LB, lbToKg } from '@/lib/domain/weight-constants';
 
 // truth in code
 export const PROFILES = {
@@ -76,6 +76,13 @@ export const FOOD_LOG = {
 export const FOOD_ENTRY = {
   QUANTITY: { MIN_EXCLUSIVE: 0, MAX: 100000 },
   MACRO_G: { MIN: 0, MAX: 9999.99 },
+} as const;
+
+// Bundle limits (UI + validation policy).
+// Keep centralized to avoid hardcoding values (engineering-guidelines.md §7).
+export const BUNDLES = {
+  COUNT: { MAX: 20 }, // Maximum bundles per user (app-level policy)
+  ITEMS: { MIN: 2 },  // Minimum items required per bundle
 } as const;
 
   // Daily nutrient target ranges (for onboarding and daily focus targets)

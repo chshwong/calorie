@@ -1768,6 +1768,7 @@
     "remove_button": "Remove",
     "macros": {
       "saturated_fat_short": "Sat Fat",
+      "trans_fat_short": "Trans Fat",
       "sugar_short": "Sugar",
       "sodium_short": "Sodium",
       "protein": "Protein",
@@ -1786,6 +1787,10 @@
       "enter_bundle_name": "Please enter a bundle name",
       "bundle_name_too_long": "Bundle name must be 40 characters or less",
       "add_at_least_two_foods": "Please add at least 2 foods to create a bundle",
+      "calories_too_high": "Calories too high. Please correct.",
+      "quantity_greater_than_zero": "Quantity must be greater than 0",
+      "quantity_exceeds_limit": "Quantity cannot exceed {{max}}. Please reduce the quantity.",
+      "calories_exceed_limit": "Calories ({{calories}} cal) exceed the {{max}} cal limit per entry. Reduce quantity or split into {{entries}} entries.",
       "bundle_limit_reached_title": "Bundle Limit Reached",
       "bundle_limit_reached_message": "You have reached the maximum limit of 20 bundles.\n\nTo create a new bundle:\n• Delete an existing bundle from the Bundle tab\n• Or edit an existing bundle instead of creating a new one",
       "update_bundle_failed": "Failed to update bundle: {{error}}",
@@ -1795,9 +1800,6 @@
       "load_food_failed": "Failed to load food",
       "select_food_and_serving": "Please select a food and serving",
       "enter_valid_quantity": "Please enter a valid quantity",
-      "quantity_greater_than_zero": "Quantity must be greater than 0",
-      "quantity_exceeds_limit": "Quantity cannot exceed {{max}}. Please reduce the quantity or split into multiple entries.",
-      "calories_exceed_limit": "Calories ({{calories}} cal) exceed the {{max}} cal limit per entry. Reduce quantity or split into {{entries}} entries.",
       "add_at_least_one_food": "Please add at least one food to the bundle"
     },
     "bundle_name_label": "Bundle Name",

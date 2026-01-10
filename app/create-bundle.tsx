@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -7,12 +7,20 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { FoodSearchBar } from '@/components/food-search-bar';
+import { NumberInput } from '@/components/input/NumberInput';
 import { Colors } from '@/constants/theme';
-import { TEXT_LIMITS } from '@/constants/constraints';
+import { BUNDLES, FOOD_ENTRY, RANGES, TEXT_LIMITS } from '@/constants/constraints';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFoodSearch } from '@/hooks/use-food-search';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import {
+  getButtonAccessibilityProps,
+  getInputAccessibilityProps,
+  getWebAccessibilityProps,
+  getMinTouchTargetStyle,
+  getFocusStyle,
+} from '@/utils/accessibility';
 import {
   calculateNutrientsSimple,
   getMasterUnitsFromServingOption,
@@ -46,26 +54,6 @@ type BundleItem = {
   calculatedNutrition?: Nutrients;
 };
 
-function sanitizeOneDecimalQuantityInput(raw: string): string {
-  // Allow: empty (so user can delete), digits, and at most one '.' with at most 1 decimal digit
-  const t = raw.replace(',', '.'); // helpful for some keyboards/locales
-
-  // Keep only digits and dots
-  const filtered = t.replace(/[^0-9.]/g, '');
-  if (filtered.length === 0) return '';
-
-  // If it starts with '.', prefix '0'
-  const normalizedLeading = filtered.startsWith('.') ? `0${filtered}` : filtered;
-
-  // Keep only first '.'
-  const firstDot = normalizedLeading.indexOf('.');
-  if (firstDot === -1) return normalizedLeading;
-
-  const intPart = normalizedLeading.slice(0, firstDot);
-  const rest = normalizedLeading.slice(firstDot + 1).replace(/\./g, ''); // remove extra dots
-  return rest.length > 0 ? `${intPart}.${rest}` : `${intPart}.`;
-}
-
 function parseQuantityOrZero(input: string): number {
   const n = Number.parseFloat(input);
   return Number.isFinite(n) ? n : 0;
@@ -73,6 +61,17 @@ function parseQuantityOrZero(input: string): number {
 
 export default function CreateBundleScreen() {
   const router = useRouter();
+
+  // Safe back navigation helper: falls back to home if navigation stack is empty
+  // This prevents "GO_BACK was not handled" errors on web refresh
+  const goBackOrHome = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Fallback to home (Diary/Food Log) when stack is empty (e.g., after browser refresh)
+      router.replace('/(tabs)');
+    }
+  }, [router]);
   const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -81,10 +80,6 @@ export default function CreateBundleScreen() {
 
   const bundleId = params.bundleId as string | undefined;
   const isEditing = !!bundleId;
-
-  // Validation limits (same as entry creation)
-  const MAX_QUANTITY = 100000;
-  const MAX_CALORIES = 5000;
 
   // Form state
   const [bundleName, setBundleName] = useState('');
@@ -104,6 +99,19 @@ export default function CreateBundleScreen() {
   // Per-item quantity input refs for auto-focus
   const quantityInputRefs = useRef<Map<string, TextInput>>(new Map());
   const [newlyAddedItemId, setNewlyAddedItemId] = useState<string | null>(null);
+
+  // Calculate total calories from all bundle items
+  const totalCalories = useMemo(() => {
+    return bundleItems.reduce((acc, item) => {
+      if (item.calculatedNutrition) {
+        acc += item.calculatedNutrition.calories_kcal || 0;
+      }
+      return acc;
+    }, 0);
+  }, [bundleItems]);
+
+  // Check if calories exceed limit
+  const caloriesExceedLimit = totalCalories > RANGES.CALORIES_KCAL.MAX;
 
   // Load bundle for editing
   useEffect(() => {
@@ -142,7 +150,7 @@ export default function CreateBundleScreen() {
 
       if (bundleError || !bundleData) {
         Alert.alert(t('alerts.error_title'), t('create_bundle.errors.load_bundle_failed'));
-        router.back();
+        goBackOrHome();
         return;
       }
 
@@ -323,8 +331,7 @@ export default function CreateBundleScreen() {
 
   // Handle inline quantity change for a bundle item
   const handleItemQuantityChange = useCallback((itemId: string, newQuantity: string) => {
-    const sanitized = sanitizeOneDecimalQuantityInput(newQuantity);
-    const parsedQuantity = parseQuantityOrZero(sanitized);
+    const parsedQuantity = parseQuantityOrZero(newQuantity);
     
     setBundleItems(prevItems => 
       prevItems.map(item => {
@@ -333,7 +340,7 @@ export default function CreateBundleScreen() {
         const updatedItem = {
           ...item,
           quantity: parsedQuantity,
-          quantityInput: sanitized,
+          quantityInput: newQuantity, // NumberInput already sanitizes, but keep the raw input for display
         };
         
         return calculateItemNutritionSync(updatedItem);
@@ -349,14 +356,19 @@ export default function CreateBundleScreen() {
 
         const trimmed = item.quantityInput.trim();
         const withoutTrailingDot = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
-        const sanitized = sanitizeOneDecimalQuantityInput(withoutTrailingDot);
-        let parsed = parseQuantityOrZero(sanitized);
+        let parsed = parseQuantityOrZero(withoutTrailingDot);
 
         // Clamp to reasonable bounds
         if (parsed < 0) parsed = 0;
-        if (parsed > MAX_QUANTITY) parsed = MAX_QUANTITY;
+        if (parsed > FOOD_ENTRY.QUANTITY.MAX) parsed = FOOD_ENTRY.QUANTITY.MAX;
 
-        const finalInput = sanitized.length > 0 ? sanitizeOneDecimalQuantityInput(String(parsed)) : '';
+        // Format the final input (remove trailing zeros if needed, but keep up to 2 decimals)
+        let finalInput = '';
+        if (parsed > 0) {
+          // Format to show up to 2 decimal places, removing trailing zeros
+          const formatted = parsed.toFixed(2).replace(/\.?0+$/, '');
+          finalInput = formatted;
+        }
 
         const updatedItem = {
           ...item,
@@ -437,14 +449,46 @@ export default function CreateBundleScreen() {
       return;
     }
 
-    if (bundleName.length > 40) {
+    if (bundleName.length > TEXT_LIMITS.BUNDLES_NAME.MAX_LEN) {
       Alert.alert(t('alerts.error_title'), t('create_bundle.errors.bundle_name_too_long'));
       return;
     }
 
-    if (bundleItems.length < 2) {
+    if (bundleItems.length < BUNDLES.ITEMS.MIN) {
       Alert.alert(t('alerts.error_title'), t('create_bundle.errors.add_at_least_two_foods'));
       return;
+    }
+
+    // Validate each bundle item quantity before save
+    for (const item of bundleItems) {
+      if (item.quantity <= 0) {
+        Alert.alert(t('alerts.error_title'), t('create_bundle.errors.quantity_greater_than_zero'));
+        return;
+      }
+      
+      if (item.quantity > FOOD_ENTRY.QUANTITY.MAX) {
+        Alert.alert(
+          t('alerts.validation_error'),
+          t('create_bundle.errors.quantity_exceeds_limit', { max: FOOD_ENTRY.QUANTITY.MAX.toLocaleString() })
+        );
+        return;
+      }
+      
+      // Validate calories if calculated
+      if (item.calculatedNutrition?.calories_kcal) {
+        const itemCalories = item.calculatedNutrition.calories_kcal;
+        if (itemCalories > RANGES.CALORIES_KCAL.MAX) {
+          Alert.alert(
+            t('alerts.validation_error'),
+            t('create_bundle.errors.calories_exceed_limit', {
+              calories: itemCalories.toLocaleString(),
+              max: RANGES.CALORIES_KCAL.MAX.toLocaleString(),
+              entries: Math.ceil(itemCalories / RANGES.CALORIES_KCAL.MAX),
+            })
+          );
+          return;
+        }
+      }
     }
 
     // Set loading early to prevent multiple submissions
@@ -457,7 +501,7 @@ export default function CreateBundleScreen() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      if (!countError && count !== null && count >= 20) {
+      if (!countError && count !== null && count >= BUNDLES.COUNT.MAX) {
         Alert.alert(
           t('create_bundle.errors.bundle_limit_reached_title'),
           t('create_bundle.errors.bundle_limit_reached_message')
@@ -538,9 +582,9 @@ export default function CreateBundleScreen() {
         }
         
         // Navigate back - the focus effect will handle refreshing and highlighting
-        router.back();
+        goBackOrHome();
       } else {
-        router.back();
+        goBackOrHome();
       }
     } catch (error: any) {
       Alert.alert(t('alerts.error_title'), t('create_bundle.errors.save_bundle_failed', { error: error?.message || t('common.unexpected_error') }));
@@ -579,9 +623,11 @@ export default function CreateBundleScreen() {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
+              style={[styles.backButton, getMinTouchTargetStyle()]}
+              onPress={goBackOrHome}
               activeOpacity={0.7}
+              {...getButtonAccessibilityProps(t('common.back'), 'Double tap to go back')}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
             >
               <ThemedText style={[styles.backButtonText, { color: colors.tint }]}>←</ThemedText>
             </TouchableOpacity>
@@ -591,18 +637,26 @@ export default function CreateBundleScreen() {
             <TouchableOpacity
               style={[
                 styles.checkmarkButton,
+                getMinTouchTargetStyle(),
                 {
-                  opacity: (bundleName.trim().length >= 1 && bundleItems.length >= 2 && !loading) ? 1 : 0.4,
+                  opacity: (bundleName.trim().length >= 1 && bundleItems.length >= BUNDLES.ITEMS.MIN && !loading && !caloriesExceedLimit) ? 1 : 0.4,
                 }
               ]}
               onPress={handleSaveBundle}
-              disabled={loading || bundleName.trim().length < 1 || bundleItems.length < 2}
+              disabled={loading || bundleName.trim().length < 1 || bundleItems.length < BUNDLES.ITEMS.MIN || caloriesExceedLimit}
               activeOpacity={0.7}
+              {...getButtonAccessibilityProps(
+                isEditing ? t('create_bundle.update_button') : t('create_bundle.create_button'),
+                'Double tap to save bundle',
+                loading || bundleName.trim().length < 1 || bundleItems.length < BUNDLES.ITEMS.MIN || caloriesExceedLimit
+              )}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
             >
               <IconSymbol 
                 name="checkmark" 
                 size={24} 
-                color={(bundleName.trim().length >= 1 && bundleItems.length >= 2 && !loading) ? colors.tint : colors.icon}
+                decorative
+                color={(bundleName.trim().length >= 1 && bundleItems.length >= BUNDLES.ITEMS.MIN && !loading && !caloriesExceedLimit) ? colors.tint : colors.icon}
               />
             </TouchableOpacity>
           </View>
@@ -613,7 +667,7 @@ export default function CreateBundleScreen() {
         </View>
         <View style={styles.searchContainer}>
           <TextInput
-            style={[styles.searchInput, { borderColor: colors.icon + '30', color: colors.text, backgroundColor: colors.background }]}
+            style={[styles.searchInput, { borderColor: colors.icon + '30', color: colors.text, backgroundColor: colors.background }, Platform.OS === 'web' && getFocusStyle(colors.tint)]}
             value={bundleName}
             onChangeText={(text) => {
               if (text.length <= TEXT_LIMITS.BUNDLES_NAME.MAX_LEN) {
@@ -623,6 +677,8 @@ export default function CreateBundleScreen() {
             placeholder={t('create_bundle.bundle_name_placeholder')}
             placeholderTextColor={colors.textSecondary}
             maxLength={TEXT_LIMITS.BUNDLES_NAME.MAX_LEN}
+            {...getInputAccessibilityProps(t('create_bundle.step1_title'), 'Enter bundle name', undefined, true)}
+            {...getWebAccessibilityProps('textbox', t('create_bundle.step1_title'), undefined, false, true)}
           />
         </View>
         <ThemedText style={[styles.helperText, { color: colors.textSecondary, marginBottom: 12 }]}>
@@ -677,17 +733,26 @@ export default function CreateBundleScreen() {
                 
                 {/* Quantity Input */}
                 <View style={styles.bundleItemQuantity}>
-                  <TextInput
+                  <NumberInput
                     ref={(ref) => {
                       if (ref) quantityInputRefs.current.set(item.id, ref);
                     }}
-                    style={[styles.bundleItemInput, { color: colors.text, borderColor: colors.icon + '40' }]}
+                    style={[styles.bundleItemInput, { color: colors.text, borderColor: colors.icon + '40' }, Platform.OS === 'web' && getFocusStyle(colors.tint)]}
                     value={item.quantityInput}
-                    onChangeText={(text) => handleItemQuantityChange(item.id, text)}
+                    onChangeValue={(text) => handleItemQuantityChange(item.id, text)}
                     onBlur={() => handleItemQuantityBlur(item.id)}
-                    keyboardType="decimal-pad"
                     placeholder="1"
                     placeholderTextColor={colors.textSecondary}
+                    allowDecimal
+                    maxDecimals={2}
+                    maxIntegers={4}
+                    {...getInputAccessibilityProps(
+                      `${t('create_bundle.quantity_label', { defaultValue: 'Quantity' })} for ${item.food?.name || item.item_name || t('create_bundle.unknown_item')}`,
+                      'Enter quantity up to 4 integers and 2 decimal places',
+                      undefined,
+                      false
+                    )}
+                    {...getWebAccessibilityProps('spinbutton', `${t('create_bundle.quantity_label', { defaultValue: 'Quantity' })} for ${item.food?.name || item.item_name || t('create_bundle.unknown_item')}`, undefined, false, false)}
                   />
                 </View>
                 
@@ -699,7 +764,7 @@ export default function CreateBundleScreen() {
                     }}
                   >
                     <TouchableOpacity
-                      style={[styles.bundleItemDropdown, { borderColor: colors.icon + '40' }]}
+                      style={[styles.bundleItemDropdown, getMinTouchTargetStyle(), { borderColor: colors.icon + '40' }]}
                       onPress={() => {
                         const ref = servingButtonRefs.current.get(item.id);
                         ref?.measure((x, y, width, height, pageX, pageY) => {
@@ -708,6 +773,11 @@ export default function CreateBundleScreen() {
                         });
                       }}
                       activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(
+                        `${t('create_bundle.select_serving', { defaultValue: 'Select serving' })} for ${item.food?.name || item.item_name || t('create_bundle.unknown_item')}`,
+                        'Double tap to select serving'
+                      )}
+                      {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
                     >
                       <ThemedText 
                         style={[styles.bundleItemDropdownText, { color: colors.text }]}
@@ -730,9 +800,14 @@ export default function CreateBundleScreen() {
                 
                 {/* Delete Button */}
                 <TouchableOpacity
-                  style={[styles.bundleItemDelete, { backgroundColor: '#EF4444' + '20' }]}
+                  style={[styles.bundleItemDelete, getMinTouchTargetStyle(), { backgroundColor: '#EF4444' + '20' }]}
                   onPress={() => handleRemoveItem(item.id)}
                   activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(
+                    t('create_bundle.remove_item_title', { name: item.food?.name || item.item_name || t('create_bundle.unknown_item') }),
+                    'Double tap to remove item from bundle'
+                  )}
+                  {...(Platform.OS === 'web' && getFocusStyle('#EF4444'))}
                 >
                   <Text style={{ color: '#EF4444', fontSize: 14 }}>✕</Text>
                 </TouchableOpacity>
@@ -752,6 +827,7 @@ export default function CreateBundleScreen() {
               acc.fat += item.calculatedNutrition.fat_g || 0;
               acc.fiber += item.calculatedNutrition.fiber_g || 0;
               acc.saturatedFat += item.calculatedNutrition.saturated_fat_g || 0;
+              acc.transFat += item.calculatedNutrition.trans_fat_g || 0;
               acc.sugar += item.calculatedNutrition.sugar_g || 0;
               acc.sodium += item.calculatedNutrition.sodium_mg || 0;
             }
@@ -763,9 +839,11 @@ export default function CreateBundleScreen() {
             fat: 0,
             fiber: 0,
             saturatedFat: 0,
+            transFat: 0,
             sugar: 0,
             sodium: 0,
           });
+
 
           return (
             <View style={[styles.summaryCard, { backgroundColor: colors.background, borderColor: colors.tint + '30' }]}>
@@ -774,7 +852,7 @@ export default function CreateBundleScreen() {
               </ThemedText>
               <View style={styles.summaryContent}>
                 <View style={styles.summaryCalories}>
-                  <ThemedText style={[styles.summaryCaloriesValue, { color: colors.tint }]}>
+                  <ThemedText style={[styles.summaryCaloriesValue, { color: caloriesExceedLimit ? '#EF4444' : colors.tint }]}>
                     {Math.round(totals.calories)}
                   </ThemedText>
                   <ThemedText style={[styles.summaryCaloriesLabel, { color: colors.textSecondary }]}>
@@ -782,68 +860,68 @@ export default function CreateBundleScreen() {
                   </ThemedText>
                 </View>
                 <View style={styles.summaryMacros}>
-                  {totals.protein > 0 && (
-                    <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.protein')}</ThemedText>
-                      <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
-                        {Math.round(totals.protein * 10) / 10}g
-                      </ThemedText>
-                    </View>
-                  )}
-                  {totals.carbs > 0 && (
-                    <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.carbs')}</ThemedText>
-                      <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
-                        {Math.round(totals.carbs * 10) / 10}g
-                      </ThemedText>
-                    </View>
-                  )}
-                  {totals.fat > 0 && (
-                    <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.fat')}</ThemedText>
-                      <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
-                        {Math.round(totals.fat * 10) / 10}g
-                      </ThemedText>
-                    </View>
-                  )}
-                  {totals.fiber > 0 && (
-                    <View style={styles.summaryMacroItem}>
-                      <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.fiber')}</ThemedText>
-                      <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
-                        {Math.round(totals.fiber * 10) / 10}g
-                      </ThemedText>
-                    </View>
-                  )}
-                </View>
-                {((totals.saturatedFat > 0) || (totals.sugar > 0) || (totals.sodium > 0)) && (
-                  <View style={[styles.summaryMacros, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.icon + '30' }]}>
-                    {totals.saturatedFat > 0 && (
-                      <View style={styles.summaryMacroItem}>
-                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.saturated_fat_short')}</ThemedText>
-                        <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
-                          {Math.round(totals.saturatedFat * 10) / 10}g
-                        </ThemedText>
-                      </View>
-                    )}
-                    {totals.sugar > 0 && (
-                      <View style={styles.summaryMacroItem}>
-                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.sugar_short')}</ThemedText>
-                        <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
-                          {Math.round(totals.sugar * 10) / 10}g
-                        </ThemedText>
-                      </View>
-                    )}
-                    {totals.sodium > 0 && (
-                      <View style={styles.summaryMacroItem}>
-                        <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.sodium_short')}</ThemedText>
-                        <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
-                          {Math.round(totals.sodium * 10) / 10}mg
-                        </ThemedText>
-                      </View>
-                    )}
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.protein')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
+                      {Math.round(totals.protein * 10) / 10}g
+                    </ThemedText>
                   </View>
-                )}
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.carbs')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
+                      {Math.round(totals.carbs * 10) / 10}g
+                    </ThemedText>
+                  </View>
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.fat')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
+                      {Math.round(totals.fat * 10) / 10}g
+                    </ThemedText>
+                  </View>
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary }]}>{t('create_bundle.macros.fiber')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text }]}>
+                      {Math.round(totals.fiber * 10) / 10}g
+                    </ThemedText>
+                  </View>
+                </View>
+                <View style={[styles.summaryMacros, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.icon + '30' }]}>
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.saturated_fat_short')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
+                      {Math.round(totals.saturatedFat * 10) / 10}g
+                    </ThemedText>
+                  </View>
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.trans_fat_short')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
+                      {Math.round(totals.transFat * 10) / 10}g
+                    </ThemedText>
+                  </View>
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.sugar_short')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
+                      {Math.round(totals.sugar * 10) / 10}g
+                    </ThemedText>
+                  </View>
+                  <View style={styles.summaryMacroItem}>
+                    <ThemedText style={[styles.summaryMacroLabel, { color: colors.textSecondary, fontSize: 11 }]}>{t('create_bundle.macros.sodium_short')}</ThemedText>
+                    <ThemedText style={[styles.summaryMacroValue, { color: colors.text, fontSize: 11 }]}>
+                      {Math.round(totals.sodium)}mg
+                    </ThemedText>
+                  </View>
+                </View>
               </View>
+              {caloriesExceedLimit && (
+                <Text 
+                  style={[styles.errorText, { color: '#EF4444', marginTop: 12 }]}
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                  {...getWebAccessibilityProps('alert', t('create_bundle.errors.calories_too_high'))}
+                >
+                  {t('create_bundle.errors.calories_too_high')}
+                </Text>
+              )}
             </View>
           );
         })()}
@@ -851,23 +929,32 @@ export default function CreateBundleScreen() {
         {/* Save and Cancel Buttons */}
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.cancelButton, { backgroundColor: colors.background, borderColor: colors.icon + '30' }]}
-            onPress={() => router.back()}
+            style={[styles.cancelButton, getMinTouchTargetStyle(), { backgroundColor: colors.background, borderColor: colors.icon + '30' }]}
+            onPress={goBackOrHome}
             activeOpacity={0.7}
+            {...getButtonAccessibilityProps(t('create_bundle.cancel_button'), 'Double tap to cancel')}
+            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
           >
             <ThemedText style={[styles.cancelButtonText, { color: colors.text }]}>{t('create_bundle.cancel_button')}</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
-              styles.saveButton, 
+              styles.saveButton,
+              getMinTouchTargetStyle(),
               { 
-                backgroundColor: (bundleName.trim().length >= 1 && bundleItems.length >= 2) ? colors.tint : colors.icon + '40',
-                opacity: (bundleName.trim().length >= 1 && bundleItems.length >= 2) ? 1 : 0.6,
+                backgroundColor: (bundleName.trim().length >= 1 && bundleItems.length >= BUNDLES.ITEMS.MIN && !caloriesExceedLimit) ? colors.tint : colors.icon + '40',
+                opacity: (bundleName.trim().length >= 1 && bundleItems.length >= BUNDLES.ITEMS.MIN && !caloriesExceedLimit) ? 1 : 0.6,
               }
             ]}
             onPress={handleSaveBundle}
-            disabled={loading || bundleName.trim().length < 1 || bundleItems.length < 2}
+            disabled={loading || bundleName.trim().length < 1 || bundleItems.length < BUNDLES.ITEMS.MIN || caloriesExceedLimit}
             activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              isEditing ? t('create_bundle.update_button') : t('create_bundle.create_button'),
+              'Double tap to save bundle',
+              loading || bundleName.trim().length < 1 || bundleItems.length < BUNDLES.ITEMS.MIN || caloriesExceedLimit
+            )}
+            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
