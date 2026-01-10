@@ -58,11 +58,6 @@ export function EmptyEntriesState({
           t('mealtype_log.ai_camera.accessibility_hint')
         )}
       >
-        <IconSymbol 
-          name="camera.fill" 
-          size={24} 
-          color={colors.tint}
-        />
         <ThemedText style={[styles.emptyStateText, { color: colors.tint, flex: 1 }]}>
           {t('mealtype_log.ai_camera.title')}
         </ThemedText>
