@@ -1,6 +1,9 @@
+import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
 import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
+import { ConfettiBurst } from '@/components/ConfettiBurst';
 import type { TransferMode } from '@/components/copy-mealtype-modal';
 import { CopyMealtypeModal } from '@/components/copy-mealtype-modal';
+import { DoneForTodayButton } from '@/components/DoneForTodayButton';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -8,19 +11,21 @@ import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { MacroGauge } from '@/components/MacroGauge';
 import { NoteEditor } from '@/components/note-editor';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
-import { DoneForTodayButton } from '@/components/DoneForTodayButton';
-import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { BorderRadius, Colors, FontSize, FontWeight, Layout, Nudge, Spacing } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
+import { FOOD_LOG } from '@/constants/constraints';
 import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Nudge, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { isTourCompleted, isTourWelcomeShown, setTourWelcomeShown } from '@/features/tour/storage';
+import { useTour } from '@/features/tour/TourProvider';
+import { V1_HOMEPAGE_TOUR_STEPS } from '@/features/tour/tourSteps';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
 import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
@@ -32,6 +37,8 @@ import { useTransferMealtypeEntries } from '@/hooks/use-transfer-mealtype-entrie
 import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
 import { userConfigQueryKey, useUserConfig } from '@/hooks/use-user-config';
 import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
+import { compareDateKeys, minDateKey } from '@/lib/date-guard';
+import { calculateNetCalories } from '@/lib/domain/burned/netCalories';
 import { getPersistentCache } from '@/lib/persistentCache';
 import { fetchBundles } from '@/lib/services/bundles';
 import { getEntriesForDate } from '@/lib/services/calorieEntries';
@@ -39,31 +46,23 @@ import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-
 import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
-import { storage, STORAGE_KEYS } from '@/lib/storage';
+import { ensureContrast } from '@/theme/contrast';
 import {
   getButtonAccessibilityProps,
   getFocusStyle,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
-import { ensureContrast } from '@/theme/contrast';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
-import { calculateNetCalories, canComputeNetCalories } from '@/lib/domain/burned/netCalories';
 import { useQueryClient } from '@tanstack/react-query';
-import { compareDateKeys, minDateKey } from '@/lib/date-guard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ScrollView } from 'react-native';
 import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { FOOD_LOG } from '@/constants/constraints';
-import { useTour } from '@/features/tour/TourProvider';
-import { useTourAnchor } from '@/features/tour/useTourAnchor';
-import { V1_HOMEPAGE_TOUR_STEPS } from '@/features/tour/tourSteps';
-import { isTourCompleted, isTourWelcomeShown, setTourWelcomeShown } from '@/features/tour/storage';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -2381,8 +2380,8 @@ const styles = StyleSheet.create({
   mealGroupHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: Platform.select({ web: 0, default: 0 }),
+    alignItems: 'center',
+    paddingVertical: 0,
     paddingHorizontal: 0,
     flexWrap: 'wrap',
     gap: Platform.select({ web: 4, default: 4 }),
@@ -2485,10 +2484,15 @@ const styles = StyleSheet.create({
   },
   mealGroupCalories: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingVertical: 0,
   },
   mealGroupCaloriesValue: {
     fontSize: Platform.select({ web: 15, default: 16 }),
     fontWeight: '600',
+    lineHeight: Platform.select({ web: 18, default: 20 }),
+    marginTop: 0,
   },
   mealGroupCaloriesLabel: {
     fontSize: 15,
@@ -2894,7 +2898,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mealMoreButton: {
-    padding: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 0,
     marginLeft: Spacing.sm,
     minWidth: 44,
     minHeight: 44,
