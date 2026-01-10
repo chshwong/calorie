@@ -1420,6 +1420,12 @@
       "loading": "Loading recent foods...",
       "title": "Recent Foods"
     },
+    "ai_camera": {
+      "title": "AI Camera",
+      "new_badge": "NEW",
+      "accessibility_label": "AI Camera, new feature",
+      "accessibility_hint": "Double tap to open AI Quick Log"
+    },
     "scanner": {
       "title": "Scan Barcode",
       "point_at_barcode": "Point your camera at a barcode",
@@ -2407,6 +2413,34 @@
   "quick_log": {
     "header_title": "🍴 Diary",
     "title": "⚡Quick Log",
+    "tabs": {
+      "quick_log": "Quick Log",
+      "ai_photo": "AI 📷"
+    },
+    "manual": {
+      "badge_accessibility_label": "Manual quick log"
+    },
+    "ai": {
+      "badge_accessibility_label": "AI quick log",
+      "instructions": "Copy the prompt, use it with your AI assistant (with your meal photo), then paste the AI reply here.",
+      "copy_prompt_button": "Copy Prompt",
+      "copy_prompt_success": "AI prompt copied",
+      "copy_prompt_accessibility_label": "Copy AI prompt",
+      "paste_reply_label": "Paste AI Reply",
+      "paste_reply_placeholder": "Paste the AI assistant reply here…",
+      "paste_reply_accessibility_label": "Paste AI reply",
+      "paste_reply_accessibility_hint": "Paste the AI reply text. Then parse and fill the quick log.",
+      "parse_button": "Parse → Fill Quick Log",
+      "parse_accessibility_label": "Parse and fill quick log",
+      "clear_button": "Clear",
+      "clear_accessibility_label": "Clear AI reply",
+      "parse_failed_title": "Couldn’t parse TOTAL_KCAL",
+      "warnings_title": "Some fields were ignored",
+      "parse_success_announcement": "Quick Log filled from AI.",
+      "cleared_announcement": "AI reply cleared.",
+      "parse_error_fallback_announcement": "Could not parse AI reply.",
+      "prompt": "You are helping me log a meal into Avovibe, a calorie tracker app, from a food photo.\n\nOUTPUT FORMAT (STRICT):\nRespond with EXACTLY ONE code block.\nInside the block, return ONLY the header fields below, one per line, in the exact order.\nDo not include any text outside the single code block. (No explanations, no extra sentences, no emojis.)\nIf code blocks are not supported, output the same lines without any surrounding text.\n\nHEADER FIELDS:\nFOOD_NAME: <short name>\nTOTAL_KCAL: <integer 0-5000>\nProtein_G: <number with up to 1 decimal place, 0-1000>\nTotal_Carb_G: <number with up to 1 decimal place, 0-2000>\nTotal_Fat_G: <number with up to 1 decimal place, 0-1000>\nFIBRE_G: <number with up to 1 decimal place, 0-1000>\nSaturated_Fat_G: <number with up to 1 decimal place, 0-1000>\nTrans_Fat_G: <number with up to 1 decimal place, 0-500>\nTotal_Sugar_G: <number with up to 1 decimal place, 0-2000>\nSODIUM_MG: <integer 0-30000>\nCONFIDENCE: <low|med|high>\n\nRULES:\nFOOD_NAME must be as short as possible and MUST NOT exceed 30 characters.\nUse numbers only (no units in values, no commas).\nDecimal fields may have at most 1 digit after the decimal point.\nIf unsure, estimate.\nDO NOT include explanations, descriptions, or reasoning.\nDO NOT include any text outside the single code block."
+    },
     "errors": {
       "not_quick_log_entry": "This entry is not a Quick Log entry."
     },

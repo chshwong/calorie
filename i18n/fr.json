@@ -1989,6 +1989,45 @@
     "enter_weight": "Enregistrer le poids",
     "scan_barcode": "Scanner un code-barres"
   },
+  "quick_log": {
+    "header_title": "🍴 Journal",
+    "title": "⚡Ajout rapide",
+    "tabs": {
+      "quick_log": "Ajout rapide",
+      "ai_photo": "AI 📷"
+    },
+    "manual": {
+      "badge_accessibility_label": "Ajout rapide manuel"
+    },
+    "ai": {
+      "badge_accessibility_label": "Ajout rapide via IA",
+      "instructions": "Copiez l’invite, utilisez-la avec votre assistant IA (avec une photo du repas), puis collez la réponse ici.",
+      "copy_prompt_button": "Copier l’invite",
+      "copy_prompt_success": "Invite IA copiée",
+      "copy_prompt_accessibility_label": "Copier l’invite IA",
+      "paste_reply_label": "Coller la réponse IA",
+      "paste_reply_placeholder": "Collez la réponse de l’assistant IA ici…",
+      "paste_reply_accessibility_label": "Coller la réponse IA",
+      "paste_reply_accessibility_hint": "Collez le texte de la réponse IA. Ensuite, analysez et remplissez l’ajout rapide.",
+      "parse_button": "Analyser → Remplir l’ajout rapide",
+      "parse_accessibility_label": "Analyser et remplir l’ajout rapide",
+      "clear_button": "Effacer",
+      "clear_accessibility_label": "Effacer la réponse IA",
+      "parse_failed_title": "Impossible d’analyser TOTAL_KCAL",
+      "warnings_title": "Certains champs ont été ignorés",
+      "parse_success_announcement": "Ajout rapide rempli via l’IA.",
+      "cleared_announcement": "Réponse IA effacée.",
+      "parse_error_fallback_announcement": "Impossible d’analyser la réponse IA.",
+      "prompt": "You are helping me log a meal into a calorie tracker from a food photo.\n\nReturn ONLY this header block first (one per line), then a short explanation after it:\n\nFOOD_NAME: <short name>\nTOTAL_KCAL: <integer 0-5000>\nP_G: <integer>\nC_G: <integer>\nF_G: <integer>\nFIBRE_G: <integer>\nSODIUM_MG: <integer>\nCONFIDENCE: <low|med|high>\n\nRules:\n- FOOD_NAME must be as short as possible (ideally 1–3 words) and MUST NOT exceed 30 characters.\n- Use numbers only (no units in values).\n- If unsure, estimate.\n- TOTAL_KCAL must be <= 5000.\n- P_G, C_G, F_G, FIBRE_G must be between 0 and 9999.99.\n- SODIUM_MG must be between 0 and 30000."
+    },
+    "errors": {
+      "not_quick_log_entry": "Cette entrée n’est pas un ajout rapide."
+    },
+    "accessibility": {
+      "cancel_hint": "Annuler et fermer le formulaire d’ajout rapide",
+      "save_hint": "Enregistrer l’entrée d’ajout rapide"
+    }
+  },
   "weight": {
     "fab": {
       "log_weight": "+ Noter le poids",

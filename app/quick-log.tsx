@@ -8,35 +8,42 @@
  * - Quick Log tab in mealtype-log
  */
 
-import React, { useEffect, useMemo, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Dimensions, Platform, TouchableOpacity } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ThemedView } from '@/components/themed-view';
+import { QuickLogForm, type QuickLogFieldApi } from '@/components/QuickLogForm';
+import { SegmentedTabs, type SegmentedTabItem } from '@/components/SegmentedTabs';
+import { AIQuickLogTab } from '@/components/quick-log/AIQuickLogTab';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { QuickLogForm } from '@/components/QuickLogForm';
-import { getLocalDateString } from '@/utils/calculations';
-import { Spacing, Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQueryClient } from '@tanstack/react-query';
-import type { CalorieEntry } from '@/utils/types';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import type { AIQuickLogParsed } from '@/lib/ai/aiQuickLogParser';
 import { clampDateKey } from '@/lib/date-guard';
+import { getWebAccessibilityProps } from '@/utils/accessibility';
+import { getLocalDateString } from '@/utils/calculations';
 import { toDateKey } from '@/utils/dateKey';
+import type { CalorieEntry } from '@/utils/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type QuickLogRouteParams = {
   date?: string;
   mealType?: string;
   quickLogId?: string;
   entryPayload?: string;
+  tab?: string;
 };
 
 // Hide default Expo Router header - we use custom header instead
 export const options = {
   headerShown: false,
 };
+
+type QuickLogTabKey = 'quick-log' | 'ai';
 
 export default function QuickLogScreen() {
   const params = useLocalSearchParams<QuickLogRouteParams>();
@@ -46,6 +53,11 @@ export default function QuickLogScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<QuickLogTabKey>('quick-log');
+  const [announcement, setAnnouncement] = useState<string>('');
+  const [pendingAiFill, setPendingAiFill] = useState<{ parsed: AIQuickLogParsed; rawText: string } | null>(null);
+
+  const fieldApiRef = useRef<QuickLogFieldApi | null>(null);
 
   const entryPayloadParam = Array.isArray(params.entryPayload) ? params.entryPayload[0] : params.entryPayload;
 
@@ -65,12 +77,20 @@ export default function QuickLogScreen() {
   const dateParam = Array.isArray(params.date) ? params.date[0] : params.date;
   const mealTypeParam = Array.isArray(params.mealType) ? params.mealType[0] : params.mealType;
   const quickLogId = Array.isArray(params.quickLogId) ? params.quickLogId[0] : params.quickLogId;
+  const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
 
   const { dateKey: routeDateKey, minDateKey, todayKey } = useClampedDateParam({ paramKey: 'date' });
   const hasRouteDateParam = !!dateParam;
   const dateRaw = hasRouteDateParam ? routeDateKey : (initialEntry?.entry_date ?? getLocalDateString());
   const date = clampDateKey(toDateKey(dateRaw), minDateKey, todayKey);
   const mealType = mealTypeParam ?? initialEntry?.meal_type ?? 'breakfast';
+
+  // Set active tab from route param if provided
+  useEffect(() => {
+    if (tabParam === 'ai') {
+      setActiveTab('ai');
+    }
+  }, [tabParam]);
 
   // Seed the entries cache so the form can hydrate instantly from cache
   useEffect(() => {
@@ -87,6 +107,52 @@ export default function QuickLogScreen() {
       return [...existing, initialEntry];
     });
   }, [initialEntry, queryClient, user?.id]);
+
+  // Apply pending AI fill once QuickLogForm has registered the field API
+  useEffect(() => {
+    if (!pendingAiFill || activeTab !== 'quick-log') return;
+
+    // Wait for API to be registered (QuickLogForm registers on mount)
+    // Use setTimeout to ensure QuickLogForm's useEffect has run after tab switch
+    const timeoutId = setTimeout(() => {
+      const api = fieldApiRef.current;
+      if (!api) {
+        // If API still not ready, the form hasn't mounted/registered yet
+        // This should be rare, but we'll just skip and let it retry on next effect run
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('AI fill pending but QuickLogForm API not yet registered');
+        }
+        return;
+      }
+
+      const { parsed, rawText } = pendingAiFill;
+
+      api.setFoodName(parsed.foodName);
+      api.setCaloriesKcal(String(parsed.totalKcal));
+
+      if (parsed.proteinG != null) api.setProteinG(String(parsed.proteinG));
+      if (parsed.carbsG != null) api.setCarbsG(String(parsed.carbsG));
+      if (parsed.fatG != null) api.setFatG(String(parsed.fatG));
+      if (parsed.fibreG != null) api.setFibreG(String(parsed.fibreG));
+      if (parsed.saturatedFatG != null) api.setSaturatedFatG(String(parsed.saturatedFatG));
+      if (parsed.transFatG != null) api.setTransFatG(String(parsed.transFatG));
+      if (parsed.totalSugarG != null) api.setTotalSugarG(String(parsed.totalSugarG));
+      if (parsed.sodiumMg != null) api.setSodiumMg(String(parsed.sodiumMg));
+
+      api.setAiProvenance({
+        source: 'ai',
+        aiRawText: rawText,
+        aiConfidence: parsed.confidence ?? null,
+      });
+
+      setAnnouncement(t('quick_log.ai.parse_success_announcement'));
+      setPendingAiFill(null);
+
+      setTimeout(() => api.focusCalories?.(), 0);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [pendingAiFill, t, activeTab]);
 
   // Detect desktop for responsive layout
   const screenWidth = Dimensions.get('window').width;
@@ -151,6 +217,14 @@ export default function QuickLogScreen() {
     router.back();
   };
 
+  const tabs: SegmentedTabItem[] = useMemo(
+    () => [
+      { key: 'quick-log', label: t('quick_log.tabs.quick_log') },
+      { key: 'ai', label: t('quick_log.tabs.ai_photo') },
+    ],
+    [t]
+  );
+
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
@@ -193,16 +267,51 @@ export default function QuickLogScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.centeredContainer}>
-          <View style={[styles.cardContainer, { maxWidth: isDesktop ? 480 : '100%' }]}>
-            <QuickLogForm
-              date={date}
-              mealType={mealType}
-              quickLogId={quickLogId}
-              initialEntry={initialEntry ?? undefined}
-              onCancel={handleClose}
-              onSaved={handleClose}
-              registerSubmit={(fn) => { submitRef.current = fn; }}
+          {/* Screen-level live region announcements (web + native) */}
+          <Text
+            accessibilityLiveRegion="polite"
+            style={styles.srOnly}
+            {...getWebAccessibilityProps('status')}
+          >
+            {announcement}
+          </Text>
+
+          <View style={[styles.segmentedContainer, { maxWidth: isDesktop ? 480 : '100%' }]}>
+            <SegmentedTabs
+              items={tabs}
+              activeKey={activeTab}
+              onChange={(key) => setActiveTab(key as QuickLogTabKey)}
             />
+          </View>
+
+          <View style={[styles.cardContainer, { maxWidth: isDesktop ? 480 : '100%' }]}>
+            {activeTab === 'quick-log' ? (
+              <QuickLogForm
+                date={date}
+                mealType={mealType}
+                quickLogId={quickLogId}
+                initialEntry={initialEntry ?? undefined}
+                onCancel={handleClose}
+                onSaved={handleClose}
+                registerSubmit={(fn) => { submitRef.current = fn; }}
+                // registerFieldApi will be implemented in QuickLogForm; safe no-op if not provided
+                registerFieldApi={(api: QuickLogFieldApi) => {
+                  fieldApiRef.current = api;
+                }}
+              />
+            ) : (
+              <AIQuickLogTab
+                onApplyParsed={(input: { parsed: AIQuickLogParsed; rawText: string }) => {
+                  setPendingAiFill(input);
+                  setActiveTab('quick-log');
+                }}
+                onClearAi={() => {
+                  fieldApiRef.current?.setAiProvenance({ source: 'manual', aiRawText: null, aiConfidence: null });
+                  setAnnouncement(t('quick_log.ai.cleared_announcement'));
+                }}
+                onParseErrorAnnouncement={(msg) => setAnnouncement(msg)}
+              />
+            )}
           </View>
         </View>
       </ScrollView>
@@ -274,6 +383,30 @@ const styles = StyleSheet.create({
     width: '100%',
     // Card styling is handled by QuickLogForm component
   },
+  segmentedContainer: {
+    width: '100%',
+    paddingHorizontal: 2,
+    marginBottom: Spacing.sm,
+  },
+  srOnly: Platform.select({
+    web: {
+      position: 'absolute',
+      width: 1,
+      height: 1,
+      padding: 0,
+      margin: -1,
+      overflow: 'hidden',
+      clip: 'rect(0,0,0,0)',
+      whiteSpace: 'nowrap',
+      borderWidth: 0,
+    },
+    default: {
+      position: 'absolute',
+      width: 1,
+      height: 1,
+      opacity: 0,
+    },
+  }),
 });
 
 

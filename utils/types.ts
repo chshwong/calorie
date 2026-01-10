@@ -37,6 +37,9 @@ export interface CalorieEntry {
   sugar_g: number | null;
   sodium_mg: number | null;
   notes: string | null;
+  source?: string | null;
+  ai_raw_text?: string | null;
+  ai_confidence?: string | null;
   created_at: string;
   updated_at: string;
 }

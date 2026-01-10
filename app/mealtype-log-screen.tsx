@@ -1801,6 +1801,17 @@ export default function LogFoodScreen() {
     });
   }, [router, entryDate, mealType]);
 
+  const handleAiCamera = useCallback(() => {
+    router.push({
+      pathname: '/quick-log',
+      params: {
+        date: entryDate,
+        mealType: mealType,
+        tab: 'ai',
+      }
+    });
+  }, [router, entryDate, mealType]);
+
   // Handle barcode scan button press
   const handleBarcodeScanPress = useCallback(async () => {
     try {
@@ -2548,6 +2559,7 @@ export default function LogFoodScreen() {
               onScanPress={handleBarcodeScanPress}
               onCopyFromYesterday={handleCopyFromPreviousDay}
               onQuickLog={handleQuickLog}
+              onAiCamera={handleAiCamera}
               isCopying={isCopyingFromYesterday}
               isToday={isSelectedDateToday}
               mealTypeLabel={getMealTypeLabelLocal(selectedMealType)}

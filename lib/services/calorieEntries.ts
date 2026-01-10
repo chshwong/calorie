@@ -39,6 +39,9 @@ const ENTRY_COLUMNS = `
   sugar_g,
   sodium_mg,
   notes,
+  source,
+  ai_raw_text,
+  ai_confidence,
   created_at,
   updated_at
 `;

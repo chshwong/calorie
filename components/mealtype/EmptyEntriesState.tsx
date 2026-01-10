@@ -12,6 +12,7 @@ type EmptyEntriesStateProps = {
   onScanPress: () => void;
   onCopyFromYesterday: () => void;
   onQuickLog: () => void;
+  onAiCamera: () => void;
   isCopying: boolean;
   isToday: boolean;
   mealTypeLabel: string;
@@ -24,6 +25,7 @@ export function EmptyEntriesState({
   onScanPress,
   onCopyFromYesterday,
   onQuickLog,
+  onAiCamera,
   isCopying,
   isToday,
   mealTypeLabel,
@@ -44,6 +46,46 @@ export function EmptyEntriesState({
           backgroundColor: colors.tint + '15', 
           borderColor: colors.tint + '40',
           marginTop: 16,
+          flexDirection: 'row',
+          gap: 8,
+          alignItems: 'center',
+        }]}
+        onPress={onAiCamera}
+        activeOpacity={0.7}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        {...getButtonAccessibilityProps(
+          t('mealtype_log.ai_camera.accessibility_label'),
+          t('mealtype_log.ai_camera.accessibility_hint')
+        )}
+      >
+        <IconSymbol 
+          name="camera.fill" 
+          size={24} 
+          color={colors.tint}
+        />
+        <ThemedText style={[styles.emptyStateText, { color: colors.tint, flex: 1 }]}>
+          {t('mealtype_log.ai_camera.title')}
+        </ThemedText>
+        <View
+          style={{
+            backgroundColor: colors.tint + '30',
+            borderColor: colors.tint + '60',
+            borderWidth: 1,
+            borderRadius: 4,
+            paddingHorizontal: 4,
+            paddingVertical: 2,
+          }}
+        >
+          <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.tint, textTransform: 'uppercase' }}>
+            {t('mealtype_log.ai_camera.new_badge')}
+          </ThemedText>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.barcodeButton, { 
+          backgroundColor: colors.tint + '15', 
+          borderColor: colors.tint + '40',
+          marginTop: 12,
           flexDirection: 'row',
           gap: 8,
         }]}

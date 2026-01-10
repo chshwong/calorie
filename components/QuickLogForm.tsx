@@ -31,6 +31,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { NumberInput } from '@/components/input/NumberInput';
+import type { AIQuickLogConfidence } from '@/lib/ai/aiQuickLogParser';
 
 type QuickLogFormProps = {
   date: string;                 // ISO date string (YYYY-MM-DD)
@@ -40,12 +41,41 @@ type QuickLogFormProps = {
   onCancel: () => void;         // called when user taps Cancel
   onSaved: () => void;          // called after successful save/update
   registerSubmit?: (submitFn: () => void) => void; // register submit function for header button
+  registerFieldApi?: (api: QuickLogFieldApi) => void; // optional field setter API (AI tab)
 };
 
 const ENTRIES_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS;
 
+export type QuickLogFieldApi = {
+  setFoodName: (name: string) => void;
+  setCaloriesKcal: (kcal: string) => void;
+  setProteinG: (val: string) => void;
+  setCarbsG: (val: string) => void;
+  setFatG: (val: string) => void;
+  setFibreG: (val: string) => void;
+  setSaturatedFatG: (val: string) => void;
+  setTransFatG: (val: string) => void;
+  setTotalSugarG: (val: string) => void;
+  setSodiumMg: (val: string) => void;
+  setAiProvenance: (input: {
+    source: 'manual' | 'ai';
+    aiRawText?: string | null;
+    aiConfidence?: AIQuickLogConfidence | null;
+  }) => void;
+  focusCalories?: () => void;
+};
 
-export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCancel, onSaved, registerSubmit }: QuickLogFormProps) {
+
+export function QuickLogForm({
+  date,
+  mealType,
+  quickLogId,
+  initialEntry,
+  onCancel,
+  onSaved,
+  registerSubmit,
+  registerFieldApi,
+}: QuickLogFormProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const colorScheme = useColorScheme();
@@ -53,6 +83,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
   const isDark = colorScheme === 'dark';
   const queryClient = useQueryClient();
   const itemNameInputRef = useRef<TextInput>(null);
+  const caloriesInputRef = useRef<TextInput>(null);
 
   // Form state
   const [itemName, setItemName] = useState('');
@@ -67,6 +98,11 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
   const [transFat, setTransFat] = useState('');
   const [sugar, setSugar] = useState('');
   const [sodium, setSodium] = useState('');
+  const [aiProvenance, setAiProvenance] = useState<{
+    source: 'manual' | 'ai';
+    aiRawText: string | null;
+    aiConfidence: AIQuickLogConfidence | null;
+  }>({ source: 'manual', aiRawText: null, aiConfidence: null });
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -403,6 +439,18 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
         fiber_g: fiber && fiber.trim() !== '' ? parseFloat(fiber) : null,
       };
 
+      // AI provenance (Quick Log only). If user edits values after AI fill, we still keep source='ai'.
+      // If user clears AI tab before saving, source resets to 'manual'.
+      entryData.source = aiProvenance.source;
+      if (aiProvenance.source === 'ai') {
+        const raw = aiProvenance.aiRawText ?? '';
+        entryData.ai_raw_text = raw.slice(0, TEXT_LIMITS.AI_RAW_TEXT_MAX_LEN);
+        entryData.ai_confidence = aiProvenance.aiConfidence ?? null;
+      } else {
+        entryData.ai_raw_text = null;
+        entryData.ai_confidence = null;
+      }
+
       // Only include saturated_fat_g if it has a value greater than 0
       if (saturatedFat && saturatedFat.trim() !== '') {
         const parsedSaturatedFat = parseFloat(saturatedFat);
@@ -485,7 +533,8 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
       const allowedFields = [
         'user_id', 'entry_date', 'eaten_at', 'meal_type', 'item_name', 'quantity', 'unit',
         'calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g',
-        'saturated_fat_g', 'trans_fat_g', 'sugar_g', 'sodium_mg'
+        'saturated_fat_g', 'trans_fat_g', 'sugar_g', 'sodium_mg',
+        'source', 'ai_raw_text', 'ai_confidence'
       ];
       
       for (const key of allowedFields) {
@@ -670,6 +719,32 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
     setShowDeleteConfirm(false);
   }, []);
 
+  // Expose a minimal field API to the parent (used by the AI tab in Quick Log screen).
+  useEffect(() => {
+    if (!registerFieldApi) return;
+
+    registerFieldApi({
+      setFoodName: (name) => setItemName(name),
+      setCaloriesKcal: (kcal) => setCalories(kcal),
+      setProteinG: (val) => setProtein(val),
+      setCarbsG: (val) => setCarbs(val),
+      setFatG: (val) => setFat(val),
+      setFibreG: (val) => setFiber(val),
+      setSaturatedFatG: (val) => setSaturatedFat(val),
+      setTransFatG: (val) => setTransFat(val),
+      setTotalSugarG: (val) => setSugar(val),
+      setSodiumMg: (val) => setSodium(val),
+      setAiProvenance: (input) => {
+        setAiProvenance({
+          source: input.source,
+          aiRawText: input.aiRawText ?? null,
+          aiConfidence: input.aiConfidence ?? null,
+        });
+      },
+      focusCalories: () => caloriesInputRef.current?.focus?.(),
+    });
+  }, [registerFieldApi]);
+
   return (
     <View style={[
       styles.container,
@@ -691,12 +766,19 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
               backgroundColor: colors.icon + '20',
               borderColor: colors.icon + '40',
             }
-          ]}>
+          ]}
+          accessibilityRole="text"
+          accessibilityLabel={
+            aiProvenance.source === 'ai'
+              ? t('quick_log.ai.badge_accessibility_label')
+              : t('quick_log.manual.badge_accessibility_label')
+          }
+          >
             <ThemedText style={[
               styles.sourceBadgeText,
               { color: colors.icon }
             ]}>
-              ⚡
+              {aiProvenance.source === 'ai' ? 'AI' : '⚡'}
             </ThemedText>
           </View>
         </View>
@@ -829,6 +911,7 @@ export function QuickLogForm({ date, mealType, quickLogId, initialEntry, onCance
             <View>
               <View style={[styles.nutritionLabelInputWithUnit, styles.quickLogCaloriesContainer]}>
                 <NumberInput
+                  ref={caloriesInputRef}
                   style={[
                     styles.nutritionLabelInput,
                     styles.nutritionLabelCaloriesInput,

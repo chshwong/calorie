@@ -1611,17 +1611,56 @@ export default function FoodLogHomeScreen() {
                         </View>
                       </View>
 
-                      {/* Copy from yesterday button - only show when no entries AND no notes */}
+                      {/* Copy from yesterday button + AI Camera button - only show when no entries AND no notes */}
                       {group.entries.length === 0 && !hasNotes && (
                         <View style={styles.copyFromYesterdayContainer}>
-                          <MealTypeCopyButton
-                            mealType={mealType}
-                            mealTypeLabel={mealTypeLabel}
-                            selectedDate={selectedDate}
-                            isToday={isToday}
-                            colors={colors}
-                            t={t}
-                          />
+                          <View style={styles.emptyActionsRow}>
+                            <View style={styles.leftActions}>
+                              <MealTypeCopyButton
+                                mealType={mealType}
+                                mealTypeLabel={mealTypeLabel}
+                                selectedDate={selectedDate}
+                                isToday={isToday}
+                                colors={colors}
+                                t={t}
+                              />
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.aiCameraButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
+                              onPress={() => {
+                                router.push({
+                                  pathname: '/quick-log',
+                                  params: {
+                                    date: selectedDateString,
+                                    mealType: mealType,
+                                    tab: 'ai',
+                                  }
+                                });
+                              }}
+                              activeOpacity={0.7}
+                              {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
+                              {...getButtonAccessibilityProps('AI Camera (New)', 'Opens AI Quick Log')}
+                            >
+                              <Text style={[styles.aiCameraButtonText, { color: colors.tint }]}>
+                                AI 📷
+                              </Text>
+                              <View
+                                style={{
+                                  backgroundColor: colors.tint + '30',
+                                  borderColor: colors.tint + '60',
+                                  borderWidth: 1,
+                                  borderRadius: 3,
+                                  paddingHorizontal: 3,
+                                  paddingVertical: 1,
+                                  marginLeft: 4,
+                                }}
+                              >
+                                <Text style={{ fontSize: 8, fontWeight: '700', color: colors.tint, textTransform: 'uppercase' }}>
+                                  NEW
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       )}
 
@@ -2620,7 +2659,29 @@ const styles = StyleSheet.create({
   copyFromYesterdayContainer: {
     marginTop: Spacing.xs,
     marginBottom: Spacing.xs,
-    alignItems: 'flex-start',
+  },
+  emptyActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  leftActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiCameraButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  aiCameraButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
   copyFromYesterdayButton: {
     flexDirection: 'row',

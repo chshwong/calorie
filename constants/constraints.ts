@@ -30,10 +30,15 @@ export const PROFILES = {
     NOTES_MAX_LEN: 200,                         // DB: exercise_log_notes_length, med_log_notes_length
     MED_NAME_MAX_LEN: 30,                       // DB: med_log_name_length
     MED_DOSE_UNIT_MAX_LEN: 10,                  // DB: med_log_dose_unit_length
+    // AI Quick Log (UI + parsing policy). Keep centralized; do not change global name limits.
+    AI_QUICK_LOG_NAME_MAX_LEN: 30,
+    // Raw AI response text can be large; cap client-side to prevent oversized rows/payloads.
+    AI_RAW_TEXT_MAX_LEN: 30000,
   } as const;
   
   export const RANGES = {
     CALORIES_KCAL: { MIN: 0, MAX: 5000 },       // DB: calorie_entries_calories_kcal_check
+    SODIUM_MG: { MIN: 0, MAX: 30000 },          // sanity ceiling for single entry / AI parsing (mg)
     EXERCISE_MINUTES: { MIN: 0, MAX: 999 },     // DB: minutes_range (nullable)
     EXERCISE_SETS: { MIN: 0, MAX: 999 },        // DB: exercise_log_sets_check (nullable)
     EXERCISE_REPS_MIN: { MIN: 1, MAX: 100 },    // DB: exercise_log_reps_range_check (nullable)
