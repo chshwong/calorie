@@ -10,7 +10,7 @@ import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -564,18 +564,24 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
   const todayKey = getTodayKey();
 
   // Define streak types with labels, icons, and category colors
-  const streakTypes = [
+  const streakTypes: Array<{
+    type: 'login' | 'food';
+    label: string;
+    icon: IconSymbolName;
+    streak: typeof loginStreak;
+    accentColor: string;
+  }> = [
     { 
       type: 'login' as const, 
       label: t('dashboard.streaks.login'), 
-      icon: 'person.fill', 
+      icon: 'person.fill' as IconSymbolName, 
       streak: loginStreak,
       accentColor: colors.accentStreak, // Purple for login streak
     },
     { 
       type: 'food' as const, 
       label: t('dashboard.streaks.food'), 
-      icon: 'fork.knife', 
+      icon: 'fork.knife' as IconSymbolName, 
       streak: foodStreak,
       accentColor: colors.accentFood, // Salmon for food streak
     },
@@ -628,12 +634,12 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
   // Helper to get PR (personal best) text
   const getPRText = (currentDays: number, bestDays: number) => {
     if (currentDays === bestDays && currentDays > 0) {
-      return `Best: ${bestDays} days · tied`;
+      return t('dashboard.streaks.best_tied', { days: bestDays });
     }
     if (currentDays > bestDays) {
-      return `Best: ${currentDays} days · new PR 🎉`;
+      return t('dashboard.streaks.best_new_pr', { days: currentDays });
     }
-    return `Best: ${bestDays} days`;
+    return t('dashboard.streaks.best_days', { days: bestDays });
   };
 
   // Helper to get motivation message
@@ -641,7 +647,9 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
     if (bestDays > 0 && currentDays < bestDays) {
       const daysToBeat = bestDays - currentDays;
       if (daysToBeat <= 2) {
-        return daysToBeat === 1 ? '1 day to beat your best' : `${daysToBeat} days to beat your best`;
+        return daysToBeat === 1 
+          ? t('dashboard.streaks.motivation_one')
+          : t('dashboard.streaks.motivation_plural', { days: daysToBeat });
       }
     }
     return null;
@@ -693,7 +701,8 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
               if (type === 'login') {
                 // Navigate to home/index page (main calorie tracking page)
                 // Using /(tabs) which defaults to the index tab
-                router.push('/(tabs)' as any);
+                // Note: Type assertion needed due to expo-router type limitations with tab routes
+                router.push('/(tabs)' as Parameters<typeof router.push>[0]);
               } else if (type === 'food') {
                 // Navigate to Food Diary (Today) with appropriate meal type
                 const todayString = getLocalDateString();
@@ -712,15 +721,19 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
             return (
               <TouchableOpacity
                 key={type}
-                style={[styles.streakRow, { backgroundColor: colors.backgroundSecondary }]}
+                style={[
+                  styles.streakRow, 
+                  { backgroundColor: colors.backgroundSecondary },
+                  getMinTouchTargetStyle(),
+                ]}
                 activeOpacity={0.7}
                 onPress={handlePress}
-                {...getButtonAccessibilityProps(label, t('dashboard.streaks.accessibility_hint', { defaultValue: 'View streak details' }))}
+                {...getButtonAccessibilityProps(label, t('dashboard.streaks.accessibility_hint'))}
                 {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
               >
                 <View style={styles.streakLeft}>
                   <View style={[styles.streakIconContainer, { backgroundColor: accentColor + '20' }]}>
-                    <IconSymbol name={icon as any} size={18} color={accentColor} decorative />
+                    <IconSymbol name={icon as IconSymbolName} size={18} color={accentColor} decorative />
                   </View>
                   <View style={styles.streakLabelContainer}>
                     <ThemedText style={[styles.streakLabel, { color: colors.text }]}>
@@ -746,7 +759,9 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
                       )}
                     </View>
                     <ThemedText style={[styles.streakHeroLabel, { color: colors.textMuted }]}>
-                      {currentDays === 1 ? 'day' : 'days'} streak
+                      {currentDays === 1 
+                        ? t('dashboard.streaks.day_streak')
+                        : t('dashboard.streaks.days_streak')}
                     </ThemedText>
                     {motivationText ? (
                       <ThemedText style={[styles.streakMotivationText, { color: accentColor }]}>
@@ -759,7 +774,7 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
                     )}
                     {isAtRisk && (
                       <ThemedText style={[styles.streakAtRiskText, { color: colors.textMuted }]}>
-                        Log today to keep streak
+                        {t('dashboard.streaks.at_risk')}
                       </ThemedText>
                     )}
                   </View>
@@ -780,7 +795,7 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
                   {index === 0 && (
                     <View style={styles.streakWeekIndicatorHeader}>
                       <ThemedText style={[styles.streakWeekLabel, { color: colors.textMuted }]}>
-                        Last 7 days
+                        {t('dashboard.streaks.last_7_days')}
                       </ThemedText>
                     </View>
                   )}
