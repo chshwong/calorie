@@ -1796,6 +1796,21 @@ export default function FoodLogHomeScreen() {
                                             : entry.quantity.toFixed(1)} x {entry.unit}
                                         </ThemedText>
                                       )}
+                                      {!entry.food_id && (
+                                        <View style={[
+                                          styles.mealItemSourceBadge,
+                                          {
+                                            backgroundColor: 'transparent',
+                                          }
+                                        ]}>
+                                          <ThemedText style={[
+                                            styles.mealItemSourceBadgeText,
+                                            { color: colors.textSecondary }
+                                          ]}>
+                                            {entry.source === 'ai' ? 'AI' : '⚡'}
+                                          </ThemedText>
+                                        </View>
+                                      )}
                                     </View>
                                     <View style={[styles.calCol, { width: CAL_COL_WIDTH }]}>
                                       <ThemedText style={[styles.mealItemCalories, { color: colors.text }]}>
@@ -3231,6 +3246,20 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: 0,
     opacity: 0.7,
+  },
+  mealItemSourceBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 0,
+    marginTop: 0,
+    alignSelf: 'flex-start',
+  },
+  mealItemSourceBadgeText: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '500',
+    textTransform: 'uppercase',
   },
   mealItemCalories: {
     fontSize: 13,

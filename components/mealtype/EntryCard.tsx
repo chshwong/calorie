@@ -1,16 +1,16 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Platform } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { FoodSourceBadge } from '@/components/food-source-badge';
 import { HighlightableRow } from '@/components/common/highlightable-row';
+import { FoodSourceBadge } from '@/components/food-source-badge';
 import { MultiSelectItem } from '@/components/multi-select-item';
+import { ThemedText } from '@/components/themed-text';
+import type { Colors } from '@/constants/theme';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
-import type { Colors } from '@/constants/theme';
 import type { CalorieEntry } from '@/utils/types';
+import React from 'react';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type EntryCardProps = {
   entry: CalorieEntry;
@@ -43,6 +43,13 @@ export function EntryCard({
   t,
   styles,
 }: EntryCardProps) {
+  // Calculate secondary nutrients for details mode
+  const satG = entry.saturated_fat_g ?? 0;
+  const transG = entry.trans_fat_g ?? 0;
+  const sugarG = (entry as any).total_sugar_g ?? entry.sugar_g ?? 0;
+  const sodiumMg = entry.sodium_mg ?? 0;
+  const hasSecondaryNutrients = satG > 0 || transG > 0 || sugarG > 0 || sodiumMg > 0;
+
   const entryContent = (
     <HighlightableRow
       isNew={isNewlyAdded}
@@ -50,8 +57,8 @@ export function EntryCard({
         styles.entryCard, 
         { 
           backgroundColor: 'transparent',
-          borderColor: 'transparent',
-          borderWidth: 0,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator + '40',
         }
       ]}
     >
@@ -98,15 +105,14 @@ export function EntryCard({
                 <View style={[
                   styles.sourceBadge,
                   {
-                    backgroundColor: colors.icon + '20',
-                    borderColor: colors.icon + '40',
+                    backgroundColor: 'transparent',
                     marginLeft: 6,
                     marginRight: 0,
                   }
                 ]}>
                   <ThemedText style={[
                     styles.sourceBadgeText,
-                    { color: colors.icon }
+                    { color: colors.textSecondary }
                   ]}>
                     {entry.source === 'ai' ? 'AI' : '⚡'}
                   </ThemedText>
@@ -126,48 +132,46 @@ export function EntryCard({
             <TouchableOpacity
               onPress={() => onEdit(entry)}
               activeOpacity={0.7}
-              style={styles.entryMacros}
+              style={styles.entryMacrosContainer}
             >
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.protein_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.protein_g ?? 0}g</ThemedText>
-              </View>
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.carbs_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.carbs_g ?? 0}g</ThemedText>
-              </View>
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fat_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fat_g ?? 0}g</ThemedText>
-              </View>
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.fiber_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.fiber_g ?? 0}g</ThemedText>
-              </View>
-            </TouchableOpacity>
-          )}
-          {showEntryDetails && (
-            <TouchableOpacity
-              onPress={() => onEdit(entry)}
-              activeOpacity={0.7}
-              style={[styles.entryMacros, { marginTop: 2 }]}
-            >
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.saturated_fat_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.saturated_fat_g ?? 0}g</ThemedText>
-              </View>
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.trans_fat_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.trans_fat_g ?? 0}g</ThemedText>
-              </View>
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sugar_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sugar_g ?? 0}g</ThemedText>
-              </View>
-              <View style={styles.entryMacroItem}>
-                <ThemedText style={[styles.entryMacroLabel, { color: colors.textSecondary }]}>{t('mealtype_log.macros.sodium_short')}</ThemedText>
-                <ThemedText style={[styles.entryMacroValue, { color: colors.text }]}>{entry.sodium_mg ?? 0}mg</ThemedText>
-              </View>
+                <View style={styles.entryMacrosRow}>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>P</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.text }]}>{entry.protein_g ?? 0}g</ThemedText>
+                  </View>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>C</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.text }]}>{entry.carbs_g ?? 0}g</ThemedText>
+                  </View>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>F</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.text }]}>{entry.fat_g ?? 0}g</ThemedText>
+                  </View>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>Fib</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.text }]}>{entry.fiber_g ?? 0}g</ThemedText>
+                  </View>
+                </View>
+              {hasSecondaryNutrients && (
+                <View style={styles.entryMacrosRowSecondary}>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>Sat</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.textSecondary }]}>{satG}g</ThemedText>
+                  </View>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>Trans</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.textSecondary }]}>{transG}g</ThemedText>
+                  </View>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>Sugar</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.textSecondary }]}>{sugarG}g</ThemedText>
+                  </View>
+                  <View style={styles.entryMacroChip}>
+                    <ThemedText style={[styles.entryMacroChipLabel, { color: colors.textSecondary }]}>Na</ThemedText>
+                    <ThemedText style={[styles.entryMacroChipValue, { color: colors.textSecondary }]}>{sodiumMg}mg</ThemedText>
+                  </View>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         </View>
