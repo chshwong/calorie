@@ -92,39 +92,46 @@ export function BundlesTab({
     <View style={styles.tabContent}>
       {/* Create New Bundle Button */}
       <View style={[styles.searchResultsContainer, { backgroundColor: 'transparent', borderColor: 'transparent', borderRadius: 0, marginBottom: bundlesLoading || bundles.length === 0 ? 0 : 0, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) }]}>
-        <TouchableOpacity
-          style={[
-            styles.searchResultItem,
-            getMinTouchTargetStyle(),
-            { 
-              borderBottomColor: colors.icon + '15', 
-              backgroundColor: bundles.length >= BUNDLES.COUNT.MAX ? colors.icon + '20' : colors.tint + '10',
-              opacity: bundles.length >= BUNDLES.COUNT.MAX ? 0.6 : 1,
-            }
-          ]}
-          onPress={() => {
-            if (bundles.length >= BUNDLES.COUNT.MAX) {
-              Alert.alert(t('alerts.limit_reached'), t('mealtype_log.bundles.limit_reached'));
-              return;
-            }
-            router.push({
-              pathname: '/create-bundle',
-              params: {
-                mealType: mealType || 'breakfast',
-                entryDate: entryDate || new Date().toISOString().split('T')[0],
-              },
-            });
-          }}
-          disabled={bundles.length >= BUNDLES.COUNT.MAX}
-          activeOpacity={0.7}
-          {...getButtonAccessibilityProps(
-            t('mealtype_log.bundles.create_new'),
-            'Double tap to create a new bundle',
-            bundles.length >= BUNDLES.COUNT.MAX
-          )}
-          {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-        >
-          <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
+        <View style={[styles.searchResultItem, { 
+          borderBottomColor: colors.icon + '15', 
+          backgroundColor: bundles.length >= BUNDLES.COUNT.MAX ? colors.icon + '20' : colors.tint + '10',
+          opacity: bundles.length >= BUNDLES.COUNT.MAX ? 0.6 : 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }]}>
+          <TouchableOpacity
+            style={[
+              styles.searchResultContent,
+              getMinTouchTargetStyle(),
+              { 
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }
+            ]}
+            onPress={() => {
+              if (bundles.length >= BUNDLES.COUNT.MAX) {
+                Alert.alert(t('alerts.limit_reached'), t('mealtype_log.bundles.limit_reached'));
+                return;
+              }
+              router.push({
+                pathname: '/create-bundle',
+                params: {
+                  mealType: mealType || 'breakfast',
+                  entryDate: entryDate || new Date().toISOString().split('T')[0],
+                },
+              });
+            }}
+            disabled={bundles.length >= BUNDLES.COUNT.MAX}
+            activeOpacity={0.7}
+            {...getButtonAccessibilityProps(
+              t('mealtype_log.bundles.create_new'),
+              'Double tap to create a new bundle',
+              bundles.length >= BUNDLES.COUNT.MAX
+            )}
+            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+          >
             <ThemedText style={[
               styles.searchResultName, 
               { 
@@ -142,29 +149,29 @@ export function BundlesTab({
                 {t('mealtype_log.bundles.bundles_count', { count: bundles.length })}
               </ThemedText>
             </ThemedText>
-            {bundles.length > 0 && (
-              <TouchableOpacity
-                onPress={onToggleEditMode}
-                style={[styles.editButton, getMinTouchTargetStyle(), { 
-                  backgroundColor: editMode ? '#10B981' + '20' : colors.tint + '20', 
-                  borderColor: editMode ? '#10B981' + '40' : colors.tint + '40' 
-                }]}
-                activeOpacity={0.7}
-                {...getButtonAccessibilityProps(
-                  editMode ? t('common.done', { defaultValue: 'Done' }) : t('common.edit'),
-                  'Double tap to toggle edit mode'
-                )}
-                {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-              >
-                <Text style={[styles.editButtonText, { 
-                  color: editMode ? '#10B981' : colors.tint 
-                }]}>
-                  {editMode ? '✓' : '✏️'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+          {bundles.length > 0 && (
+            <TouchableOpacity
+              onPress={onToggleEditMode}
+              style={[styles.editButton, getMinTouchTargetStyle(), { 
+                backgroundColor: editMode ? '#10B981' + '20' : colors.tint + '20', 
+                borderColor: editMode ? '#10B981' + '40' : colors.tint + '40' 
+              }]}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps(
+                editMode ? t('common.done', { defaultValue: 'Done' }) : t('common.edit'),
+                'Double tap to toggle edit mode'
+              )}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+            >
+              <Text style={[styles.editButtonText, { 
+                color: editMode ? '#10B981' : colors.tint 
+              }]}>
+                {editMode ? '✓' : '✏️'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {bundlesLoading ? (

@@ -1,11 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Linking } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, SemanticColors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getButtonAccessibilityProps, getInputAccessibilityProps, getLinkAccessibilityProps, getMinTouchTargetStyle, getWebAccessibilityProps } from '@/utils/accessibility';
-import { showAppToast } from '@/components/ui/app-toast';
 import { parseAIQuickLogReply, type AIQuickLogParsed } from '@/lib/ai/aiQuickLogParser';
+import { getButtonAccessibilityProps, getInputAccessibilityProps, getLinkAccessibilityProps, getMinTouchTargetStyle, getWebAccessibilityProps } from '@/utils/accessibility';
+import React, { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Props = {
   onApplyParsed: (input: { parsed: AIQuickLogParsed; rawText: string }) => void;
@@ -104,10 +104,15 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
   return (
     <View style={[styles.container, { backgroundColor: isDark ? colors.card : colors.background }]}>
       <View style={styles.content}>
+        {/* Disclaimer */}
+        <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
+          {t('quick_log.ai.disclaimer')}
+        </Text>
+
         {/* STEP 1 */}
         <View style={styles.step}>
-          <Text style={[styles.stepText, { color: colors.text }]}>
-            ① Click the "Copy Prompt" button
+          <Text style={[styles.stepHeader, { color: colors.text }]}>
+            {t('quick_log.ai.step1_header')}
           </Text>
           <TouchableOpacity
             style={[styles.secondaryButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
@@ -123,8 +128,11 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
 
         {/* STEP 2 */}
         <View style={styles.step}>
-          <Text style={[styles.stepText, { color: colors.text }]}>
-            ② Paste the prompt into your preferred AI assistant (for example,{' '}
+          <Text style={[styles.stepHeader, { color: colors.text }]}>
+            {t('quick_log.ai.step2_header')}
+          </Text>
+          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+            {t('quick_log.ai.step2_helper_prefix')}{' '}
             <Text
               onPress={() => handleOpenLink('https://chat.openai.com')}
               style={[styles.linkText, { color: colors.tint }]}
@@ -132,7 +140,7 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
             >
               ChatGPT
             </Text>
-            {' '}or{' '}
+            {' or '}
             <Text
               onPress={() => handleOpenLink('https://gemini.google.com')}
               style={[styles.linkText, { color: colors.tint }]}
@@ -140,23 +148,27 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
             >
               Gemini
             </Text>
-            ), along with a photo of your meal
+            {' '}
+            {t('quick_log.ai.step2_helper_suffix')}
           </Text>
         </View>
 
         {/* STEP 3 */}
         <View style={styles.step}>
-          <Text style={[styles.stepText, { color: colors.text }]}>
-            ③ Copy the AI's reply, paste it here, then click "Parse → Fill Quick Log"
+          <Text style={[styles.stepHeader, { color: colors.text }]}>
+            {t('quick_log.ai.step3_header')}
+          </Text>
+          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+            {t('quick_log.ai.step3_helper')}
           </Text>
           <TextInput
             ref={replyInputRef}
             style={[
               styles.replyInput,
               {
-                color: isDark ? colors.inputTextDark : '#000000',
-                backgroundColor: isDark ? colors.background : '#FFFFFF',
-                borderColor: errors.length > 0 ? errorColor : colors.icon + '30',
+                color: isDark ? colors.inputTextDark : colors.text,
+                backgroundColor: colors.inputBackground,
+                borderColor: errors.length > 0 ? errorColor : colors.icon + '20',
               },
             ]}
             value={aiReplyText}
@@ -186,7 +198,9 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
               activeOpacity={0.8}
               {...getButtonAccessibilityProps(t('quick_log.ai.parse_accessibility_label'))}
             >
-              <Text style={styles.primaryButtonText}>{t('quick_log.ai.parse_button')}</Text>
+              <Text style={[styles.primaryButtonText, { color: colors.textOnTint }]}>
+                {t('quick_log.ai.parse_button')}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -246,15 +260,26 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    gap: Spacing.lg,
+    gap: 20,
+  },
+  disclaimer: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    marginBottom: 10,
   },
   step: {
-    gap: 12,
+    gap: 8,
   },
-  stepText: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '600',
+  stepHeader: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+  },
+  helperText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400',
   },
   linkText: {
     textDecorationLine: 'underline',
@@ -268,7 +293,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   replyInput: {
-    minHeight: 180,
+    minHeight: 140,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
@@ -289,7 +314,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },

@@ -26,7 +26,7 @@ import { toDateKey } from '@/utils/dateKey';
 import type { CalorieEntry } from '@/utils/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -160,6 +160,9 @@ export default function QuickLogScreen() {
 
   // Ref for triggering form submit from the header save/check button
   const submitRef = useRef<(() => void) | null>(null);
+  
+  // State for form validation (shared with primary button)
+  const [canSubmit, setCanSubmit] = useState(false);
 
   // Map meal type keys to display labels (using i18n)
   const getMealTypeLabel = (type: string): string => {
@@ -213,9 +216,50 @@ export default function QuickLogScreen() {
   const mealTypeLabel = getMealTypeLabel(mealType);
   const dateLabel = formatDate(date);
 
-  const handleClose = () => {
-    router.back();
-  };
+  // Robust exit handler with fallback navigation
+  const handleExit = useCallback(() => {
+    // Try to go back if possible
+    try {
+      if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+        try {
+          router.back();
+          return;
+        } catch (backError) {
+          // router.back() might throw even if canGoBack() returned true (edge case)
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('router.back() failed, using fallback navigation:', backError);
+          }
+          // Fall through to fallback navigation
+        }
+      }
+    } catch (error) {
+      // canGoBack() might throw or not exist, fall through to fallback
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('router.canGoBack() failed, using fallback navigation:', error);
+      }
+    }
+
+    // Fallback: navigate to mealtype-log with same date/mealType
+    const fallbackParams: Record<string, string> = {};
+    
+    // Use date param if available, map to entryDate for mealtype-log
+    if (dateParam) {
+      fallbackParams.entryDate = dateParam;
+    }
+    
+    // Use mealType param if available
+    if (mealTypeParam) {
+      fallbackParams.mealType = mealTypeParam;
+    }
+
+    // Navigate to mealtype-log (use replace to avoid history stack issues)
+    router.replace({
+      pathname: '/mealtype-log',
+      params: Object.keys(fallbackParams).length > 0 ? fallbackParams : undefined,
+    });
+  }, [router, dateParam, mealTypeParam]);
+
+  const handleClose = handleExit;
 
   const tabs: SegmentedTabItem[] = useMemo(
     () => [
@@ -231,7 +275,7 @@ export default function QuickLogScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleExit}
           activeOpacity={0.7}
         >
           <ThemedText style={[styles.backButtonText, { color: colors.tint }]}>←</ThemedText>
@@ -248,11 +292,12 @@ export default function QuickLogScreen() {
           style={[
             styles.checkmarkButton,
             {
-              opacity: 1,
+              opacity: canSubmit ? 1 : 0.5,
             }
           ]}
           onPress={() => submitRef.current?.()}
-          activeOpacity={0.7}
+          disabled={!canSubmit}
+          activeOpacity={canSubmit ? 0.7 : 1}
         >
           <IconSymbol 
             name="checkmark" 
@@ -281,6 +326,7 @@ export default function QuickLogScreen() {
               items={tabs}
               activeKey={activeTab}
               onChange={(key) => setActiveTab(key as QuickLogTabKey)}
+              useContrastingTextOnActive={true}
             />
           </View>
 
@@ -297,6 +343,9 @@ export default function QuickLogScreen() {
                 // registerFieldApi will be implemented in QuickLogForm; safe no-op if not provided
                 registerFieldApi={(api: QuickLogFieldApi) => {
                   fieldApiRef.current = api;
+                }}
+                registerValidationState={(canSubmit) => {
+                  setCanSubmit(canSubmit);
                 }}
               />
             ) : (

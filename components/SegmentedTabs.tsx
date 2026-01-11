@@ -42,9 +42,11 @@ type SegmentedTabsProps = {
   onActiveTabLayout?: (layout: { x: number; y: number; width: number; height: number } | null) => void;
   /** Optional refs for specific tab buttons (used for guided tours / measurement). */
   tabRefs?: Record<string, React.Ref<any> | undefined>;
+  /** If true, uses contrasting text colors for active tabs (black in dark mode, white in light mode) */
+  useContrastingTextOnActive?: boolean;
 };
 
-export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLayout, tabRefs }: SegmentedTabsProps) {
+export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLayout, tabRefs, useContrastingTextOnActive = false }: SegmentedTabsProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const onActiveTabLayoutRef = useRef(onActiveTabLayout);
@@ -183,7 +185,9 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                 style={[
                   styles.tabText,
                   {
-                    color: colors.text, // Dark text for both active and inactive - readable on pastel backgrounds
+                    color: isActive && useContrastingTextOnActive
+                      ? (colorScheme === 'dark' ? colors.textOnTint : colors.textInverse)
+                      : colors.text,
                     fontWeight: isActive 
                       ? FontWeight.semibold 
                       : FontWeight.medium,

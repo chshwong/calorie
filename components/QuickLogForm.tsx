@@ -42,6 +42,7 @@ type QuickLogFormProps = {
   onSaved: () => void;          // called after successful save/update
   registerSubmit?: (submitFn: () => void) => void; // register submit function for header button
   registerFieldApi?: (api: QuickLogFieldApi) => void; // optional field setter API (AI tab)
+  registerValidationState?: (canSubmit: boolean) => void; // register validation state for header button
 };
 
 const ENTRIES_CACHE_MAX_AGE_MS = DEFAULT_CACHE_MAX_AGE_MS;
@@ -75,6 +76,7 @@ export function QuickLogForm({
   onSaved,
   registerSubmit,
   registerFieldApi,
+  registerValidationState,
 }: QuickLogFormProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -195,6 +197,13 @@ export function QuickLogForm({
       setTransFat(hydratedEntry.trans_fat_g?.toString() || '');
       setSugar(hydratedEntry.sugar_g?.toString() || '');
       setSodium(hydratedEntry.sodium_mg?.toString() || '');
+
+      // Initialize AI provenance from loaded entry
+      setAiProvenance({
+        source: hydratedEntry.source === 'ai' ? 'ai' : 'manual',
+        aiRawText: hydratedEntry.ai_raw_text ?? null,
+        aiConfidence: (hydratedEntry.ai_confidence as AIQuickLogConfidence) ?? null,
+      });
 
       entryHydratedRef.current = true;
       setTimeout(() => {
@@ -549,12 +558,23 @@ export function QuickLogForm({
         const updatedEntry = await updateEntryService(quickLogId, cleanedEntryData);
         if (!updatedEntry) {
           error = { message: 'Failed to update entry' };
+        } else {
+          // Optimistically update cache with returned entry (includes source/ai_confidence)
+          queryClient.setQueryData<CalorieEntry[]>(entriesQueryKey, (prev) => {
+            if (!prev) return [updatedEntry];
+            return prev.map((e) => (e.id === quickLogId ? updatedEntry : e));
+          });
         }
       } else {
         // Insert new entry - uses service layer per engineering guidelines
         const createdEntry = await createEntryService(cleanedEntryData);
         if (!createdEntry) {
           error = { message: 'Failed to create entry' };
+        } else {
+          // Optimistically update cache with returned entry (includes source/ai_confidence)
+          queryClient.setQueryData<CalorieEntry[]>(entriesQueryKey, (prev) => {
+            return prev ? [...prev, createdEntry] : [createdEntry];
+          });
         }
       }
 
@@ -660,6 +680,18 @@ export function QuickLogForm({
       registerSubmit(handleFormSubmit);
     }
   }, [registerSubmit, handleFormSubmit]);
+
+  // Compute canSubmit state (same logic as primary button)
+  const canSubmit = useMemo(() => {
+    return isFormValid() && !loading;
+  }, [isFormValid, loading, itemName, quantity, calories, protein, carbs, fat, fiber]);
+
+  // Register validation state for header button
+  useEffect(() => {
+    if (registerValidationState) {
+      registerValidationState(canSubmit);
+    }
+  }, [registerValidationState, canSubmit]);
 
   // Delete entry function - uses service layer per engineering guidelines
   const deleteEntry = useCallback(async (entryId: string) => {

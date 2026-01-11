@@ -10,30 +10,7 @@ import {
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import type { Colors } from '@/constants/theme';
-
-type CalorieEntry = {
-  id: string;
-  user_id: string;
-  entry_date: string;
-  eaten_at: string | null;
-  meal_type: string;
-  item_name: string;
-  food_id: string | null;
-  serving_id: string | null;
-  quantity: number;
-  unit: string;
-  calories_kcal: number;
-  protein_g: number | null;
-  carbs_g: number | null;
-  fat_g: number | null;
-  fiber_g: number | null;
-  saturated_fat_g: number | null;
-  sugar_g: number | null;
-  sodium_mg: number | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
+import type { CalorieEntry } from '@/utils/types';
 
 type EntryCardProps = {
   entry: CalorieEntry;
@@ -131,7 +108,7 @@ export function EntryCard({
                     styles.sourceBadgeText,
                     { color: colors.icon }
                   ]}>
-                    ⚡
+                    {entry.source === 'ai' ? 'AI' : '⚡'}
                   </ThemedText>
                 </View>
               )}
