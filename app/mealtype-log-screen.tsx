@@ -2125,29 +2125,10 @@ export default function LogFoodScreen() {
                 quickAddLabel={t('mealtype_log.quick_add')}
                 highlightedIndex={highlightedIndex}
                 onHighlightChange={setHighlightedIndex}
+                onBarcodePress={handleBarcodeScanPress}
+                onAiPress={handleAiCamera}
               />
             </View>
-            <TouchableOpacity
-              ref={tourBarcodeBtnRef as any}
-              style={[styles.barcodeButton, { 
-                backgroundColor: colors.tint + '15', 
-                borderColor: colors.tint + '40',
-              }]}
-              onPress={handleBarcodeScanPress}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              {...getButtonAccessibilityProps(
-                'Scan barcode',
-                'Double tap to scan a barcode'
-              )}
-            >
-              <IconSymbol 
-                name="barcode.viewfinder" 
-                size={24} 
-                color={colors.tint}
-                accessibilityLabel={t('mealtype_log.accessibility.scan_barcode')}
-              />
-            </TouchableOpacity>
           </View>
 
         {/* Tabs */}
