@@ -17,6 +17,8 @@ import {
   Platform,
   Animated,
   Easing,
+  Text,
+  useWindowDimensions,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -24,6 +26,7 @@ import { FoodSourceBadge } from '@/components/food-source-badge';
 import { FoodStatusChip } from '@/components/food-status-chip';
 import { showAppToast } from '@/components/ui/app-toast';
 import type { FoodMaster } from '@/utils/nutritionMath';
+import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
 
 export interface FoodSearchBarProps {
   /** Current search query */
@@ -72,6 +75,10 @@ export interface FoodSearchBarProps {
   highlightedIndex?: number;
   /** Set highlighted index */
   onHighlightChange?: (index: number) => void;
+  /** Optional handler for barcode scan button press */
+  onBarcodePress?: () => void;
+  /** Optional handler for AI camera button press */
+  onAiPress?: () => void;
 }
 
 /**
@@ -98,6 +105,8 @@ export function FoodSearchBar({
   quickAddLabel,
   highlightedIndex = -1,
   onHighlightChange,
+  onBarcodePress,
+  onAiPress,
 }: FoodSearchBarProps) {
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -298,6 +307,61 @@ export function FoodSearchBar({
     outputRange: [0, Platform.OS === 'ios' ? 0.22 : 0.18],
   });
 
+  // Determine theme mode based on background color for action button tints
+  const isLightMode = colors.background === '#FFFFFF' || colors.background === '#fff' || colors.background.toLowerCase() === '#ffffff';
+  const barcodeBg = isLightMode ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.08)';
+  const aiBg = isLightMode ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.10)';
+
+  // Responsive layout for narrow screens
+  const { width } = useWindowDimensions();
+  const isNarrow = width <= 360;
+
+  // Render action buttons (shared between narrow and wide layouts)
+  const renderActionButtons = () => {
+    if (!onBarcodePress && !onAiPress) return null;
+    
+    return (
+      <View style={isNarrow ? styles.actionsRowNarrow : styles.actionsRow}>
+        {onBarcodePress && (
+          <TouchableOpacity
+            style={[
+              styles.actionPill,
+              { backgroundColor: barcodeBg },
+              getMinTouchTargetStyle(),
+            ]}
+            onPress={onBarcodePress}
+            activeOpacity={0.6}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            {...getButtonAccessibilityProps('Scan barcode', 'Double tap to scan a barcode')}
+          >
+            <IconSymbol 
+              name="barcode.viewfinder" 
+              size={18} 
+              color={colors.tint}
+            />
+          </TouchableOpacity>
+        )}
+        {onAiPress && (
+          <TouchableOpacity
+            style={[
+              styles.actionPill,
+              { backgroundColor: aiBg },
+              getMinTouchTargetStyle(),
+            ]}
+            onPress={onAiPress}
+            activeOpacity={0.6}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            {...getButtonAccessibilityProps('AI meal photo log', 'Double tap to open AI camera log')}
+          >
+            <Text style={[styles.actionPillText, { color: colors.text }]}>
+              📷AI
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View 
       ref={wrapperRef}
@@ -311,81 +375,179 @@ export function FoodSearchBar({
         return false;
       }}
     >
-      {/* Search Input */}
-      <Animated.View
-        style={[
-          styles.searchOuterContainer,
-          {
-            backgroundColor: searchQuery.length > 0 
-              ? colors.tint + '20' 
-              : colors.icon + '10', // Subtle background when unfocused
-            borderWidth: isFocused ? 2 : 1,
-            borderColor: isFocused ? colors.tint : colors.icon + '20', // Subtle border when unfocused, tint when focused
-            shadowColor: isFocused ? colors.tint : '#000',
-            transform: [{ scale: containerScale }],
-            shadowOpacity: containerShadowOpacity as any,
-          },
-          isFocused && styles.searchOuterContainerFocused,
-        ]}
-      >
-        <View style={styles.searchInnerContainer}>
-          {searchLoading ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.tint}
-              style={styles.searchIcon}
-            />
-          ) : (
-            <IconSymbol
-              name="magnifyingglass"
-              size={18}
-              color={colors.icon}
-              style={styles.searchIcon}
-            />
-          )}
-
-          {showClearButton && (
-            <TouchableOpacity
-              onPress={handleClear}
-              style={styles.clearButton}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              accessibilityHint="Clears the search query and closes the dropdown"
-              {...(Platform.OS === 'web' && {
-                // @ts-ignore - web-specific props
-                'aria-label': 'Clear search',
-              })}
+      {isNarrow ? (
+        /* Narrow layout: 2-row (search full width, buttons on separate row) */
+        <>
+          <View style={styles.searchRowNarrow}>
+            <Animated.View
+              style={[
+                styles.searchOuterContainer,
+                {
+                  backgroundColor: searchQuery.length > 0 
+                    ? colors.tint + '20' 
+                    : colors.icon + '10', // Subtle background when unfocused
+                  borderWidth: isFocused ? 2 : 1,
+                  borderColor: isFocused ? colors.tint : colors.icon + '20', // Subtle border when unfocused, tint when focused
+                  shadowColor: isFocused ? colors.tint : '#000',
+                  transform: [{ scale: containerScale }],
+                  shadowOpacity: containerShadowOpacity as any,
+                },
+                isFocused && styles.searchOuterContainerFocused,
+              ]}
             >
-              <IconSymbol
-                name="xmark"
-                size={16}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          )}
+              <View style={styles.searchInnerContainer}>
+                {searchLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.tint}
+                    style={styles.searchIcon}
+                  />
+                ) : (
+                  <IconSymbol
+                    name="magnifyingglass"
+                    size={18}
+                    color={colors.icon}
+                    style={styles.searchIcon}
+                  />
+                )}
 
-          <TextInput
-            ref={inputRef}
+                <TextInput
+                  ref={inputRef}
+                  style={[
+                    styles.searchInput,
+                    {
+                      color: colors.text,
+                    },
+                    Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                  ]}
+                  placeholder={placeholder}
+                  placeholderTextColor={colors.textSecondary}
+                  value={searchQuery}
+                  onChangeText={onSearchChange}
+                  onKeyPress={handleKeyPress}
+                  onBlur={handleBlur}
+                  onFocus={handleFocus}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                {/* Clear button slot - always reserved to prevent layout shift */}
+                <View style={styles.clearSlot}>
+                  {showClearButton ? (
+                    <TouchableOpacity
+                      onPress={handleClear}
+                      style={styles.clearButton}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear search"
+                      accessibilityHint="Clears the search query and closes the dropdown"
+                      {...(Platform.OS === 'web' && {
+                        // @ts-ignore - web-specific props
+                        'aria-label': 'Clear search',
+                      })}
+                    >
+                      <IconSymbol
+                        name="xmark"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.clearPlaceholder} />
+                  )}
+                </View>
+              </View>
+            </Animated.View>
+          </View>
+          {renderActionButtons()}
+        </>
+      ) : (
+        /* Wide layout: Single-row (search + buttons side by side) */
+        <View style={styles.searchRowContainer}>
+          {/* Search Input */}
+          <Animated.View
             style={[
-              styles.searchInput,
+              styles.searchInputWrapper,
+              styles.searchOuterContainer,
               {
-                color: colors.text,
+                backgroundColor: searchQuery.length > 0 
+                  ? colors.tint + '20' 
+                  : colors.icon + '10', // Subtle background when unfocused
+                borderWidth: isFocused ? 2 : 1,
+                borderColor: isFocused ? colors.tint : colors.icon + '20', // Subtle border when unfocused, tint when focused
+                shadowColor: isFocused ? colors.tint : '#000',
+                transform: [{ scale: containerScale }],
+                shadowOpacity: containerShadowOpacity as any,
               },
-              Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+              isFocused && styles.searchOuterContainerFocused,
             ]}
-            placeholder={placeholder}
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={onSearchChange}
-            onKeyPress={handleKeyPress}
-            onBlur={handleBlur}
-            onFocus={handleFocus}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          >
+            <View style={styles.searchInnerContainer}>
+              {searchLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.tint}
+                  style={styles.searchIcon}
+                />
+              ) : (
+                <IconSymbol
+                  name="magnifyingglass"
+                  size={18}
+                  color={colors.icon}
+                  style={styles.searchIcon}
+                />
+              )}
+
+              <TextInput
+                ref={inputRef}
+                style={[
+                  styles.searchInput,
+                  {
+                    color: colors.text,
+                  },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                ]}
+                placeholder={placeholder}
+                placeholderTextColor={colors.textSecondary}
+                value={searchQuery}
+                onChangeText={onSearchChange}
+                onKeyPress={handleKeyPress}
+                onBlur={handleBlur}
+                onFocus={handleFocus}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              {/* Clear button slot - always reserved to prevent layout shift */}
+              <View style={styles.clearSlot}>
+                {showClearButton ? (
+                  <TouchableOpacity
+                    onPress={handleClear}
+                    style={styles.clearButton}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear search"
+                    accessibilityHint="Clears the search query and closes the dropdown"
+                    {...(Platform.OS === 'web' && {
+                      // @ts-ignore - web-specific props
+                      'aria-label': 'Clear search',
+                    })}
+                  >
+                    <IconSymbol
+                      name="xmark"
+                      size={16}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.clearPlaceholder} />
+                )}
+              </View>
+            </View>
+          </Animated.View>
+          {renderActionButtons()}
         </View>
-      </Animated.View>
+      )}
 
       {/* Search Results Dropdown - Floats over content below */}
       {showSearchResults && searchResults.length > 0 && (
@@ -558,6 +720,18 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1000,
   },
+  searchRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchRowNarrow: {
+    width: '100%',
+  },
+  searchInputWrapper: {
+    flexGrow: 1,
+    minWidth: 0,
+  },
   searchOuterContainer: {
     borderRadius: 999,
     paddingHorizontal: 10,
@@ -608,6 +782,8 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     paddingVertical: Platform.OS === 'ios' ? 6 : 4,
     paddingHorizontal: 8,
     fontSize: 16,
@@ -617,10 +793,20 @@ const styles = StyleSheet.create({
     outlineWidth: 0,
     outlineColor: 'transparent',
   },
+  clearSlot: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   clearButton: {
     padding: 6,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  clearPlaceholder: {
+    width: 32,
+    height: 32,
   },
   searchResultsContainer: {
     position: 'absolute',
@@ -719,6 +905,33 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 14,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+    marginTop: 1, // Subtle vertical alignment with search bar
+  },
+  actionsRowNarrow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  actionPill: {
+    height: 32,
+    minWidth: 32,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  actionPillText: {
+    fontSize: 12.5,
+    fontWeight: '500',
   },
 });
 
