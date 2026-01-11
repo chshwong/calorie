@@ -59,10 +59,10 @@ export function MealTypeLogHeader({
             <ThemedText style={[styles.subHeaderMealType, { color: colors.tint }]}>{mealTypeLabel} ▼</ThemedText>
           </TouchableOpacity>
         </View>
-        <ThemedText style={[styles.subHeaderSeparator, { color: colors.textSecondary }]}> • </ThemedText>
         <TouchableOpacity
           style={[
             getMinTouchTargetStyle(),
+            { marginLeft: 8 },
           ]}
           onPress={onDatePress}
           activeOpacity={0.7}

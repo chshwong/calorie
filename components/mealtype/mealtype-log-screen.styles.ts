@@ -343,36 +343,87 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     flexShrink: 0,
   },
-  entryMacros: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
+  entryMacrosContainer: {
     marginLeft: 8,
     marginTop: 4,
   },
-  entryMacroItem: {
+  entryMacrosRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  entryMacrosRowSecondary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+    marginTop: 2,
+  },
+  entryMacroChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  entryMacroLabel: {
+  entryMacroChipLabel: {
     fontSize: 10,
-    fontWeight: '600',
-    opacity: 1.0,
+    fontWeight: '500',
   },
-  entryMacroValue: {
+  entryMacroChipValue: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   mealTotalsContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginVertical: 4,
+    marginBottom: 12,
   },
-  mealTotalsLine: {
+  totalsBand: {
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  totalsLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  mealTotalsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  mealTotalsValue: {
     fontSize: 13,
+    fontWeight: '600',
+    marginRight: 2,
+  },
+  mealTotalsLabel: {
+    fontSize: 11,
+    marginRight: 4,
+  },
+  mealTotalsChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  mealTotalsChipLabel: {
+    fontSize: 10,
     fontWeight: '500',
+  },
+  mealTotalsChipValue: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   editButton: {
     paddingHorizontal: 6,
@@ -680,15 +731,17 @@ export const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sourceBadge: {
-    paddingHorizontal: 2,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 3,
-    borderWidth: 1,
-    marginLeft: 8,
+    borderRadius: 4,
+    borderWidth: 0,
+    marginLeft: 6,
+    alignSelf: 'flex-start',
   },
   sourceBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '500',
     textTransform: 'uppercase',
   },
   selectAllRow: {
