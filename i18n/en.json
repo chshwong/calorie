@@ -2441,6 +2441,7 @@
       "disclaimer": "Powered by your own AI assistant (keeps it free).",
       "instructions": "Copy the prompt, use it with your AI assistant (with your meal photo), then paste the AI reply here.",
       "step1_header": "① 📷 Meal photo → Copy Prompt",
+      "step1_helper": "Snap your meal, then click this button.",
       "step2_header": "② Paste prompt + meal photo to AI",
       "step2_helper_prefix": "Paste the copied prompt into any AI assistant like",
       "step2_helper_suffix": "with your meal picture attached.",

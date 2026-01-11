@@ -2582,7 +2582,7 @@ export default function LogFoodScreen() {
 
           {/* AvoScore Donut Chart - Only shown when there are entries and meal totals */}
           {entries.length > 0 && mealTotals && mealTotals.kcal > 0 && (
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md }}>
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.md, paddingBottom: Spacing.md + 20 }}>
               <MacroCompositionDonutChart
                 gramsCarbTotal={mealTotals.carbs_g ?? 0}
                 gramsFiber={mealTotals.fiber_g ?? 0}

@@ -114,6 +114,9 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
           <Text style={[styles.stepHeader, { color: colors.text }]}>
             {t('quick_log.ai.step1_header')}
           </Text>
+          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+            {t('quick_log.ai.step1_helper')}
+          </Text>
           <TouchableOpacity
             style={[styles.secondaryButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
             onPress={handleCopyPrompt}

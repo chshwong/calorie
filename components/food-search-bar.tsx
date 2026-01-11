@@ -315,15 +315,17 @@ export function FoodSearchBar({
       <Animated.View
         style={[
           styles.searchOuterContainer,
-          { backgroundColor: colors.background },
-          isFocused && styles.searchOuterContainerFocused,
-          searchQuery.length > 0 && {
-            backgroundColor: colors.tint + '20',
-          },
           {
+            backgroundColor: searchQuery.length > 0 
+              ? colors.tint + '20' 
+              : colors.icon + '10', // Subtle background when unfocused
+            borderWidth: isFocused ? 2 : 1,
+            borderColor: isFocused ? colors.tint : colors.icon + '20', // Subtle border when unfocused, tint when focused
+            shadowColor: isFocused ? colors.tint : '#000',
             transform: [{ scale: containerScale }],
             shadowOpacity: containerShadowOpacity as any,
           },
+          isFocused && styles.searchOuterContainerFocused,
         ]}
       >
         <View style={styles.searchInnerContainer}>
@@ -370,6 +372,7 @@ export function FoodSearchBar({
               {
                 color: colors.text,
               },
+              Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
             ]}
             placeholder={placeholder}
             placeholderTextColor={colors.textSecondary}
@@ -557,22 +560,18 @@ const styles = StyleSheet.create({
   },
   searchOuterContainer: {
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'transparent',
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === 'ios' ? 6 : 4,
-    backgroundColor: 'transparent',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
     shadowOpacity: 0, // animated
     elevation: 0,
     zIndex: 1001,
+    // borderWidth, borderColor, backgroundColor, shadowColor set dynamically based on focus state
   },
   searchOuterContainerFocused: {
-    borderColor: '#2C98F0', // blue focus color
-    shadowColor: '#2C98F0',
     elevation: Platform.OS === 'android' ? 2 : 0,
+    // borderWidth, borderColor, shadowColor set dynamically inline
   },
   // Highlight when user is typing (iOS 17-ish subtle fill)
   searchOuterContainerActive: {

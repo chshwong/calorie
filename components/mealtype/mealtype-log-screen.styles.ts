@@ -490,6 +490,7 @@ export const styles = StyleSheet.create({
     marginBottom: 2,
     position: 'relative',
     zIndex: 1000,
+    paddingHorizontal: 3, // Small inset to prevent focused border (2px) from clipping on left edge
   },
   searchInputWrapper: {
     flex: 1,
