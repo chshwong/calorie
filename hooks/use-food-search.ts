@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 import { type FoodMaster } from '@/utils/nutritionMath';
 import { getServingsForFoods, getDefaultServingWithNutrients } from '@/lib/servings';
 
@@ -100,10 +101,15 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
 
     try {
       // Call Supabase RPC directly for every search (no persistent cache)
-      const { data: foodsData, error: rpcError } = await supabase.rpc('search_food_master', {
-        search_term: normalized, // Normalized query - server normalizes using combined name+brand field
-        limit_rows: maxResults * 2, // Get more results for client-side sorting/filtering
-      });
+      // Wrap with timeout to prevent infinite hangs
+      const { data: foodsData, error: rpcError } = await withTimeout(
+        supabase.rpc('search_food_master', {
+          search_term: normalized, // Normalized query - server normalizes using combined name+brand field
+          limit_rows: maxResults * 2, // Get more results for client-side sorting/filtering
+        }),
+        7000, // 7s timeout - balances network delays with preventing hangs
+        'food_search.search_food_master'
+      );
 
       if (rpcError) {
         console.error('Error searching foods:', rpcError);

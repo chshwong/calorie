@@ -55,12 +55,60 @@ export function clearReloadGuard(): void {
 }
 
 /**
+ * Clear persisted state that could cause reload loops
+ * Clears React Query cache, persistentCache, and Supabase auth keys
+ */
+function clearPersistedState(): void {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    // Clear React Query persister storage (default key from @tanstack/query-sync-storage-persister)
+    // Also check for any keys that match the pattern
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      
+      // React Query persister keys (default is 'REACT_QUERY_OFFLINE_CACHE')
+      if (key === 'REACT_QUERY_OFFLINE_CACHE' || key.startsWith('REACT_QUERY_')) {
+        keysToRemove.push(key);
+      }
+      
+      // Persistent cache keys (prefix from lib/persistentCache.ts, with colon)
+      if (key.startsWith('fitbud_cache_v1:')) {
+        keysToRemove.push(key);
+      }
+      
+      // Supabase auth keys
+      if (key.includes('supabase') || key.includes('sb-')) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        // Ignore errors (private browsing, etc.)
+      }
+    });
+  } catch (e) {
+    // Ignore errors (private browsing, etc.)
+  }
+}
+
+/**
  * Perform a hard reload of the application
  * 
  * @param reason Optional reason string for debugging (not used in production)
  */
 export async function hardReloadNow(reason?: string): Promise<void> {
   if (Platform.OS === 'web') {
+    // Clear persisted state before reload to prevent re-entering broken state
+    clearPersistedState();
+    
     // Web: use location.replace() with cache-busting query param
     if (typeof window !== 'undefined' && window.location) {
       const url = new URL(window.location.href);

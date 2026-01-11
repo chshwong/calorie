@@ -122,6 +122,27 @@ export default function RootLayout() {
     return cleanup;
   }, []);
 
+  // Web: Add online/offline listener for automatic query invalidation on reconnect
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleOnline = () => {
+      // Invalidate critical queries when coming back online
+      // This enables automatic recovery via refetchOnReconnect
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['userConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['frequentFoods'] });
+      queryClient.invalidateQueries({ queryKey: ['recentFoods'] });
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
   // Monitor for navigation lifecycle (web only)
   useEffect(() => {
     if (!mountRef.current) {

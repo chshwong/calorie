@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
 import { exchangeCodeForSession, getSession, getUser, signOut } from '@/lib/services/auth';
+import { hardReloadNow } from '@/lib/hardReload';
+import { withTimeout } from '@/lib/withTimeout';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
@@ -116,7 +118,11 @@ export default function AuthCallbackScreen() {
         // OAuth callback: ?code=... (PKCE) → exchange.
         // Magic link callback: no code; Supabase will restore session from URL tokens on page load.
         if (code) {
-          const { error } = await exchangeCodeForSession(code);
+          const { error } = await withTimeout(
+            exchangeCodeForSession(code),
+            6000, // 6s timeout
+            'auth.callback.exchangeCodeForSession'
+          );
           if (error) {
             setBusy(false);
             setTitle(t('auth.callback.failed_title'));
@@ -126,17 +132,43 @@ export default function AuthCallbackScreen() {
         }
 
         // Session may take a moment to appear for magic link callbacks.
-        let sessionUser = (await getSession()).data.session?.user ?? null;
+        let sessionUser = (await withTimeout(
+          getSession(),
+          6000, // 6s timeout
+          'auth.callback.getSession'
+        )).data.session?.user ?? null;
         if (!sessionUser && !code) {
           for (let i = 0; i < 5; i += 1) {
             // Small delay to allow the client to parse URL tokens and persist the session.
             await new Promise((r) => setTimeout(r, 250));
-            sessionUser = (await getSession()).data.session?.user ?? null;
-            if (sessionUser) break;
+            try {
+              sessionUser = (await withTimeout(
+                getSession(),
+                6000, // 6s timeout per poll
+                'auth.callback.getSession.poll'
+              )).data.session?.user ?? null;
+              if (sessionUser) break;
+            } catch (timeoutError) {
+              // If poll times out, break out of loop
+              break;
+            }
           }
         }
 
-        const user = sessionUser ?? (await getUser()).data.user ?? null;
+        let user = sessionUser;
+        if (!user) {
+          try {
+            user = (await withTimeout(
+              getUser(),
+              6000, // 6s timeout
+              'auth.callback.getUser'
+            )).data.user ?? null;
+          } catch (timeoutError) {
+            // Fall through to error handling
+            user = null;
+          }
+        }
+
         if (!user) {
           setBusy(false);
           setTitle(t('auth.callback.failed_title'));
@@ -177,8 +209,16 @@ export default function AuthCallbackScreen() {
         router.replace('/(tabs)');
       } catch (e: any) {
         setBusy(false);
-        setTitle(t('auth.callback.failed_title'));
-        setDetail(e?.message ?? t('common.unexpected_error'));
+        // Check if it's a timeout error
+        const isTimeout = e?.message?.includes('timed out');
+        if (isTimeout) {
+          setTitle(t('auth.callback.failed_title'));
+          setDetail(t('auth.callback.timeout_detail') || 'Connection timed out. Please try again.');
+          // Show "Try again" button that triggers hard reload
+        } else {
+          setTitle(t('auth.callback.failed_title'));
+          setDetail(e?.message ?? t('common.unexpected_error'));
+        }
       } finally {
         setBusy(false);
       }
@@ -210,11 +250,22 @@ export default function AuthCallbackScreen() {
 
         {!busy ? (
           <Pressable
-            onPress={() => router.replace('/login')}
+            onPress={() => {
+              // If it's a timeout, try hard reload; otherwise go to login
+              if (detail?.includes('timed out') || detail?.includes('Connection timed out')) {
+                hardReloadNow('auth_callback_timeout').catch(() => {
+                  router.replace('/login');
+                });
+              } else {
+                router.replace('/login');
+              }
+            }}
             style={[styles.button, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
           >
             <ThemedText style={{ color: colors.text, fontWeight: FontWeight.bold }}>
-              {t('auth.callback.back_to_login')}
+              {detail?.includes('timed out') || detail?.includes('Connection timed out')
+                ? (t('auth.callback.try_again') || 'Try Again')
+                : t('auth.callback.back_to_login')}
             </ThemedText>
           </Pressable>
         ) : null}

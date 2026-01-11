@@ -4,6 +4,7 @@ import { prefetchUserConfig } from '@/lib/prefetch-user-config';
 import { queryClient } from '@/lib/query-client';
 import { ensureProfileExists } from '@/lib/services/profileService';
 import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -201,8 +202,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Get initial session with timeout to prevent infinite hangs
+    withTimeout(
+      supabase.auth.getSession(),
+      5000, // 5s timeout - balances network delays with preventing hangs
+      'auth.getSession'
+    ).then(({ data: { session } }) => {
       if (!mountedRef.current) return;
     
       setSession(session);
@@ -249,6 +254,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         setUser(null);
         setProfile(null);
+        
+        // On timeout/error: clear Supabase auth storage keys on web
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+              if (key.includes('supabase') || key.includes('sb-')) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (e) {
+            // Ignore errors clearing storage (private browsing, etc.)
+          }
+        }
+        
         // Even on error, auth state is now known (treat as signed out).
         setAuthReady(true);
       }
