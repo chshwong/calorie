@@ -736,7 +736,6 @@ export const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 0,
     marginLeft: 6,
-    alignSelf: 'flex-start',
   },
   sourceBadgeText: {
     fontSize: 11,
