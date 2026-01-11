@@ -1198,6 +1198,7 @@
       "bundles": "Bundles",
       "search": "Search",
       "manual": "Manual",
+      "quick_log": "⚡Quick Log",
       "favorites": "Γ¡É Favorites"
     },
     "food_log": {
@@ -1593,6 +1594,7 @@
       "custom_tab": "Custom foods tab",
       "bundles_tab": "Food bundles tab",
       "manual_tab": "Manual entry tab",
+      "quick_log_tab": "Quick Log tab",
       "quick_add_hint": "Double tap to add with default serving",
       "searching": "Searching for food",
       "favorite_tab": "Favorite foods tab"
@@ -2416,6 +2418,18 @@
     "tabs": {
       "quick_log": "Quick Log",
       "ai_photo": "AI 📷"
+    },
+    "landing": {
+      "manual_log": {
+        "label": "Manual Log",
+        "subtitle": "Enter numbers directly",
+        "hint": "Enter numbers directly"
+      },
+      "ai_camera": {
+        "label": "AI Camera",
+        "subtitle": "Meal photo + your own AI (free)",
+        "hint": "Meal photo + your own AI (free)"
+      }
     },
     "manual": {
       "badge_accessibility_label": "Manual quick log"

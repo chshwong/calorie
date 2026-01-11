@@ -9,7 +9,7 @@ import type { ColorScheme } from '@/hooks/use-color-scheme';
 /**
  * Get the color for a tab based on its type and selection state
  * 
- * @param tab - The tab identifier (frequent, recent, custom, bundle, manual)
+ * @param tab - The tab identifier (frequent, recent, custom, bundle, quick-log)
  * @param isSelected - Whether the tab is currently selected
  * @param fallbackColor - Fallback color if tab type is not recognized
  * @returns Hex color string with opacity for unselected tabs
@@ -24,7 +24,7 @@ export function getTabColor(
     recent: '#10B981', // Green
     custom: '#8B5CF6', // Purple
     bundle: '#F59E0B', // Orange
-    manual: '#6B7280', // Dark Grey
+    'quick-log': '#6B7280', // Dark Grey
   };
   
   const baseColor = shades[tab as keyof typeof shades] || fallbackColor;
@@ -41,7 +41,7 @@ export function getTabColor(
 /**
  * Get the background color for a tab list based on tab type and color scheme
  * 
- * @param tab - The tab identifier (frequent, recent, custom, bundle, manual)
+ * @param tab - The tab identifier (frequent, recent, custom, bundle, quick-log)
  * @param colorScheme - The current color scheme ('light' or 'dark')
  * @param fallbackColor - Fallback color if tab type is not recognized
  * @returns Hex color string with opacity for background
@@ -69,7 +69,7 @@ export function getTabListBackgroundColor(
     recent: '#10B981', // Green
     custom: '#8B5CF6', // Purple
     bundle: '#F59E0B', // Orange (fallback)
-    manual: '#6B7280', // Dark Grey
+    'quick-log': '#6B7280', // Dark Grey
   };
   
   const baseColor = shades[tab as keyof typeof shades] || fallbackColor;

@@ -1,87 +1,84 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator, Animated, Dimensions, Modal } from 'react-native';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import * as SecureStore from 'expo-secure-store';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
+import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
 import { FoodSearchBar } from '@/components/food-search-bar';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight, CategoryColors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useFoodSearch } from '@/hooks/use-food-search';
-import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { EmptyEntriesState } from '@/components/mealtype/EmptyEntriesState';
+import { EntryCard } from '@/components/mealtype/EntryCard';
+import { FoodLogMenuModal } from '@/components/mealtype/FoodLogMenuModal';
+import { MealTotals } from '@/components/mealtype/MealTotals';
+import { styles } from '@/components/mealtype/mealtype-log-screen.styles';
+import { MealTypeLogHeader } from '@/components/mealtype/MealTypeLogHeader';
+import { BundlesTab } from '@/components/mealtype/tabs/BundlesTab';
+import { CustomFoodsTab } from '@/components/mealtype/tabs/CustomFoodsTab';
+import { FrequentFoodsTab } from '@/components/mealtype/tabs/FrequentFoodsTab';
+import { QuickLogLanding } from '@/components/mealtype/tabs/QuickLogLanding';
+import { RecentFoodsTab } from '@/components/mealtype/tabs/RecentFoodsTab';
+import { MultiSelectItem } from '@/components/multi-select-item';
+import { NoteEditor } from '@/components/note-editor';
+import { SegmentedTabs } from '@/components/SegmentedTabs';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
+import { AppDatePicker } from '@/components/ui/app-date-picker';
+import { showAppToast } from '@/components/ui/app-toast';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { TapToExpandHint } from '@/components/ui/tap-to-expand-hint';
+import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
+import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
+import { CategoryColors, Colors, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
-import { useFrequentFoods } from '@/hooks/use-frequent-foods';
-import { useRecentFoods } from '@/hooks/use-recent-foods';
-import { useCustomFoods } from '@/hooks/use-custom-foods';
+import { isTourCompleted } from '@/features/tour/storage';
+import { useTour } from '@/features/tour/TourProvider';
+import { V1_MEALTYPELOG_TOUR_STEPS } from '@/features/tour/tourSteps';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import { useAddBundleToMeal } from '@/hooks/use-add-bundle-to-meal';
 import { useBundles } from '@/hooks/use-bundles';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useCustomFoods } from '@/hooks/use-custom-foods';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
+import { useEntryDetailsPreference } from '@/hooks/use-entry-details-preference';
 import { useFoodMasterByIds } from '@/hooks/use-food-master-by-ids';
-import { useQueryClient } from '@tanstack/react-query';
-import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
+import { useFoodSearch } from '@/hooks/use-food-search';
+import { useFrequentFoods } from '@/hooks/use-frequent-foods';
+import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
+import { useMultiSelect } from '@/hooks/use-multi-select';
+import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
+import { useRecentFoods } from '@/hooks/use-recent-foods';
+import { useTabScrollState } from '@/hooks/use-tab-scroll-state';
+import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
+import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
 import { validateAndNormalizeBarcode } from '@/lib/barcode';
-import { supabase } from '@/lib/supabase';
-import { 
-  type FoodMaster as FoodMasterType,
-  type FoodMaster,
-  type FoodServing as FoodServingType,
-  type ServingOption,
-} from '@/utils/nutritionMath';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
 import {
-  getServingsForFood,
-  getDefaultServingWithNutrients,
   computeNutrientsForFoodServing,
   computeNutrientsForRawQuantity,
+  getDefaultServingWithNutrients,
+  getServingsForFood,
   type FoodNutrients,
 } from '@/lib/servings';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { NoteEditor } from '@/components/note-editor';
-import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
-import { useUpsertMealtypeMeta } from '@/hooks/use-upsert-mealtype-meta';
-import { showAppToast } from '@/components/ui/app-toast';
-import { useCloneMealTypeFromPreviousDay } from '@/hooks/use-clone-meal-type-from-previous-day';
-import { useCopyFromYesterday } from '@/hooks/useCopyFromYesterday';
-import { getLocalDateKey } from '@/utils/dateTime';
-import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
-import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
-import { SegmentedTabs, type SegmentedTabItem } from '@/components/SegmentedTabs';
-import { useNewItemHighlight } from '@/hooks/use-new-item-highlight';
-import { MultiSelectItem } from '@/components/multi-select-item';
-import { useMultiSelect } from '@/hooks/use-multi-select';
-import { useAddBundleToMeal } from '@/hooks/use-add-bundle-to-meal';
-import { useTabScrollState } from '@/hooks/use-tab-scroll-state';
-import { useEntryDetailsPreference } from '@/hooks/use-entry-details-preference';
+import { supabase } from '@/lib/supabase';
+import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
-import { FrequentFoodsTab } from '@/components/mealtype/tabs/FrequentFoodsTab';
-import { RecentFoodsTab } from '@/components/mealtype/tabs/RecentFoodsTab';
-import { CustomFoodsTab } from '@/components/mealtype/tabs/CustomFoodsTab';
-import { BundlesTab } from '@/components/mealtype/tabs/BundlesTab';
-import { TapToExpandHint } from '@/components/ui/tap-to-expand-hint';
-import { MealTotals } from '@/components/mealtype/MealTotals';
-import { EmptyEntriesState } from '@/components/mealtype/EmptyEntriesState';
-import { EntryCard } from '@/components/mealtype/EntryCard';
-import { FoodLogMenuModal } from '@/components/mealtype/FoodLogMenuModal';
-import { MealTypeLogHeader } from '@/components/mealtype/MealTypeLogHeader';
-import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
-import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
-import { styles } from '@/components/mealtype/mealtype-log-screen.styles';
-import { AppDatePicker } from '@/components/ui/app-date-picker';
-import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
-import { useTour } from '@/features/tour/TourProvider';
-import { useTourAnchor } from '@/features/tour/useTourAnchor';
-import { V1_MEALTYPELOG_TOUR_STEPS } from '@/features/tour/tourSteps';
-import { isTourCompleted } from '@/features/tour/storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Layout } from '@/constants/theme';
-import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
 import { computeAvoScore, type AvoScoreInput } from '@/utils/avoScore';
+import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
+import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
+import { getLocalDateKey } from '@/utils/dateTime';
+import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
+import {
+  type FoodMaster
+} from '@/utils/nutritionMath';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Animated, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type CalorieEntry = {
   id: string;
@@ -502,7 +499,7 @@ export default function LogFoodScreen() {
   const openManualModeParam = params.openManualMode; // Flag to open manual mode
   const openBarcodeScannerParam = params.openBarcodeScanner; // Flag to open barcode scanner
   const openFoodSearchParam = params.openFoodSearch; // Flag to open food search expanded
-  const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'manual')
+  const initialTab = (activeTabParam === 'custom' || activeTabParam === 'recent' || activeTabParam === 'frequent' || activeTabParam === 'bundle' || activeTabParam === 'quick-log')
     ? activeTabParam
     : 'frequent';
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
@@ -515,7 +512,7 @@ export default function LogFoodScreen() {
   const [tabContentCollapsed, setTabContentCollapsed] = useState(!shouldStartExpanded);
   
   // Helper function to handle tab press - toggles content collapse if already active
-  const handleTabPress = (tab: TabKey, additionalActions?: () => void) => {
+  const handleTabPress = (tab: 'frequent' | 'recent' | 'custom' | 'bundle' | 'quick-log', additionalActions?: () => void) => {
     if (activeTab === tab) {
       // Tab is already active - toggle content collapse
       setTabContentCollapsed(!tabContentCollapsed);
@@ -545,7 +542,7 @@ export default function LogFoodScreen() {
               ? customTabBtnRef
               : tab === 'bundle'
                 ? bundleTabBtnRef
-                : tab === 'manual'
+                : tab === 'quick-log'
                   ? (tourQuickLogTabRef as any)
                   : null;
 
@@ -2006,8 +2003,15 @@ export default function LogFoodScreen() {
           </View>
         );
       
-      case 'manual':
-        return null; // Manual mode is handled separately
+      case 'quick-log':
+        return (
+          <QuickLogLanding
+            entryDate={entryDate}
+            mealType={mealType}
+            colors={colors}
+            t={t}
+          />
+        );
       
       default:
         return null;
@@ -2206,27 +2210,16 @@ export default function LogFoodScreen() {
                       themeFillColor: getTabListBackgroundColorLocal('bundle'),
                     },
                     {
-                      key: 'manual',
-                      label: '⚡Quick Log',
-                      accessibilityLabel: t('mealtype_log.accessibility.manual_tab'),
+                      key: 'quick-log',
+                      label: t('mealtype_log.tabs.quick_log', '⚡Quick Log'),
+                      accessibilityLabel: t('mealtype_log.accessibility.quick_log_tab', 'Quick Log tab'),
                       themeColor: CategoryColors.manual,
-                      themeFillColor: getTabListBackgroundColorLocal('manual'),
+                      themeFillColor: getTabListBackgroundColorLocal('quick-log'),
                     },
                   ]}
                   activeKey={activeTab}
                   onChange={(key) => {
-                    if (key === 'manual') {
-                      // Navigate to dedicated Quick Log screen
-                      router.push({
-                        pathname: '/quick-log',
-                        params: {
-                          date: entryDate,
-                          mealType: mealType,
-                        }
-                      });
-                    } else {
-                      handleTabPress(key as 'frequent' | 'recent' | 'custom' | 'bundle');
-                    }
+                    handleTabPress(key as 'frequent' | 'recent' | 'custom' | 'bundle' | 'quick-log');
                   }}
                   onActiveTabLayout={handleActiveTabLayout}
                   style={{ marginHorizontal: Spacing.sm, marginTop: Spacing.xs }}
@@ -2235,7 +2228,7 @@ export default function LogFoodScreen() {
                     recent: recentTabBtnRef,
                     custom: customTabBtnRef,
                     bundle: bundleTabBtnRef,
-                    manual: tourQuickLogTabRef,
+                    'quick-log': tourQuickLogTabRef,
                   }}
                 />
               </ScrollView>

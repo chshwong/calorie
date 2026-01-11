@@ -31,7 +31,7 @@ import {
   StyleSheet,
 } from 'react-native';
 
-export type TabKey = 'frequent' | 'recent' | 'custom' | 'bundle' | 'manual';
+export type TabKey = 'frequent' | 'recent' | 'custom' | 'bundle' | 'quick-log';
 
 export type AnimatedTabContentProps = {
   /** Currently active tab key */
@@ -53,7 +53,7 @@ const SLIDE_EASING = { useNativeDriver: true };
 const EXPAND_EASING = { useNativeDriver: false }; // height cannot use native driver
 
 // Tab order for determining slide direction
-const TAB_ORDER: TabKey[] = ['frequent', 'recent', 'custom', 'bundle', 'manual'];
+const TAB_ORDER: TabKey[] = ['frequent', 'recent', 'custom', 'bundle', 'quick-log'];
 
 export function AnimatedTabContent({
   activeKey,
