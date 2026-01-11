@@ -2343,89 +2343,105 @@ export default function LogFoodScreen() {
         <View ref={tourFoodLogSectionRef as any} style={[styles.foodLogContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.entriesSection}>
             <View style={styles.entriesHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('mealtype_log.food_log.title_with_count', { count: entries.length })}
-            </ThemedText>
-              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                {` \u00B7 `}
-              </ThemedText>
-              <ThemedText style={[styles.sectionTitle, { color: colors.tint, fontWeight: '400' }]}>
-                {`${mealCaloriesTotal} ${t('home.food_log.kcal')}`}
-              </ThemedText>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {!showLoadingSpinner && entries.length > 0 && (
-                <View style={styles.toggleContainer}>
-                  <ThemedText style={[styles.toggleLabel, { color: colors.textSecondary }]}>
-                    {t('mealtype_log.food_log.details')}
-                  </ThemedText>
-                  <TouchableOpacity
-                    onPress={() => setShowEntryDetails(!showEntryDetails)}
-                    activeOpacity={0.8}
-                  >
-                    <Animated.View
-                      style={[
-                        styles.toggleTrack,
-                        {
-                          backgroundColor: showEntryDetails ? colors.tint : colors.icon + '40',
-                        },
-                      ]}
+              {/* Left: Label + Item Count */}
+              <View style={styles.entriesHeaderLeft}>
+                <ThemedText style={[styles.foodLogTitle, { color: colors.text }]}>
+                  {t('mealtype_log.food_log.title')}
+                </ThemedText>
+                <ThemedText style={[styles.foodLogItemCount, { color: colors.textMuted }]}>
+                  {entries.length} {entries.length === 1 ? t('mealtype_log.food_log.item_one') : t('mealtype_log.food_log.item_other')}
+                </ThemedText>
+              </View>
+
+              {/* Center/Mid-right: Calories */}
+              <View style={styles.entriesHeaderCenter}>
+                <ThemedText style={[styles.foodLogCalories, { color: colors.tint }]}>
+                  {Math.round(mealCaloriesTotal).toLocaleString('en-US')} {t('home.food_log.kcal')}
+                </ThemedText>
+              </View>
+
+              {/* Right: Controls */}
+              <View style={styles.entriesHeaderRight}>
+                {!showLoadingSpinner && entries.length > 0 && (
+                  <View style={styles.detailsToggleGroup}>
+                    <ThemedText style={[styles.detailsToggleLabel, { color: colors.textSecondary }]}>
+                      {t('mealtype_log.food_log.details')}
+                    </ThemedText>
+                    <TouchableOpacity
+                      onPress={() => setShowEntryDetails(!showEntryDetails)}
+                      activeOpacity={0.8}
+                      style={getMinTouchTargetStyle()}
+                      {...getButtonAccessibilityProps(
+                        t('mealtype_log.food_log.details'),
+                        showEntryDetails 
+                          ? t('mealtype_log.food_log.details') + ' enabled. Double tap to disable.'
+                          : t('mealtype_log.food_log.details') + ' disabled. Double tap to enable.'
+                      )}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: showEntryDetails }}
                     >
                       <Animated.View
                         style={[
-                          styles.toggleThumb,
+                          styles.toggleTrack,
                           {
-                            backgroundColor: '#fff',
-                            transform: [
-                              {
-                                translateX: toggleAnimation.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [0, 20],
-                                }),
-                              },
-                            ],
+                            backgroundColor: showEntryDetails ? colors.tint : colors.icon + '40',
                           },
                         ]}
-                      />
-                    </Animated.View>
+                      >
+                        <Animated.View
+                          style={[
+                            styles.toggleThumb,
+                            {
+                              backgroundColor: colors.textInverse,
+                              transform: [
+                                {
+                                  translateX: toggleAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0, 20],
+                                  }),
+                                },
+                              ],
+                            },
+                          ]}
+                        />
+                      </Animated.View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!showLoadingSpinner && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (entriesEditMode) {
+                        // Exit edit mode
+                        setEntriesEditMode(false);
+                        clearEntrySelection();
+                      } else {
+                        // Open menu
+                        setActiveModal('menu');
+                      }
+                    }}
+                    style={[
+                      styles.threeDotMenuButton,
+                      getMinTouchTargetStyle(),
+                    ]}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(
+                      entriesEditMode 
+                        ? t('mealtype_log.food_log.exit_selection_mode')
+                        : t('mealtype_log.food_log.more_options'),
+                      entriesEditMode
+                        ? t('mealtype_log.food_log.exit_selection_mode_hint')
+                        : t('mealtype_log.food_log.more_options_hint')
+                    )}
+                  >
+                    {entriesEditMode ? (
+                      <IconSymbol name="checkmark" size={20} color={colors.tint} />
+                    ) : (
+                      <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} />
+                    )}
                   </TouchableOpacity>
-                </View>
-              )}
-              {!showLoadingSpinner && (
-                <TouchableOpacity
-                  onPress={() => {
-                    if (entriesEditMode) {
-                      // Exit edit mode
-                      setEntriesEditMode(false);
-                      clearEntrySelection();
-                    } else {
-                      // Open menu
-                      setActiveModal('menu');
-                    }
-                  }}
-                  style={[
-                    styles.threeDotMenuButton,
-                    getMinTouchTargetStyle(),
-                  ]}
-                  activeOpacity={0.7}
-                  {...getButtonAccessibilityProps(
-                    entriesEditMode 
-                      ? t('mealtype_log.food_log.exit_selection_mode')
-                      : t('mealtype_log.food_log.more_options'),
-                    entriesEditMode
-                      ? t('mealtype_log.food_log.exit_selection_mode_hint')
-                      : t('mealtype_log.food_log.more_options_hint')
-                  )}
-                >
-                  {entriesEditMode ? (
-                    <IconSymbol name="checkmark" size={20} color={colors.tint} />
-                  ) : (
-                    <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
+                )}
+              </View>
           </View>
           {/* Notes row */}
           {currentMealMeta?.note && currentMealMeta.note.trim().length > 0 && (

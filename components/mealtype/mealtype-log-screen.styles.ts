@@ -117,6 +117,43 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: Spacing.sm, // 8px padding to prevent title from touching edges
   },
+  entriesHeaderLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  entriesHeaderCenter: {
+    flex: 1,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+  },
+  entriesHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: Spacing.sm,
+  },
+  foodLogTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    fontFamily: FontFamilies.semibold,
+    lineHeight: FontSize.base * 1.2,
+  },
+  foodLogItemCount: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.regular,
+    fontFamily: FontFamilies.regular,
+    lineHeight: FontSize.sm * 1.2,
+    marginTop: Spacing.xxs, // 2px - using theme token instead of hardcoded value
+  },
+  foodLogCalories: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    fontFamily: FontFamilies.semibold,
+    lineHeight: FontSize.md * 1.2,
+  },
   foodLogDivider: {
     height: 1,
     width: '100%',
@@ -127,6 +164,16 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     fontFamily: FontFamilies.bold,
+  },
+  detailsToggleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs, // Tightly grouped: 4px gap
+  },
+  detailsToggleLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    fontFamily: FontFamilies.medium,
   },
   toggleContainer: {
     flexDirection: 'row',

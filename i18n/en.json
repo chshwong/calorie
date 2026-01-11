@@ -1214,6 +1214,8 @@
       "mass_delete_hint": "Delete selected entries",
       "mass_delete_disabled_hint": "Select entries to delete",
       "title": "Food Log",
+      "item_one": "item",
+      "item_other": "items",
       "edit": "Edit",
       "done": "Done",
       "no_entries": "No entries yet. Add one above!"

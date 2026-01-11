@@ -153,18 +153,18 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                 {
                   backgroundColor: isActive 
                     ? fillColor
-                    : colors.background, // Clean white background for inactive tabs
-                  // Explicitly remove all border properties
-                  borderWidth: 0,
+                    : 'transparent', // No background for unselected tabs
+                  // Set all border properties individually (avoid shorthand to prevent conflicts)
                   borderLeftWidth: 0,
                   borderRightWidth: 0,
                   borderTopWidth: 0,
-                  borderBottomWidth: 0,
-                  borderColor: 'transparent',
+                  borderBottomWidth: pressed && !isActive ? 1 : 0, // Subtle underline feedback for unselected tabs on press
+                  borderColor: pressed && !isActive 
+                    ? (colorScheme === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.15)' 
+                        : 'rgba(0, 0, 0, 0.1)')
+                    : 'transparent',
                   ...Platform.select({
-                    web: {
-                      border: 'none',
-                    },
                     default: {
                       elevation: 0, // Remove Android shadow/elevation
                       shadowOpacity: 0, // Remove iOS shadow
@@ -173,7 +173,7 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                     },
                   }),
                 },
-                pressed && styles.tabPressed,
+                pressed && isActive && styles.tabPressed,
               ]}
             >
               {item.icon ? (
@@ -185,9 +185,11 @@ export function SegmentedTabs({ items, activeKey, onChange, style, onActiveTabLa
                 style={[
                   styles.tabText,
                   {
-                    color: isActive && useContrastingTextOnActive
-                      ? (colorScheme === 'dark' ? colors.textOnTint : colors.textInverse)
-                      : colors.text,
+                    color: isActive 
+                      ? (useContrastingTextOnActive
+                          ? (colorScheme === 'dark' ? colors.textOnTint : colors.textInverse)
+                          : colors.text)
+                      : colors.textMuted, // Muted text color for unselected tabs
                     fontWeight: isActive 
                       ? FontWeight.semibold 
                       : FontWeight.medium,
@@ -236,14 +238,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.md, // px-3 equivalent (12px) - reduced from px-4
-    paddingVertical: Spacing.xs , // py-0.5 equivalent (2px) - MUCH shorter vertical padding
-    marginHorizontal: Spacing.xs, // mx-1 equivalent (4px)
+    paddingHorizontal: Spacing.md, // 12px
+    paddingVertical: Spacing.xxs, // 2px - reduced from 4px for better density
+    marginHorizontal: Spacing.xxs, // 2px - reduced from 4px for tighter spacing
     borderRadius: BorderRadius.full,
-    // minHeight removed completely for compact iOS segmented control height
+    minHeight: 44, // WCAG minimum tap target height
     flexShrink: 0, // Prevent compression, allow natural width
-    // Explicitly remove all borders
-    borderWidth: 0,
+    // Explicitly set all border properties individually (no shorthand to avoid conflicts)
     borderLeftWidth: 0,
     borderRightWidth: 0,
     borderTopWidth: 0,
@@ -251,9 +252,6 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     // Remove shadows/elevation that might create border-like appearance
     ...Platform.select({
-      web: {
-        border: 'none',
-      },
       default: {
         elevation: 0,
         shadowOpacity: 0,
@@ -281,7 +279,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabText: {
-    fontSize: FontSize.base + 4, // +2 for larger mealtype tabs
+    fontSize: FontSize.base + 3, // 17px - reduced by 1pt from 18px for better density
     textAlign: 'center',
     flexShrink: 0, // Prevent text compression
   },
