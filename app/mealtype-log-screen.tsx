@@ -2363,41 +2363,38 @@ export default function LogFoodScreen() {
               {/* Right: Controls */}
               <View style={styles.entriesHeaderRight}>
                 {!showLoadingSpinner && entries.length > 0 && (
-                  <View style={styles.detailsToggleGroup}>
-                    <ThemedText style={[styles.detailsToggleLabel, { color: colors.textSecondary }]}>
+                  <View style={styles.detailsToggleStack}>
+                    <ThemedText style={[styles.detailsToggleLabelSmall, { color: colors.textSecondary }]}>
                       {t('mealtype_log.food_log.details')}
                     </ThemedText>
                     <TouchableOpacity
                       onPress={() => setShowEntryDetails(!showEntryDetails)}
                       activeOpacity={0.8}
-                      style={getMinTouchTargetStyle()}
-                      {...getButtonAccessibilityProps(
-                        t('mealtype_log.food_log.details'),
-                        showEntryDetails 
-                          ? t('mealtype_log.food_log.details') + ' enabled. Double tap to disable.'
-                          : t('mealtype_log.food_log.details') + ' disabled. Double tap to enable.'
-                      )}
                       accessibilityRole="switch"
+                      accessibilityLabel={t('mealtype_log.food_log.details')}
+                      accessibilityHint={showEntryDetails 
+                        ? t('mealtype_log.food_log.details') + ' enabled. Double tap to disable.'
+                        : t('mealtype_log.food_log.details') + ' disabled. Double tap to enable.'}
                       accessibilityState={{ checked: showEntryDetails }}
+                      style={styles.toggleHitSlopWrapper}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Animated.View
                         style={[
-                          styles.toggleTrack,
-                          {
-                            backgroundColor: showEntryDetails ? colors.tint : colors.icon + '40',
-                          },
+                          styles.toggleTrackSmall,
+                          { backgroundColor: showEntryDetails ? colors.tint : colors.icon + '40' },
                         ]}
                       >
                         <Animated.View
                           style={[
-                            styles.toggleThumb,
+                            styles.toggleThumbSmall,
                             {
                               backgroundColor: colors.textInverse,
                               transform: [
                                 {
                                   translateX: toggleAnimation.interpolate({
                                     inputRange: [0, 1],
-                                    outputRange: [0, 20],
+                                    outputRange: [0, 16],
                                   }),
                                 },
                               ],

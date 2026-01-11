@@ -170,10 +170,27 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs, // Tightly grouped: 4px gap
   },
+  detailsToggleStack: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    margin: 0,
+  },
   detailsToggleLabel: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
     fontFamily: FontFamilies.medium,
+  },
+  detailsToggleLabelSmall: {
+    fontSize: FontSize.sm,
+    lineHeight: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  toggleHitSlopWrapper: {
+    padding: 0,
+    margin: 0,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -200,6 +217,34 @@ export const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+      },
+      default: {
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 2,
+      },
+    }),
+  },
+  toggleTrackSmall: {
+    width: 34,
+    height: 18,
+    borderRadius: 999,
+    padding: 2,
+    justifyContent: 'center',
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+    }),
+  },
+  toggleThumbSmall: {
+    width: 14,
+    height: 14,
+    borderRadius: 999,
     ...Platform.select({
       web: {
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
