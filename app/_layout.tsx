@@ -12,7 +12,7 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { OfflineModeProvider } from '@/contexts/OfflineModeContext';
 import { ThemeProvider as AppThemeProvider } from '@/contexts/ThemeContext';
 import { DebugLoadingProvider } from '@/contexts/DebugLoadingContext';
@@ -23,6 +23,7 @@ import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { TourProvider } from '@/features/tour/TourProvider';
 import { TourOverlay } from '@/features/tour/TourOverlay';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 
 // Import QueryClient from separate module to avoid circular dependency with AuthContext
 import { queryClient } from '@/lib/query-client';
@@ -152,14 +153,8 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Show loading indicator while fonts are loading
-  if (!fontsLoaded && !fontError) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </View>
-    );
-  }
+  // Show branded loader while fonts are loading
+  const isFontsBlocking = !fontsLoaded && !fontError;
 
   return (
     <I18nextProvider i18n={i18n}>
@@ -167,6 +162,7 @@ export default function RootLayout() {
         <DebugLoadingProvider>
           <AppThemeProvider>
             <OfflineModeProvider>
+              <BlockingBrandedLoader enabled={isFontsBlocking} timeoutMs={8000} overlay={true} />
               <ThemeProviderWrapper />
             </OfflineModeProvider>
           </AppThemeProvider>
@@ -192,6 +188,7 @@ function ThemeProviderWrapper() {
 
   return (
     <AuthProvider>
+      <AuthLoadingGuard />
       <TourProvider>
         <ToastProvider>
           <GlobalAuthGuard />
@@ -224,6 +221,15 @@ function ThemeProviderWrapper() {
   );
 }
 
+/**
+ * Guard component that monitors auth loading state and shows BlockingBrandedLoader
+ * if auth is blocking (authLoading is true).
+ */
+function AuthLoadingGuard() {
+  const { loading: authLoading } = useAuth();
+  return <BlockingBrandedLoader enabled={authLoading} timeoutMs={8000} overlay={true} />;
+}
+
 function GlobalAuthGuard() {
   // Allow unauthenticated access to a small set of public routes.
   // Everything else will redirect to /login when logged out.
@@ -235,10 +241,3 @@ function GlobalAuthGuard() {
   return null;
 }
 
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

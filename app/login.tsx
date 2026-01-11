@@ -35,6 +35,7 @@ import {
   getMinTouchTargetStyle,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -742,13 +743,9 @@ export default function LoginScreen() {
     }
   }, [authLoading, user, router]);
 
-  // Show brief spinner only while auth is initializing
+  // Show branded loader while auth is initializing
   if (authLoading) {
-    return (
-      <ThemedView style={[styles.page, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </ThemedView>
-    );
+    return <BlockingBrandedLoader enabled={true} timeoutMs={8000} />;
   }
 
   // If user is logged in, return null (redirect is handled in useEffect)
