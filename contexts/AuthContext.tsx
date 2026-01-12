@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/query-client';
 import { ensureProfileExists } from '@/lib/services/profileService';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
+import { hardReloadNow } from '@/lib/hardReload';
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -202,12 +203,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     
-    // Get initial session with timeout to prevent infinite hangs
-    withTimeout(
-      supabase.auth.getSession(),
-      5000, // 5s timeout - balances network delays with preventing hangs
-      'auth.getSession'
-    ).then(({ data: { session } }) => {
+    // Helper function to handle successful session retrieval
+    const handleSessionSuccess = (session: Session | null) => {
       if (!mountedRef.current) return;
     
       setSession(session);
@@ -246,33 +243,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // No session: clear profile (auth is already ready)
         setProfile(null);
       }
-    }).catch((error) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[AuthProvider] Error getting initial session:', error);
-      }
-      if (mountedRef.current) {
-        setSession(null);
-        setUser(null);
-        setProfile(null);
+    };
+    
+    // Get initial session with timeout to prevent infinite hangs
+    // Retry once if first attempt times out (waits 250ms between attempts)
+    const attemptGetSession = async (isRetry = false): Promise<void> => {
+      try {
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          5000, // 5s timeout - balances network delays with preventing hangs
+          `auth.getSession${isRetry ? '_retry' : ''}`
+        );
+        handleSessionSuccess(session);
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(`[AuthProvider] Error getting initial session${isRetry ? ' (retry)' : ''}:`, error);
+        }
         
-        // On timeout/error: clear Supabase auth storage keys on web
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          try {
-            const keys = Object.keys(localStorage);
-            keys.forEach(key => {
-              if (key.includes('supabase') || key.includes('sb-')) {
-                localStorage.removeItem(key);
-              }
-            });
-          } catch (e) {
-            // Ignore errors clearing storage (private browsing, etc.)
+        if (!mountedRef.current) return;
+        
+        // If first attempt timed out, wait 250ms and retry once
+        if (!isRetry) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          if (mountedRef.current) {
+            await attemptGetSession(true);
+            return;
           }
         }
         
-        // Even on error, auth state is now known (treat as signed out).
-        setAuthReady(true);
+        // Second attempt also timed out (or mount was cancelled)
+        // On web: immediately hard reload (emulates close+reopen)
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            await hardReloadNow('auth_getSession_timeout_2');
+            return; // hardReload will navigate away, so we won't reach code below
+          } catch (reloadError) {
+            // If hardReload fails (shouldn't on web), fall through to setAuthReady
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[AuthProvider] hardReload failed:', reloadError);
+            }
+          }
+        }
+        
+        // Fallback: mark auth ready but leave session/user unchanged
+        // This preserves existing session state if Supabase actually has one
+        // (onAuthStateChange may fire INITIAL_SESSION later and set it properly)
+        if (mountedRef.current) {
+          setAuthReady(true);
+          // DO NOT clear session/user/profile - let onAuthStateChange handle it
+          // DO NOT clear localStorage keys - preserves "close+reopen works" behavior
+        }
       }
-    });
+    };
+    
+    void attemptGetSession();
     
 
     // Listen for auth changes
@@ -311,11 +335,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Handle INITIAL_SESSION - this fires after getSession() completes
-      // The session should already be set by getSession(), but we'll set it again to be safe
-      // and ensure loading state is correct
+      // This is important because if getSession() timed out, Supabase may still restore
+      // the session via onAuthStateChange, and we need to capture it properly
       if (event === 'INITIAL_SESSION') {
-        // Keep this handler simple: auth state is known.
+        setSession(session);
+        setUser(session?.user ?? null);
         setAuthReady(true);
+        
+        if (session?.user) {
+          // Hydrate from snapshot quickly (if present), then fetch in background
+          const snapshot = loadProfileSnapshot(session.user.id);
+          if (snapshot && snapshot.user_id === session.user.id) {
+            setProfile(snapshot);
+          }
+          
+          // Prefetch userConfig immediately
+          prefetchUserConfig(queryClient, session.user.id).catch((err) => {
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[AuthProvider] Failed to prefetch userConfig:', err);
+            }
+          });
+          
+          // Load profile from Supabase in the background
+          void fetchProfile(session.user.id, true);
+        } else {
+          // No session: clear profile
+          setProfile(null);
+        }
         return;
       }
 
