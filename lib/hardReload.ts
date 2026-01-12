@@ -10,7 +10,11 @@
 
 import { Platform } from 'react-native';
 
+// IMPORTANT: GUARD_KEY must NOT start with "avovibe_" or it will be cleared by clearSessionStorageRuntimeKeys().
 const GUARD_KEY = 'avovibe_autoreload_guard';
+
+const SESSION_PREFIXES_TO_CLEAR = ["avovibe_"]; // start minimal; add more only if you confirm you use them
+
 
 /**
  * Check if the guard is currently set (meaning we already auto-reloaded once)
@@ -54,6 +58,20 @@ export function clearReloadGuard(): void {
   }
 }
 
+
+function clearSessionStorageRuntimeKeys() {
+  try {
+    const keys = Object.keys(sessionStorage);
+    for (const k of keys) {
+      if (SESSION_PREFIXES_TO_CLEAR.some((p) => k.startsWith(p))) {
+        sessionStorage.removeItem(k);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Perform a hard reload of the application
  * 
@@ -66,8 +84,9 @@ export async function hardReloadNow(reason?: string): Promise<void> {
     // Web: use location.replace() with cache-busting query param
     // DO NOT clear storage - preserves Supabase auth keys for proper session restore
     if (typeof window !== 'undefined' && window.location) {
+      clearSessionStorageRuntimeKeys();      
       const url = new URL(window.location.href);
-      url.searchParams.set('__r', Date.now().toString());
+      url.searchParams.set('__r', Date.now().toString());      
       window.location.replace(url.toString());
     }
   } else {
