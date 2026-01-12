@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
@@ -174,6 +174,7 @@ export default function RootLayout() {
 function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean; fontError: Error | null }) {
   const colorScheme = useColorScheme();
   const navigationMountRef = useRef(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     if (!navigationMountRef.current) {
@@ -187,7 +188,12 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
 
   return (
     <AuthProvider>
-      <BlockingGate fontsLoaded={fontsLoaded} fontError={fontError}>
+      <BlockingGateWithRetry
+        fontsLoaded={fontsLoaded}
+        fontError={fontError}
+        retryToken={retryToken}
+        setRetryToken={setRetryToken}
+      >
         <TourProvider>
           <ToastProvider>
             <GlobalAuthGuard />
@@ -216,7 +222,7 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
           </ThemeProvider>
           </ToastProvider>
         </TourProvider>
-      </BlockingGate>
+      </BlockingGateWithRetry>
     </AuthProvider>
   );
 }
@@ -226,21 +232,50 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
  * There is exactly ONE instance of BlockingBrandedLoader to prevent guard conflicts.
  * When blocking, replaces the entire app (not overlay) to prevent state conflicts.
  */
-function BlockingGate({ 
+function BlockingGateWithRetry({ 
   fontsLoaded, 
   fontError, 
-  children 
+  children,
+  retryToken,
+  setRetryToken
 }: { 
   fontsLoaded: boolean; 
   fontError: Error | null; 
   children: React.ReactNode;
+  retryToken: number;
+  setRetryToken: (updater: (x: number) => number) => void;
 }) {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, authInitError, retryAuthInit } = useAuth();
   const isFontsBlocking = !fontsLoaded && !fontError;
-  const isGlobalBlocking = isFontsBlocking || authLoading;
+  // Block if fonts are loading, auth is loading, OR there's an auth init error
+  // (authInitError keeps the loader visible so Recovery UI can appear via timeout)
+  const isGlobalBlocking = isFontsBlocking || authLoading || !!authInitError;
+  
+  // Handle "Try again" - retry auth init, then increment retry token to force re-evaluation
+  const handleTryAgain = () => {
+    retryAuthInit().then(() => {
+      setRetryToken((x) => x + 1);
+    }).catch(() => {
+      // Even if retry fails, increment token to allow UI to update
+      setRetryToken((x) => x + 1);
+    });
+  };
+
+  // Re-evaluate blocking state when retryToken changes (forces re-check)
+  useEffect(() => {
+    // This effect ensures the gate re-evaluates when retry is triggered
+    // The actual blocking check happens in the render below
+  }, [retryToken]);
 
   if (isGlobalBlocking) {
-    return <BlockingBrandedLoader enabled={true} timeoutMs={8000} overlay={false} />;
+    return (
+      <BlockingBrandedLoader 
+        enabled={true} 
+        timeoutMs={8000} 
+        overlay={false}
+        onTryAgain={handleTryAgain}
+      />
+    );
   }
 
   return <>{children}</>;

@@ -5,13 +5,12 @@ import { queryClient } from '@/lib/query-client';
 import { ensureProfileExists } from '@/lib/services/profileService';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
-import { hardReloadNow } from '@/lib/hardReload';
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000 * 180; // 24 hours x 180
-const PROFILE_TIMEOUT_MS = 4000; // 7 second timeout for profile fetch
+const PROFILE_TIMEOUT_MS = 4000; // 4 second timeout for profile fetch
 
 // Profile cache key per user
 const profileCacheKey = (userId: string) => `profile:${userId}`;
@@ -33,9 +32,19 @@ type AuthContextType = {
   isAdmin: boolean;
   onboardingComplete: boolean;
   isPasswordRecovery: () => boolean;
+  /**
+   * Error that occurred during auth initialization (e.g., session timeout).
+   * Null if initialization succeeded or hasn't failed yet.
+   */
+  authInitError: string | null;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfileState: (profile: any | null) => void;
+  /**
+   * Retry auth initialization (re-runs attemptGetSession).
+   * Clears authInitError and attempts to restore session.
+   */
+  retryAuthInit: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -48,9 +57,11 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   onboardingComplete: false,
   isPasswordRecovery: () => false,
+  authInitError: null,
   signOut: async () => {},
   refreshProfile: async () => {},
   updateProfileState: () => {},
+  retryAuthInit: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -60,12 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // authReady is ONLY about session restoration; it must never wait on fetchProfile().
   const [authReady, setAuthReady] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [authInitError, setAuthInitError] = useState<string | null>(null);
   const profileFetchRetryCount = useRef(0);
   const profileRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<any | null>(null); // Ref to track profile for closures
   const userRef = useRef<User | null>(null); // Ref to track user for closures
   const isPasswordRecoveryRef = useRef(false); // Track if we're in password recovery mode
   const mountedRef = useRef(true);
+  const attemptGetSessionRef = useRef<(() => Promise<void>) | null>(null);
 
   // Update refs whenever state changes
   useEffect(() => {
@@ -203,12 +216,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     
+    // Safety timeout: ensure authReady is always set, even if everything else fails
+    // This prevents infinite blocking if Supabase client fails or onAuthStateChange never fires
+    const safetyTimeout = setTimeout(() => {
+      if (mountedRef.current && !authReady) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[AuthProvider] Safety timeout: forcing authReady=true after 10s');
+        }
+        setAuthReady(true);
+      }
+    }, 10000); // 10 seconds max wait
+    
     // Helper function to handle successful session retrieval
     const handleSessionSuccess = (session: Session | null) => {
       if (!mountedRef.current) return;
     
       setSession(session);
       setUser(session?.user ?? null);
+      // Clear any previous error on success
+      setAuthInitError(null);
       // Session is now known; mark auth as ready immediately (do NOT wait on profile).
       setAuthReady(true);
   
@@ -248,6 +274,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session with timeout to prevent infinite hangs
     // Retry once if first attempt times out (waits 250ms between attempts)
     const attemptGetSession = async (isRetry = false): Promise<void> => {
+      // Clear any previous error when retrying
+      if (mountedRef.current) {
+        setAuthInitError(null);
+      }
       try {
         const { data: { session } } = await withTimeout(
           supabase.auth.getSession(),
@@ -255,6 +285,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           `auth.getSession${isRetry ? '_retry' : ''}`
         );
         handleSessionSuccess(session);
+        // Clear error on success
+        if (mountedRef.current) {
+          setAuthInitError(null);
+        }
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
           console.error(`[AuthProvider] Error getting initial session${isRetry ? ' (retry)' : ''}:`, error);
@@ -272,29 +306,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         
         // Second attempt also timed out (or mount was cancelled)
-        // On web: immediately hard reload (emulates close+reopen)
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          try {
-            await hardReloadNow('auth_getSession_timeout_2');
-            return; // hardReload will navigate away, so we won't reach code below
-          } catch (reloadError) {
-            // If hardReload fails (shouldn't on web), fall through to setAuthReady
-            if (process.env.NODE_ENV !== 'production') {
-              console.warn('[AuthProvider] hardReload failed:', reloadError);
-            }
-          }
-        }
-        
-        // Fallback: mark auth ready but leave session/user unchanged
-        // This preserves existing session state if Supabase actually has one
-        // (onAuthStateChange may fire INITIAL_SESSION later and set it properly)
+        // Set error state and mark auth ready (safety timeout will also set it, but set it here too)
+        // Do NOT trigger automatic reload - let Recovery UI handle recovery
         if (mountedRef.current) {
+          setAuthInitError('Session initialization timed out');
           setAuthReady(true);
           // DO NOT clear session/user/profile - let onAuthStateChange handle it
           // DO NOT clear localStorage keys - preserves "close+reopen works" behavior
         }
       }
     };
+    
+    // Store attemptGetSession in ref so retryAuthInit can call it
+    attemptGetSessionRef.current = () => attemptGetSession(false);
     
     void attemptGetSession();
     
@@ -314,6 +338,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setSession(session);
         setUser(session?.user ?? null);
+        setAuthInitError(null); // Clear any previous error
         setAuthReady(true);
         if (session?.user) {
           void fetchProfile(session.user.id, true);
@@ -340,6 +365,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'INITIAL_SESSION') {
         setSession(session);
         setUser(session?.user ?? null);
+        setAuthInitError(null); // Clear any previous error
         setAuthReady(true);
         
         if (session?.user) {
@@ -373,6 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
         setSession(session);
         setUser(session?.user ?? null);
+        setAuthInitError(null); // Clear any previous error
         setAuthReady(true);
 
         if (session?.user) {
@@ -426,6 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profileRetryTimeoutRef.current) {
         clearTimeout(profileRetryTimeoutRef.current);
       }
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
@@ -523,6 +551,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const retryAuthInit = async () => {
+    if (attemptGetSessionRef.current) {
+      // Clear error and reset authReady to trigger blocking gate
+      setAuthInitError(null);
+      setAuthReady(false);
+      await attemptGetSessionRef.current();
+    }
+  };
+
   // Calculate isAdmin from profile
   const isAdmin = profile?.is_admin === true;
   
@@ -542,6 +579,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin,
         onboardingComplete,
         isPasswordRecovery,
+        authInitError,
         signOut,
         refreshProfile,
         updateProfileState: (profileData) => {
@@ -550,6 +588,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             saveProfileSnapshot(user.id, profileData);
           }
         },
+        retryAuthInit,
       }}
     >
       {children}
