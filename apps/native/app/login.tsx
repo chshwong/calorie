@@ -1,9 +1,17 @@
 import * as React from "react";
 import { useEffect } from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Input } from "../components/ui/Input";
+import { Screen } from "../components/ui/Screen";
+import { Text } from "../components/ui/Text";
+import { getDeviceRegion } from "../lib/region/getDeviceRegion";
+import { spacing } from "../theme/tokens";
 
 export default function LoginScreen() {
   const { user, loading, onboardingComplete } = useAuth();
@@ -12,6 +20,15 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = React.useState<null | "signin" | "signup">(null);
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [deviceRegion, setDeviceRegion] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    const region = getDeviceRegion();
+    setDeviceRegion(region);
+    if (__DEV__) {
+      console.log("Device region:", region ?? "unknown");
+    }
+  }, []);
 
   // Reactive redirect: navigate based on onboarding status when user signs in
   useEffect(() => {
@@ -119,105 +136,180 @@ export default function LoginScreen() {
     }
   };
 
+  const isCanada = deviceRegion === "CA";
+
   return (
-    <View style={{ flex: 1, padding: 24, justifyContent: "center" }}>
-      <Text style={{ fontSize: 28, fontWeight: "700", marginBottom: 12 }}>
-        AvoVibe
-      </Text>
-      <Text style={{ fontSize: 16, opacity: 0.7, marginBottom: 32 }}>
-        Native app (v1)
-      </Text>
-
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Email"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={submitting === null}
-        style={{
-          borderWidth: 1,
-          borderColor: "#ddd",
-          borderRadius: 12,
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          fontSize: 16,
-          marginBottom: 16,
-          backgroundColor: submitting !== null ? "#f5f5f5" : "#fff",
-        }}
-      />
-
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Password"
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={submitting === null}
-        style={{
-          borderWidth: 1,
-          borderColor: "#ddd",
-          borderRadius: 12,
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          fontSize: 16,
-          marginBottom: 24,
-          backgroundColor: submitting !== null ? "#f5f5f5" : "#fff",
-        }}
-      />
-
-      <Pressable
-        onPress={handleSignIn}
-        disabled={submitting !== null}
-        style={{
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderRadius: 12,
-          alignItems: "center",
-          backgroundColor: submitting !== null ? "#999" : "#111",
-          opacity: submitting !== null ? 0.6 : 1,
-          marginBottom: 12,
-        }}
+    <Screen padding={0}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
-          {submitting === "signin" ? "Signing in..." : "Sign in"}
-        </Text>
-      </Pressable>
+        <View style={styles.header}>
+          <Image
+            source={require("../assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="AvoVibe logo"
+          />
+          <Text variant="title" style={styles.heroTitle}>
+            {isCanada
+              ? "Simple nutrition tracking, built for Canadians."
+              : "Simple nutrition tracking that stays out of your way."}
+          </Text>
+          <Text tone="muted" style={styles.subtitle}>
+            Log fast. No costs. No upsells. Just fitness and health.
+          </Text>
+        </View>
 
-      <Pressable
-        onPress={handleSignUp}
-        disabled={submitting !== null}
-        style={{
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderRadius: 12,
-          alignItems: "center",
-          backgroundColor: submitting !== null ? "#999" : "#eee",
-          opacity: submitting !== null ? 0.6 : 1,
-        }}
-      >
-        <Text style={{ fontSize: 16, fontWeight: "600" }}>
-          {submitting === "signup" ? "Creating account..." : "Create account"}
-        </Text>
-      </Pressable>
+        <Card>
+          <View style={styles.form}>
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={submitting === null}
+            />
 
-      {message && (
-        <Text style={{ fontSize: 14, opacity: 0.8, marginTop: 16, textAlign: "center" }}>
-          {message}
-        </Text>
-      )}
+            <Input
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={submitting === null}
+            />
 
-      {error && (
-        <Text style={{ fontSize: 14, fontWeight: "600", opacity: 0.8, marginTop: 16, textAlign: "center" }}>
-          {error}
-        </Text>
-      )}
+            {error ? (
+              <Text tone="danger" style={styles.centerText}>
+                {error}
+              </Text>
+            ) : null}
 
-      <Text style={{ fontSize: 14, opacity: 0.6, marginTop: 24, textAlign: "center" }}>
-        {loading ? "Auth: loading..." : user ? `Auth: signed in (${user.email})` : "Auth: signed out"}
-      </Text>
-    </View>
+            <Button
+              title={submitting === "signin" ? "Signing in..." : "Sign in"}
+              loading={submitting === "signin"}
+              onPress={handleSignIn}
+              disabled={submitting !== null}
+            />
+
+            <Button
+              variant="secondary"
+              title={submitting === "signup" ? "Creating account..." : "Create account"}
+              loading={submitting === "signup"}
+              onPress={handleSignUp}
+              disabled={submitting !== null}
+            />
+
+            {message ? (
+              <Text tone="muted" style={styles.centerText}>
+                {message}
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+
+        <Card>
+          <View style={styles.marketing}>
+            <Text variant="body" style={styles.marketingTitle}>
+              Fitness made simple
+            </Text>
+            <View style={styles.bullet}>
+              <Text style={styles.bulletIcon}>⚡</Text>
+              <Text>Simple. Reliable. Build great habits.</Text>
+            </View>
+            <View style={styles.bullet}>
+              <Text style={styles.bulletIcon}>📊</Text>
+              <Text>Track nutrition, activity, and goals.</Text>
+            </View>
+            <View style={styles.bullet}>
+              <Text style={styles.bulletIcon}>🔒</Text>
+              <Text>Engineered for health, not paywalls.</Text>
+            </View>
+            {isCanada ? (
+              <View style={styles.bullet}>
+                <Text style={styles.bulletIcon}>🇨🇦</Text>
+                <Text>Built with Canadian values.</Text>
+              </View>
+            ) : null}
+          </View>
+        </Card>
+
+        <View style={styles.socialProof}>
+          <Text tone="muted" style={styles.socialItem}>
+            ✅ Designed for real life
+          </Text>
+          <Text tone="muted" style={styles.socialItem}>
+            ✅ Simple insights, no noise
+          </Text>
+          <Text tone="muted" style={styles.socialItem}>
+            ✅ Your data stays yours
+          </Text>
+        </View>
+
+        <Text tone="muted" style={styles.authStatus}>
+          {loading ? "Auth: loading..." : user ? `Auth: signed in (${user.email})` : "Auth: signed out"}
+        </Text>
+      </ScrollView>
+    </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+    padding: spacing.xl,
+    gap: spacing.lg,
+  },
+  header: {
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  logo: {
+    width: 72,
+    height: 72,
+  },
+  heroTitle: {
+    textAlign: "center",
+  },
+  subtitle: {
+    marginTop: spacing.xs,
+    textAlign: "center",
+  },
+  form: {
+    gap: spacing.md,
+  },
+  centerText: {
+    textAlign: "center",
+  },
+  marketing: {
+    gap: spacing.sm,
+  },
+  marketingTitle: {
+    fontWeight: "700",
+  },
+  bullet: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  bulletIcon: {
+    width: 24,
+    textAlign: "center",
+  },
+  socialProof: {
+    gap: spacing.sm,
+    alignItems: "center",
+  },
+  socialItem: {
+    textAlign: "center",
+  },
+  authStatus: {
+    textAlign: "center",
+  },
+});
