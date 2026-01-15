@@ -61,5 +61,6 @@ export const radius = {
 export const fontSizes = {
   title: 22,
   body: 16,
+  label: 14,
   caption: 12,
 } as const;

@@ -43,8 +43,16 @@ export function Button({
   const baseStyle = [styles.base, containerStyle, isDisabled && styles.disabled];
   const pressableStyle =
     typeof style === 'function'
-      ? (state: PressableStateCallbackType) => [baseStyle, style(state)]
-      : [baseStyle, style];
+      ? (state: PressableStateCallbackType) => [
+          baseStyle,
+          state.pressed && variant === 'primary' && styles.primaryPressed,
+          style(state),
+        ]
+      : (state: PressableStateCallbackType) => [
+          baseStyle,
+          state.pressed && variant === 'primary' && styles.primaryPressed,
+          style,
+        ];
 
   return (
     <Pressable
@@ -80,17 +88,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 48,
     borderWidth: 1,
+    position: 'relative',
+    overflow: 'hidden',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    position: 'relative',
+    zIndex: 1,
   },
   text: {
     fontWeight: '600',
   },
   disabled: {
     opacity: 0.6,
+  },
+  primaryPressed: {
+    transform: [{ translateY: 1 }],
   },
 });
 
@@ -126,6 +141,12 @@ function getVariantStyles(
         containerStyle: {
           backgroundColor: theme.primary,
           borderColor: theme.primary,
+          borderWidth: 1,
+          shadowColor: theme.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.22,
+          shadowRadius: 10,
+          elevation: 5,
         },
         textColor: theme.primaryText,
         spinnerColor: theme.primaryText,

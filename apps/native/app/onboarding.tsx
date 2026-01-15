@@ -1,21 +1,27 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, router } from "expo-router";
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
 import { NameStep } from "@/components/onboarding/steps/NameStep";
 import { PlaceholderStep } from "@/components/onboarding/steps/PlaceholderStep";
-import { completeOnboardingProfile } from "@/services/onboarding";
+import { SexStep } from "@/components/onboarding/steps/SexStep";
+import {
+  completeOnboardingProfile,
+  fetchOnboardingProfile,
+  saveStepOneProfile,
+  saveStepTwoProfile,
+} from "@/services/onboarding";
 import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
 import { ThemeModeProvider } from "../contexts/ThemeModeContext";
 import { validateDob } from "../lib/dates/dobRules";
 import {
-    filterPreferredNameInput,
-    normalizePreferredName,
-    validatePreferredName,
+  filterPreferredNameInput,
+  normalizePreferredName,
+  validatePreferredName,
 } from "../lib/validation/preferredName";
 import { spacing } from "../theme/tokens";
 
@@ -34,36 +40,38 @@ export default function OnboardingScreen() {
   const [heightCm, setHeightCm] = useState("");
   const [weightLb, setWeightLb] = useState("");
 
-  // Auth and onboarding guards
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <Text tone="muted">Loading...</Text>
-      </View>
-    );
-  }
-
-  if (!user) {
-    return <Redirect href="/login" />;
-  }
-
-  // Profile is still loading
-  if (onboardingComplete === null) {
-    return (
-      <View style={styles.centered}>
-        <Text tone="muted">Loading...</Text>
-      </View>
-    );
-  }
-
-  // User already completed onboarding
-  if (onboardingComplete === true) {
-    return <Redirect href="/(tabs)/today" />;
-  }
-
   const completeMutation = useMutation({
     mutationFn: completeOnboardingProfile,
   });
+  const stepOneMutation = useMutation({
+    mutationFn: saveStepOneProfile,
+  });
+  const stepTwoMutation = useMutation({
+    mutationFn: saveStepTwoProfile,
+  });
+  const queryClient = useQueryClient();
+  const { data: profileData } = useQuery({
+    queryKey: ["onboarding-profile", user?.id],
+    queryFn: () => fetchOnboardingProfile(user!.id),
+    enabled: Boolean(user?.id),
+  });
+
+  useEffect(() => {
+    if (!profileData) return;
+
+    if (!firstName && profileData.first_name) {
+      setFirstName(profileData.first_name);
+    }
+    if (!dateOfBirth && profileData.date_of_birth) {
+      setDateOfBirth(profileData.date_of_birth);
+    }
+    if (!avatarUri && profileData.avatar_url) {
+      setAvatarUri(profileData.avatar_url);
+    }
+    if (!gender && (profileData.gender === "male" || profileData.gender === "female")) {
+      setGender(profileData.gender);
+    }
+  }, [profileData, firstName, dateOfBirth, avatarUri, gender]);
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -136,51 +144,127 @@ export default function OnboardingScreen() {
     }
   };
 
-  // Safety check: guard should redirect, but handle brief null state
-  if (!user) {
-    return null;
-  }
+  const handleNameStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+    const normalizedName = normalizePreferredName(firstName);
+    const nameValidation = validatePreferredName(normalizedName);
+    if (!nameValidation.ok) {
+      setError(nameValidation.errorKey || "onboarding.name_age.error_name_invalid");
+      return;
+    }
+    const dobValidation = validateDob(dateOfBirth);
+    if (!dobValidation.ok) {
+      setError(dobValidation.errorKey || "onboarding.name_age.error_dob_format");
+      return;
+    }
+    if (normalizedName !== firstName) {
+      setFirstName(normalizedName);
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepOneMutation.mutateAsync({
+        userId: user.id,
+        firstName: normalizedName,
+        dateOfBirth: dateOfBirth.trim(),
+        avatarUrl: avatarUri,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(2);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSexStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+    if (gender !== "male" && gender !== "female") {
+      setError("onboarding.sex.error_select_sex");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepTwoMutation.mutateAsync({
+        userId: user.id,
+        gender,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(3);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <ThemeModeProvider>
       <Screen padding={0}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {currentStep === 1 ? (
-            <NameStep
-              firstName={firstName}
-              dateOfBirth={dateOfBirth}
-              avatarUri={avatarUri}
-              error={error}
-              saving={saving}
-              onFirstNameChange={(text) =>
-                setFirstName(filterPreferredNameInput(firstName, text))
-              }
-              onFirstNameBlur={() => setFirstName(normalizePreferredName(firstName))}
-              onDateOfBirthChange={setDateOfBirth}
-              onAvatarChange={setAvatarUri}
-              onContinue={() => {
-                setError(null);
-                const normalizedName = normalizePreferredName(firstName);
-                const nameValidation = validatePreferredName(normalizedName);
-                if (!nameValidation.ok) {
-                  setError(nameValidation.errorKey || "onboarding.name_age.error_name_invalid");
-                  return;
+        {loading || onboardingComplete === null ? (
+          <View style={styles.centered}>
+            <Text tone="muted">Loading...</Text>
+          </View>
+        ) : !user ? (
+          <Redirect href="/login" />
+        ) : onboardingComplete === true ? (
+          <Redirect href="/(tabs)/today" />
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            {currentStep === 1 ? (
+              <NameStep
+                firstName={firstName}
+                dateOfBirth={dateOfBirth}
+                avatarUri={avatarUri}
+                error={error}
+                saving={saving}
+                onFirstNameChange={(text) =>
+                  setFirstName(filterPreferredNameInput(firstName, text))
                 }
-                const dobValidation = validateDob(dateOfBirth);
-                if (!dobValidation.ok) {
-                  setError(dobValidation.errorKey || "onboarding.name_age.error_dob_format");
-                  return;
-                }
-                if (normalizedName !== firstName) {
-                  setFirstName(normalizedName);
-                }
-                setCurrentStep(2);
-              }}
-            />
-          ) : (
-            <PlaceholderStep onBack={() => setCurrentStep(1)} />
-          )}
-        </ScrollView>
+                onFirstNameBlur={() => setFirstName(normalizePreferredName(firstName))}
+                onDateOfBirthChange={setDateOfBirth}
+                onAvatarChange={setAvatarUri}
+                onContinue={handleNameStepContinue}
+              />
+            ) : currentStep === 2 ? (
+              <SexStep
+                sex={gender === "not_telling" ? "" : gender}
+                loading={saving}
+                error={error}
+                onSexChange={(value) => setGender(value)}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(1)}
+                onContinue={handleSexStepContinue}
+              />
+            ) : (
+              <PlaceholderStep onBack={() => setCurrentStep(1)} />
+            )}
+          </ScrollView>
+        )}
       </Screen>
     </ThemeModeProvider>
   );

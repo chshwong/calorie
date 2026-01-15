@@ -4,7 +4,7 @@ import { StyleSheet, Text as RNText, TextProps as RNTextProps } from 'react-nati
 import { colors, fontSizes } from '../../theme/tokens';
 import { useColorScheme } from '../useColorScheme';
 
-type TextVariant = 'title' | 'body' | 'caption';
+type TextVariant = 'title' | 'body' | 'label' | 'caption';
 type TextTone = 'default' | 'muted' | 'primary' | 'danger';
 
 export type TextProps = RNTextProps & {
@@ -36,13 +36,19 @@ const textVariants = StyleSheet.create({
     fontSize: fontSizes.body,
     fontWeight: '400',
   },
+  label: {
+    fontSize: fontSizes.label,
+    fontWeight: '600',
+  },
   caption: {
     fontSize: fontSizes.caption,
     fontWeight: '400',
   },
 });
 
-function getToneColor(theme: typeof colors.light, tone: TextTone) {
+type ThemeColors = (typeof colors)['light'] | (typeof colors)['dark'];
+
+function getToneColor(theme: ThemeColors, tone: TextTone) {
   switch (tone) {
     case 'muted':
       return theme.textMuted;

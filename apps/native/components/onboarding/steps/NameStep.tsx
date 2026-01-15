@@ -1,9 +1,12 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
 
-import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
+import { DEFAULT_DOB_DATE } from "@/lib/validation/date";
+import Feather from "@expo/vector-icons/Feather";
 import { useThemeMode } from "../../../contexts/ThemeModeContext";
 import {
   formatDob,
@@ -13,7 +16,6 @@ import {
   parseDob,
 } from "../../../lib/dates/dobRules";
 import { colors, radius, spacing } from "../../../theme/tokens";
-import { AvatarPicker } from "../../ui/AvatarPicker";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
 import { Input } from "../../ui/Input";
@@ -55,30 +57,97 @@ export function NameStep({
   const age = dateOfBirth ? getAgeFromDob(dateOfBirth) : null;
   const nameError = error && isNameError(error) ? error : undefined;
   const dobError = error && isDobError(error) ? error : undefined;
-  const brandName = t("auth.login.brand_name");
-  const brandParts = useMemo(() => {
-    const avo = brandName.slice(0, 3);
-    const vibe = brandName.slice(3);
-    return { avo, vibe };
-  }, [brandName]);
+  const initials = firstName.trim().length > 0 ? firstName.trim()[0]?.toUpperCase() : "";
+  const dobMinDate = getDobMinDate();
+  const dobMaxDate = getDobMaxDate();
+  const dobPickerDate = useMemo(() => {
+    if (dobDate) {
+      return dobDate;
+    }
+    return clampDate(DEFAULT_DOB_DATE, dobMinDate, dobMaxDate);
+  }, [dobDate, dobMinDate, dobMaxDate]);
+
+  const pickAvatar = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== "granted") {
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const nextUri = result.assets?.[0]?.uri ?? null;
+    onAvatarChange(nextUri);
+  };
 
   return (
-    <>
-      <StepIndicator activeStep={1} totalSteps={12} />
-      <Text variant="caption" tone="muted" style={styles.stepCaption}>
-        {t("onboarding.step1_title")}
-      </Text>
-      <YourAvoVibeHeader brandAvo={brandParts.avo} brandVibe={brandParts.vibe} />
-      <Text variant="title" style={styles.title}>
-        {t("onboarding.name_age.title")}
-      </Text>
-      <Text tone="muted" style={styles.subtitle}>
-        {t("onboarding.name_age.subtitle")}
-      </Text>
+    <OnboardingShell
+      step={1}
+      totalSteps={12}
+      title={t("onboarding.name_age.title")}
+    >
+      <View style={styles.section}>
+          <View style={styles.avatarWrap}>
+            <View
+              style={[
+                styles.avatarOuter,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                  shadowColor: theme.text,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.avatarRing,
+                  { borderColor: theme.brandAvo, backgroundColor: theme.card },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.avatar,
+                    { borderColor: theme.brandVibe, backgroundColor: theme.surface },
+                  ]}
+                >
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                  ) : (
+                    <Text tone="muted" style={styles.avatarPlaceholder}>
+                      {initials}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
 
-      <Card>
-        <View style={styles.section}>
-          <AvatarPicker uri={avatarUri} onChange={onAvatarChange} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("onboarding.name_age.photo_change_label")}
+              hitSlop={styles.iconHitSlop}
+              onPress={pickAvatar}
+              disabled={saving}
+              style={[
+                styles.avatarButton,
+                styles.avatarButtonBottom,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                  shadowColor: theme.text,
+                },
+              ]}
+            >
+              <Feather name="camera" size={14} color={theme.text} />
+            </Pressable>
+          </View>
 
           <View style={styles.fieldGroup}>
             <Input
@@ -90,19 +159,27 @@ export function NameStep({
               autoCapitalize="words"
               editable={!saving}
               error={nameError ? t(nameError) : undefined}
+              labelStyle={styles.inputLabel}
+              style={[styles.inputControl, { borderColor: theme.border }]}
             />
-            <Text variant="caption" tone="muted">
+            <Text
+              variant="caption"
+              tone="muted"
+              style={[styles.helperText, { color: theme.textMuted }]}
+            >
               {t("onboarding.name_age.preferred_name_helper")}
             </Text>
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text variant="caption" tone="muted" style={styles.inputLabel}>
+            <Text variant="label" tone="muted" style={styles.inputLabel}>
               {t("onboarding.name_age.dob_label")} *
             </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setShowDobPicker(true)}
+              onPress={() =>
+                setShowDobPicker((prev) => (Platform.OS === "ios" ? !prev : true))
+              }
               disabled={saving}
               style={[
                 styles.dobField,
@@ -112,10 +189,18 @@ export function NameStep({
                 },
               ]}
             >
-              <Text tone={dobTone}>{dobDisplay}</Text>
+              <Text tone={dobTone} style={styles.dobText}>
+                {dobDisplay}
+              </Text>
+              <View pointerEvents="none" style={styles.dobIcon}>
+                <Feather name="calendar" size={18} color={theme.textMuted} />
+              </View>
             </Pressable>
+            <Text variant="caption" tone="muted" style={styles.dobHelper}>
+              {t("onboarding.name_age.subtitle")}
+            </Text>
             {age !== null ? (
-              <Text variant="caption" tone="muted">
+              <Text variant="caption" tone="muted" style={styles.ageText}>
                 {t("onboarding.name_age.age_display", { age })}
               </Text>
             ) : null}
@@ -127,11 +212,12 @@ export function NameStep({
           </View>
           {showDobPicker ? (
             <DateTimePicker
-              value={dobDate ?? getDobMaxDate()}
+              value={dobPickerDate}
               mode="date"
-              display="default"
-              minimumDate={getDobMinDate()}
-              maximumDate={getDobMaxDate()}
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              textColor={Platform.OS === "ios" ? theme.text : undefined}
+              minimumDate={dobMinDate}
+              maximumDate={dobMaxDate}
               onChange={(event, selected) => {
                 const eventType = (event as any)?.type;
                 if (eventType === "dismissed") {
@@ -141,7 +227,9 @@ export function NameStep({
                 if (selected) {
                   onDateOfBirthChange(formatDob(selected));
                 }
-                setShowDobPicker(false);
+                if (Platform.OS !== "ios") {
+                  setShowDobPicker(false);
+                }
               }}
             />
           ) : null}
@@ -154,67 +242,90 @@ export function NameStep({
             </Text>
           ) : null}
 
-          <Button title={t("common.next")} onPress={onContinue} disabled={saving} />
-        </View>
-      </Card>
-    </>
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={saving}
+            loading={saving}
+            style={[styles.nextButton, { shadowColor: theme.text }]}
+          />
+      </View>
+    </OnboardingShell>
   );
 }
 
 function ThemeModeToggle() {
   const { mode, setMode } = useThemeMode();
-  const { width } = useWindowDimensions();
   const { t } = useTranslation();
+  const scheme = useColorScheme() ?? "light";
+  const theme = colors[scheme];
+
+  const modeLabel =
+    mode === "light"
+      ? t("onboarding.name_age.appearance_value_light")
+      : mode === "dark"
+        ? t("onboarding.name_age.appearance_value_dark")
+        : t("onboarding.name_age.appearance_value_system");
+  const modeIcon =
+    mode === "light" ? "sun" : mode === "dark" ? "moon" : "monitor";
+
+  const cycleMode = () => {
+    if (mode === "system") {
+      setMode("light");
+      return;
+    }
+    if (mode === "light") {
+      setMode("dark");
+      return;
+    }
+    setMode("system");
+  };
 
   return (
-    <View style={styles.themeSection}>
-      <Text style={styles.sectionTitle}>{t("onboarding.name_age.appearance_title")}</Text>
-      <Text tone="muted" style={styles.themeSubtitle}>
-        {t("onboarding.name_age.appearance_subtitle")}
-      </Text>
-      <View style={styles.themeButtons}>
-        <Button
-          title={t("onboarding.name_age.appearance_value_system")}
-          variant={mode === "system" ? "primary" : "ghost"}
-          onPress={() => setMode("system")}
-          style={styles.themeButton}
-          titleProps={{ numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.85 }}
-        />
-        <Button
-          title={t("onboarding.name_age.appearance_value_light")}
-          variant={mode === "light" ? "primary" : "ghost"}
-          onPress={() => setMode("light")}
-          style={styles.themeButton}
-          titleProps={{ numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.85 }}
-        />
-        <Button
-          title={t("onboarding.name_age.appearance_value_dark")}
-          variant={mode === "dark" ? "primary" : "ghost"}
-          onPress={() => setMode("dark")}
-          style={styles.themeButton}
-          titleProps={{ numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.85 }}
-        />
-      </View>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t("onboarding.name_age.appearance_title")}, ${modeLabel}`}
+      onPress={cycleMode}
+      style={({ pressed }) => [styles.themePressable, pressed && styles.themePressed]}
+    >
+      <Card
+        style={[
+          styles.themeCard,
+          {
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+            shadowColor: theme.text,
+          },
+        ]}
+      >
+        <View style={styles.themeRow}>
+          <View style={styles.themeIcon}>
+            <Feather name={modeIcon} size={18} color={theme.textMuted} />
+          </View>
+          <View style={styles.themeText}>
+            <Text style={styles.sectionTitle}>{t("onboarding.name_age.appearance_title")}</Text>
+            <Text tone="muted" style={styles.themeSubtitle}>
+              {t("onboarding.name_age.appearance_subtitle")}
+            </Text>
+          </View>
+          <View style={[styles.themeValue, { backgroundColor: theme.card }]}>
+            <Text style={{ color: theme.primary }}>{modeLabel}</Text>
+          </View>
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
-function YourAvoVibeHeader({ brandAvo, brandVibe }: { brandAvo: string; brandVibe: string }) {
-  const scheme = useColorScheme() ?? "light";
-  const theme = colors[scheme];
-  const { t } = useTranslation();
-
-  return (
-    <Text variant="title" style={styles.headerTitle}>
-      <Text variant="title">{t("onboarding.header_prefix")}</Text>
-      <Text variant="title" style={{ color: theme.brandAvo }}>
-        {brandAvo}
-      </Text>
-      <Text variant="title" style={{ color: theme.brandVibe }}>
-        {brandVibe}
-      </Text>
-    </Text>
-  );
+function clampDate(value: Date, min: Date, max: Date) {
+  const time = value.getTime();
+  if (time < min.getTime()) {
+    return min;
+  }
+  if (time > max.getTime()) {
+    return max;
+  }
+  return value;
 }
 
 function isNameError(error: string) {
@@ -226,36 +337,116 @@ function isDobError(error: string) {
 }
 
 const styles = StyleSheet.create({
-  stepCaption: {
-    textAlign: "center",
-  },
-  headerTitle: {
-    textAlign: "center",
-  },
-  title: {
-    textAlign: "center",
-  },
-  subtitle: {
-    textAlign: "center",
+  dobHelper: {
+    textAlign: "left",
   },
   section: {
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  avatarWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    width: 132,
+    height: 132,
+    alignSelf: "center",
+  },
+  avatarOuter: {
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  avatarRing: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatar: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    ...StyleSheet.absoluteFillObject,
+    resizeMode: "cover",
+  },
+  avatarPlaceholder: {
+    fontSize: 28,
+    fontWeight: "600",
+  },
+  avatarButton: {
+    position: "absolute",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarButtonTop: {
+    top: 6,
+    right: 6,
+  },
+  avatarButtonBottom: {
+    bottom: 6,
+    right: 6,
+  },
+  iconHitSlop: {
+    top: 12,
+    right: 12,
+    bottom: 12,
+    left: 12,
   },
   fieldGroup: {
     gap: spacing.xs,
   },
   inputLabel: {
-    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs / 2,
+  },
+  inputControl: {
+    borderWidth: 1,
+    paddingVertical: spacing.md,
+  },
+  helperText: {
+    opacity: 0.9,
+    marginTop: spacing.xs / 2,
   },
   dobField: {
     borderRadius: radius.md,
     borderWidth: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
-  themeSection: {
-    gap: spacing.xs,
+  dobText: {
+    flex: 1,
   },
+  dobIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ageText: {},
   sectionTitle: {
     fontWeight: "600",
     textAlign: "center",
@@ -263,13 +454,47 @@ const styles = StyleSheet.create({
   themeSubtitle: {
     textAlign: "center",
   },
-  themeButtons: {
+  themePressable: {
+    width: "100%",
+  },
+  themePressed: {
+    opacity: 0.9,
+  },
+  themeCard: {
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  themeRow: {
     flexDirection: "row",
-    gap: spacing.sm,
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  themeIcon: {
+    width: 24,
+    alignItems: "center",
     justifyContent: "center",
   },
-  themeButton: {
+  themeText: {
     flex: 1,
+    gap: spacing.xs,
+  },
+  themeValue: {
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  nextButton: {
+    minHeight: 56,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
   },
   centerText: {
     textAlign: "center",

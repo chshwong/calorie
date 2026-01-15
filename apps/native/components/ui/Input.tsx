@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { StyleSheet, TextInput, TextInputProps, TextStyle, View, ViewStyle } from 'react-native';
 
 import { colors, radius, spacing } from '../../theme/tokens';
 import { useColorScheme } from '../useColorScheme';
@@ -9,9 +9,10 @@ export type InputProps = TextInputProps & {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
+  labelStyle?: TextStyle;
 };
 
-export function Input({ label, error, style, containerStyle, ...props }: InputProps) {
+export function Input({ label, error, style, containerStyle, labelStyle, ...props }: InputProps) {
   const scheme = useColorScheme() ?? 'light';
   const theme = colors[scheme];
   const showError = Boolean(error);
@@ -19,7 +20,7 @@ export function Input({ label, error, style, containerStyle, ...props }: InputPr
   return (
     <View style={[styles.container, containerStyle]}>
       {label ? (
-        <Text variant="caption" tone="muted" style={styles.label}>
+        <Text variant="label" tone="muted" style={[styles.label, labelStyle]}>
           {label}
         </Text>
       ) : null}
