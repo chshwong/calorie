@@ -32,7 +32,8 @@
     "password": "Password",
     "year": "Year",
     "month": "Month",
-    "day": "Day"
+    "day": "Day",
+    "remove": "Remove"
   },
   "date": {
     "yday": "Yday"
@@ -593,6 +594,13 @@
     }
   },
   "onboarding": {
+    "photoUploadError": "Couldn’t upload your photo. Please try again.",
+    "photoRemoveConfirmTitle": "Remove photo?",
+    "photoRemoveConfirmMessage": "This will remove your profile photo.",
+    "photoRemove": {
+      "title": "Remove photo?",
+      "message": "This will remove your profile photo."
+    },
     "header_prefix": "Your ",
     "plan": {
       "title": "Choose your plan",

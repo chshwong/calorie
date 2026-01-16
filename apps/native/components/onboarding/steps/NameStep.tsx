@@ -15,12 +15,16 @@ import {
   getDobMinDate,
   parseDob,
 } from "../../../lib/dates/dobRules";
+import { prepareAvatarImageAsync } from "../../../lib/images/avatar";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
+import { ConfirmModal } from "../../ui/ConfirmModal";
 import { Input } from "../../ui/Input";
 import { Text } from "../../ui/Text";
 import { useColorScheme } from "../../useColorScheme";
+
+const MASCOT_PLACEHOLDER = require("../../../../../assets/brand/Logo_MascotOnly.png");
 
 type NameStepProps = {
   firstName: string;
@@ -28,6 +32,7 @@ type NameStepProps = {
   avatarUri: string | null;
   error: string | null;
   saving: boolean;
+  avatarSaving: boolean;
   onFirstNameChange: (value: string) => void;
   onFirstNameBlur: () => void;
   onDateOfBirthChange: (value: string) => void;
@@ -41,6 +46,7 @@ export function NameStep({
   avatarUri,
   error,
   saving,
+  avatarSaving,
   onFirstNameChange,
   onFirstNameBlur,
   onDateOfBirthChange,
@@ -49,6 +55,7 @@ export function NameStep({
 }: NameStepProps) {
   const { t } = useTranslation();
   const [showDobPicker, setShowDobPicker] = useState(false);
+  const [removeModalOpen, setRemoveModalOpen] = useState(false);
   const scheme = useColorScheme() ?? "light";
   const theme = colors[scheme];
   const dobDate = parseDob(dateOfBirth);
@@ -60,6 +67,7 @@ export function NameStep({
   const initials = firstName.trim().length > 0 ? firstName.trim()[0]?.toUpperCase() : "";
   const dobMinDate = getDobMinDate();
   const dobMaxDate = getDobMaxDate();
+  const avatarBusy = saving || avatarSaving;
   const dobPickerDate = useMemo(() => {
     if (dobDate) {
       return dobDate;
@@ -85,7 +93,16 @@ export function NameStep({
     }
 
     const nextUri = result.assets?.[0]?.uri ?? null;
-    onAvatarChange(nextUri);
+    if (!nextUri) {
+      onAvatarChange(null);
+      return;
+    }
+    const processed = await prepareAvatarImageAsync(nextUri);
+    onAvatarChange(processed.uri);
+  };
+
+  const handleRemoveAvatar = () => {
+    setRemoveModalOpen(true);
   };
 
   return (
@@ -95,7 +112,11 @@ export function NameStep({
       title={t("onboarding.name_age.title")}
     >
       <View style={styles.section}>
-          <View style={styles.avatarWrap}>
+          <View
+            style={styles.avatarWrap}
+            accessible
+            accessibilityLabel={t("onboarding.name_age.photo_change_label")}
+          >
             <View
               style={[
                 styles.avatarOuter,
@@ -121,9 +142,13 @@ export function NameStep({
                   {avatarUri ? (
                     <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                   ) : (
-                    <Text tone="muted" style={styles.avatarPlaceholder}>
-                      {initials}
-                    </Text>
+                    <Image
+                      source={MASCOT_PLACEHOLDER}
+                      style={styles.avatarMascot}
+                      resizeMode="contain"
+                      accessibilityIgnoresInvertColors
+                      accessible={false}
+                    />
                   )}
                 </View>
               </View>
@@ -134,7 +159,7 @@ export function NameStep({
               accessibilityLabel={t("onboarding.name_age.photo_change_label")}
               hitSlop={styles.iconHitSlop}
               onPress={pickAvatar}
-              disabled={saving}
+              disabled={avatarBusy}
               style={[
                 styles.avatarButton,
                 styles.avatarButtonBottom,
@@ -147,6 +172,26 @@ export function NameStep({
             >
               <Feather name="camera" size={14} color={theme.text} />
             </Pressable>
+            {avatarUri ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("delete_entry.confirm")}
+                hitSlop={styles.iconHitSlop}
+                onPress={handleRemoveAvatar}
+                disabled={avatarBusy}
+                style={[
+                  styles.avatarButton,
+                  styles.avatarButtonBottomLeft,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.danger,
+                    shadowColor: theme.text,
+                  },
+                ]}
+              >
+                <Feather name="trash-2" size={14} color={theme.danger} />
+              </Pressable>
+            ) : null}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -248,6 +293,19 @@ export function NameStep({
             disabled={saving}
             loading={saving}
             style={[styles.nextButton, { shadowColor: theme.text }]}
+          />
+          <ConfirmModal
+            visible={removeModalOpen}
+            title={t("onboarding.photoRemove.title")}
+            message={t("onboarding.photoRemove.message")}
+            cancelText={t("common.cancel")}
+            confirmText={t("common.remove")}
+            confirmVariant="destructive"
+            onCancel={() => setRemoveModalOpen(false)}
+            onConfirm={() => {
+              setRemoveModalOpen(false);
+              onAvatarChange(null);
+            }}
           />
       </View>
     </OnboardingShell>
@@ -388,6 +446,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "600",
   },
+  avatarMascot: {
+    width: 64,
+    height: 64,
+    opacity: 0.7,
+  },
   avatarButton: {
     position: "absolute",
     width: 32,
@@ -408,6 +471,10 @@ const styles = StyleSheet.create({
   avatarButtonBottom: {
     bottom: 6,
     right: 6,
+  },
+  avatarButtonBottomLeft: {
+    bottom: 6,
+    left: 6,
   },
   iconHitSlop: {
     top: 12,
@@ -456,6 +523,7 @@ const styles = StyleSheet.create({
   },
   themePressable: {
     width: "100%",
+    marginTop: spacing.lg,
   },
   themePressed: {
     opacity: 0.9,

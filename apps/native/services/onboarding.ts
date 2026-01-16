@@ -38,6 +38,24 @@ export async function saveStepOneProfile(input: StepOneInput) {
   return { ok: true };
 }
 
+type AvatarProfileInput = {
+  userId: string;
+  avatarUrl: string | null;
+};
+
+export async function saveAvatarProfile(input: AvatarProfileInput) {
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ avatar_url: input.avatarUrl })
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
 export async function completeOnboardingProfile(input: CompleteOnboardingInput) {
   const { error: updateError } = await supabase
     .from("profiles")

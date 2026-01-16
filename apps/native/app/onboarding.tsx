@@ -18,23 +18,25 @@ import { PlaceholderStep } from "@/components/onboarding/steps/PlaceholderStep";
 import { PlanStep, type PlanSelection } from "@/components/onboarding/steps/PlanStep";
 import { SexStep } from "@/components/onboarding/steps/SexStep";
 import { buildWeightPayload, WeightStep } from "@/components/onboarding/steps/WeightStep";
+import { uploadAvatar } from "@/services/avatar";
 import { getActiveLegalDocuments } from "@/services/legal";
 import {
-  completeOnboardingProfile,
-  fetchOnboardingProfile,
-  fetchUserLegalAcceptances,
-  finalizeOnboarding,
-  saveModulePreferences,
-  saveStepEightProfile,
-  saveStepFiveProfile,
-  saveStepFourProfile,
-  saveStepNineProfile,
-  saveStepOneProfile,
-  saveStepSevenProfile,
-  saveStepSixProfile,
-  saveStepThreeProfile,
-  saveStepTwoProfile,
-  type UserLegalAcceptance,
+    completeOnboardingProfile,
+    fetchOnboardingProfile,
+    fetchUserLegalAcceptances,
+    finalizeOnboarding,
+    saveAvatarProfile,
+    saveModulePreferences,
+    saveStepEightProfile,
+    saveStepFiveProfile,
+    saveStepFourProfile,
+    saveStepNineProfile,
+    saveStepOneProfile,
+    saveStepSevenProfile,
+    saveStepSixProfile,
+    saveStepThreeProfile,
+    saveStepTwoProfile,
+    type UserLegalAcceptance,
 } from "@/services/onboarding";
 import { type LegalDocType, type LegalDocument } from "../../../legal/legal-documents";
 import { mapCaloriePlanToDb } from "../../../lib/onboarding/calorie-plan";
@@ -42,6 +44,7 @@ import { HARD_HARD_STOP } from "../../../lib/onboarding/goal-calorie-nutrient-ru
 import { GoalWeightStep } from "../components/onboarding/steps/GoalWeightStep";
 import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
+import { useColorScheme } from "../components/useColorScheme";
 import { ThemeModeProvider } from "../contexts/ThemeModeContext";
 import { validateDob } from "../lib/dates/dobRules";
 import { kgToLb, lbToKg, roundTo3, roundTo1 as roundWeightTo1 } from "../lib/domain/conversions";
@@ -51,21 +54,23 @@ import { validateBodyFatPercent, validateWeightKg } from "../lib/onboarding/weig
 import { ActivityLevel, validateActivityLevel } from "../lib/validation/activity";
 import { GoalType, validateGoalType } from "../lib/validation/goal";
 import {
-  cmToFtIn,
-  HeightUnit,
-  roundTo1,
+    cmToFtIn,
+    HeightUnit,
+    roundTo1,
 } from "../lib/validation/height";
 import {
-  filterPreferredNameInput,
-  normalizePreferredName,
-  validatePreferredName,
+    filterPreferredNameInput,
+    normalizePreferredName,
+    validatePreferredName,
 } from "../lib/validation/preferredName";
 import { WeightUnit } from "../lib/validation/weight";
-import { spacing } from "../theme/tokens";
+import { colors, spacing } from "../theme/tokens";
 
 export default function OnboardingScreen() {
   const { t } = useTranslation();
   const { user, loading, onboardingComplete, refreshProfile } = useAuth();
+  const scheme = useColorScheme() ?? "light";
+  const theme = colors[scheme];
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -74,7 +79,8 @@ export default function OnboardingScreen() {
     null
   );
   const [currentStep, setCurrentStep] = useState(1);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarLocalUri, setAvatarLocalUri] = useState<string | null>(null);
+  const [avatarRemoteUrl, setAvatarRemoteUrl] = useState<string | null>(null);
 
   // Form fields
   const [firstName, setFirstName] = useState("");
@@ -146,6 +152,57 @@ export default function OnboardingScreen() {
   const modulePreferencesMutation = useMutation({
     mutationFn: saveModulePreferences,
   });
+  const avatarUploadMutation = useMutation({
+    mutationFn: async (params: { userId: string; localUri: string }) => {
+      const { cacheBustedUrl } = await uploadAvatar(params);
+      const saveResult = await saveAvatarProfile({
+        userId: params.userId,
+        avatarUrl: cacheBustedUrl,
+      });
+      if (!saveResult.ok) {
+        throw new Error(saveResult.error ?? "onboarding.error_save_failed");
+      }
+      return { avatarUrl: cacheBustedUrl };
+    },
+    onSuccess: ({ avatarUrl }) => {
+      if (!user?.id) return;
+      setAvatarRemoteUrl(avatarUrl);
+      setAvatarLocalUri(null);
+      queryClient.setQueryData(["onboarding-profile", user.id], (old: any) => {
+        if (!old) return old;
+        return { ...old, avatar_url: avatarUrl };
+      });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+    },
+    onError: (e) => {
+      if (__DEV__) {
+        console.error("[avatar] upload failed", e);
+      }
+      setError("onboarding.photoUploadError");
+    },
+  });
+  const avatarClearMutation = useMutation({
+    mutationFn: async (params: { userId: string }) => {
+      const saveResult = await saveAvatarProfile({
+        userId: params.userId,
+        avatarUrl: null,
+      });
+      if (!saveResult.ok) {
+        throw new Error(saveResult.error ?? "onboarding.error_save_failed");
+      }
+      return { avatarUrl: null };
+    },
+    onSuccess: () => {
+      if (!user?.id) return;
+      setAvatarRemoteUrl(null);
+      setAvatarLocalUri(null);
+      queryClient.setQueryData(["onboarding-profile", user.id], (old: any) => {
+        if (!old) return old;
+        return { ...old, avatar_url: null };
+      });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+    },
+  });
   const finalizeOnboardingMutation = useMutation({
     mutationFn: finalizeOnboarding,
   });
@@ -191,8 +248,8 @@ export default function OnboardingScreen() {
     if (!dateOfBirth && profileData.date_of_birth) {
       setDateOfBirth(profileData.date_of_birth);
     }
-    if (!avatarUri && profileData.avatar_url) {
-      setAvatarUri(profileData.avatar_url);
+    if (!avatarRemoteUrl && profileData.avatar_url) {
+      setAvatarRemoteUrl(profileData.avatar_url);
     }
     if (!gender && (profileData.gender === "male" || profileData.gender === "female")) {
       setGender(profileData.gender);
@@ -318,7 +375,8 @@ export default function OnboardingScreen() {
     profileData,
     firstName,
     dateOfBirth,
-    avatarUri,
+    avatarLocalUri,
+    avatarRemoteUrl,
     gender,
     heightCm,
     heightFt,
@@ -472,7 +530,11 @@ export default function OnboardingScreen() {
         userId: user.id,
         firstName: normalizedName,
         dateOfBirth: dateOfBirth.trim(),
-        avatarUrl: avatarUri,
+        avatarUrl:
+          avatarRemoteUrl &&
+          (avatarRemoteUrl.startsWith("http://") || avatarRemoteUrl.startsWith("https://"))
+            ? avatarRemoteUrl
+            : undefined,
       });
 
       if (!result.ok) {
@@ -994,7 +1056,7 @@ export default function OnboardingScreen() {
               <NameStep
                 firstName={firstName}
                 dateOfBirth={dateOfBirth}
-                avatarUri={avatarUri}
+                avatarUri={avatarRemoteUrl ?? avatarLocalUri}
                 error={error}
                 saving={saving}
                 onFirstNameChange={(text) => {
@@ -1003,7 +1065,16 @@ export default function OnboardingScreen() {
                 }}
                 onFirstNameBlur={() => setFirstName(normalizePreferredName(firstName))}
                 onDateOfBirthChange={setDateOfBirth}
-                onAvatarChange={setAvatarUri}
+                onAvatarChange={(nextUri) => {
+                  setAvatarLocalUri(nextUri);
+                  if (nextUri && user?.id) {
+                    avatarUploadMutation.mutate({ userId: user.id, localUri: nextUri });
+                  }
+                  if (!nextUri && user?.id) {
+                    avatarClearMutation.mutate({ userId: user.id });
+                  }
+                }}
+                avatarSaving={avatarUploadMutation.isPending || avatarClearMutation.isPending}
                 onContinue={handleNameStepContinue}
               />
             ) : currentStep === 2 ? (
