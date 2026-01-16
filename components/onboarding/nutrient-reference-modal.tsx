@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, Modal, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Text } from '@/components/ui/text';
@@ -17,63 +18,63 @@ interface NutrientReferenceModalProps {
 }
 
 interface NutrientReferenceContent {
-  title: string;
-  whyTrack: string;
-  whatToAimFor: string;
+  titleKey: string;
+  whyTrackKey: string;
+  whatToAimForKey: string;
   typicalRanges?: {
-    male?: string;
-    female?: string;
-    combined?: string;
+    maleKey?: string;
+    femaleKey?: string;
+    combinedKey?: string;
   };
-  realisticStart?: string;
-  whenThisMayNotApply?: string;
-  disclaimer: string;
+  realisticStartKey?: string;
+  whenThisMayNotApplyKey?: string;
+  disclaimerKey: string;
 }
 
 const NUTRIENT_REFERENCES: Record<NutrientType, NutrientReferenceContent> = {
   protein: {
-    title: 'Protein',
-    whyTrack: 'Protein helps preserve and build muscle and keeps you fuller for longer.',
-    whatToAimFor: 'Most people do well around 0.7–1.0 g per lb of body weight per day.',
+    titleKey: 'onboarding.daily_targets.reference.protein.title',
+    whyTrackKey: 'onboarding.daily_targets.reference.protein.why_track',
+    whatToAimForKey: 'onboarding.daily_targets.reference.protein.what_to_aim_for',
     typicalRanges: {
-      female: 'Females: often ~70–140 g/day',
-      combined: 'Exact needs vary with size and activity.',
+      femaleKey: 'onboarding.daily_targets.reference.protein.typical_ranges.female',
+      combinedKey: 'onboarding.daily_targets.reference.protein.typical_ranges.combined',
     },
-    disclaimer: 'General guidance only, not medical advice. Needs vary with age, activity level, kidney or liver conditions, medications, and other factors.',
+    disclaimerKey: 'onboarding.daily_targets.reference.protein.disclaimer',
   },
   fiber: {
-    title: 'Fiber',
-    whyTrack: 'Supports digestion, fullness, and steadier energy.',
-    whatToAimFor: 'Health guidelines suggest:',
+    titleKey: 'onboarding.daily_targets.reference.fiber.title',
+    whyTrackKey: 'onboarding.daily_targets.reference.fiber.why_track',
+    whatToAimForKey: 'onboarding.daily_targets.reference.fiber.what_to_aim_for',
     typicalRanges: {
-      male: 'Males: ~30–38 g/day',
-      female: 'Females: ~25–30 g/day',
-      combined: 'Most adults today average only ~15–20 g/day.',
+      maleKey: 'onboarding.daily_targets.reference.fiber.typical_ranges.male',
+      femaleKey: 'onboarding.daily_targets.reference.fiber.typical_ranges.female',
+      combinedKey: 'onboarding.daily_targets.reference.fiber.typical_ranges.combined',
     },
-    realisticStart: '~20 g/day could be a great first goal. You can build from there.',
-    disclaimer: 'General guidance only, not medical advice.',
+    realisticStartKey: 'onboarding.daily_targets.reference.fiber.realistic_start',
+    disclaimerKey: 'onboarding.daily_targets.reference.fiber.disclaimer',
   },
   carbs: {
-    title: 'Carbs',
-    whyTrack: 'Capping carbs helps limit easy calorie creep and encourages better carb choices.',
-    whatToAimFor: 'Many people do well around 30–55% of daily calories from carbs.',
+    titleKey: 'onboarding.daily_targets.reference.carbs.title',
+    whyTrackKey: 'onboarding.daily_targets.reference.carbs.why_track',
+    whatToAimForKey: 'onboarding.daily_targets.reference.carbs.what_to_aim_for',
     typicalRanges: {
-      combined: 'Intake may be much lower if you follow approaches like keto.',
+      combinedKey: 'onboarding.daily_targets.reference.carbs.typical_ranges.combined',
     },
-    disclaimer: 'General guidance only, not medical advice. Needs vary with training, diabetes/prediabetes, medications, and other conditions.',
+    disclaimerKey: 'onboarding.daily_targets.reference.carbs.disclaimer',
   },
   sugar: {
-    title: 'Sugar',
-    whyTrack: 'Capping sugar helps limit ultra-processed calories and supports heart and dental health.',
-    whatToAimFor: 'A practical range for many people is under ~25–50 g/day.',
-    disclaimer: 'General guidance only, not medical advice. Individual needs vary.',
+    titleKey: 'onboarding.daily_targets.reference.sugar.title',
+    whyTrackKey: 'onboarding.daily_targets.reference.sugar.why_track',
+    whatToAimForKey: 'onboarding.daily_targets.reference.sugar.what_to_aim_for',
+    disclaimerKey: 'onboarding.daily_targets.reference.sugar.disclaimer',
   },
   sodium: {
-    title: 'Sodium',
-    whyTrack: 'Capping sodium helps support healthy blood pressure and reduces hidden salt from processed foods.',
-    whatToAimFor: 'Many people do well around ~2,000–2,300 mg/day.',
-    whenThisMayNotApply: 'This tracking is for those who want to limit sodium.\nSome very active individuals may need extra sodium to stay safe. If that applies to you, it\'s reasonable to opt out of this target.',
-    disclaimer: 'General guidance only, not medical advice. Sodium needs vary with blood pressure, kidney or heart conditions, sweating, and medications.',
+    titleKey: 'onboarding.daily_targets.reference.sodium.title',
+    whyTrackKey: 'onboarding.daily_targets.reference.sodium.why_track',
+    whatToAimForKey: 'onboarding.daily_targets.reference.sodium.what_to_aim_for',
+    whenThisMayNotApplyKey: 'onboarding.daily_targets.reference.sodium.when_not_apply',
+    disclaimerKey: 'onboarding.daily_targets.reference.sodium.disclaimer',
   },
 };
 
@@ -84,14 +85,15 @@ export function NutrientReferenceModal({
   sexAtBirth,
   colors,
 }: NutrientReferenceModalProps) {
+  const { t } = useTranslation();
   const content = NUTRIENT_REFERENCES[nutrientType];
   const normalizedSex = sexAtBirth === 'male' || sexAtBirth === 'female' ? sexAtBirth : null;
 
   // Determine which ranges to show
   const showRanges = content.typicalRanges && (
-    (normalizedSex === 'male' && content.typicalRanges.male) ||
-    (normalizedSex === 'female' && content.typicalRanges.female) ||
-    content.typicalRanges.combined
+    (normalizedSex === 'male' && content.typicalRanges.maleKey) ||
+    (normalizedSex === 'female' && content.typicalRanges.femaleKey) ||
+    content.typicalRanges.combinedKey
   );
 
   return (
@@ -112,7 +114,7 @@ export function NutrientReferenceModal({
           {/* Header */}
           <View style={styles.header}>
             <ThemedText type="title" style={[styles.title, { color: colors.text }]}>
-              {content.title}
+              {t(content.titleKey)}
             </ThemedText>
             <TouchableOpacity
               style={styles.closeButton}
@@ -129,20 +131,20 @@ export function NutrientReferenceModal({
               {/* Why track */}
               <View style={styles.section}>
                 <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                  Why track
+                  {t('onboarding.daily_targets.reference.sections.why_track')}
                 </ThemedText>
                 <ThemedText style={[styles.sectionText, { color: colors.textSecondary }]}>
-                  {content.whyTrack}
+                  {t(content.whyTrackKey)}
                 </ThemedText>
               </View>
 
               {/* What to aim for */}
               <View style={styles.section}>
                 <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                  What to aim for
+                  {t('onboarding.daily_targets.reference.sections.what_to_aim_for')}
                 </ThemedText>
                 <ThemedText style={[styles.sectionText, { color: colors.textSecondary }]}>
-                  {content.whatToAimFor}
+                  {t(content.whatToAimForKey)}
                 </ThemedText>
 
                 {/* Typical ranges */}
@@ -150,43 +152,43 @@ export function NutrientReferenceModal({
                   <View style={styles.rangesContainer}>
                     {normalizedSex === 'male' && content.typicalRanges?.male && (
                       <ThemedText style={[styles.rangeText, { color: colors.textSecondary }]}>
-                        {content.typicalRanges.male}
+                        {t(content.typicalRanges.maleKey)}
                       </ThemedText>
                     )}
-                    {normalizedSex === 'female' && content.typicalRanges?.female && (
+                    {normalizedSex === 'female' && content.typicalRanges?.femaleKey && (
                       <ThemedText style={[styles.rangeText, { color: colors.textSecondary }]}>
-                        {content.typicalRanges.female}
+                        {t(content.typicalRanges.femaleKey)}
                       </ThemedText>
                     )}
-                    {content.typicalRanges?.combined && (
+                    {content.typicalRanges?.combinedKey && (
                       <ThemedText style={[styles.rangeText, { color: colors.textSecondary }]}>
-                        {content.typicalRanges.combined}
+                        {t(content.typicalRanges.combinedKey)}
                       </ThemedText>
                     )}
                   </View>
                 )}
 
                 {/* Realistic start (for fiber) */}
-                {content.realisticStart && (
+                {content.realisticStartKey && (
                   <View style={styles.realisticStartContainer}>
                     <ThemedText style={[styles.realisticStartTitle, { color: colors.text }]}>
-                      A realistic start
+                      {t('onboarding.daily_targets.reference.sections.realistic_start')}
                     </ThemedText>
                     <ThemedText style={[styles.sectionText, { color: colors.textSecondary }]}>
-                      {content.realisticStart}
+                      {t(content.realisticStartKey)}
                     </ThemedText>
                   </View>
                 )}
               </View>
 
               {/* When this may not apply (for sodium) */}
-              {content.whenThisMayNotApply && (
+              {content.whenThisMayNotApplyKey && (
                 <View style={styles.section}>
                   <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                    When this may not apply
+                    {t('onboarding.daily_targets.reference.sections.when_not_apply')}
                   </ThemedText>
                   <ThemedText style={[styles.sectionText, { color: colors.textSecondary }]}>
-                    {content.whenThisMayNotApply}
+                    {t(content.whenThisMayNotApplyKey)}
                   </ThemedText>
                 </View>
               )}
@@ -194,7 +196,7 @@ export function NutrientReferenceModal({
               {/* Disclaimer */}
               <View style={styles.disclaimerContainer}>
                 <ThemedText style={[styles.disclaimerText, { color: colors.textSecondary }]}>
-                  {content.disclaimer}
+                  {t(content.disclaimerKey)}
                 </ThemedText>
               </View>
             </View>

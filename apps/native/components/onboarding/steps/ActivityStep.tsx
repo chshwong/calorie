@@ -5,7 +5,7 @@ import Feather from "@expo/vector-icons/Feather";
 
 import { HeroCard } from "@/components/onboarding/HeroCard";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
-import { ChoiceTile } from "@/components/ui/ChoiceTile";
+import { ActivityStepContent } from "@/components/onboarding/ActivityStepContent";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { useColorScheme } from "@/components/useColorScheme";
@@ -22,37 +22,6 @@ type ActivityStepProps = {
   onContinue: () => void;
 };
 
-const OPTIONS: Array<{
-  value: ActivityLevel;
-  labelKey: string;
-  descriptionKey: string;
-}> = [
-  {
-    value: "sedentary",
-    labelKey: "onboarding.activity.sedentary.label",
-    descriptionKey: "onboarding.activity.sedentary.description",
-  },
-  {
-    value: "light",
-    labelKey: "onboarding.activity.light.label",
-    descriptionKey: "onboarding.activity.light.description",
-  },
-  {
-    value: "moderate",
-    labelKey: "onboarding.activity.moderate.label",
-    descriptionKey: "onboarding.activity.moderate.description",
-  },
-  {
-    value: "high",
-    labelKey: "onboarding.activity.high.label",
-    descriptionKey: "onboarding.activity.high.description",
-  },
-  {
-    value: "very_high",
-    labelKey: "onboarding.activity.very_high.label",
-    descriptionKey: "onboarding.activity.very_high.description",
-  },
-];
 
 export function ActivityStep({
   activityLevel,
@@ -87,26 +56,14 @@ export function ActivityStep({
       }
     >
       <View style={styles.section}>
-        <View style={styles.options}>
-          {OPTIONS.map((option) => {
-            const selected = activityLevel === option.value;
-            return (
-              <ChoiceTile
-                key={option.value}
-                title={t(option.labelKey)}
-                description={t(option.descriptionKey)}
-                selected={selected}
-                onPress={() => {
-                  onActivityLevelChange(option.value);
-                  onErrorClear();
-                }}
-                disabled={loading}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-              />
-            );
-          })}
-        </View>
+        <ActivityStepContent
+          value={activityLevel}
+          onChange={(level) => {
+            onActivityLevelChange(level);
+            onErrorClear();
+          }}
+          disabled={loading}
+        />
 
         {error ? (
           <Text variant="caption" tone="danger" style={styles.centerText}>
@@ -140,9 +97,6 @@ const styles = StyleSheet.create({
   heroVisual: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  options: {
-    gap: spacing.lg,
   },
   actions: {
     gap: spacing.md,

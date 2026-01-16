@@ -86,6 +86,7 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
   const [inputValue, setInputValue] = useState(currentValue.toString());
   const [showConstraintModal, setShowConstraintModal] = useState(false);
   const [constraint, setConstraint] = useState<ConstraintType>(defaultConstraint);
+  const { t } = useTranslation();
 
   // Update input value when currentValue changes externally
   useEffect(() => {
@@ -146,8 +147,8 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
   };
 
   const getConstraintBadgeLabel = (): string | null => {
-    if (constraint === 'min') return 'Daily Min';
-    if (constraint === 'max') return 'Daily Max';
+    if (constraint === 'min') return t('onboarding.daily_targets.daily_min');
+    if (constraint === 'max') return t('onboarding.daily_targets.daily_max');
     return null;
   };
 
@@ -197,11 +198,17 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
         {/* Suggested value */}
         <View style={styles.suggestedRow}>
           <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
-            Suggested: {suggestedValue} {unit}
+            {t('onboarding.daily_targets.suggested_value', {
+              value: suggestedValue,
+              unit,
+            })}
           </Text>
           {currentTargetValue != null && (
             <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
-              Current: {currentTargetValue} {unit}
+              {t('onboarding.daily_targets.current_value', {
+                value: currentTargetValue,
+                unit,
+              })}
             </Text>
           )}
         </View>
@@ -217,8 +224,8 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
               keyboardType="number-pad"
               editable={!disabled}
               {...getInputAccessibilityProps(
-                `${label} input`,
-                `Enter ${label} value in ${unit}`,
+                t('onboarding.daily_targets.a11y_target_input_label', { label }),
+                t('onboarding.daily_targets.a11y_target_input_hint', { label, unit }),
                 undefined,
                 true
               )}
@@ -238,8 +245,8 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
               onPress={handleIncrement}
               disabled={disabled || currentValue >= max}
               {...getButtonAccessibilityProps(
-                `Increase ${label}`,
-                `Double tap to increase ${label} by ${step} ${unit}`,
+                t('onboarding.daily_targets.a11y_increase_label', { label }),
+                t('onboarding.daily_targets.a11y_increase_hint', { label, step, unit }),
                 disabled || currentValue >= max
               )}
             >
@@ -255,8 +262,8 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
               onPress={handleDecrement}
               disabled={disabled || currentValue <= min}
               {...getButtonAccessibilityProps(
-                `Decrease ${label}`,
-                `Double tap to decrease ${label} by ${step} ${unit}`,
+                t('onboarding.daily_targets.a11y_decrease_label', { label }),
+                t('onboarding.daily_targets.a11y_decrease_hint', { label, step, unit }),
                 disabled || currentValue <= min
               )}
             >
@@ -271,13 +278,13 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
           onPress={() => setShowConstraintModal(true)}
           disabled={disabled}
           {...getButtonAccessibilityProps(
-            'Constraint settings',
-            'Double tap to change constraint type',
+            t('onboarding.daily_targets.constraint_settings_label'),
+            t('onboarding.daily_targets.constraint_settings_hint'),
             disabled
           )}
         >
           <Text style={[styles.constraintButtonText, { color: colors.textSecondary }]}>
-            Constraint
+            {t('onboarding.daily_targets.constraint_button')}
           </Text>
           <IconSymbol name="chevron.right" size={16} color={colors.textSecondary} />
         </TouchableOpacity>
@@ -293,10 +300,10 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <ThemedText type="title" style={[styles.modalTitle, { color: colors.text }]}>
-              {label} Constraint
+              {t('onboarding.daily_targets.constraint_modal_title', { label })}
             </ThemedText>
             <ThemedText style={[styles.modalDescription, { color: colors.textSecondary }]}>
-              Choose how this target should be enforced
+              {t('onboarding.daily_targets.constraint_modal_description')}
             </ThemedText>
             
             <View style={styles.constraintOptions}>
@@ -311,9 +318,11 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
                   setShowConstraintModal(false);
                 }}
               >
-                <Text style={[styles.constraintOptionLabel, { color: colors.text }]}>Minimum</Text>
+                <Text style={[styles.constraintOptionLabel, { color: colors.text }]}>
+                  {t('onboarding.daily_targets.constraint_option_minimum')}
+                </Text>
                 <Text style={[styles.constraintOptionDesc, { color: colors.textSecondary }]}>
-                  Ensure at least this amount
+                  {t('onboarding.daily_targets.constraint_option_minimum_desc')}
                 </Text>
               </TouchableOpacity>
               
@@ -328,9 +337,11 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
                   setShowConstraintModal(false);
                 }}
               >
-                <Text style={[styles.constraintOptionLabel, { color: colors.text }]}>Maximum</Text>
+                <Text style={[styles.constraintOptionLabel, { color: colors.text }]}>
+                  {t('onboarding.daily_targets.constraint_option_maximum')}
+                </Text>
                 <Text style={[styles.constraintOptionDesc, { color: colors.textSecondary }]}>
-                  Stay below this amount
+                  {t('onboarding.daily_targets.constraint_option_maximum_desc')}
                 </Text>
               </TouchableOpacity>
               
@@ -345,9 +356,11 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
                   setShowConstraintModal(false);
                 }}
               >
-                <Text style={[styles.constraintOptionLabel, { color: colors.text }]}>Target</Text>
+                <Text style={[styles.constraintOptionLabel, { color: colors.text }]}>
+                  {t('onboarding.daily_targets.constraint_option_target')}
+                </Text>
                 <Text style={[styles.constraintOptionDesc, { color: colors.textSecondary }]}>
-                  Aim for this amount
+                  {t('onboarding.daily_targets.constraint_option_target_desc')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -355,10 +368,14 @@ const TargetStepper: React.FC<TargetStepperProps> = ({
             <TouchableOpacity
               style={[styles.modalCloseButton, { backgroundColor: onboardingColors.primary }]}
               onPress={() => setShowConstraintModal(false)}
-              {...getButtonAccessibilityProps('Close', 'Double tap to close', false)}
+              {...getButtonAccessibilityProps(
+                t('common.close'),
+                t('onboarding.daily_targets.constraint_modal_close_hint'),
+                false
+              )}
             >
               <Text style={[styles.modalCloseButtonText, { color: Colors.light.textInverse }]}>
-                Done
+                {t('common.done')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -407,9 +424,10 @@ const NutrientTargetSliderCard: React.FC<NutrientTargetSliderCardProps> = ({
   nutrientType,
   onReferencePress,
 }) => {
+  const { t } = useTranslation();
   const getConstraintBadgeLabel = (): string | null => {
-    if (constraintType === 'min') return 'Daily Min';
-    if (constraintType === 'max') return 'Daily Max';
+    if (constraintType === 'min') return t('onboarding.daily_targets.daily_min');
+    if (constraintType === 'max') return t('onboarding.daily_targets.daily_max');
     return null;
   };
 
@@ -459,11 +477,17 @@ const NutrientTargetSliderCard: React.FC<NutrientTargetSliderCardProps> = ({
       <View style={styles.suggestedRow}>
         <View>
           <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
-            Suggested: {formatValue ? formatValue(suggestedValue) : suggestedValue.toString()} {unit}
+            {t('onboarding.daily_targets.suggested_value', {
+              value: formatValue ? formatValue(suggestedValue) : suggestedValue.toString(),
+              unit,
+            })}
           </Text>
           {currentTargetValue != null && (
             <Text variant="caption" style={[styles.suggestedText, { color: colors.textSecondary }]}>
-              Current: {formatValue ? formatValue(currentTargetValue) : currentTargetValue.toString()} {unit}
+              {t('onboarding.daily_targets.current_value', {
+                value: formatValue ? formatValue(currentTargetValue) : currentTargetValue.toString(),
+                unit,
+              })}
             </Text>
           )}
         </View>
@@ -473,13 +497,13 @@ const NutrientTargetSliderCard: React.FC<NutrientTargetSliderCardProps> = ({
           style={Platform.OS === 'web' && getFocusStyle(colors.tint)}
           hitSlop={Spacing.sm}
           {...getButtonAccessibilityProps(
-            `${label} reference`,
-            `Double tap to view ${label} reference information`,
+            t('onboarding.daily_targets.reference_label'),
+            t('onboarding.daily_targets.reference_hint', { label }),
             disabled
           )}
         >
           <Text style={[styles.refText, { color: colors.tint }]}>
-            ℹ️ Reference
+            {t('onboarding.daily_targets.reference_label')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -906,8 +930,10 @@ export const DailyFocusTargetsStep: React.FC<DailyFocusTargetsStepProps> = ({
                 onPress={() => setExpandedSecondary(!expandedSecondary)}
                 disabled={loading}
                 {...getButtonAccessibilityProps(
-                  expandedSecondary ? 'Collapse secondary targets' : 'Expand secondary targets',
-                  'Double tap to expand or collapse secondary targets',
+                  expandedSecondary
+                    ? t('onboarding.daily_targets.collapse_secondary')
+                    : t('onboarding.daily_targets.expand_secondary'),
+                  t('onboarding.daily_targets.secondary_toggle_hint'),
                   loading
                 )}
               >

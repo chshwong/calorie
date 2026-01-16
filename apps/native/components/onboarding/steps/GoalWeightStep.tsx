@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
-import { useTranslation } from "react-i18next";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import React, { useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { StyleSheet, View } from "react-native";
 
 import { GoalWeightSlider } from "@/components/onboarding/GoalWeightSlider";
 import { HeroCard } from "@/components/onboarding/HeroCard";

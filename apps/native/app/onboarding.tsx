@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { ActivityStep } from "@/components/onboarding/steps/ActivityStep";
+import { DailyFocusTargetsStep, type DailyFocusTargets } from "@/components/onboarding/steps/DailyFocusTargetsStep";
+import { DailyTargetCaloriesStep } from "@/components/onboarding/steps/DailyTargetCaloriesStep";
 import { GoalStep } from "@/components/onboarding/steps/GoalStep";
 import { HeightStep } from "@/components/onboarding/steps/HeightStep";
 import { NameStep } from "@/components/onboarding/steps/NameStep";
@@ -15,14 +17,18 @@ import { buildWeightPayload, WeightStep } from "@/components/onboarding/steps/We
 import {
   completeOnboardingProfile,
   fetchOnboardingProfile,
+  saveStepEightProfile,
   saveStepFiveProfile,
   saveStepFourProfile,
   saveStepOneProfile,
+  saveStepNineProfile,
   saveStepSevenProfile,
   saveStepSixProfile,
   saveStepThreeProfile,
   saveStepTwoProfile,
 } from "@/services/onboarding";
+import { mapCaloriePlanToDb } from "../../../lib/onboarding/calorie-plan";
+import { HARD_HARD_STOP } from "../../../lib/onboarding/goal-calorie-nutrient-rules";
 import { GoalWeightStep } from "../components/onboarding/steps/GoalWeightStep";
 import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
@@ -77,6 +83,10 @@ export default function OnboardingScreen() {
   const [goalWeightKg, setGoalWeightKg] = useState("");
   const [goalWeightLb, setGoalWeightLb] = useState("");
   const [weightLb, setWeightLb] = useState("");
+  const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
+  const [maintenanceCalories, setMaintenanceCalories] = useState<number | null>(null);
+  const [caloriePlan, setCaloriePlan] = useState<string | null>(null);
+  const [dailyTargets, setDailyTargets] = useState<DailyFocusTargets | null>(null);
   const heightPrefilledRef = useRef(false);
   const weightsPrefilledRef = useRef(false);
   const goalWeightsPrefilledRef = useRef(false);
@@ -104,6 +114,12 @@ export default function OnboardingScreen() {
   });
   const stepSevenMutation = useMutation({
     mutationFn: saveStepSevenProfile,
+  });
+  const stepEightMutation = useMutation({
+    mutationFn: saveStepEightProfile,
+  });
+  const stepNineMutation = useMutation({
+    mutationFn: saveStepNineProfile,
   });
   const queryClient = useQueryClient();
   const { data: profileData } = useQuery({
@@ -194,6 +210,39 @@ export default function OnboardingScreen() {
       }
       weightsPrefilledRef.current = true;
     }
+    if (
+      calorieTarget === null &&
+      profileData.daily_calorie_target !== null &&
+      profileData.daily_calorie_target !== undefined
+    ) {
+      setCalorieTarget(profileData.daily_calorie_target);
+    }
+    if (
+      maintenanceCalories === null &&
+      profileData.maintenance_calories !== null &&
+      profileData.maintenance_calories !== undefined
+    ) {
+      setMaintenanceCalories(profileData.maintenance_calories);
+    }
+    if (!caloriePlan && profileData.calorie_plan) {
+      setCaloriePlan(profileData.calorie_plan);
+    }
+    if (
+      dailyTargets === null &&
+      profileData.protein_g_min !== null &&
+      profileData.fiber_g_min !== null &&
+      profileData.carbs_g_max !== null &&
+      profileData.sugar_g_max !== null &&
+      profileData.sodium_mg_max !== null
+    ) {
+      setDailyTargets({
+        proteinGMin: profileData.protein_g_min,
+        fiberGMin: profileData.fiber_g_min,
+        carbsGMax: profileData.carbs_g_max,
+        sugarGMax: profileData.sugar_g_max,
+        sodiumMgMax: profileData.sodium_mg_max,
+      });
+    }
   }, [
     profileData,
     firstName,
@@ -212,6 +261,10 @@ export default function OnboardingScreen() {
     goalType,
     goalWeightKg,
     goalWeightLb,
+    calorieTarget,
+    maintenanceCalories,
+    caloriePlan,
+    dailyTargets,
   ]);
 
   const handleSubmit = async () => {
@@ -595,6 +648,96 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleDailyTargetStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+    if (
+      calorieTarget === null ||
+      !isFinite(calorieTarget) ||
+      calorieTarget < HARD_HARD_STOP ||
+      maintenanceCalories === null ||
+      caloriePlan === null
+    ) {
+      setError("onboarding.calorie_target.error_select_target");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const mappedPlan = mapCaloriePlanToDb(caloriePlan);
+      const result = await stepEightMutation.mutateAsync({
+        userId: user.id,
+        dailyCalorieTarget: calorieTarget,
+        maintenanceCalories,
+        caloriePlan: mappedPlan,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(9);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDailyTargetsStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+    if (!dailyTargets) {
+      setError("onboarding.daily_targets.error_missing_data");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepNineMutation.mutateAsync({
+        userId: user.id,
+        proteinGMin: dailyTargets.proteinGMin,
+        fiberGMin: dailyTargets.fiberGMin,
+        carbsGMax: dailyTargets.carbsGMax,
+        sugarGMax: dailyTargets.sugarGMax,
+        sodiumMgMax: dailyTargets.sodiumMgMax,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      queryClient.setQueryData(["onboarding-profile", user.id], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          protein_g_min: dailyTargets.proteinGMin,
+          fiber_g_min: dailyTargets.fiberGMin,
+          carbs_g_max: dailyTargets.carbsGMax,
+          sugar_g_max: dailyTargets.sugarGMax,
+          sodium_mg_max: dailyTargets.sodiumMgMax,
+        };
+      });
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(10);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const currentWeightLbValue =
     currentWeightUnit === "kg"
       ? currentWeightKg.trim()
@@ -718,8 +861,33 @@ export default function OnboardingScreen() {
                 onBack={() => setCurrentStep(6)}
                 onContinue={handleGoalWeightStepContinue}
               />
+            ) : currentStep === 8 ? (
+              <DailyTargetCaloriesStep
+                profile={profileData ?? null}
+                loading={saving}
+                error={error}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(7)}
+                onContinue={handleDailyTargetStepContinue}
+                onActivityLevelSaved={setActivityLevel}
+                onCalorieTargetChange={(target) => {
+                  setCalorieTarget(target.calorieTarget);
+                  setMaintenanceCalories(target.maintenanceCalories);
+                  setCaloriePlan(target.caloriePlan);
+                }}
+              />
+            ) : currentStep === 9 ? (
+              <DailyFocusTargetsStep
+                profile={profileData ?? null}
+                loading={saving}
+                error={error}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(8)}
+                onContinue={handleDailyTargetsStepContinue}
+                onTargetsChange={setDailyTargets}
+              />
             ) : (
-              <PlaceholderStep onBack={() => setCurrentStep(7)} />
+              <PlaceholderStep onBack={() => setCurrentStep(9)} />
             )}
           </View>
         )}

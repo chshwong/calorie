@@ -72,6 +72,7 @@ const CalorieStepper: React.FC<CalorieStepperProps> = ({
   disabled = false,
   colors,
 }) => {
+  const { t } = useTranslation();
   const handleIncrement = () => {
     const clamped = Math.max(min, Math.min(max, value + step));
     const next = Math.max(min, roundDownTo25(clamped));
@@ -96,8 +97,8 @@ const CalorieStepper: React.FC<CalorieStepperProps> = ({
         onPress={handleDecrement}
         disabled={disabled || value <= min}
         {...getButtonAccessibilityProps(
-          'Decrease calories',
-          `Double tap to decrease by ${step} cal`,
+          t('onboarding.calorie_target.a11y_decrease_calories_label'),
+          t('onboarding.calorie_target.a11y_decrease_calories_hint', { step }),
           disabled || value <= min
         )}
       >
@@ -108,7 +109,7 @@ const CalorieStepper: React.FC<CalorieStepperProps> = ({
           {value}
         </Text>
         <Text variant="caption" style={[styles.unitText, { color: colors.textSecondary }]}>
-          cal/day
+          {t('onboarding.calorie_target.kcal_per_day')}
         </Text>
       </View>
       <TouchableOpacity
@@ -121,8 +122,8 @@ const CalorieStepper: React.FC<CalorieStepperProps> = ({
         onPress={handleIncrement}
         disabled={disabled || value >= max}
         {...getButtonAccessibilityProps(
-          'Increase calories',
-          `Double tap to increase by ${step} cal`,
+          t('onboarding.calorie_target.a11y_increase_calories_label'),
+          t('onboarding.calorie_target.a11y_increase_calories_hint', { step }),
           disabled || value >= max
         )}
       >
@@ -450,7 +451,8 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
     if (isWeightLoss) {
       if (!calculations) return null;
-      const { warningLevel, warningText } = getWeightLossCalorieWarning(customCalories);
+      const { warningLevel } = getWeightLossCalorieWarning(customCalories);
+      const warningText = getWarningTextByLevel(warningLevel);
       if (warningText === null) return null;
       
       // Determine color: yellow if selected, otherwise based on warning level
@@ -467,7 +469,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
       }
       
       return {
-        text: warningLevel === 'red' ? `⚠️ ${warningText}` : warningText,
+        text: warningText,
         color,
       };
     }
@@ -479,7 +481,8 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
       // For maintenance/recomp, use unified low-calorie warnings (same as weight loss)
       if (isMaintain || isRecomp) {
-        const { warningLevel, warningText } = getWeightLossCalorieWarning(customCalories);
+        const { warningLevel } = getWeightLossCalorieWarning(customCalories);
+        const warningText = getWarningTextByLevel(warningLevel);
         if (warningText !== null) {
           let color: string;
           if (isCustomSelected) {
@@ -493,7 +496,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
           }
           
           return {
-            text: warningLevel === 'red' ? `⚠️ ${warningText}` : warningText,
+            text: warningText,
             color,
           };
         }
@@ -565,10 +568,16 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     etaDate.setDate(etaDate.getDate() + weeks * 7);
 
     // Format pace line (weight loss format for all goals)
-    const paceLine = `~${roundTo1(Math.abs(lbPerWeek))} lb/week`;
+    const paceLine = t('onboarding.calorie_target.pace_per_week', {
+      pace: roundTo1(Math.abs(lbPerWeek)),
+    });
 
     // Format ETA line (weight loss format: ~X weeks (by DATE))
-    const etaLine = `~${weeks} week${weeks === 1 ? '' : 's'} (by ${formatDateForDisplay(etaDate.toISOString().split('T')[0])})`;
+    const etaLine = t('onboarding.calorie_target.eta_weeks', {
+      weeks,
+      suffix: weeks === 1 ? '' : 's',
+      date: formatDateForDisplay(etaDate.toISOString().split('T')[0]),
+    });
 
     return {
       paceLbsPerWeek: Math.round(Math.abs(lbPerWeek) * 10) / 10,
@@ -661,23 +670,23 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
   // Get goal-specific subtitle text
   const getSubtitleText = (): string => {
     if (!targetWeightLb) {
-      return 'Choose a daily calorie target: ';
+      return t('onboarding.calorie_target.subtitle_default');
     }
 
     const formattedWeight = formatWeight(targetWeightLb);
 
     if (isWeightLoss) {
-      return `To reach ${formattedWeight}, choose a calorie target below maintenance: `;
+      return t('onboarding.calorie_target.subtitle_lose', { weight: formattedWeight });
     } else if (isMaintain) {
-      return `To maintain at ${formattedWeight}, choose a calorie target near maintenance: `;
+      return t('onboarding.calorie_target.subtitle_maintain', { weight: formattedWeight });
     } else if (isRecomp) {
-      return `To recomposition at ${formattedWeight}, choose a calorie target near maintenance: `;
+      return t('onboarding.calorie_target.subtitle_recomp', { weight: formattedWeight });
     } else if (isGain) {
-      return `To gain toward ${formattedWeight}, choose a daily calorie target above maintenance: `;
+      return t('onboarding.calorie_target.subtitle_gain', { weight: formattedWeight });
     }
 
     // Fallback
-    return 'Choose a daily calorie target: ';
+    return t('onboarding.calorie_target.subtitle_default');
   };
 
 
@@ -780,12 +789,12 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
             onPress={() => setShowActivityModal(true)}
             style={styles.adjustActivityLinkContainer}
             {...getButtonAccessibilityProps(
-              'Adjust activity level',
-              'Double tap to adjust your activity level'
+              t('onboarding.calorie_target.adjust_activity_link'),
+              t('onboarding.calorie_target.a11y_adjust_activity_hint')
             )}
           >
             <Text style={[styles.adjustActivityLink, { color: onboardingColors.primary }]}>
-              Adjust activity level
+              {t('onboarding.calorie_target.adjust_activity_link')}
             </Text>
           </TouchableOpacity>
         )}
@@ -807,6 +816,42 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     return isSelected ? Colors.light.warning : Colors.light.error;
   };
 
+  const getWarningTextByLevel = (
+    warningLevel: 'none' | 'neutral' | 'red' | 'unsafe'
+  ): string | null => {
+    if (warningLevel === 'unsafe') return t('onboarding.calorie_target.warning_level_unsafe');
+    if (warningLevel === 'red') return t('onboarding.calorie_target.warning_level_red');
+    if (warningLevel === 'neutral') return t('onboarding.calorie_target.warning_level_neutral');
+    return null;
+  };
+
+  const getWeightLossPlanTitle = (
+    planKey: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200'
+  ): string => {
+    switch (planKey) {
+      case 'moreSustainable':
+      case 'sustainable_floor_1200':
+        return t('onboarding.calorie_target.weight_loss_more_sustainable_title');
+      case 'standard':
+        return t('onboarding.calorie_target.weight_loss_standard_title');
+      case 'aggressive':
+        return t('onboarding.calorie_target.weight_loss_aggressive_title');
+      case 'cautiousMinimum':
+        return t('onboarding.calorie_target.weight_loss_cautious_minimum_title');
+      default:
+        return t('onboarding.calorie_target.weight_loss_standard_title');
+    }
+  };
+
+  const getWeightLossPlanSubtitle = (
+    planKey: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200'
+  ): string | null => {
+    if (planKey === 'sustainable_floor_1200') {
+      return t('onboarding.calorie_target.weight_loss_escape_hatch_subtitle');
+    }
+    return null;
+  };
+
   // Helper function to render a baseline deficit chip
   const renderBaselineChip = (planKey: 'moreSustainable' | 'standard' | 'aggressive' | 'cautiousMinimum' | 'sustainable_floor_1200') => {
     if (!calculations) return null;
@@ -822,19 +867,25 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     const isSelectable = plan.isSelectable;
     const textColor = isSelected && isSelectable ? Colors.light.textInverse : colors.text;
     const secondaryTextColor = isSelected && isSelectable ? Colors.light.textInverse : colors.textSecondary;
+    const planTitle = getWeightLossPlanTitle(planKey);
+    const planSubtitle = getWeightLossPlanSubtitle(planKey);
 
     // Format pace display
     const paceText = plan.paceLbsPerWeek !== null && plan.paceLbsPerWeek > 0
-      ? `~${roundTo1(plan.paceLbsPerWeek)} lb/week`
+      ? t('onboarding.calorie_target.pace_per_week', { pace: roundTo1(plan.paceLbsPerWeek) })
       : null;
 
     // Format date display
     const dateText = plan.etaDateISO && plan.etaWeeks !== null && plan.etaWeeks > 0
-      ? `~${plan.etaWeeks} week${plan.etaWeeks === 1 ? '' : 's'} (by ${formatDateForDisplay(plan.etaDateISO)})`
+      ? t('onboarding.calorie_target.eta_weeks', {
+          weeks: plan.etaWeeks,
+          suffix: plan.etaWeeks === 1 ? '' : 's',
+          date: formatDateForDisplay(plan.etaDateISO),
+        })
       : null;
 
     // Get warning text from plan (computed by rules module)
-    const warningText = plan.warningText;
+    const warningText = getWarningTextByLevel(plan.warningLevel);
     // Determine warning color based on level and selection state
     let warningColor: string;
     if (isSelected && isSelectable) {
@@ -851,8 +902,8 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
 
     // Get title with recommended badge
     const titleText = plan.isRecommended
-      ? `${plan.title} (Recommended)`
-      : plan.title;
+      ? `${planTitle} (${t('onboarding.calorie_target.recommended_badge')})`
+      : planTitle;
 
     return (
       <TouchableOpacity
@@ -884,15 +935,15 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
         {...getButtonAccessibilityProps(
           `${titleText}${isSelected ? ' selected' : ''}${!isSelectable ? ' (disabled)' : ''}`,
           !isSelectable
-            ? 'This plan is below the safe minimum intake'
-            : `Double tap to select ${plan.title}`,
+            ? t('onboarding.calorie_target.a11y_plan_below_safe_minimum')
+            : t('onboarding.calorie_target.a11y_select_plan', { planTitle }),
           loading || !isSelectable
         )}
       >
         <View style={styles.presetContent}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <Text variant="h4" style={[styles.presetLabel, { color: textColor }]}>
-              {plan.title}
+              {planTitle}
             </Text>
             {plan.isRecommended && (
               <View style={{
@@ -937,9 +988,9 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
               {t('onboarding.calorie_target.lower_safety_boundary')}
             </Text>
           )}
-          {plan.subtitle && (
+          {planSubtitle && (
             <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
-              {plan.subtitle}
+              {planSubtitle}
             </Text>
           )}
           {warningText && (
@@ -949,7 +1000,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                 { color: warningColor },
               ]}
             >
-              {plan.warningLevel === 'red' ? '⚠️ ' : ''}{warningText}
+              {warningText}
             </ThemedText>
           )}
         </View>
@@ -988,10 +1039,14 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
           etaDate.setDate(etaDate.getDate() + weeks * 7);
           
           // Format pace line (weight loss format: ~X lb/week)
-          paceLine = `~${roundTo1(lbPerWeek)} lb/week`;
+          paceLine = t('onboarding.calorie_target.pace_per_week', { pace: roundTo1(lbPerWeek) });
           
           // Format ETA line (weight loss format: ~X weeks (by DATE))
-          etaLine = `~${weeks} week${weeks === 1 ? '' : 's'} (by ${formatDateForDisplay(etaDate.toISOString().split('T')[0])})`;
+          etaLine = t('onboarding.calorie_target.eta_weeks', {
+            weeks,
+            suffix: weeks === 1 ? '' : 's',
+            date: formatDateForDisplay(etaDate.toISOString().split('T')[0]),
+          });
         } else {
           paceLine = null;
           etaLine = null;
@@ -1014,7 +1069,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
     let warningLevel: 'none' | 'neutral' | 'red' | 'unsafe' = 'none';
     if ((isMaintain || isRecomp) && plan.caloriesPerDay < HARD_FLOOR) {
       const warning = getWeightLossCalorieWarning(plan.caloriesPerDay);
-      warningText = warning.warningText;
+      warningText = getWarningTextByLevel(warning.warningLevel);
       warningLevel = warning.warningLevel;
     } else if (plan.warning) {
       // For gain goals, use existing warning structure
@@ -1094,7 +1149,9 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
             )}
           </View>
           <Text variant="body" style={[styles.presetCalories, { color: textColor }]}>
-            {isSelectable ? `${plan.caloriesPerDay} cal/day` : t('onboarding.calorie_target.below_safe_minimum')}
+            {isSelectable
+              ? `${plan.caloriesPerDay} ${t('onboarding.calorie_target.kcal_per_day')}`
+              : t('onboarding.calorie_target.below_safe_minimum')}
           </Text>
           <Text variant="caption" style={[styles.presetDescription, { color: secondaryTextColor }]}>
             {t(plan.subtitleKey)}
@@ -1232,8 +1289,9 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                   label = maintenanceText.substring(0, colonIndex + 1).trim();
                   range = maintenanceText.substring(colonIndex + 1).trim();
                 } else {
-                  // Fallback: split at "cal/day" if no colon
-                  const calDayIndex = maintenanceText.indexOf('cal/day');
+                  // Fallback: split at kcal label if no colon
+                  const kcalLabel = t('onboarding.calorie_target.kcal_per_day');
+                  const calDayIndex = maintenanceText.indexOf(kcalLabel);
                   if (calDayIndex !== -1) {
                     label = maintenanceText.substring(0, calDayIndex).trim();
                     range = maintenanceText.substring(calDayIndex).trim();
@@ -1400,22 +1458,34 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                   />
                   {isWeightLoss && customMeta.paceLbsPerWeek !== null && customMeta.paceLbsPerWeek > 0 && (
                     <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
-                      ~{roundTo1(customMeta.paceLbsPerWeek)} lb/week
+                      {t('onboarding.calorie_target.pace_per_week', {
+                        pace: roundTo1(customMeta.paceLbsPerWeek),
+                      })}
                     </Text>
                   )}
                   {isWeightLoss && customMeta.etaWeeks !== null && customMeta.etaWeeks > 0 && customMeta.etaDate && (
                     <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
-                      ~{customMeta.etaWeeks} week{customMeta.etaWeeks === 1 ? '' : 's'} (by {formatDateForDisplay(customMeta.etaDate.toISOString().split('T')[0])})
+                      {t('onboarding.calorie_target.eta_weeks', {
+                        weeks: customMeta.etaWeeks,
+                        suffix: customMeta.etaWeeks === 1 ? '' : 's',
+                        date: formatDateForDisplay(customMeta.etaDate.toISOString().split('T')[0]),
+                      })}
                     </Text>
                   )}
                   {isGain && customGainMeta.paceLbsPerWeek !== null && customGainMeta.paceLbsPerWeek > 0 && (
                     <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
-                      ~{roundTo1(customGainMeta.paceLbsPerWeek)} lb/week
+                      {t('onboarding.calorie_target.pace_per_week', {
+                        pace: roundTo1(customGainMeta.paceLbsPerWeek),
+                      })}
                     </Text>
                   )}
                   {isGain && customGainMeta.etaWeeks !== null && customGainMeta.etaWeeks > 0 && customGainMeta.etaDate && (
                     <Text variant="caption" style={[styles.presetMetaText, { color: Colors.light.textInverse }]}>
-                      ~{customGainMeta.etaWeeks} week{customGainMeta.etaWeeks === 1 ? '' : 's'} (by {formatDateForDisplay(customGainMeta.etaDate.toISOString().split('T')[0])})
+                      {t('onboarding.calorie_target.eta_weeks', {
+                        weeks: customGainMeta.etaWeeks,
+                        suffix: customGainMeta.etaWeeks === 1 ? '' : 's',
+                        date: formatDateForDisplay(customGainMeta.etaDate.toISOString().split('T')[0]),
+                      })}
                     </Text>
                   )}
                   {getCustomWarningText() && (
@@ -1458,7 +1528,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
               t('onboarding.calorie_target.plan_custom'),
-              'Double tap to select custom calorie target',
+              t('onboarding.calorie_target.a11y_select_custom_plan'),
               loading
             )}
           >
@@ -1493,7 +1563,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                   onPress={handleCustomWarningAdjust}
                   {...getButtonAccessibilityProps(
                     t('onboarding.calorie_target.custom_warning_adjust'),
-                    'Double tap to adjust calories'
+                    t('onboarding.calorie_target.a11y_adjust_calories_hint')
                   )}
                 >
                   <Text variant="body" style={[styles.modalButtonText, { color: colors.text }]}>
@@ -1505,7 +1575,7 @@ export const DailyCalorieTargetStep: React.FC<DailyCalorieTargetStepProps> = ({
                   onPress={handleCustomWarningProceed}
                   {...getButtonAccessibilityProps(
                     t('onboarding.calorie_target.custom_warning_proceed'),
-                    'Double tap to proceed anyway'
+                    t('onboarding.calorie_target.a11y_proceed_anyway_hint')
                   )}
                 >
                   <Text variant="body" style={[styles.modalButtonText, { color: Colors.light.textInverse }]}>

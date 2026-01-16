@@ -6,6 +6,7 @@ export const POLICY = {
 } as const;
 
 import { DB_MAX_WEIGHT_LB, DB_MIN_WEIGHT_LB, lbToKg } from "@/lib/domain/weight-constants";
+import { NUTRIENT_TARGETS as ROOT_NUTRIENT_TARGETS } from "../../../constants/constraints";
 
 export const PROFILES = {
   HEIGHT_CM: { MIN: 50, MAX: 260 },
@@ -19,3 +20,5 @@ export const DERIVED = {
     MAX: lbToKg(DB_MAX_WEIGHT_LB),
   },
 } as const;
+
+export const NUTRIENT_TARGETS = ROOT_NUTRIENT_TARGETS;

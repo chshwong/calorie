@@ -85,13 +85,23 @@ type OnboardingProfile = {
   body_fat_percent: number | null;
   goal_type: "lose" | "maintain" | "gain" | "recomp" | null;
   goal_weight_lb: number | null;
+  daily_calorie_target: number | null;
+  maintenance_calories: number | null;
+  calorie_plan: string | null;
+  onboarding_calorie_set_at: string | null;
+  protein_g_min: number | null;
+  fiber_g_min: number | null;
+  carbs_g_max: number | null;
+  sugar_g_max: number | null;
+  sodium_mg_max: number | null;
+  onboarding_targets_set_at: string | null;
 };
 
 export async function fetchOnboardingProfile(userId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "first_name, date_of_birth, avatar_url, gender, height_cm, height_unit, activity_level, weight_lb, weight_unit, body_fat_percent, goal_type, goal_weight_lb"
+      "first_name, date_of_birth, avatar_url, gender, height_cm, height_unit, activity_level, weight_lb, weight_unit, body_fat_percent, goal_type, goal_weight_lb, daily_calorie_target, maintenance_calories, calorie_plan, onboarding_calorie_set_at, protein_g_min, fiber_g_min, carbs_g_max, sugar_g_max, sodium_mg_max, onboarding_targets_set_at"
     )
     .eq("user_id", userId)
     .single();
@@ -228,6 +238,64 @@ export async function saveStepSevenProfile(input: StepSevenInput) {
     .update({
       goal_weight_lb: input.goalWeightLb,
     })
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepEightInput = {
+  userId: string;
+  dailyCalorieTarget: number;
+  maintenanceCalories: number;
+  caloriePlan: string;
+};
+
+export async function saveStepEightProfile(input: StepEightInput) {
+  const payload: Record<string, number | string> = {
+    daily_calorie_target: input.dailyCalorieTarget,
+    maintenance_calories: input.maintenanceCalories,
+    calorie_plan: input.caloriePlan,
+    onboarding_calorie_set_at: new Date().toISOString(),
+  };
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepNineInput = {
+  userId: string;
+  proteinGMin: number;
+  fiberGMin: number;
+  carbsGMax: number;
+  sugarGMax: number;
+  sodiumMgMax: number;
+};
+
+export async function saveStepNineProfile(input: StepNineInput) {
+  const payload: Record<string, number | string> = {
+    protein_g_min: input.proteinGMin,
+    fiber_g_min: input.fiberGMin,
+    carbs_g_max: input.carbsGMax,
+    sugar_g_max: input.sugarGMax,
+    sodium_mg_max: input.sodiumMgMax,
+    onboarding_targets_set_at: new Date().toISOString(),
+  };
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update(payload)
     .eq("user_id", input.userId);
 
   if (updateError) {

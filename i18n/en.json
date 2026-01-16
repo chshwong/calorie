@@ -914,7 +914,37 @@
       "plan_custom_desc": "Set your own target",
       "below_minimum": "Below recommended minimum intake.",
       "warning_below_recommended": "Below our recommended minimum, proceed with caution",
-      "warning_critical": "ΓÜá∩╕Å This would require an unsafe calorie intake. Choose another target date or weight."
+      "warning_critical": "ΓÜá∩╕Å This would require an unsafe calorie intake. Choose another target date or weight.",
+      "adjust_activity_link": "Adjust activity level",
+      "subtitle_default": "Choose a daily calorie target:",
+      "subtitle_lose": "To reach {{weight}}, choose a calorie target below maintenance:",
+      "subtitle_maintain": "To maintain at {{weight}}, choose a calorie target near maintenance:",
+      "subtitle_recomp": "To recomposition at {{weight}}, choose a calorie target near maintenance:",
+      "subtitle_gain": "To gain toward {{weight}}, choose a daily calorie target above maintenance:",
+      "weight_loss_more_sustainable_title": "More sustainable",
+      "weight_loss_standard_title": "Standard pace",
+      "weight_loss_aggressive_title": "Fast-tracked pace",
+      "weight_loss_cautious_minimum_title": "Cautious Minimum",
+      "weight_loss_escape_hatch_subtitle": "Arrives later, easier to sustain.",
+      "extreme_edge_case_title": "⚠️ This goal is beyond what the app can guide safely.",
+      "extreme_edge_case_body": "Based on your current data, standard weight-loss targets would fall below safe limits. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you're doing, or go back and adjust your goal.",
+      "maintenance_recomp_warning_title": "⚠️ This goal is beyond what the app can guide reliably.",
+      "maintenance_warning_details": "Based on your current data, maintenance targets at this range are hard to estimate accurately and small fluctuations can shift outcomes. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you're doing, or go back and adjust your goal.",
+      "recomp_warning_details": "Based on your current data, recomposition targets at this range are hard to set because progress depends heavily on training quality, protein, and recovery. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you're doing, or go back and adjust your goal.",
+      "pace_per_week": "~{{pace}} lb/week",
+      "eta_weeks": "~{{weeks}} week{{suffix}} (by {{date}})",
+      "warning_level_unsafe": "This plan is unsafe and cannot be selected.",
+      "warning_level_red": "⚠️ Unsafe for most people without professional supervision.",
+      "warning_level_neutral": "Demanding — requires careful nutrition and monitoring.",
+      "a11y_decrease_calories_label": "Decrease calories",
+      "a11y_decrease_calories_hint": "Double tap to decrease by {{step}} cal",
+      "a11y_increase_calories_label": "Increase calories",
+      "a11y_increase_calories_hint": "Double tap to increase by {{step}} cal",
+      "a11y_adjust_activity_hint": "Double tap to adjust your activity level",
+      "a11y_select_custom_plan": "Double tap to select custom calorie target",
+      "a11y_adjust_calories_hint": "Double tap to adjust calories",
+      "a11y_proceed_anyway_hint": "Double tap to proceed anyway",
+      "error_select_target": "Please select a calorie target."
     },
     "daily_targets": {
       "title": "Daily Focus Targets",
@@ -926,9 +956,91 @@
       "carbs": "Total Carbs Limit",
       "sugar": "Sugar Limit",
       "sodium": "Sodium Limit",
+      "suggested_value": "Suggested: {{value}} {{unit}}",
+      "current_value": "Current: {{value}} {{unit}}",
+      "reference_label": "Reference",
+      "reference_hint": "Double tap to view {{label}} reference information",
+      "reset_to_baseline": "Reset to baseline",
+      "reset_to_baseline_hint": "Double tap to reset to baseline value",
+      "daily_min": "Daily Min",
+      "daily_max": "Daily Max",
+      "expand_secondary": "Expand secondary targets",
+      "collapse_secondary": "Collapse secondary targets",
+      "secondary_toggle_hint": "Double tap to expand or collapse secondary targets",
+      "a11y_increase_label": "Increase {{label}}",
+      "a11y_increase_hint": "Double tap to increase {{label}} by {{step}} {{unit}}",
+      "a11y_decrease_label": "Decrease {{label}}",
+      "a11y_decrease_hint": "Double tap to decrease {{label}} by {{step}} {{unit}}",
+      "a11y_target_input_label": "{{label}} input",
+      "a11y_target_input_hint": "Enter {{label}} value in {{unit}}",
+      "constraint_settings_label": "Constraint settings",
+      "constraint_settings_hint": "Double tap to change constraint type",
+      "constraint_button": "Constraint",
+      "constraint_modal_title": "{{label}} Constraint",
+      "constraint_modal_description": "Choose how this target should be enforced",
+      "constraint_option_minimum": "Minimum",
+      "constraint_option_minimum_desc": "Ensure at least this amount",
+      "constraint_option_maximum": "Maximum",
+      "constraint_option_maximum_desc": "Stay below this amount",
+      "constraint_option_target": "Target",
+      "constraint_option_target_desc": "Aim for this amount",
+      "constraint_modal_close_hint": "Double tap to close",
       "error_missing_data": "Please complete previous steps to see suggested targets.",
       "water": "Daily Water Target",
-      "based_on_calories": "Based on your calorie target of {{calories}} cal/day"
+      "based_on_calories": "Based on your calorie target of {{calories}} cal/day",
+      "reference": {
+        "sections": {
+          "why_track": "Why track",
+          "what_to_aim_for": "What to aim for",
+          "typical_ranges": "Typical ranges",
+          "realistic_start": "A realistic start",
+          "when_not_apply": "When this may not apply"
+        },
+        "protein": {
+          "title": "Protein",
+          "why_track": "Protein helps preserve and build muscle and keeps you fuller for longer.",
+          "what_to_aim_for": "Most people do well around 0.7–1.0 g per lb of body weight per day.",
+          "typical_ranges": {
+            "female": "Females: often ~70–140 g/day",
+            "combined": "Exact needs vary with size and activity."
+          },
+          "disclaimer": "General guidance only, not medical advice. Needs vary with age, activity level, kidney or liver conditions, medications, and other factors."
+        },
+        "fiber": {
+          "title": "Fiber",
+          "why_track": "Supports digestion, fullness, and steadier energy.",
+          "what_to_aim_for": "Health guidelines suggest:",
+          "typical_ranges": {
+            "male": "Males: ~30–38 g/day",
+            "female": "Females: ~25–30 g/day",
+            "combined": "Most adults today average only ~15–20 g/day."
+          },
+          "realistic_start": "~20 g/day could be a great first goal. You can build from there.",
+          "disclaimer": "General guidance only, not medical advice."
+        },
+        "carbs": {
+          "title": "Carbs",
+          "why_track": "Capping carbs helps limit easy calorie creep and encourages better carb choices.",
+          "what_to_aim_for": "Many people do well around 30–55% of daily calories from carbs.",
+          "typical_ranges": {
+            "combined": "Intake may be much lower if you follow approaches like keto."
+          },
+          "disclaimer": "General guidance only, not medical advice. Needs vary with training, diabetes/prediabetes, medications, and other conditions."
+        },
+        "sugar": {
+          "title": "Sugar",
+          "why_track": "Capping sugar helps limit ultra-processed calories and supports heart and dental health.",
+          "what_to_aim_for": "A practical range for many people is under ~25–50 g/day.",
+          "disclaimer": "General guidance only, not medical advice. Individual needs vary."
+        },
+        "sodium": {
+          "title": "Sodium",
+          "why_track": "Capping sodium helps support healthy blood pressure and reduces hidden salt from processed foods.",
+          "what_to_aim_for": "Many people do well around ~2,000–2,300 mg/day.",
+          "when_not_apply": "This tracking is for those who want to limit sodium.\nSome very active individuals may need extra sodium to stay safe. If that applies to you, it's reasonable to opt out of this target.",
+          "disclaimer": "General guidance only, not medical advice. Sodium needs vary with blood pressure, kidney or heart conditions, sweating, and medications."
+        }
+      }
     },
     "legal": {
       "title": "Legal Agreement",
