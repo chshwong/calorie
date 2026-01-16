@@ -4,7 +4,7 @@ import { StyleSheet, View } from "react-native";
 
 import { HeroCard } from "@/components/onboarding/HeroCard";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
-import { colors, spacing } from "../../../theme/tokens";
+import { colors, fontSizes, fontWeights, spacing } from "../../../theme/tokens";
 import { Button } from "../../ui/Button";
 import { ChoiceTile } from "../../ui/ChoiceTile";
 import { Text } from "../../ui/Text";
@@ -111,8 +111,8 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
   illustrationSymbol: {
-    fontSize: 48,
-    fontWeight: "700",
+    fontSize: fontSizes.illustration,
+    fontWeight: fontWeights.bold,
   },
   options: {
     gap: spacing.lg,

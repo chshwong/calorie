@@ -1,16 +1,16 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import Feather from "@expo/vector-icons/Feather";
+
+import ActivityRunImage from "@/assets/activity_run.png";
 
 import { HeroCard } from "@/components/onboarding/HeroCard";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { ActivityStepContent } from "@/components/onboarding/ActivityStepContent";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
-import { useColorScheme } from "@/components/useColorScheme";
 import { ActivityLevel, validateActivityLevel } from "@/lib/validation/activity";
-import { colors, spacing } from "@/theme/tokens";
+import { spacing } from "@/theme/tokens";
 
 type ActivityStepProps = {
   activityLevel: ActivityLevel | "";
@@ -33,8 +33,6 @@ export function ActivityStep({
   onContinue,
 }: ActivityStepProps) {
   const { t } = useTranslation();
-  const scheme = useColorScheme() ?? "light";
-  const theme = colors[scheme];
 
   const validation = useMemo(
     () => validateActivityLevel(activityLevel),
@@ -49,8 +47,12 @@ export function ActivityStep({
       subtitle={t("onboarding.activity.subtitle")}
       hero={
         <HeroCard>
-          <View style={styles.heroVisual}>
-            <Feather name="activity" size={56} color={theme.primary} />
+          <View style={styles.heroContainer}>
+            <Image
+              source={ActivityRunImage}
+              resizeMode="contain"
+              style={styles.heroImage}
+            />
           </View>
         </HeroCard>
       }
@@ -94,9 +96,14 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.lg,
   },
-  heroVisual: {
+  heroContainer: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  heroImage: {
+    width: 120,
+    height: 120,
+    opacity: 0.95,
   },
   actions: {
     gap: spacing.md,

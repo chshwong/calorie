@@ -49,8 +49,8 @@ export function ChoiceTile({
         isCompact && styles.tileCompact,
         pressed && styles.pressed,
         {
-          backgroundColor: selected ? withAlpha(theme.primary, 0.16) : theme.card,
-          borderColor: selected ? theme.primary : theme.border,
+          backgroundColor: selected ? withAlpha(theme.primary, 0.16) : theme.surface,
+          borderColor: selected ? theme.primary : theme.inputBorder,
         },
         style,
       ]}
@@ -81,9 +81,9 @@ const styles = StyleSheet.create({
   tile: {
     borderWidth: 1,
     borderRadius: radius.md,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.xl - 3,
     paddingHorizontal: spacing.xl,
-    minHeight: spacing.xxl + spacing.xl,
+    minHeight: spacing.xxl + spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   pressed: {
-    opacity: 0.92,
+    opacity: 0.88,
   },
 });
 

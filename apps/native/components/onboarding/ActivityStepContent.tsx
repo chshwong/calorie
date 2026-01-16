@@ -70,6 +70,6 @@ export function ActivityStepContent({ value, onChange, disabled }: ActivityStepC
 
 const styles = StyleSheet.create({
   options: {
-    gap: spacing.lg,
+    gap: spacing.md,
   },
 });

@@ -63,4 +63,22 @@ export const fontSizes = {
   body: 16,
   label: 14,
   caption: 12,
+  illustration: 64,
+} as const;
+
+export const fontWeights = {
+  regular: '400',
+  semibold: '600',
+  bold: '700',
+} as const;
+
+export const opacity = {
+  subtle: 0.5,
+  muted: 0.7,
+  image: 0.9,
+  full: 1.0,
+} as const;
+
+export const imageSizes = {
+  heroIllustration: { width: 64, height: 140 },
 } as const;

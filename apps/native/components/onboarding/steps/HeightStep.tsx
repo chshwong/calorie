@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
+
+import HeightRulerImage from "@/assets/height_ruler.png";
 
 import { HeroCard } from "@/components/onboarding/HeroCard";
 import { OnboardingErrorBox } from "@/components/onboarding/OnboardingErrorBox";
@@ -9,12 +11,11 @@ import { ChoiceTile } from "@/components/ui/ChoiceTile";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
-import { useColorScheme } from "@/components/useColorScheme";
 import { filterNumericInput } from "@/lib/validation/inputFilters";
 import { roundTo1 } from "@/lib/domain/conversions";
 import { convertHeightToCm, validateHeightInputs } from "@/lib/onboarding/height-validation";
 import { cmToFtIn, HeightUnit } from "@/lib/validation/height";
-import { colors, spacing } from "@/theme/tokens";
+import { spacing, opacity, imageSizes } from "@/theme/tokens";
 
 type HeightStepProps = {
   heightCm: string;
@@ -48,8 +49,6 @@ export function HeightStep({
   onContinue,
 }: HeightStepProps) {
   const { t } = useTranslation();
-  const scheme = useColorScheme() ?? "light";
-  const theme = colors[scheme];
 
   const validation = useMemo(
     () => validateHeightInputs(heightUnit, heightCm, heightFt, heightIn),
@@ -112,21 +111,12 @@ export function HeightStep({
       subtitle={t("onboarding.height.subtitle")}
       hero={
         <HeroCard>
-          <View style={[styles.heroVisual, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.ruler, { backgroundColor: withAlpha(theme.primary, 0.2) }]}>
-              {RULER_TICKS.map((index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.tick,
-                    { backgroundColor: withAlpha(theme.primary, index % 2 === 0 ? 0.85 : 0.55) },
-                  ]}
-                />
-              ))}
-              <View
-                style={[styles.indicator, { backgroundColor: theme.primary }]}
-              />
-            </View>
+          <View style={styles.heroContainer}>
+            <Image
+              source={HeightRulerImage}
+              resizeMode="contain"
+              style={styles.heroImage}
+            />
           </View>
         </HeroCard>
       }
@@ -163,7 +153,7 @@ export function HeightStep({
               label={`${t("onboarding.height.height_label")} (${t("units.cm")})`}
               value={heightCm}
               onChangeText={handleCmChange}
-              placeholder={t("onboarding.height.height_cm_placeholder")}
+              placeholder={t("units.cm")}
               keyboardType="numeric"
               editable={!loading}
             />
@@ -221,36 +211,14 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.lg,
   },
-  heroVisual: {
-    width: "75%",
-    height: "75%",
-    borderRadius: spacing.lg,
-    borderWidth: 1,
+  heroContainer: {
     alignItems: "center",
     justifyContent: "center",
   },
-  ruler: {
-    width: spacing.md,
-    height: "80%",
-    borderRadius: spacing.md,
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: spacing.sm,
-    position: "relative",
-  },
-  tick: {
-    width: "70%",
-    height: 2,
-    borderRadius: 2,
-  },
-  indicator: {
-    position: "absolute",
-    left: "50%",
-    top: "52%",
-    width: "140%",
-    height: 3,
-    borderRadius: 3,
-    transform: [{ translateX: -spacing.sm }],
+  heroImage: {
+    width: imageSizes.heroIllustration.width,
+    height: imageSizes.heroIllustration.height,
+    opacity: opacity.image,
   },
   unitToggle: {
     flexDirection: "row",
@@ -283,16 +251,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
-const RULER_TICKS = [0, 1, 2, 3, 4];
-
-function withAlpha(color: string, alpha: number) {
-  const normalized = color.replace("#", "");
-  if (normalized.length !== 6) {
-    return color;
-  }
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
