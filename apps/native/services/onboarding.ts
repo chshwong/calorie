@@ -390,3 +390,70 @@ export async function saveLegalAgreements(input: SaveLegalAgreementsInput) {
 
   return { ok: true };
 }
+
+type FinalizeOnboardingInput = {
+  userId: string;
+  documents: Array<{ docType: LegalDocType; version: string }>;
+  profileUpdate: {
+    dailyCalorieTarget: number | null;
+    maintenanceCalories: number | null;
+    caloriePlan: string | null;
+    targets: {
+      proteinGMin: number;
+      fiberGMin: number;
+      carbsGMax: number;
+      sugarGMax: number;
+      sodiumMgMax: number;
+    } | null;
+  };
+};
+
+export async function finalizeOnboarding(input: FinalizeOnboardingInput) {
+  const rows = input.documents.map((doc) => ({
+    user_id: input.userId,
+    doc_type: doc.docType,
+    version: doc.version,
+  }));
+
+  const { error: insertError } = await supabase
+    .from("user_legal_acceptances")
+    .insert(rows);
+
+  if (insertError) {
+    return { ok: false, error: insertError.message };
+  }
+
+  const updateData: Record<string, any> = {
+    onboarding_complete: true,
+  };
+
+  if (input.profileUpdate.dailyCalorieTarget !== null) {
+    updateData.daily_calorie_target = input.profileUpdate.dailyCalorieTarget;
+  }
+  if (input.profileUpdate.maintenanceCalories !== null) {
+    updateData.maintenance_calories = input.profileUpdate.maintenanceCalories;
+  }
+  if (input.profileUpdate.caloriePlan) {
+    updateData.calorie_plan = input.profileUpdate.caloriePlan;
+    updateData.onboarding_calorie_set_at = new Date().toISOString();
+  }
+  if (input.profileUpdate.targets) {
+    updateData.protein_g_min = input.profileUpdate.targets.proteinGMin;
+    updateData.fiber_g_min = input.profileUpdate.targets.fiberGMin;
+    updateData.carbs_g_max = input.profileUpdate.targets.carbsGMax;
+    updateData.sugar_g_max = input.profileUpdate.targets.sugarGMax;
+    updateData.sodium_mg_max = input.profileUpdate.targets.sodiumMgMax;
+    updateData.onboarding_targets_set_at = new Date().toISOString();
+  }
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("user_id", input.userId);
+
+  if (profileError) {
+    return { ok: false, error: profileError.message };
+  }
+
+  return { ok: true };
+}

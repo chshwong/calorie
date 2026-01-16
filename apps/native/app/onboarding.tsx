@@ -23,7 +23,7 @@ import {
   completeOnboardingProfile,
   fetchOnboardingProfile,
   fetchUserLegalAcceptances,
-  saveLegalAgreements,
+  finalizeOnboarding,
   saveModulePreferences,
   saveStepEightProfile,
   saveStepFiveProfile,
@@ -146,8 +146,8 @@ export default function OnboardingScreen() {
   const modulePreferencesMutation = useMutation({
     mutationFn: saveModulePreferences,
   });
-  const legalAgreementsMutation = useMutation({
-    mutationFn: saveLegalAgreements,
+  const finalizeOnboardingMutation = useMutation({
+    mutationFn: finalizeOnboarding,
   });
   const queryClient = useQueryClient();
   const { data: profileData } = useQuery({
@@ -940,9 +940,16 @@ export default function OnboardingScreen() {
 
     setSaving(true);
     try {
-      const result = await legalAgreementsMutation.mutateAsync({
+      const finalCaloriePlan = mapCaloriePlanToDb(caloriePlan);
+      const result = await finalizeOnboardingMutation.mutateAsync({
         userId: user.id,
         documents: legalDocuments.map((doc) => ({ docType: doc.docType, version: doc.version })),
+        profileUpdate: {
+          dailyCalorieTarget: calorieTarget,
+          maintenanceCalories,
+          caloriePlan: finalCaloriePlan,
+          targets: dailyTargets,
+        },
       });
 
       if (!result.ok) {
