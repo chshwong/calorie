@@ -5,14 +5,14 @@
  * Handles unit conversions and provides detailed error messages.
  */
 
-import { PROFILES, DERIVED } from '@/constants/constraints';
+import { DERIVED, PROFILES } from '@/constants/constraints';
 import {
-  MIN_DELTA_LOSE_LB,
-  MIN_DELTA_GAIN_LB,
-  MAX_DELTA_LOSE_PCT,
-  MAX_DELTA_GAIN_PCT,
-  MAINTAIN_RECOMP_PCT,
   MAINTAIN_RECOMP_ABS_CAP_LB,
+  MAINTAIN_RECOMP_PCT,
+  MAX_DELTA_GAIN_PCT,
+  MAX_DELTA_LOSE_PCT,
+  MIN_DELTA_GAIN_LB,
+  MIN_DELTA_LOSE_LB,
   kgToLb,
   lbToKg,
 } from '@/lib/domain/weight-constants';
