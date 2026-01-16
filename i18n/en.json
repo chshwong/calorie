@@ -464,7 +464,9 @@
       "needs_email_detail": "This sign-in method didn't provide an email address. Please add an email to the provider, or sign in with Google or a magic link instead.",
       "no_session_detail": "No user session was created. Please try again.",
       "please_wait": "Please wait…",
-      "back_to_login": "Back to login"
+      "back_to_login": "Back to login",
+      "timeout_detail": "Connection timed out. Please try again.",
+      "try_again": "Try Again"
     },
     "linking": {
       "title": "Link accounts",
@@ -592,6 +594,18 @@
       "not_email": "Doesn't match your email",
       "not_common": "Not a common password"
     }
+  },
+  "recovery": {
+    "title": "Trouble loading Avovibe",
+    "body": "Avovibe is taking longer than expected to start. This can happen after an update or when the network is unstable. You can try again, restart the app, or reset local data.",
+    "try_again": "Try again",
+    "restart_app": "Restart app",
+    "reset_confirm_title": "Reset local data?",
+    "reset_confirm_message": "This will sign you out and clear local cached data on this device.",
+    "reset_confirm_button": "Reset",
+    "reset_error_title": "Reset failed",
+    "reset_error_message": "Could not reset local data. Please try restarting the app manually.",
+    "reset_data": "Reset local data"
   },
   "onboarding": {
     "photoUploadError": "Couldn’t upload your photo. Please try again.",
