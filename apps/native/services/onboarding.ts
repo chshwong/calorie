@@ -95,13 +95,16 @@ type OnboardingProfile = {
   sugar_g_max: number | null;
   sodium_mg_max: number | null;
   onboarding_targets_set_at: string | null;
+  focus_module_1: "Food" | "Exercise" | "Med" | "Water" | null;
+  focus_module_2: "Exercise" | "Med" | "Water" | null;
+  focus_module_3: "Exercise" | "Med" | "Water" | null;
 };
 
 export async function fetchOnboardingProfile(userId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "first_name, date_of_birth, avatar_url, gender, height_cm, height_unit, activity_level, weight_lb, weight_unit, body_fat_percent, goal_type, goal_weight_lb, daily_calorie_target, maintenance_calories, calorie_plan, onboarding_calorie_set_at, protein_g_min, fiber_g_min, carbs_g_max, sugar_g_max, sodium_mg_max, onboarding_targets_set_at"
+      "first_name, date_of_birth, avatar_url, gender, height_cm, height_unit, activity_level, weight_lb, weight_unit, body_fat_percent, goal_type, goal_weight_lb, daily_calorie_target, maintenance_calories, calorie_plan, onboarding_calorie_set_at, protein_g_min, fiber_g_min, carbs_g_max, sugar_g_max, sodium_mg_max, onboarding_targets_set_at, focus_module_1, focus_module_2, focus_module_3"
     )
     .eq("user_id", userId)
     .single();
@@ -296,6 +299,29 @@ export async function saveStepNineProfile(input: StepNineInput) {
   const { error: updateError } = await supabase
     .from("profiles")
     .update(payload)
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type ModulePreferencesInput = {
+  userId: string;
+  focusModule2: "Exercise" | "Med" | "Water";
+  focusModule3: "Exercise" | "Med" | "Water";
+};
+
+export async function saveModulePreferences(input: ModulePreferencesInput) {
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      focus_module_1: "Food",
+      focus_module_2: input.focusModule2,
+      focus_module_3: input.focusModule3,
+    })
     .eq("user_id", input.userId);
 
   if (updateError) {

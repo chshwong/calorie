@@ -10,6 +10,7 @@ import { DailyFocusTargetsStep, type DailyFocusTargets } from "@/components/onbo
 import { DailyTargetCaloriesStep } from "@/components/onboarding/steps/DailyTargetCaloriesStep";
 import { GoalStep } from "@/components/onboarding/steps/GoalStep";
 import { HeightStep } from "@/components/onboarding/steps/HeightStep";
+import { ModulePreferencesStep, type ModulePreference } from "@/components/onboarding/steps/ModulePreferencesStep";
 import { NameStep } from "@/components/onboarding/steps/NameStep";
 import { PlaceholderStep } from "@/components/onboarding/steps/PlaceholderStep";
 import { SexStep } from "@/components/onboarding/steps/SexStep";
@@ -17,11 +18,12 @@ import { buildWeightPayload, WeightStep } from "@/components/onboarding/steps/We
 import {
   completeOnboardingProfile,
   fetchOnboardingProfile,
+  saveModulePreferences,
   saveStepEightProfile,
   saveStepFiveProfile,
   saveStepFourProfile,
-  saveStepOneProfile,
   saveStepNineProfile,
+  saveStepOneProfile,
   saveStepSevenProfile,
   saveStepSixProfile,
   saveStepThreeProfile,
@@ -87,9 +89,11 @@ export default function OnboardingScreen() {
   const [maintenanceCalories, setMaintenanceCalories] = useState<number | null>(null);
   const [caloriePlan, setCaloriePlan] = useState<string | null>(null);
   const [dailyTargets, setDailyTargets] = useState<DailyFocusTargets | null>(null);
+  const [modulePreferences, setModulePreferences] = useState<ModulePreference[]>([]);
   const heightPrefilledRef = useRef(false);
   const weightsPrefilledRef = useRef(false);
   const goalWeightsPrefilledRef = useRef(false);
+  const modulePreferencesPrefilledRef = useRef(false);
 
   const completeMutation = useMutation({
     mutationFn: completeOnboardingProfile,
@@ -120,6 +124,9 @@ export default function OnboardingScreen() {
   });
   const stepNineMutation = useMutation({
     mutationFn: saveStepNineProfile,
+  });
+  const modulePreferencesMutation = useMutation({
+    mutationFn: saveModulePreferences,
   });
   const queryClient = useQueryClient();
   const { data: profileData } = useQuery({
@@ -243,6 +250,23 @@ export default function OnboardingScreen() {
         sodiumMgMax: profileData.sodium_mg_max,
       });
     }
+    if (!modulePreferencesPrefilledRef.current) {
+      if (modulePreferences.length > 0) {
+        modulePreferencesPrefilledRef.current = true;
+        return;
+      }
+      const picks: ModulePreference[] = [];
+      const add = (value: ModulePreference | null) => {
+        if (!value) return;
+        if (!picks.includes(value)) {
+          picks.push(value);
+        }
+      };
+      add(profileData.focus_module_2 ?? null);
+      add(profileData.focus_module_3 ?? null);
+      modulePreferencesPrefilledRef.current = true;
+      setModulePreferences(picks.slice(0, 2));
+    }
   }, [
     profileData,
     firstName,
@@ -265,6 +289,7 @@ export default function OnboardingScreen() {
     maintenanceCalories,
     caloriePlan,
     dailyTargets,
+    modulePreferences,
   ]);
 
   const handleSubmit = async () => {
@@ -738,6 +763,69 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleModulePreferencesStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const fallbackOrder: ModulePreference[] = ["Exercise", "Med", "Water"];
+      const selected = modulePreferences.slice(0, 2).filter((item): item is ModulePreference =>
+        item === "Exercise" || item === "Med" || item === "Water"
+      );
+
+      let focus2: ModulePreference;
+      let focus3: ModulePreference;
+
+      if (selected.length === 2) {
+        focus2 = selected[0];
+        focus3 = selected[1];
+      } else if (selected.length === 1) {
+        focus2 = selected[0];
+        focus3 = fallbackOrder.find((item) => item !== selected[0]) ?? "Med";
+      } else {
+        focus2 = "Exercise";
+        focus3 = "Med";
+      }
+
+      if (focus2 === focus3) {
+        focus2 = "Exercise";
+        focus3 = "Med";
+      }
+
+      const result = await modulePreferencesMutation.mutateAsync({
+        userId: user.id,
+        focusModule2: focus2,
+        focusModule3: focus3,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      queryClient.setQueryData(["onboarding-profile", user.id], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          focus_module_1: "Food",
+          focus_module_2: focus2,
+          focus_module_3: focus3,
+        };
+      });
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(11);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const currentWeightLbValue =
     currentWeightUnit === "kg"
       ? currentWeightKg.trim()
@@ -886,8 +974,19 @@ export default function OnboardingScreen() {
                 onContinue={handleDailyTargetsStepContinue}
                 onTargetsChange={setDailyTargets}
               />
+            ) : currentStep === 10 ? (
+              <ModulePreferencesStep
+                profile={profileData ?? null}
+                selections={modulePreferences}
+                loading={saving}
+                error={error}
+                onSelectionsChange={setModulePreferences}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(9)}
+                onContinue={handleModulePreferencesStepContinue}
+              />
             ) : (
-              <PlaceholderStep onBack={() => setCurrentStep(9)} />
+              <PlaceholderStep onBack={() => setCurrentStep(10)} />
             )}
           </View>
         )}
