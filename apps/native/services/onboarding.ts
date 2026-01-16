@@ -330,3 +330,63 @@ export async function saveModulePreferences(input: ModulePreferencesInput) {
 
   return { ok: true };
 }
+
+export type LegalDocType = "terms" | "privacy" | "health_disclaimer";
+
+export type UserLegalAcceptance = {
+  docType: LegalDocType;
+  version: string;
+  acceptedAt: string;
+};
+
+type SaveLegalAgreementsInput = {
+  userId: string;
+  documents: Array<{ docType: LegalDocType; version: string }>;
+};
+
+export async function fetchUserLegalAcceptances(userId: string): Promise<UserLegalAcceptance[]> {
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from("user_legal_acceptances")
+    .select("doc_type, version, accepted_at")
+    .eq("user_id", userId)
+    .order("accepted_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => ({
+    docType: row.doc_type as LegalDocType,
+    version: row.version,
+    acceptedAt: row.accepted_at,
+  }));
+}
+
+export async function saveLegalAgreements(input: SaveLegalAgreementsInput) {
+  const rows = input.documents.map((doc) => ({
+    user_id: input.userId,
+    doc_type: doc.docType,
+    version: doc.version,
+  }));
+
+  const { error: insertError } = await supabase
+    .from("user_legal_acceptances")
+    .insert(rows);
+
+  if (insertError) {
+    return { ok: false, error: insertError.message };
+  }
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ onboarding_complete: true })
+    .eq("user_id", input.userId);
+
+  if (profileError) {
+    return { ok: false, error: profileError.message };
+  }
+
+  return { ok: true };
+}

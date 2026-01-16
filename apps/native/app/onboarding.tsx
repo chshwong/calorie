@@ -3,21 +3,27 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, router } from "expo-router";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Alert, StyleSheet, View } from "react-native";
 
 import { ActivityStep } from "@/components/onboarding/steps/ActivityStep";
 import { DailyFocusTargetsStep, type DailyFocusTargets } from "@/components/onboarding/steps/DailyFocusTargetsStep";
 import { DailyTargetCaloriesStep } from "@/components/onboarding/steps/DailyTargetCaloriesStep";
 import { GoalStep } from "@/components/onboarding/steps/GoalStep";
 import { HeightStep } from "@/components/onboarding/steps/HeightStep";
+import { LegalAgreementStep } from "@/components/onboarding/steps/LegalAgreementStep";
 import { ModulePreferencesStep, type ModulePreference } from "@/components/onboarding/steps/ModulePreferencesStep";
 import { NameStep } from "@/components/onboarding/steps/NameStep";
 import { PlaceholderStep } from "@/components/onboarding/steps/PlaceholderStep";
+import { PlanStep, type PlanSelection } from "@/components/onboarding/steps/PlanStep";
 import { SexStep } from "@/components/onboarding/steps/SexStep";
 import { buildWeightPayload, WeightStep } from "@/components/onboarding/steps/WeightStep";
+import { getActiveLegalDocuments } from "@/services/legal";
 import {
   completeOnboardingProfile,
   fetchOnboardingProfile,
+  fetchUserLegalAcceptances,
+  saveLegalAgreements,
   saveModulePreferences,
   saveStepEightProfile,
   saveStepFiveProfile,
@@ -28,7 +34,9 @@ import {
   saveStepSixProfile,
   saveStepThreeProfile,
   saveStepTwoProfile,
+  type UserLegalAcceptance,
 } from "@/services/onboarding";
+import { type LegalDocType, type LegalDocument } from "../../../legal/legal-documents";
 import { mapCaloriePlanToDb } from "../../../lib/onboarding/calorie-plan";
 import { HARD_HARD_STOP } from "../../../lib/onboarding/goal-calorie-nutrient-rules";
 import { GoalWeightStep } from "../components/onboarding/steps/GoalWeightStep";
@@ -56,6 +64,7 @@ import { WeightUnit } from "../lib/validation/weight";
 import { spacing } from "../theme/tokens";
 
 export default function OnboardingScreen() {
+  const { t } = useTranslation();
   const { user, loading, onboardingComplete, refreshProfile } = useAuth();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +99,19 @@ export default function OnboardingScreen() {
   const [caloriePlan, setCaloriePlan] = useState<string | null>(null);
   const [dailyTargets, setDailyTargets] = useState<DailyFocusTargets | null>(null);
   const [modulePreferences, setModulePreferences] = useState<ModulePreference[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<PlanSelection>("free");
+  const [premiumInsisted, setPremiumInsisted] = useState(false);
+  const [legalChecked, setLegalChecked] = useState<Record<LegalDocType, boolean>>({
+    terms: false,
+    privacy: false,
+    health_disclaimer: false,
+  });
   const heightPrefilledRef = useRef(false);
+  const namePrefilledRef = useRef(false);
   const weightsPrefilledRef = useRef(false);
   const goalWeightsPrefilledRef = useRef(false);
   const modulePreferencesPrefilledRef = useRef(false);
+  const legalPrefilledRef = useRef(false);
 
   const completeMutation = useMutation({
     mutationFn: completeOnboardingProfile,
@@ -128,18 +146,47 @@ export default function OnboardingScreen() {
   const modulePreferencesMutation = useMutation({
     mutationFn: saveModulePreferences,
   });
+  const legalAgreementsMutation = useMutation({
+    mutationFn: saveLegalAgreements,
+  });
   const queryClient = useQueryClient();
   const { data: profileData } = useQuery({
     queryKey: ["onboarding-profile", user?.id],
     queryFn: () => fetchOnboardingProfile(user!.id),
     enabled: Boolean(user?.id),
   });
+  const {
+    data: legalAcceptances = [],
+    isLoading: legalAcceptancesLoading,
+    error: legalAcceptancesError,
+    refetch: refetchLegalAcceptances,
+  } = useQuery<UserLegalAcceptance[]>({
+    queryKey: ["legal-acceptances", user?.id],
+    queryFn: () => fetchUserLegalAcceptances(user!.id),
+    enabled: Boolean(user?.id),
+  });
+  const {
+    data: legalDocuments = [],
+    isLoading: legalDocumentsLoading,
+    error: legalDocumentsError,
+    refetch: refetchLegalDocuments,
+  } = useQuery<LegalDocument[]>({
+    queryKey: ["legal-documents"],
+    queryFn: getActiveLegalDocuments,
+  });
 
   useEffect(() => {
     if (!profileData) return;
 
-    if (!firstName && profileData.first_name) {
-      setFirstName(profileData.first_name);
+    if (!namePrefilledRef.current) {
+      if (firstName !== "") {
+        namePrefilledRef.current = true;
+      } else if (profileData.first_name) {
+        setFirstName(profileData.first_name);
+        namePrefilledRef.current = true;
+      } else {
+        namePrefilledRef.current = true;
+      }
     }
     if (!dateOfBirth && profileData.date_of_birth) {
       setDateOfBirth(profileData.date_of_birth);
@@ -291,6 +338,41 @@ export default function OnboardingScreen() {
     dailyTargets,
     modulePreferences,
   ]);
+
+  useEffect(() => {
+    if (legalPrefilledRef.current) return;
+    if (!legalDocuments.length) {
+      legalPrefilledRef.current = true;
+      return;
+    }
+    if (!legalAcceptances) return;
+
+    const latest = legalAcceptances.reduce<Record<LegalDocType, { version: string; acceptedAt: string }>>(
+      (acc, curr) => {
+        const existing = acc[curr.docType];
+        if (!existing || new Date(curr.acceptedAt).getTime() > new Date(existing.acceptedAt).getTime()) {
+          acc[curr.docType] = { version: curr.version, acceptedAt: curr.acceptedAt };
+        }
+        return acc;
+      },
+      {} as Record<LegalDocType, { version: string; acceptedAt: string }>
+    );
+
+    const nextChecked: Record<LegalDocType, boolean> = {
+      terms: false,
+      privacy: false,
+      health_disclaimer: false,
+    };
+
+    legalDocuments.forEach((doc) => {
+      if (latest[doc.docType]?.version === doc.version) {
+        nextChecked[doc.docType] = true;
+      }
+    });
+
+    setLegalChecked(nextChecked);
+    legalPrefilledRef.current = true;
+  }, [legalAcceptances, legalDocuments]);
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -826,6 +908,59 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handlePlanStepContinue = () => {
+    if (selectedPlan !== "free") {
+      if (!premiumInsisted) {
+        Alert.alert(t("onboarding.plan.premium_next_nudge"));
+      }
+      return;
+    }
+
+    setCurrentStep(12);
+  };
+
+  const handleLegalCheckedChange = (docType: LegalDocType, value: boolean) => {
+    legalPrefilledRef.current = true;
+    setLegalChecked((prev) => ({ ...prev, [docType]: value }));
+  };
+
+  const handleLegalAgreementContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+
+    const allChecked =
+      legalDocuments.length > 0 && legalDocuments.every((doc) => legalChecked[doc.docType]);
+
+    if (!allChecked) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await legalAgreementsMutation.mutateAsync({
+        userId: user.id,
+        documents: legalDocuments.map((doc) => ({ docType: doc.docType, version: doc.version })),
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      await queryClient.invalidateQueries({ queryKey: ["legal-acceptances", user.id] });
+      router.replace("/(tabs)/today");
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const currentWeightLbValue =
     currentWeightUnit === "kg"
       ? currentWeightKg.trim()
@@ -855,9 +990,10 @@ export default function OnboardingScreen() {
                 avatarUri={avatarUri}
                 error={error}
                 saving={saving}
-                onFirstNameChange={(text) =>
-                  setFirstName(filterPreferredNameInput(firstName, text))
-                }
+                onFirstNameChange={(text) => {
+                  namePrefilledRef.current = true;
+                  setFirstName(filterPreferredNameInput(firstName, text));
+                }}
                 onFirstNameBlur={() => setFirstName(normalizePreferredName(firstName))}
                 onDateOfBirthChange={setDateOfBirth}
                 onAvatarChange={setAvatarUri}
@@ -985,8 +1121,36 @@ export default function OnboardingScreen() {
                 onBack={() => setCurrentStep(9)}
                 onContinue={handleModulePreferencesStepContinue}
               />
+            ) : currentStep === 11 ? (
+              <PlanStep
+                selectedPlan={selectedPlan}
+                onSelectedPlanChange={setSelectedPlan}
+                onPremiumInsist={() => setPremiumInsisted(true)}
+                loading={saving}
+                onBack={() => setCurrentStep(10)}
+                onContinue={handlePlanStepContinue}
+              />
+            ) : currentStep === 12 ? (
+              <LegalAgreementStep
+                documents={legalDocuments}
+                checked={legalChecked}
+                loading={saving}
+                docsLoading={legalDocumentsLoading || legalAcceptancesLoading}
+                errorKey={
+                  error ??
+                  (legalDocumentsError || legalAcceptancesError ? "legal.error_loading" : null)
+                }
+                onRetry={() => {
+                  setError(null);
+                  refetchLegalDocuments();
+                  refetchLegalAcceptances();
+                }}
+                onCheckedChange={handleLegalCheckedChange}
+                onBack={() => setCurrentStep(11)}
+                onContinue={handleLegalAgreementContinue}
+              />
             ) : (
-              <PlaceholderStep onBack={() => setCurrentStep(10)} />
+              <PlaceholderStep onBack={() => setCurrentStep(11)} />
             )}
           </View>
         )}
