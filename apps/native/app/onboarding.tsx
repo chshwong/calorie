@@ -2,27 +2,49 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, router } from "expo-router";
 import * as React from "react";
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
 
+import { ActivityStep } from "@/components/onboarding/steps/ActivityStep";
+import { GoalStep } from "@/components/onboarding/steps/GoalStep";
+import { HeightStep } from "@/components/onboarding/steps/HeightStep";
 import { NameStep } from "@/components/onboarding/steps/NameStep";
 import { PlaceholderStep } from "@/components/onboarding/steps/PlaceholderStep";
 import { SexStep } from "@/components/onboarding/steps/SexStep";
+import { buildWeightPayload, WeightStep } from "@/components/onboarding/steps/WeightStep";
 import {
   completeOnboardingProfile,
   fetchOnboardingProfile,
+  saveStepFiveProfile,
+  saveStepFourProfile,
   saveStepOneProfile,
+  saveStepSevenProfile,
+  saveStepSixProfile,
+  saveStepThreeProfile,
   saveStepTwoProfile,
 } from "@/services/onboarding";
+import { GoalWeightStep } from "../components/onboarding/steps/GoalWeightStep";
 import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
 import { ThemeModeProvider } from "../contexts/ThemeModeContext";
 import { validateDob } from "../lib/dates/dobRules";
+import { kgToLb, lbToKg, roundTo3, roundTo1 as roundWeightTo1 } from "../lib/domain/conversions";
+import { validateGoalWeight } from "../lib/onboarding/goal-weight-validation";
+import { validateHeightInputs } from "../lib/onboarding/height-validation";
+import { validateBodyFatPercent, validateWeightKg } from "../lib/onboarding/weight-validation";
+import { ActivityLevel, validateActivityLevel } from "../lib/validation/activity";
+import { GoalType, validateGoalType } from "../lib/validation/goal";
+import {
+  cmToFtIn,
+  HeightUnit,
+  roundTo1,
+} from "../lib/validation/height";
 import {
   filterPreferredNameInput,
   normalizePreferredName,
   validatePreferredName,
 } from "../lib/validation/preferredName";
+import { WeightUnit } from "../lib/validation/weight";
 import { spacing } from "../theme/tokens";
 
 export default function OnboardingScreen() {
@@ -30,6 +52,10 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [goalWeightErrorKey, setGoalWeightErrorKey] = useState<string | null>(null);
+  const [goalWeightErrorParams, setGoalWeightErrorParams] = useState<Record<string, any> | null>(
+    null
+  );
   const [currentStep, setCurrentStep] = useState(1);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
@@ -38,7 +64,22 @@ export default function OnboardingScreen() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "not_telling" | "">("");
   const [heightCm, setHeightCm] = useState("");
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
+  const [heightUnit, setHeightUnit] = useState<HeightUnit>("cm");
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | "">("");
+  const [currentWeightKg, setCurrentWeightKg] = useState("");
+  const [currentWeightLb, setCurrentWeightLb] = useState("");
+  const [currentWeightUnit, setCurrentWeightUnit] = useState<WeightUnit>("lb");
+  const [currentBodyFatPercent, setCurrentBodyFatPercent] = useState("");
+  const [goalType, setGoalType] = useState<GoalType | "">("");
+  const [showAdvancedGoals, setShowAdvancedGoals] = useState(false);
+  const [goalWeightKg, setGoalWeightKg] = useState("");
+  const [goalWeightLb, setGoalWeightLb] = useState("");
   const [weightLb, setWeightLb] = useState("");
+  const heightPrefilledRef = useRef(false);
+  const weightsPrefilledRef = useRef(false);
+  const goalWeightsPrefilledRef = useRef(false);
 
   const completeMutation = useMutation({
     mutationFn: completeOnboardingProfile,
@@ -48,6 +89,21 @@ export default function OnboardingScreen() {
   });
   const stepTwoMutation = useMutation({
     mutationFn: saveStepTwoProfile,
+  });
+  const stepThreeMutation = useMutation({
+    mutationFn: saveStepThreeProfile,
+  });
+  const stepFourMutation = useMutation({
+    mutationFn: saveStepFourProfile,
+  });
+  const stepFiveMutation = useMutation({
+    mutationFn: saveStepFiveProfile,
+  });
+  const stepSixMutation = useMutation({
+    mutationFn: saveStepSixProfile,
+  });
+  const stepSevenMutation = useMutation({
+    mutationFn: saveStepSevenProfile,
   });
   const queryClient = useQueryClient();
   const { data: profileData } = useQuery({
@@ -71,7 +127,92 @@ export default function OnboardingScreen() {
     if (!gender && (profileData.gender === "male" || profileData.gender === "female")) {
       setGender(profileData.gender);
     }
-  }, [profileData, firstName, dateOfBirth, avatarUri, gender]);
+    if (!heightPrefilledRef.current) {
+      if (heightCm || heightFt || heightIn) {
+        heightPrefilledRef.current = true;
+      } else if (profileData.height_cm !== null && profileData.height_cm !== undefined) {
+        setHeightCm(roundTo1(profileData.height_cm).toString());
+        if (profileData.height_unit === "ft") {
+          setHeightUnit("ft/in");
+          const result = cmToFtIn(profileData.height_cm);
+          if (result) {
+            setHeightFt(String(result.feet));
+            setHeightIn(String(result.inches));
+          }
+        } else {
+          setHeightUnit("cm");
+        }
+        heightPrefilledRef.current = true;
+      } else {
+        heightPrefilledRef.current = true;
+      }
+    }
+    if (
+      !activityLevel &&
+      profileData.activity_level &&
+      validateActivityLevel(profileData.activity_level).ok
+    ) {
+      setActivityLevel(profileData.activity_level);
+    }
+    if (!goalType && profileData.goal_type && validateGoalType(profileData.goal_type).ok) {
+      setGoalType(profileData.goal_type as GoalType);
+      if (profileData.goal_type === "recomp") {
+        setShowAdvancedGoals(true);
+      }
+    }
+    if (!goalWeightsPrefilledRef.current) {
+      if (goalWeightKg || goalWeightLb) {
+        goalWeightsPrefilledRef.current = true;
+        return;
+      }
+      if (profileData.goal_weight_lb !== null && profileData.goal_weight_lb !== undefined) {
+        const displayLb = roundWeightTo1(profileData.goal_weight_lb).toString();
+        const displayKg = roundWeightTo1(lbToKg(profileData.goal_weight_lb)).toString();
+        setGoalWeightLb(displayLb);
+        setGoalWeightKg(displayKg);
+      }
+      goalWeightsPrefilledRef.current = true;
+    }
+    if (!weightsPrefilledRef.current) {
+      if (currentWeightKg || currentWeightLb || currentBodyFatPercent) {
+        weightsPrefilledRef.current = true;
+        return;
+      }
+      if (profileData.weight_lb !== null && profileData.weight_lb !== undefined) {
+        const preferredUnit: WeightUnit = profileData.weight_unit === "kg" ? "kg" : "lb";
+        setCurrentWeightUnit(preferredUnit);
+        const displayLb = roundWeightTo1(profileData.weight_lb).toString();
+        const displayKg = roundWeightTo1(lbToKg(profileData.weight_lb)).toString();
+        setCurrentWeightLb(displayLb);
+        setCurrentWeightKg(displayKg);
+      }
+      if (
+        profileData.body_fat_percent !== null &&
+        profileData.body_fat_percent !== undefined
+      ) {
+        setCurrentBodyFatPercent(roundWeightTo1(profileData.body_fat_percent).toString());
+      }
+      weightsPrefilledRef.current = true;
+    }
+  }, [
+    profileData,
+    firstName,
+    dateOfBirth,
+    avatarUri,
+    gender,
+    heightCm,
+    heightFt,
+    heightIn,
+    heightUnit,
+    activityLevel,
+    currentWeightKg,
+    currentWeightLb,
+    currentWeightUnit,
+    currentBodyFatPercent,
+    goalType,
+    goalWeightKg,
+    goalWeightLb,
+  ]);
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -222,6 +363,247 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleHeightStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+
+    const validation = validateHeightInputs(heightUnit, heightCm, heightFt, heightIn);
+    if (!validation.ok) {
+      setError(validation.errorKey || "onboarding.height.error_height_invalid");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepThreeMutation.mutateAsync({
+        userId: user.id,
+        heightCm: validation.cmValue!,
+        heightUnit: heightUnit === "ft/in" ? "ft" : "cm",
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(4);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleActivityStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+
+    const validation = validateActivityLevel(activityLevel);
+    if (!validation.ok) {
+      setError(validation.errorKey || "onboarding.activity.error_select_activity");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepFourMutation.mutateAsync({
+        userId: user.id,
+        activityLevel: activityLevel as ActivityLevel,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(5);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleWeightStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+
+    const raw = currentWeightUnit === "kg" ? parseFloat(currentWeightKg) : parseFloat(currentWeightLb);
+    const weightKgValue =
+      isNaN(raw) || raw <= 0 ? null : currentWeightUnit === "kg" ? raw : lbToKg(raw);
+    const weightError = validateWeightKg(weightKgValue);
+    if (weightError) {
+      setError(weightError);
+      return;
+    }
+
+    const bodyFatValue = currentBodyFatPercent.trim()
+      ? parseFloat(currentBodyFatPercent)
+      : null;
+    const bodyFatError = validateBodyFatPercent(bodyFatValue);
+    if (bodyFatError) {
+      setError(bodyFatError);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = buildWeightPayload(
+        currentWeightUnit,
+        currentWeightKg,
+        currentWeightLb,
+        currentBodyFatPercent
+      );
+      const result = await stepFiveMutation.mutateAsync({
+        userId: user.id,
+        weightLb: payload.weightLb,
+        weightUnit: payload.weightUnit,
+        bodyFatPercent: payload.bodyFatPercent,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(6);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGoalStepContinue = async () => {
+    setError(null);
+    if (!user) {
+      setError("onboarding.error_no_session");
+      return;
+    }
+
+    const validation = validateGoalType(goalType);
+    if (!validation.ok) {
+      setError(validation.errorKey || "onboarding.goal.error_select_goal");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepSixMutation.mutateAsync({
+        userId: user.id,
+        goalType: goalType as GoalType,
+      });
+
+      if (!result.ok) {
+        setError("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(7);
+    } catch (e) {
+      setError("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGoalWeightStepContinue = async () => {
+    setError(null);
+    setGoalWeightErrorKey(null);
+    setGoalWeightErrorParams(null);
+    if (!user) {
+      setGoalWeightErrorKey("onboarding.error_no_session");
+      return;
+    }
+    if (!goalType) {
+      setGoalWeightErrorKey("onboarding.goal.error_select_goal");
+      return;
+    }
+
+    const currentWeightLbValue =
+      currentWeightUnit === "kg"
+        ? currentWeightKg.trim()
+          ? kgToLb(parseFloat(currentWeightKg))
+          : NaN
+        : currentWeightLb.trim()
+        ? parseFloat(currentWeightLb)
+        : NaN;
+
+    if (isNaN(currentWeightLbValue) || currentWeightLbValue <= 0) {
+      setGoalWeightErrorKey("onboarding.current_weight.error_weight_required");
+      return;
+    }
+
+    const targetInput =
+      currentWeightUnit === "kg" ? goalWeightKg.trim() : goalWeightLb.trim();
+
+    if (!targetInput) {
+      setGoalWeightErrorKey("onboarding.goal_weight.error_weight_required");
+      return;
+    }
+
+    const parsedTarget = parseFloat(targetInput);
+    const validation = validateGoalWeight({
+      currentWeightLb: currentWeightLbValue,
+      goalType: goalType as GoalType,
+      weightUnit: currentWeightUnit === "kg" ? "kg" : "lbs",
+      targetInput: parsedTarget,
+    });
+
+    if (!validation.ok) {
+      setGoalWeightErrorParams(validation.i18nParams || null);
+      setGoalWeightErrorKey(validation.i18nKey);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await stepSevenMutation.mutateAsync({
+        userId: user.id,
+        goalWeightLb: roundTo3(validation.targetLb),
+      });
+
+      if (!result.ok) {
+        setGoalWeightErrorKey("onboarding.error_save_failed");
+        return;
+      }
+
+      await refreshProfile();
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
+      setCurrentStep(8);
+    } catch (e) {
+      setGoalWeightErrorKey("onboarding.error_save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentWeightLbValue =
+    currentWeightUnit === "kg"
+      ? currentWeightKg.trim()
+        ? kgToLb(parseFloat(currentWeightKg))
+        : null
+      : currentWeightLb.trim()
+      ? parseFloat(currentWeightLb)
+      : null;
+
   return (
     <ThemeModeProvider>
       <Screen padding={0}>
@@ -234,7 +616,7 @@ export default function OnboardingScreen() {
         ) : onboardingComplete === true ? (
           <Redirect href="/(tabs)/today" />
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.container}>
             {currentStep === 1 ? (
               <NameStep
                 firstName={firstName}
@@ -260,10 +642,86 @@ export default function OnboardingScreen() {
                 onBack={() => setCurrentStep(1)}
                 onContinue={handleSexStepContinue}
               />
+            ) : currentStep === 3 ? (
+              <HeightStep
+                heightCm={heightCm}
+                heightFt={heightFt}
+                heightIn={heightIn}
+                heightUnit={heightUnit}
+                error={error}
+                loading={saving}
+                onHeightCmChange={setHeightCm}
+                onHeightFtChange={setHeightFt}
+                onHeightInChange={setHeightIn}
+                onHeightUnitChange={setHeightUnit}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(2)}
+                onContinue={handleHeightStepContinue}
+              />
+            ) : currentStep === 4 ? (
+              <ActivityStep
+                activityLevel={activityLevel}
+                loading={saving}
+                error={error}
+                onActivityLevelChange={setActivityLevel}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(3)}
+                onContinue={handleActivityStepContinue}
+              />
+            ) : currentStep === 5 ? (
+              <WeightStep
+                currentWeightKg={currentWeightKg}
+                currentWeightLb={currentWeightLb}
+                currentWeightUnit={currentWeightUnit}
+                bodyFatPercent={currentBodyFatPercent}
+                sexAtBirth={gender === "male" || gender === "female" ? gender : ""}
+                dateOfBirth={dateOfBirth}
+                error={error}
+                loading={saving}
+                onCurrentWeightKgChange={setCurrentWeightKg}
+                onCurrentWeightLbChange={setCurrentWeightLb}
+                onCurrentWeightUnitChange={setCurrentWeightUnit}
+                onBodyFatPercentChange={setCurrentBodyFatPercent}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(4)}
+                onContinue={handleWeightStepContinue}
+              />
+            ) : currentStep === 6 ? (
+              <GoalStep
+                goalType={goalType}
+                showAdvancedGoals={showAdvancedGoals}
+                loading={saving}
+                error={error}
+                onGoalChange={setGoalType}
+                onShowAdvancedGoals={() => setShowAdvancedGoals(true)}
+                onErrorClear={() => setError(null)}
+                onBack={() => setCurrentStep(5)}
+                onContinue={handleGoalStepContinue}
+              />
+            ) : currentStep === 7 ? (
+              <GoalWeightStep
+                goalType={goalType}
+                currentWeightUnit={currentWeightUnit}
+                currentWeightLb={currentWeightLbValue}
+                goalWeightKg={goalWeightKg}
+                goalWeightLb={goalWeightLb}
+                loading={saving}
+                errorKey={goalWeightErrorKey}
+                errorParams={goalWeightErrorParams}
+                onGoalWeightKgChange={setGoalWeightKg}
+                onGoalWeightLbChange={setGoalWeightLb}
+                onErrorClear={() => {
+                  setError(null);
+                  setGoalWeightErrorKey(null);
+                  setGoalWeightErrorParams(null);
+                }}
+                onBack={() => setCurrentStep(6)}
+                onContinue={handleGoalWeightStepContinue}
+              />
             ) : (
-              <PlaceholderStep onBack={() => setCurrentStep(1)} />
+              <PlaceholderStep onBack={() => setCurrentStep(7)} />
             )}
-          </ScrollView>
+          </View>
         )}
       </Screen>
     </ThemeModeProvider>
@@ -277,9 +735,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  scrollContent: {
-    flexGrow: 1,
-    padding: spacing.xl,
-    gap: spacing.lg,
+  container: {
+    flex: 1,
   },
 });

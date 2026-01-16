@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, ViewStyle } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
 
 import { colors, radius, spacing } from "../../theme/tokens";
@@ -8,25 +8,34 @@ import { Text } from "./Text";
 
 type ChoiceTileProps = {
   title: string;
+  description?: string;
   selected: boolean;
   onPress: () => void;
   disabled?: boolean;
   icon?: React.ReactNode;
+  variant?: "default" | "compact";
+  showCheck?: boolean;
+  style?: ViewStyle;
   accessibilityRole?: "button" | "radio";
   accessibilityState?: { selected?: boolean; disabled?: boolean };
 };
 
 export function ChoiceTile({
   title,
+  description,
   selected,
   onPress,
   disabled,
   icon,
+  variant = "default",
+  showCheck = true,
+  style,
   accessibilityRole = "button",
   accessibilityState,
 }: ChoiceTileProps) {
   const scheme = useColorScheme() ?? "light";
   const theme = colors[scheme];
+  const isCompact = variant === "compact";
 
   return (
     <Pressable
@@ -37,20 +46,29 @@ export function ChoiceTile({
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
+        isCompact && styles.tileCompact,
         pressed && styles.pressed,
         {
           backgroundColor: selected ? withAlpha(theme.primary, 0.16) : theme.card,
           borderColor: selected ? theme.primary : theme.border,
         },
+        style,
       ]}
     >
       <View style={styles.content}>
         {icon ? <View style={styles.icon}>{icon}</View> : null}
-        <Text variant="body" style={[styles.title, { color: theme.text }]}>
-          {title}
-        </Text>
+        <View style={styles.textBlock}>
+          <Text variant="body" style={[styles.title, { color: theme.text }]}>
+            {title}
+          </Text>
+          {description ? (
+            <Text variant="caption" tone="muted" style={styles.description}>
+              {description}
+            </Text>
+          ) : null}
+        </View>
       </View>
-      {selected ? (
+      {showCheck && selected ? (
         <View style={styles.checkWrap}>
           <Feather name="check" size={16} color={theme.primary} />
         </View>
@@ -65,16 +83,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xl,
-    minHeight: 64,
+    minHeight: spacing.xxl + spacing.xl,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  tileCompact: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    minHeight: spacing.xl + spacing.sm,
   },
   content: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     flex: 1,
+  },
+  textBlock: {
+    flex: 1,
+    gap: spacing.xs,
   },
   icon: {
     width: 24,
@@ -83,6 +110,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: "600",
+  },
+  description: {
+    lineHeight: 16,
   },
   checkWrap: {
     width: 24,

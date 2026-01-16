@@ -1,5 +1,13 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
@@ -36,34 +44,58 @@ export function OnboardingShell({
   }, [brandName]);
 
   return (
-    <>
-      <Text variant="title" style={styles.headerTitle}>
-        <Text variant="title">{t("onboarding.header_prefix")}</Text>
-        <Text variant="title" style={{ color: theme.brandAvo }}>
-          {brandParts.avo}
-        </Text>
-        <Text variant="title" style={{ color: theme.brandVibe }}>
-          {brandParts.vibe}
-        </Text>
-      </Text>
-      <StepIndicator activeStep={step} totalSteps={totalSteps} />
-      {hero ? <View style={styles.hero}>{hero}</View> : null}
-      <Text variant="title" style={styles.title}>
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text variant="caption" tone="muted" style={styles.subtitle}>
-          {subtitle}
-        </Text>
-      ) : null}
-      <OnboardingCard>
-        {children}
-      </OnboardingCard>
-    </>
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.flex}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text variant="title" style={styles.headerTitle}>
+              <Text variant="title">{t("onboarding.header_prefix")}</Text>
+              <Text variant="title" style={{ color: theme.brandAvo }}>
+                {brandParts.avo}
+              </Text>
+              <Text variant="title" style={{ color: theme.brandVibe }}>
+                {brandParts.vibe}
+              </Text>
+            </Text>
+            <StepIndicator activeStep={step} totalSteps={totalSteps} />
+            {hero ? <View style={styles.hero}>{hero}</View> : null}
+            <Text variant="title" style={styles.title}>
+              {title}
+            </Text>
+            {subtitle ? (
+              <Text variant="caption" tone="muted" style={styles.subtitle}>
+                {subtitle}
+              </Text>
+            ) : null}
+            <OnboardingCard>{children}</OnboardingCard>
+          </ScrollView>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoid: {
+    flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: spacing.xl,
+    gap: spacing.lg,
+    paddingBottom: spacing.xl + 180,
+  },
   headerTitle: {
     textAlign: "center",
   },

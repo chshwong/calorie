@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Modal, Platform, ScrollView, TouchableOpacity } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
-import { Text } from '@/components/ui/text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight, LineHeight, Shadows } from '@/constants/theme';
+import { Text } from '@/components/ui/text';
+import { BorderRadius, Colors, FontSize, FontWeight, LineHeight, Shadows, Spacing } from '@/constants/theme';
 import { getButtonAccessibilityProps, getFocusStyle } from '@/utils/accessibility';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Modal, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 interface BodyFatRangesModalProps {
   visible: boolean;
@@ -18,83 +18,80 @@ interface BodyFatRangesModalProps {
 type AgeGroup = '15_29' | '30s' | '40_50s' | '60_plus';
 
 interface BodyFatRange {
-  category: string;
+  categoryKey: string;
   range: string;
 }
 
-// Chart data - hardcoded
+// Chart data - labels resolved via i18n
 const BODY_FAT_DATA: Record<'male' | 'female', Record<AgeGroup, BodyFatRange[]>> = {
   male: {
     '15_29': [
-      { category: 'Athlete', range: '6–10%' },
-      { category: 'Ideal', range: '11–14%' },
-      { category: 'Average', range: '15–20%' },
-      { category: 'Above Average', range: '21–24%' },
-      { category: 'Overweight', range: '25%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '6–10%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '11–14%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '15–20%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '21–24%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '25%+' },
     ],
     '30s': [
-      { category: 'Athlete', range: '7–11%' },
-      { category: 'Ideal', range: '12–15%' },
-      { category: 'Average', range: '16–22%' },
-      { category: 'Above Average', range: '23–26%' },
-      { category: 'Overweight', range: '27%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '7–11%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '12–15%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '16–22%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '23–26%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '27%+' },
     ],
     '40_50s': [
-      { category: 'Athlete', range: '8–12%' },
-      { category: 'Ideal', range: '13–16%' },
-      { category: 'Average', range: '17–23%' },
-      { category: 'Above Average', range: '24–27%' },
-      { category: 'Overweight', range: '28%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '8–12%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '13–16%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '17–23%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '24–27%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '28%+' },
     ],
     '60_plus': [
-      { category: 'Athlete', range: '9–13%' },
-      { category: 'Ideal', range: '14–17%' },
-      { category: 'Average', range: '18–24%' },
-      { category: 'Above Average', range: '25–28%' },
-      { category: 'Overweight', range: '29%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '9–13%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '14–17%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '18–24%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '25–28%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '29%+' },
     ],
   },
   female: {
     '15_29': [
-      { category: 'Athlete', range: '14–19%' },
-      { category: 'Ideal', range: '20–24%' },
-      { category: 'Average', range: '25–31%' },
-      { category: 'Above Average', range: '32–35%' },
-      { category: 'Overweight', range: '36%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '14–19%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '20–24%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '25–31%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '32–35%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '36%+' },
     ],
     '30s': [
-      { category: 'Athlete', range: '15–20%' },
-      { category: 'Ideal', range: '21–25%' },
-      { category: 'Average', range: '26–32%' },
-      { category: 'Above Average', range: '33–36%' },
-      { category: 'Overweight', range: '37%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '15–20%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '21–25%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '26–32%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '33–36%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '37%+' },
     ],
     '40_50s': [
-      { category: 'Athlete', range: '16–21%' },
-      { category: 'Ideal', range: '22–26%' },
-      { category: 'Average', range: '27–33%' },
-      { category: 'Above Average', range: '34–37%' },
-      { category: 'Overweight', range: '38%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '16–21%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '22–26%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '27–33%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '34–37%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '38%+' },
     ],
     '60_plus': [
-      { category: 'Athlete', range: '17–22%' },
-      { category: 'Ideal', range: '23–27%' },
-      { category: 'Average', range: '28–34%' },
-      { category: 'Above Average', range: '35–38%' },
-      { category: 'Overweight', range: '39%+' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.athlete', range: '17–22%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.ideal', range: '23–27%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.average', range: '28–34%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.above_average', range: '35–38%' },
+      { categoryKey: 'onboarding.current_weight.body_fat_modal.categories.overweight', range: '39%+' },
     ],
   },
 };
 
-const AGE_GROUP_LABELS: Record<AgeGroup, string> = {
-  '15_29': '15–29',
-  '30s': '30s',
-  '40_50s': '40s–50s',
-  '60_plus': '60+',
+const AGE_GROUP_KEYS: Record<AgeGroup, string> = {
+  '15_29': 'onboarding.current_weight.body_fat_modal.age_groups.15_29',
+  '30s': 'onboarding.current_weight.body_fat_modal.age_groups.30s',
+  '40_50s': 'onboarding.current_weight.body_fat_modal.age_groups.40_50s',
+  '60_plus': 'onboarding.current_weight.body_fat_modal.age_groups.60_plus',
 };
-
-const DISCLAIMER_TEXT =
-  'These ranges are broad population estimates based on fitness and health references. Individual body fat percentage varies by genetics, measurement method, and other factors. Use this only as a rough guide.';
 
 function mapAgeToDefaultAgeGroup(ageYears: number | null | undefined): AgeGroup | null {
   if (ageYears === null || ageYears === undefined || !isFinite(ageYears)) return null;
@@ -146,10 +143,14 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
           {/* Header */}
           <View style={styles.header}>
             <ThemedText type="title" style={[styles.title, { color: colors.text }]}>
-              {`Typical body fat % ranges${normalizedSex === 'male' ? ' ♂' : normalizedSex === 'female' ? ' ♀' : ''}`}
+              {t('onboarding.current_weight.body_fat_modal.title', {
+                symbol: normalizedSex
+                  ? t(`onboarding.current_weight.body_fat_modal.symbols.${normalizedSex}`)
+                  : '',
+              })}
             </ThemedText>
             <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Broad population ranges by age.
+              {t('onboarding.current_weight.body_fat_modal.subtitle')}
             </ThemedText>
             <TouchableOpacity
               style={styles.closeButton}
@@ -163,7 +164,9 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
           {/* Age Group Selector */}
           {normalizedSex && (
             <View style={styles.ageGroupContainer}>
-              {ageGroups.map((ageGroup) => (
+              {ageGroups.map((ageGroup) => {
+                const ageLabel = t(AGE_GROUP_KEYS[ageGroup]);
+                return (
                 <TouchableOpacity
                   key={ageGroup}
                   style={[
@@ -177,8 +180,8 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
                   ]}
                   onPress={() => setSelectedAgeGroup(ageGroup)}
                   {...getButtonAccessibilityProps(
-                    AGE_GROUP_LABELS[ageGroup],
-                    `Double tap to select ${AGE_GROUP_LABELS[ageGroup]}`,
+                    ageLabel,
+                    `Double tap to select ${ageLabel}`,
                     false
                   )}
                 >
@@ -186,13 +189,14 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
                     variant="body"
                     style={{
                       color: selectedAgeGroup === ageGroup ? Colors.light.textInverse : colors.text,
-                      fontWeight: selectedAgeGroup === ageGroup ? FontWeight.semibold : FontWeight.normal,
+                      fontWeight: selectedAgeGroup === ageGroup ? FontWeight.semibold : FontWeight.regular,
                     }}
                   >
-                    {AGE_GROUP_LABELS[ageGroup]}
+                    {ageLabel}
                   </Text>
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </View>
           )}
 
@@ -201,7 +205,7 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
             {!normalizedSex ? (
               <View style={styles.noSexContainer}>
                 <ThemedText style={[styles.noSexText, { color: colors.textSecondary }]}>
-                  Select sex in onboarding to view ranges.
+                  {t('onboarding.current_weight.body_fat_modal.no_sex')}
                 </ThemedText>
               </View>
             ) : (
@@ -216,7 +220,7 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
                   >
                     <View style={styles.chartCell}>
                       <ThemedText style={[styles.categoryText, { color: colors.text }]}>
-                        {row.category}
+                        {t(row.categoryKey)}
                       </ThemedText>
                     </View>
                     <View style={[styles.chartCell, styles.chartCellRight]}>
@@ -232,7 +236,7 @@ export function BodyFatRangesModal({ visible, onClose, sex, ageYears, colors }: 
             {/* Disclaimer */}
             <View style={styles.disclaimerContainer}>
               <ThemedText style={[styles.disclaimerText, { color: colors.textSecondary }]}>
-                {DISCLAIMER_TEXT}
+                {t('onboarding.current_weight.body_fat_modal.disclaimer')}
               </ThemedText>
             </View>
           </ScrollView>
@@ -346,7 +350,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: FontSize.base,
-    fontWeight: FontWeight.normal,
+    fontWeight: FontWeight.regular,
   },
   rangeText: {
     fontSize: FontSize.base,

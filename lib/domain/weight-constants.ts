@@ -19,6 +19,15 @@ export const DB_MIN_WEIGHT_LB = 45;
 export const DB_MAX_WEIGHT_LB = 880;
 
 /**
+ * Aoo level current weight constraints (pounds), does not apply to goal. 
+ * 
+ */
+export const APP_MIN_CURRENT_WEIGHT_LB = DB_MIN_WEIGHT_LB +5;
+export const APP_MAX_CURRENT_WEIGHT_LB = DB_MAX_WEIGHT_LB -5;
+
+
+
+/**
  * Conversion factor: pounds per kilogram
  * Standard conversion factor used throughout the application
  */

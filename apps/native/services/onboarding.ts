@@ -77,12 +77,22 @@ type OnboardingProfile = {
   date_of_birth: string | null;
   avatar_url: string | null;
   gender: "male" | "female" | null;
+  height_cm: number | null;
+  height_unit: "cm" | "ft" | null;
+  activity_level: "sedentary" | "light" | "moderate" | "high" | "very_high" | null;
+  weight_lb: number | null;
+  weight_unit: "kg" | "lbs" | "lb" | null;
+  body_fat_percent: number | null;
+  goal_type: "lose" | "maintain" | "gain" | "recomp" | null;
+  goal_weight_lb: number | null;
 };
 
 export async function fetchOnboardingProfile(userId: string) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("first_name, date_of_birth, avatar_url, gender")
+    .select(
+      "first_name, date_of_birth, avatar_url, gender, height_cm, height_unit, activity_level, weight_lb, weight_unit, body_fat_percent, goal_type, goal_weight_lb"
+    )
     .eq("user_id", userId)
     .single();
 
@@ -106,6 +116,117 @@ export async function saveStepTwoProfile(input: StepTwoInput) {
     .from("profiles")
     .update({
       gender: input.gender,
+    })
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepThreeInput = {
+  userId: string;
+  heightCm: number;
+  heightUnit: "cm" | "ft";
+};
+
+export async function saveStepThreeProfile(input: StepThreeInput) {
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      height_cm: input.heightCm,
+      height_unit: input.heightUnit,
+    })
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepFourInput = {
+  userId: string;
+  activityLevel: "sedentary" | "light" | "moderate" | "high" | "very_high";
+};
+
+export async function saveStepFourProfile(input: StepFourInput) {
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      activity_level: input.activityLevel,
+    })
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepFiveInput = {
+  userId: string;
+  weightLb: number;
+  weightUnit: "kg" | "lbs";
+  bodyFatPercent?: number;
+};
+
+export async function saveStepFiveProfile(input: StepFiveInput) {
+  const payload: Record<string, number | string> = {
+    weight_lb: input.weightLb,
+    weight_unit: input.weightUnit,
+  };
+
+  if (input.bodyFatPercent !== undefined) {
+    payload.body_fat_percent = input.bodyFatPercent;
+  }
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepSixInput = {
+  userId: string;
+  goalType: "lose" | "maintain" | "gain" | "recomp";
+};
+
+export async function saveStepSixProfile(input: StepSixInput) {
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      goal_type: input.goalType,
+    })
+    .eq("user_id", input.userId);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}
+
+type StepSevenInput = {
+  userId: string;
+  goalWeightLb: number;
+};
+
+export async function saveStepSevenProfile(input: StepSevenInput) {
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      goal_weight_lb: input.goalWeightLb,
     })
     .eq("user_id", input.userId);
 

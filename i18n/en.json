@@ -7,6 +7,8 @@
     "cancel": "Cancel",
     "edit": "Edit",
     "close": "Close",
+    "increase": "Increase",
+    "decrease": "Decrease",
     "close_hint": "Double tap to close menu",
     "loading": "Loading",
     "error": "Error",
@@ -739,14 +741,42 @@
       "title": "What's your current weight?",
       "subtitle": "This is your starting point today.",
       "body_fat_label": "Body Fat % (optional)",
+      "body_fat_reference_label": "Reference",
+      "body_fat_reference_hint": "Double tap to view typical body fat percentage ranges",
       "body_fat_placeholder": "(e.g., 20)",
       "body_fat_accessibility_label": "Body fat percentage",
       "body_fat_accessibility_hint": "Enter your body fat percentage",
       "error_weight_required": "Weight is required",
       "error_weight_invalid": "Weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)",
+      "error_body_fat_invalid": "Body fat must be between 2% and 80%",
       "weight_label": "Weight",
       "weight_kg_placeholder": "35-250",
-      "weight_lb_placeholder": "77-550"
+      "weight_lb_placeholder": "77-550",
+      "body_fat_modal": {
+        "title": "Typical body fat % ranges {{symbol}}",
+        "subtitle": "Broad population ranges by age.",
+        "no_sex": "Select sex in onboarding to view ranges.",
+        "disclaimer": "These ranges are broad population estimates based on fitness and health references. Individual body fat percentage varies by genetics, measurement method, and other factors. Use this only as a rough guide.",
+        "range_span": "{{min}}–{{max}}%",
+        "range_plus": "{{min}}%+",
+        "symbols": {
+          "male": "♂",
+          "female": "♀"
+        },
+        "age_groups": {
+          "15_29": "15–29",
+          "30s": "30s",
+          "40_50s": "40s–50s",
+          "60_plus": "60+"
+        },
+        "categories": {
+          "athlete": "Athlete",
+          "ideal": "Ideal",
+          "average": "Average",
+          "above_average": "Above Average",
+          "overweight": "Overweight"
+        }
+      }
     },
     "goal_weight": {
       "title": "What's your goal weight?",
@@ -769,7 +799,7 @@
       "goal_weight_error_recomp_range_lb": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} lbs of your current weight.",
       "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight.",
       "suggested_placeholder": "Based on your data, we suggest: {{weight}} {{unit}}",
-      "suggest_prefix": "A smart place to start: ",
+      "suggest_prefix": "A possible starting point: ",
       "your_goal": "Your goal",
       "your_current_weight": "Your current weight",
       "nudge_hint": "Drag the slider to fine-tune your goal.",
