@@ -21,22 +21,22 @@ import { buildWeightPayload, WeightStep } from "@/components/onboarding/steps/We
 import { uploadAvatar } from "@/services/avatar";
 import { getActiveLegalDocuments } from "@/services/legal";
 import {
-    completeOnboardingProfile,
-    fetchOnboardingProfile,
-    fetchUserLegalAcceptances,
-    finalizeOnboarding,
-    saveAvatarProfile,
-    saveModulePreferences,
-    saveStepEightProfile,
-    saveStepFiveProfile,
-    saveStepFourProfile,
-    saveStepNineProfile,
-    saveStepOneProfile,
-    saveStepSevenProfile,
-    saveStepSixProfile,
-    saveStepThreeProfile,
-    saveStepTwoProfile,
-    type UserLegalAcceptance,
+  completeOnboardingProfile,
+  fetchOnboardingProfile,
+  fetchUserLegalAcceptances,
+  finalizeOnboarding,
+  saveAvatarProfile,
+  saveModulePreferences,
+  saveStepEightProfile,
+  saveStepFiveProfile,
+  saveStepFourProfile,
+  saveStepNineProfile,
+  saveStepOneProfile,
+  saveStepSevenProfile,
+  saveStepSixProfile,
+  saveStepThreeProfile,
+  saveStepTwoProfile,
+  type UserLegalAcceptance,
 } from "@/services/onboarding";
 import { type LegalDocType, type LegalDocument } from "../../../legal/legal-documents";
 import { mapCaloriePlanToDb } from "../../../lib/onboarding/calorie-plan";
@@ -55,14 +55,14 @@ import { validateBodyFatPercent, validateWeightKg } from "../lib/onboarding/weig
 import { ActivityLevel, validateActivityLevel } from "../lib/validation/activity";
 import { GoalType, validateGoalType } from "../lib/validation/goal";
 import {
-    cmToFtIn,
-    HeightUnit,
-    roundTo1,
+  cmToFtIn,
+  HeightUnit,
+  roundTo1,
 } from "../lib/validation/height";
 import {
-    filterPreferredNameInput,
-    normalizePreferredName,
-    validatePreferredName,
+  filterPreferredNameInput,
+  normalizePreferredName,
+  validatePreferredName,
 } from "../lib/validation/preferredName";
 import { WeightUnit } from "../lib/validation/weight";
 import { colors, spacing } from "../theme/tokens";
@@ -529,7 +529,7 @@ export default function OnboardingScreen() {
       setSuccess("Onboarding completed!");
 
       setTimeout(() => {
-        router.replace("/(tabs)/today");
+        router.replace("/(tabs)");
       }, 1000);
     } catch (e: any) {
       const errorMessage = e?.message || "An unexpected error occurred";
@@ -1090,7 +1090,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       await queryClient.invalidateQueries({ queryKey: ["legal-acceptances", user.id] });
-      router.replace("/(tabs)/today");
+      router.replace("/(tabs)");
     } catch (e) {
       if (__DEV__) {
         showDebugError(e, "Legal Agreement Step Save Error");
@@ -1120,7 +1120,7 @@ export default function OnboardingScreen() {
         ) : !user ? (
           <Redirect href="/login" />
         ) : onboardingComplete === true ? (
-          <Redirect href="/(tabs)/today" />
+          <Redirect href="/(tabs)" />
         ) : (
           <View style={styles.container}>
             {currentStep === 1 ? (

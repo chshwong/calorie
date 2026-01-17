@@ -39,7 +39,7 @@ export default function LoginScreen() {
       }
       // Route based on onboarding status
       if (onboardingComplete) {
-        router.replace("/(tabs)/today");
+        router.replace("/(tabs)");
       } else {
         router.replace("/onboarding");
       }

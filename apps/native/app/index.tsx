@@ -32,5 +32,5 @@ export default function Index() {
   }
 
   // User exists and onboarding complete
-  return <Redirect href="/(tabs)/today" />;
+  return <Redirect href="/(tabs)" />;
 }

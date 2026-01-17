@@ -34,7 +34,8 @@ export default function TabLayout() {
 
   // User authenticated and onboarded - render tabs
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs screenOptions={{ headerShown: false }} initialRouteName="index">
+      <Tabs.Screen name="index" />
       <Tabs.Screen name="today" />
       <Tabs.Screen name="log" />
       <Tabs.Screen name="settings" />

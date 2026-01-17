@@ -71,7 +71,7 @@ export function LegalAgreementStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <Feather name="file-text" size={56} color={theme.primary} />
+            <Feather name="file-text" size={112} color={theme.primary} />
           </View>
         </HeroCard>
       }
@@ -81,7 +81,7 @@ export function LegalAgreementStep({
           <Button
             title={t("common.next")}
             onPress={onContinue}
-            disabled={loading || !canProceed}
+            disabled={loading || !allChecked}
             loading={loading}
           />
         </View>
