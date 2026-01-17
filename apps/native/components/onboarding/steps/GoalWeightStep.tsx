@@ -130,7 +130,7 @@ export function GoalWeightStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <MaterialCommunityIcons name="flag-outline" size={64} color={theme.primary} />
+            <MaterialCommunityIcons name="flag-outline" size={128} color={theme.primary} />
           </View>
         </HeroCard>
       }

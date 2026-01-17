@@ -121,7 +121,7 @@ export function ModulePreferencesStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <Feather name="layers" size={56} color={theme.primary} />
+            <Feather name="layers" size={112} color={theme.primary} />
           </View>
         </HeroCard>
       }

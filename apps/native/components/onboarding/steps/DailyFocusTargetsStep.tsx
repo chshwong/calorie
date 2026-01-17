@@ -189,7 +189,7 @@ export function DailyFocusTargetsStep({
         hero={
           <HeroCard>
             <View style={styles.heroVisual}>
-              <MaterialCommunityIcons name="target" size={64} color={theme.primary} />
+              <MaterialCommunityIcons name="target" size={128} color={theme.primary} />
             </View>
           </HeroCard>
         }
@@ -436,7 +436,7 @@ export function DailyFocusTargetsStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <MaterialCommunityIcons name="target" size={64} color={theme.primary} />
+            <MaterialCommunityIcons name="target" size={128} color={theme.primary} />
           </View>
         </HeroCard>
       }

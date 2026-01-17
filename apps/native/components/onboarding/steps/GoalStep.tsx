@@ -1,12 +1,12 @@
-import React, { useMemo } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import { useTranslation } from "react-i18next";
 import Feather from "@expo/vector-icons/Feather";
+import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { HeroCard } from "@/components/onboarding/HeroCard";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
-import { ChoiceTile } from "@/components/ui/ChoiceTile";
 import { Button } from "@/components/ui/Button";
+import { ChoiceTile } from "@/components/ui/ChoiceTile";
 import { Text } from "@/components/ui/Text";
 import { useColorScheme } from "@/components/useColorScheme";
 import { colors, spacing } from "@/theme/tokens";
@@ -91,6 +91,22 @@ export function GoalStep({
             <Feather name="target" size={112} color={theme.primary} />
           </View>
         </HeroCard>
+      }
+      footer={
+        <View style={styles.actions}>
+          <Button
+            title={t("common.back")}
+            variant="secondary"
+            onPress={onBack}
+            disabled={loading}
+          />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={loading || !goalType}
+            loading={loading}
+          />
+        </View>
       }
     >
       <View style={styles.section}>

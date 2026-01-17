@@ -465,7 +465,7 @@ export function DailyTargetCaloriesStep({
         hero={
           <HeroCard>
             <View style={styles.heroVisual}>
-              <MaterialCommunityIcons name="fire" size={64} color={theme.primary} />
+              <MaterialCommunityIcons name="fire" size={128} color={theme.primary} />
             </View>
           </HeroCard>
         }
@@ -485,7 +485,7 @@ export function DailyTargetCaloriesStep({
         hero={
           <HeroCard>
             <View style={styles.heroVisual}>
-              <MaterialCommunityIcons name="fire" size={64} color={theme.primary} />
+              <MaterialCommunityIcons name="fire" size={128} color={theme.primary} />
             </View>
           </HeroCard>
         }
@@ -505,7 +505,7 @@ export function DailyTargetCaloriesStep({
         hero={
           <HeroCard>
             <View style={styles.heroVisual}>
-              <MaterialCommunityIcons name="fire" size={64} color={theme.primary} />
+              <MaterialCommunityIcons name="fire" size={128} color={theme.primary} />
             </View>
           </HeroCard>
         }
@@ -713,7 +713,7 @@ export function DailyTargetCaloriesStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <MaterialCommunityIcons name="fire" size={64} color={theme.primary} />
+            <MaterialCommunityIcons name="fire" size={128} color={theme.primary} />
           </View>
         </HeroCard>
       }

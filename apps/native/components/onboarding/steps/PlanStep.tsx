@@ -84,7 +84,7 @@ export function PlanStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <Feather name="award" size={56} color={theme.primary} />
+            <Feather name="award" size={112} color={theme.primary} />
           </View>
         </HeroCard>
       }
