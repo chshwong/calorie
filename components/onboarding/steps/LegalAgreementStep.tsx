@@ -39,9 +39,6 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
   const isDark = useColorScheme() === 'dark';
   const { data: documents = [], isLoading: loadingDocs, error: queryError, refetch } = useLegalDocuments();
   const [openDocKey, setOpenDocKey] = useState<string | null>(null);
-  const [openedOnce, setOpenedOnce] = useState<Record<string, boolean>>({});
-  const [scrolledToEnd, setScrolledToEnd] = useState<Record<string, boolean>>({});
-  const [containerHeights, setContainerHeights] = useState<Record<string, number>>({});
 
   const openDoc = documents.find(d => `${d.doc_type}:${d.version}` === openDocKey) ?? null;
   // Error handling: extract error message safely
@@ -88,17 +85,7 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
     }
   };
 
-  const handleCheckboxChange = (docType: string, value: boolean, docKey: string) => {
-    // Check if checkbox is locked
-    const canCheck = Boolean(openedOnce[docKey] && scrolledToEnd[docKey]);
-    
-    if (!canCheck) {
-      // Open modal if locked
-      setOpenDocKey(docKey);
-      setOpenedOnce(prev => ({ ...prev, [docKey]: true }));
-      return; // Don't toggle if locked
-    }
-    
+  const handleCheckboxChange = (docType: string, value: boolean) => {
     switch (docType) {
       case 'terms':
         onLegalAgreeTermsChange(value);
@@ -114,7 +101,6 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
 
   const handleOpenModal = (docKey: string) => {
     setOpenDocKey(docKey);
-    setOpenedOnce(prev => ({ ...prev, [docKey]: true }));
   };
 
   return (
@@ -183,9 +169,6 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
             const docKey = `${doc.doc_type}:${doc.version}`;
             const isChecked = getCheckboxValue(doc.doc_type);
             const checkboxLabel = getCheckboxLabel(doc.doc_type);
-            const canCheck = Boolean(openedOnce[docKey] && scrolledToEnd[docKey]);
-            const isLocked = !canCheck;
-
             return (
               <View
                 key={docKey}
@@ -199,14 +182,12 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
                   {/* Checkbox Area - Separate Pressable */}
                   <TouchableOpacity
                     style={styles.checkboxArea}
-                    onPress={() => handleCheckboxChange(doc.doc_type, !isChecked, docKey)}
+                    onPress={() => handleCheckboxChange(doc.doc_type, !isChecked)}
                     disabled={loading}
                     hitSlop={10}
                     {...getButtonAccessibilityProps(
                       checkboxLabel,
-                      isLocked
-                        ? t('onboarding.legal.open_scroll_enable')
-                        : t('onboarding.legal.double_tap_check', { action: isChecked ? 'uncheck' : 'check', label: checkboxLabel }),
+                      t('onboarding.legal.double_tap_check', { action: isChecked ? 'uncheck' : 'check', label: checkboxLabel }),
                       loading
                     )}
                   >
@@ -216,7 +197,6 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
                         {
                           borderColor: isChecked ? onboardingColors.primary : colors.border,
                           backgroundColor: isChecked ? onboardingColors.primary : colors.background,
-                          opacity: isLocked ? 0.5 : 1,
                         },
                       ]}
                     >
@@ -242,7 +222,7 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
                       <Text
                         style={[
                           styles.checkboxLabel,
-                          { color: colors.text, opacity: isLocked ? 0.5 : 1 },
+                          { color: colors.text },
                         ]}
                         numberOfLines={3}
                       >
@@ -302,34 +282,6 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
               style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={true}
-              scrollEventThrottle={16}
-              onLayout={(e) => {
-                if (openDocKey) {
-                  const height = e.nativeEvent.layout.height;
-                  setContainerHeights(prev => ({ ...prev, [openDocKey]: height }));
-                }
-              }}
-              onScroll={({ nativeEvent }) => {
-                if (!openDocKey) return;
-                const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                const paddingToBottom = Spacing['2xl'];
-                const isAtBottom =
-                  layoutMeasurement.height + contentOffset.y >=
-                  contentSize.height - paddingToBottom;
-
-                if (isAtBottom) {
-                  setScrolledToEnd(prev => ({ ...prev, [openDocKey]: true }));
-                }
-              }}
-              onContentSizeChange={(width, height) => {
-                if (!openDocKey) return;
-                const containerHeight = containerHeights[openDocKey] ?? 0;
-                // If content is shorter than container (with small tolerance), mark as scrolled
-                // Tolerance uses Spacing.sm (8px) per guidelines 8.1
-                if (containerHeight > 0 && height <= containerHeight + Spacing.sm) {
-                  setScrolledToEnd(prev => ({ ...prev, [openDocKey]: true }));
-                }
-              }}
             >
               <ThemedText style={[styles.modalDocumentText, { color: colors.textSecondary }]}>
                 {openDoc?.content_md ?? ''}
@@ -339,24 +291,11 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
 
             {/* Modal Footer */}
             <View style={styles.modalFooter}>
-              <Text
-                style={[
-                  styles.modalHint,
-                  {
-                    color: scrolledToEnd[openDocKey ?? ''] ? SemanticColors.success : colors.textSecondary,
-                  },
-                ]}
-              >
-                {scrolledToEnd[openDocKey ?? '']
-                  ? t('onboarding.legal.can_accept_now')
-                  : t('onboarding.legal.scroll_to_enable')}
-              </Text>
               <TouchableOpacity
                 style={[
                   styles.modalDoneButton,
                   {
                     backgroundColor: onboardingColors.primary,
-                    opacity: scrolledToEnd[openDocKey ?? ''] ? 1 : 0.6,
                   },
                 ]}
                 onPress={() => setOpenDocKey(null)}
@@ -367,7 +306,7 @@ export const LegalAgreementStep: React.FC<LegalAgreementStepProps> = ({
                 )}
               >
                 <Text style={[styles.modalDoneButtonText, { color: Colors.light.textInverse }]}>
-                  {scrolledToEnd[openDocKey ?? ''] ? t('onboarding.legal.done') : t('onboarding.legal.continue_reading')}
+                  {t('onboarding.legal.done')}
                 </Text>
               </TouchableOpacity>
             </View>
