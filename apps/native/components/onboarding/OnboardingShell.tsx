@@ -1,20 +1,18 @@
 import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { colors, fontSizes, spacing } from "../../theme/tokens";
 import { Text } from "../ui/Text";
 import { useColorScheme } from "../useColorScheme";
-import { colors, fontSizes, spacing } from "../../theme/tokens";
 import { OnboardingCard } from "./OnboardingCard";
 
 type OnboardingShellProps = {
@@ -58,54 +56,55 @@ export function OnboardingShell({
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <View style={styles.flex}>
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={[
-              styles.scrollContent,
-              footer && { paddingBottom: footerHeightWithPadding + spacing.xl },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Text variant="title" style={styles.headerTitle}>
-              <Text variant="title">{t("onboarding.header_prefix")}</Text>
-              <Text variant="title" style={{ color: theme.brandAvo }}>
-                {brandParts.avo}
-              </Text>
-              <Text variant="title" style={{ color: theme.brandVibe }}>
-                {brandParts.vibe}
-              </Text>
+      <View style={styles.flex}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            Boolean(footer) && {
+              paddingBottom: footerHeightWithPadding + spacing.xl,
+            },
+          ]}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text variant="title" style={styles.headerTitle}>
+            <Text variant="title">{t("onboarding.header_prefix")}</Text>
+            <Text variant="title" style={{ color: theme.brandAvo }}>
+              {brandParts.avo}
             </Text>
-            <StepIndicator activeStep={step} totalSteps={totalSteps} />
-            {hero ? <View style={styles.hero}>{hero}</View> : null}
-            <Text variant="title" style={styles.title}>
-              {title}
+            <Text variant="title" style={{ color: theme.brandVibe }}>
+              {brandParts.vibe}
             </Text>
-            {subtitle ? (
-              <Text variant="caption" tone="muted" style={styles.subtitle}>
-                {subtitle}
-              </Text>
-            ) : null}
-            <OnboardingCard>{children}</OnboardingCard>
-          </ScrollView>
-          {footer ? (
-            <View
-              style={[
-                styles.footer,
-                {
-                  borderTopColor: theme.border,
-                  backgroundColor: theme.background,
-                  paddingBottom: footerPadBottom,
-                },
-              ]}
-            >
-              {footer}
-            </View>
+          </Text>
+          <StepIndicator activeStep={step} totalSteps={totalSteps} />
+          {hero ? <View style={styles.hero}>{hero}</View> : null}
+          <Text variant="title" style={styles.title}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text variant="caption" tone="muted" style={styles.subtitle}>
+              {subtitle}
+            </Text>
           ) : null}
-        </View>
-      </TouchableWithoutFeedback>
+          <OnboardingCard>{children}</OnboardingCard>
+        </ScrollView>
+        {footer ? (
+          <View
+            style={[
+              styles.footer,
+              {
+                borderTopColor: theme.border,
+                backgroundColor: theme.background,
+                paddingBottom: footerPadBottom,
+              },
+            ]}
+          >
+            {footer}
+          </View>
+        ) : null}
+      </View>
     </KeyboardAvoidingView>
   );
 }
