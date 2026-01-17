@@ -88,7 +88,7 @@ export function GoalStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <Feather name="target" size={56} color={theme.primary} />
+            <Feather name="target" size={112} color={theme.primary} />
           </View>
         </HeroCard>
       }
@@ -135,21 +135,6 @@ export function GoalStep({
             {t(error)}
           </Text>
         ) : null}
-
-        <View style={styles.actions}>
-          <Button
-            title={t("common.back")}
-            variant="secondary"
-            onPress={onBack}
-            disabled={loading}
-          />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={loading || !goalType}
-            loading={loading}
-          />
-        </View>
       </View>
     </OnboardingShell>
   );

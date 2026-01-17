@@ -120,6 +120,22 @@ export function HeightStep({
           </View>
         </HeroCard>
       }
+      footer={
+        <View style={styles.actions}>
+          <Button
+            title={t("common.back")}
+            variant="secondary"
+            onPress={onBack}
+            disabled={loading}
+          />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={loading || !validation.ok}
+            loading={loading}
+          />
+        </View>
+      }
     >
       <View style={styles.section}>
         <View style={styles.unitToggle}>
@@ -187,21 +203,6 @@ export function HeightStep({
         )}
 
     {error ? <OnboardingErrorBox message={t(error)} /> : null}
-
-        <View style={styles.actions}>
-          <Button
-            title={t("common.back")}
-            variant="secondary"
-            onPress={onBack}
-            disabled={loading}
-          />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={loading || !validation.ok}
-            loading={loading}
-          />
-        </View>
       </View>
     </OnboardingShell>
   );

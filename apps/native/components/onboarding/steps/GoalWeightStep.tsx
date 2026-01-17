@@ -134,6 +134,17 @@ export function GoalWeightStep({
           </View>
         </HeroCard>
       }
+      footer={
+        <View style={styles.actions}>
+          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={loading || !goalType || !isGlobalValid}
+            loading={loading}
+          />
+        </View>
+      }
     >
       <View style={styles.section}>
         {currentWeightLb !== null && goalType ? (
@@ -249,16 +260,6 @@ export function GoalWeightStep({
         )}
 
         {errorKey ? <OnboardingErrorBox message={t(errorKey, errorParams ?? undefined)} /> : null}
-
-        <View style={styles.actions}>
-          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={loading || !goalType || !isGlobalValid}
-            loading={loading}
-          />
-        </View>
       </View>
     </OnboardingShell>
   );

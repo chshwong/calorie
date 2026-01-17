@@ -41,6 +41,7 @@ import {
 import { type LegalDocType, type LegalDocument } from "../../../legal/legal-documents";
 import { mapCaloriePlanToDb } from "../../../lib/onboarding/calorie-plan";
 import { HARD_HARD_STOP } from "../../../lib/onboarding/goal-calorie-nutrient-rules";
+import { DebugErrorModal } from "../components/debug/DebugErrorModal";
 import { GoalWeightStep } from "../components/onboarding/steps/GoalWeightStep";
 import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
@@ -66,7 +67,38 @@ import {
 import { WeightUnit } from "../lib/validation/weight";
 import { colors, spacing } from "../theme/tokens";
 
+// Helper to convert unknown errors to readable strings (DEV only)
+function formatErrorForDebug(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}\n\nStack:\n${error.stack || "No stack trace available"}`;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error && typeof error === "object") {
+    try {
+      return JSON.stringify(error, null, 2);
+    } catch {
+      return String(error);
+    }
+  }
+  return String(error);
+}
+
 export default function OnboardingScreen() {
+  // DEV-only debug error handlers
+  const showDebugError = React.useCallback((error: unknown, title?: string) => {
+    if (__DEV__) {
+      setDebugError({
+        title,
+        message: formatErrorForDebug(error),
+      });
+    }
+  }, []);
+
+  const clearDebugError = React.useCallback(() => {
+    setDebugError(null);
+  }, []);
   const { t } = useTranslation();
   const { user, loading, onboardingComplete, refreshProfile } = useAuth();
   const scheme = useColorScheme() ?? "light";
@@ -74,6 +106,7 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [debugError, setDebugError] = useState<{ title?: string; message: string } | null>(null);
   const [goalWeightErrorKey, setGoalWeightErrorKey] = useState<string | null>(null);
   const [goalWeightErrorParams, setGoalWeightErrorParams] = useState<Record<string, any> | null>(
     null
@@ -485,7 +518,8 @@ export default function OnboardingScreen() {
       });
 
       if (!result.ok) {
-        setError(result.error || "An unexpected error occurred");
+        const errorMsg = result.error || "An unexpected error occurred";
+        setError(typeof errorMsg === "string" ? errorMsg : String(errorMsg));
         setSaving(false);
         return;
       }
@@ -498,7 +532,11 @@ export default function OnboardingScreen() {
         router.replace("/(tabs)/today");
       }, 1000);
     } catch (e: any) {
-      setError(e?.message || "An unexpected error occurred");
+      const errorMessage = e?.message || "An unexpected error occurred";
+      if (__DEV__) {
+        showDebugError(e, "Complete Onboarding Error");
+      }
+      setError(typeof errorMessage === "string" ? errorMessage : String(errorMessage));
       setSaving(false);
     }
   };
@@ -546,6 +584,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(2);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Name Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -579,6 +620,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(3);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Sex Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -615,6 +659,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(4);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Height Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -650,6 +697,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(5);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Activity Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -705,6 +755,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(6);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Weight Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -740,6 +793,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(7);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Goal Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -811,6 +867,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(8);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Goal Weight Step Save Error");
+      }
       setGoalWeightErrorKey("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -853,6 +912,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(9);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Daily Target Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -901,6 +963,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(10);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Daily Targets Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -964,6 +1029,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-profile", user.id] });
       setCurrentStep(11);
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Module Preferences Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -1024,6 +1092,9 @@ export default function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["legal-acceptances", user.id] });
       router.replace("/(tabs)/today");
     } catch (e) {
+      if (__DEV__) {
+        showDebugError(e, "Legal Agreement Step Save Error");
+      }
       setError("onboarding.error_save_failed");
     } finally {
       setSaving(false);
@@ -1233,6 +1304,14 @@ export default function OnboardingScreen() {
           </View>
         )}
       </Screen>
+      {__DEV__ && (
+        <DebugErrorModal
+          visible={!!debugError}
+          title={debugError?.title || "Debug Error"}
+          message={debugError?.message || ""}
+          onClose={clearDebugError}
+        />
+      )}
     </ThemeModeProvider>
   );
 }

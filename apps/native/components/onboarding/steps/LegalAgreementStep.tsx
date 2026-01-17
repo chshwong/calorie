@@ -75,6 +75,17 @@ export function LegalAgreementStep({
           </View>
         </HeroCard>
       }
+      footer={
+        <View style={styles.actions}>
+          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={loading || !canProceed}
+            loading={loading}
+          />
+        </View>
+      }
     >
       <View style={styles.section}>
         {errorKey ? (
@@ -170,15 +181,6 @@ export function LegalAgreementStep({
           </View>
         )}
 
-        <View style={styles.actions}>
-          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={loading || !allChecked}
-            loading={loading}
-          />
-        </View>
       </View>
 
       <ReferenceModal

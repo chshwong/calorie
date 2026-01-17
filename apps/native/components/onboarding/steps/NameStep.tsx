@@ -62,8 +62,8 @@ export function NameStep({
   const dobDisplay = dateOfBirth || t("onboarding.name_age.dob_placeholder");
   const dobTone = dateOfBirth ? "default" : "muted";
   const age = dateOfBirth ? getAgeFromDob(dateOfBirth) : null;
-  const nameError = error && isNameError(error) ? error : undefined;
-  const dobError = error && isDobError(error) ? error : undefined;
+  const nameError = error && typeof error === "string" && isNameError(error) ? error : undefined;
+  const dobError = error && typeof error === "string" && isDobError(error) ? error : undefined;
   const initials = firstName.trim().length > 0 ? firstName.trim()[0]?.toUpperCase() : "";
   const dobMinDate = getDobMinDate();
   const dobMaxDate = getDobMaxDate();
@@ -110,6 +110,17 @@ export function NameStep({
       step={1}
       totalSteps={12}
       title={t("onboarding.name_age.title")}
+      footer={
+        <View>
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={saving}
+            loading={saving}
+            style={[styles.nextButton, { shadowColor: theme.text }]}
+          />
+        </View>
+      }
     >
       <View style={styles.section}>
           <View
@@ -203,7 +214,18 @@ export function NameStep({
               placeholder={t("onboarding.name_age.preferred_name_placeholder")}
               autoCapitalize="words"
               editable={!saving}
-              error={nameError ? t(nameError) : undefined}
+              error={
+                nameError && typeof nameError === "string"
+                  ? (() => {
+                      try {
+                        const translated = t(nameError);
+                        return typeof translated === "string" ? translated : nameError;
+                      } catch {
+                        return nameError;
+                      }
+                    })()
+                  : undefined
+              }
               labelStyle={styles.inputLabel}
               style={[styles.inputControl, { borderColor: theme.border }]}
             />
@@ -249,9 +271,16 @@ export function NameStep({
                 {t("onboarding.name_age.age_display", { age })}
               </Text>
             ) : null}
-            {dobError ? (
+            {dobError && typeof dobError === "string" ? (
               <Text variant="caption" tone="danger">
-                {t(dobError)}
+                {(() => {
+                  try {
+                    const translated = t(dobError);
+                    return typeof translated === "string" ? translated : dobError;
+                  } catch {
+                    return dobError;
+                  }
+                })()}
               </Text>
             ) : null}
           </View>
@@ -281,19 +310,19 @@ export function NameStep({
 
           <ThemeModeToggle />
 
-          {error && !nameError && !dobError ? (
+          {error && typeof error === "string" && !nameError && !dobError ? (
             <Text tone="danger" style={styles.centerText}>
-              {t(error)}
+              {(() => {
+                try {
+                  const translated = t(error);
+                  // If translation returns the key (meaning it wasn't found), use the key as-is
+                  return typeof translated === "string" ? translated : String(error);
+                } catch {
+                  return String(error);
+                }
+              })()}
             </Text>
           ) : null}
-
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={saving}
-            loading={saving}
-            style={[styles.nextButton, { shadowColor: theme.text }]}
-          />
           <ConfirmModal
             visible={removeModalOpen}
             title={t("onboarding.photoRemove.title")}

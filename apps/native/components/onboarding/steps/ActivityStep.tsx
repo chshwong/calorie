@@ -1,12 +1,12 @@
 import React, { useMemo } from "react";
-import { Image, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { Image, StyleSheet, View } from "react-native";
 
 import ActivityRunImage from "@/assets/activity_run.png";
 
+import { ActivityStepContent } from "@/components/onboarding/ActivityStepContent";
 import { HeroCard } from "@/components/onboarding/HeroCard";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
-import { ActivityStepContent } from "@/components/onboarding/ActivityStepContent";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { ActivityLevel, validateActivityLevel } from "@/lib/validation/activity";
@@ -56,6 +56,22 @@ export function ActivityStep({
           </View>
         </HeroCard>
       }
+      footer={
+        <View style={styles.actions}>
+          <Button
+            title={t("common.back")}
+            variant="secondary"
+            onPress={onBack}
+            disabled={loading}
+          />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={loading || !validation.ok}
+            loading={loading}
+          />
+        </View>
+      }
     >
       <View style={styles.section}>
         <ActivityStepContent
@@ -72,21 +88,6 @@ export function ActivityStep({
             {t(error)}
           </Text>
         ) : null}
-
-        <View style={styles.actions}>
-          <Button
-            title={t("common.back")}
-            variant="secondary"
-            onPress={onBack}
-            disabled={loading}
-          />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={loading || !validation.ok}
-            loading={loading}
-          />
-        </View>
       </View>
     </OnboardingShell>
   );

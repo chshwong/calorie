@@ -147,9 +147,25 @@ export function WeightStep({
       hero={
         <HeroCard>
           <View style={styles.heroVisual}>
-            <MaterialCommunityIcons name="scale-bathroom" size={64} color={theme.primary} />
+            <MaterialCommunityIcons name="scale-bathroom" size={128} color={theme.primary} />
           </View>
         </HeroCard>
+      }
+      footer={
+        <View style={styles.actions}>
+          <Button
+            title={t("common.back")}
+            variant="secondary"
+            onPress={onBack}
+            disabled={loading}
+          />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={nextDisabled}
+            loading={loading}
+          />
+        </View>
       }
     >
       <View style={styles.section}>
@@ -185,8 +201,8 @@ export function WeightStep({
             onChangeText={currentWeightUnit === "kg" ? handleKgChange : handleLbChange}
             placeholder={
               currentWeightUnit === "kg"
-                ? t("onboarding.current_weight.weight_kg_placeholder")
-                : t("onboarding.current_weight.weight_lb_placeholder")
+                ? t("units.kg")
+                : t("units.lbs")
             }
             keyboardType="decimal-pad"
             editable={!loading}
@@ -225,21 +241,6 @@ export function WeightStep({
         </View>
 
         {error ? <OnboardingErrorBox message={t(error)} /> : null}
-
-        <View style={styles.actions}>
-          <Button
-            title={t("common.back")}
-            variant="secondary"
-            onPress={onBack}
-            disabled={loading}
-          />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={nextDisabled}
-            loading={loading}
-          />
-        </View>
       </View>
       <ReferenceModal
         visible={isReferenceOpen}

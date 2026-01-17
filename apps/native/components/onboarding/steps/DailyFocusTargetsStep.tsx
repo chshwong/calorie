@@ -193,13 +193,15 @@ export function DailyFocusTargetsStep({
             </View>
           </HeroCard>
         }
-      >
-        <View style={styles.section}>
-          {error ? <OnboardingErrorBox message={t(error)} /> : null}
+        footer={
           <View style={styles.actions}>
             <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
             <Button title={t("common.next")} onPress={onContinue} disabled loading={loading} />
           </View>
+        }
+      >
+        <View style={styles.section}>
+          {error ? <OnboardingErrorBox message={t(error)} /> : null}
         </View>
       </OnboardingShell>
     );
@@ -438,6 +440,12 @@ export function DailyFocusTargetsStep({
           </View>
         </HeroCard>
       }
+      footer={
+        <View style={styles.actions}>
+          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
+          <Button title={t("common.next")} onPress={onContinue} disabled={loading} loading={loading} />
+        </View>
+      }
     >
       <View style={styles.section}>
         <View style={styles.sectionBlock}>
@@ -475,11 +483,6 @@ export function DailyFocusTargetsStep({
         </View>
 
         {error ? <OnboardingErrorBox message={t(error)} /> : null}
-
-        <View style={styles.actions}>
-          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
-          <Button title={t("common.next")} onPress={onContinue} disabled={loading} loading={loading} />
-        </View>
       </View>
 
       {referenceTarget ? (

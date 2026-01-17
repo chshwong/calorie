@@ -37,9 +37,9 @@ export function Input({ label, error, style, containerStyle, labelStyle, ...prop
         ]}
         {...props}
       />
-      {showError ? (
+      {showError && error ? (
         <Text variant="caption" tone="danger" style={styles.error}>
-          {error}
+          {typeof error === "string" ? error : String(error)}
         </Text>
       ) : null}
     </View>

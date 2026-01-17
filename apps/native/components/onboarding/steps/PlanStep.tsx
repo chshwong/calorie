@@ -88,6 +88,17 @@ export function PlanStep({
           </View>
         </HeroCard>
       }
+      footer={
+        <View style={styles.actions}>
+          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
+          <Button
+            title={t("common.next")}
+            onPress={onContinue}
+            disabled={loading || selectedPlan !== "free"}
+            loading={loading}
+          />
+        </View>
+      }
     >
       <View style={styles.section}>
         <Pressable
@@ -214,15 +225,6 @@ export function PlanStep({
           </Card>
         </Pressable>
 
-        <View style={styles.actions}>
-          <Button title={t("common.back")} variant="secondary" onPress={onBack} disabled={loading} />
-          <Button
-            title={t("common.next")}
-            onPress={onContinue}
-            disabled={loading || selectedPlan !== "free"}
-            loading={loading}
-          />
-        </View>
       </View>
 
       <Modal

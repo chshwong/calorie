@@ -23,7 +23,10 @@ type OnboardingShellProps = {
   subtitle?: string;
   hero?: React.ReactNode;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 };
+
+const FOOTER_HEIGHT = 100;
 
 export function OnboardingShell({
   step,
@@ -32,6 +35,7 @@ export function OnboardingShell({
   subtitle,
   hero,
   children,
+  footer,
 }: OnboardingShellProps) {
   const { t } = useTranslation();
   const scheme = useColorScheme() ?? "light";
@@ -52,7 +56,11 @@ export function OnboardingShell({
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View style={styles.flex}>
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContent,
+              footer && { paddingBottom: FOOTER_HEIGHT + spacing.xl },
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -77,6 +85,11 @@ export function OnboardingShell({
             ) : null}
             <OnboardingCard>{children}</OnboardingCard>
           </ScrollView>
+          {footer ? (
+            <View style={[styles.footer, { borderTopColor: theme.border }]}>
+              {footer}
+            </View>
+          ) : null}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -90,11 +103,20 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     padding: spacing.xl,
     gap: spacing.lg,
-    paddingBottom: spacing.xl + 180,
+  },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    borderTopWidth: 1,
+    backgroundColor: "transparent",
   },
   headerTitle: {
     textAlign: "center",
