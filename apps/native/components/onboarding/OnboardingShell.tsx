@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
 import { Text } from "../ui/Text";
@@ -40,12 +41,16 @@ export function OnboardingShell({
   const { t } = useTranslation();
   const scheme = useColorScheme() ?? "light";
   const theme = colors[scheme];
+  const insets = useSafeAreaInsets();
   const brandName = t("auth.login.brand_name");
   const brandParts = useMemo(() => {
     const avo = brandName.slice(0, 3);
     const vibe = brandName.slice(3);
     return { avo, vibe };
   }, [brandName]);
+
+  const footerPadBottom = Math.max(insets.bottom, spacing.md);
+  const footerHeightWithPadding = FOOTER_HEIGHT + footerPadBottom + spacing.md;
 
   return (
     <KeyboardAvoidingView
@@ -59,7 +64,7 @@ export function OnboardingShell({
             style={styles.scrollView}
             contentContainerStyle={[
               styles.scrollContent,
-              footer && { paddingBottom: FOOTER_HEIGHT + spacing.xl },
+              footer && { paddingBottom: footerHeightWithPadding + spacing.xl },
             ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -86,7 +91,16 @@ export function OnboardingShell({
             <OnboardingCard>{children}</OnboardingCard>
           </ScrollView>
           {footer ? (
-            <View style={[styles.footer, { borderTopColor: theme.border }]}>
+            <View
+              style={[
+                styles.footer,
+                {
+                  borderTopColor: theme.border,
+                  backgroundColor: theme.background,
+                  paddingBottom: footerPadBottom,
+                },
+              ]}
+            >
               {footer}
             </View>
           ) : null}
