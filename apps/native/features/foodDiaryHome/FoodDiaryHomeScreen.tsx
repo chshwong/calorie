@@ -1,7 +1,8 @@
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { RefreshControl, StyleSheet, View } from "react-native";
 import { Screen } from "@/components/ui/Screen";
 import { Button } from "@/components/ui/Button";
-import { FoodDiaryHeader } from "@/features/foodDiaryHome/components/FoodDiaryHeader";
+import { CollapsibleModuleHeader } from "@/components/header/CollapsibleModuleHeader";
+import { DatePickerButton } from "@/components/header/DatePickerButton";
 import { DaySummaryCard } from "@/features/foodDiaryHome/components/DaySummaryCard";
 import { MealSection } from "@/features/foodDiaryHome/components/MealSection";
 import { useSelectedDate } from "@/features/foodDiaryHome/hooks/useSelectedDate";
@@ -16,7 +17,7 @@ import { useMemo, useState } from "react";
 
 export function FoodDiaryHomeScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     selectedDate,
     selectedDateKey,
@@ -27,7 +28,7 @@ export function FoodDiaryHomeScreen() {
     canGoForward,
   } = useSelectedDate();
   const { dailyTotals, groupedEntries, isLoading, refetch } = useDailySummary(selectedDateKey);
-  const { targets } = useTargets();
+  const { targets, userConfig } = useTargets();
   const [refreshing, setRefreshing] = useState(false);
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>(() => {
     return MEAL_TYPE_ORDER.reduce<Record<string, boolean>>((acc, mealType) => {
@@ -48,6 +49,17 @@ export function FoodDiaryHomeScreen() {
     router.replace({ pathname: "/(tabs)", params: { date: nextKey } });
   };
 
+  const locale = i18n.language === "fr" ? "fr-FR" : "en-US";
+  const dateText = useMemo(
+    () =>
+      selectedDate.toLocaleDateString(locale, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+    [locale, selectedDate]
+  );
+
   const onRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -57,66 +69,83 @@ export function FoodDiaryHomeScreen() {
 
   return (
     <Screen padding={0}>
-      <ScrollView
-        contentContainerStyle={styles.container}
+      <CollapsibleModuleHeader
+        dateText={dateText}
+        preferredName={userConfig?.first_name ?? undefined}
+        rightAvatarUri={userConfig?.avatar_url ?? undefined}
+        rightAction={
+          <DatePickerButton
+            selectedDate={selectedDate}
+            today={today}
+            minimumDate={minDate}
+            maximumDate={today}
+            onDateSelect={navigateWithDate}
+          />
+        }
+        goBackOneDay={
+          canGoBack
+            ? () => {
+                navigateWithDate(addDays(selectedDateKey, -1));
+              }
+            : undefined
+        }
+        goForwardOneDay={
+          canGoForward
+            ? () => {
+                navigateWithDate(addDays(selectedDateKey, 1));
+              }
+            : undefined
+        }
+        isToday={isToday}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <FoodDiaryHeader
-          selectedDate={selectedDate}
-          today={today}
-          minDate={minDate}
-          isToday={isToday}
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          onSelectDate={navigateWithDate}
-          onGoBack={() => navigateWithDate(addDays(selectedDateKey, -1))}
-          onGoForward={() => navigateWithDate(addDays(selectedDateKey, 1))}
-        />
-        <DaySummaryCard totals={dailyTotals} targets={targets} isLoading={isLoading} />
-        <View style={styles.mealList}>
-          {MEAL_TYPE_ORDER.map((mealType) => {
-            const group = groupedEntries[mealType];
-            const mealTypeLabel = t(`home.meal_types.${mealType}`);
-            return (
-              <MealSection
-                key={mealType}
-                mealTypeLabel={mealTypeLabel}
-                entries={group.entries}
-                totalCalories={group.totalCalories}
-                isExpanded={expandedMeals[mealType] ?? true}
-                onToggleExpand={() => mealToggle(mealType)}
-                onPressHeader={() =>
-                  router.push({
-                    pathname: "/(tabs)/log",
-                    params: { mealType, entryDate: selectedDateKey },
-                  })
-                }
-                onPressAdd={() =>
-                  router.push({
-                    pathname: "/(tabs)/log",
-                    params: { mealType, entryDate: selectedDateKey },
-                  })
-                }
-                onPressEntry={() =>
-                  router.push({
-                    pathname: "/(tabs)/log",
-                    params: { mealType, entryDate: selectedDateKey },
-                  })
-                }
-              />
-            );
-          })}
+        <View style={styles.container}>
+          <DaySummaryCard totals={dailyTotals} targets={targets} isLoading={isLoading} />
+          <View style={styles.mealList}>
+            {MEAL_TYPE_ORDER.map((mealType) => {
+              const group = groupedEntries[mealType];
+              const mealTypeLabel = t(`home.meal_types.${mealType}`);
+              return (
+                <MealSection
+                  key={mealType}
+                  mealTypeLabel={mealTypeLabel}
+                  entries={group.entries}
+                  totalCalories={group.totalCalories}
+                  isExpanded={expandedMeals[mealType] ?? true}
+                  onToggleExpand={() => mealToggle(mealType)}
+                  onPressHeader={() =>
+                    router.push({
+                      pathname: "/(tabs)/log",
+                      params: { mealType, entryDate: selectedDateKey },
+                    })
+                  }
+                  onPressAdd={() =>
+                    router.push({
+                      pathname: "/(tabs)/log",
+                      params: { mealType, entryDate: selectedDateKey },
+                    })
+                  }
+                  onPressEntry={() =>
+                    router.push({
+                      pathname: "/(tabs)/log",
+                      params: { mealType, entryDate: selectedDateKey },
+                    })
+                  }
+                />
+              );
+            })}
+          </View>
+          <Button
+            title={t("food.log_food")}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/log",
+                params: { entryDate: selectedDateKey },
+              })
+            }
+          />
         </View>
-        <Button
-          title={t("food.log_food")}
-          onPress={() =>
-            router.push({
-              pathname: "/(tabs)/log",
-              params: { entryDate: selectedDateKey },
-            })
-          }
-        />
-      </ScrollView>
+      </CollapsibleModuleHeader>
     </Screen>
   );
 }

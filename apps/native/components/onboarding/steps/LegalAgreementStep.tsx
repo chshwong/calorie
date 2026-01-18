@@ -48,6 +48,7 @@ export function LegalAgreementStep({
     () => documents.length > 0 && documents.every((doc) => checked[doc.docType]),
     [documents, checked]
   );
+  const canProceed = allChecked;
 
   const checkboxLabelFor = (docType: LegalDocType) => {
     switch (docType) {
@@ -81,7 +82,7 @@ export function LegalAgreementStep({
           <Button
             title={t("common.next")}
             onPress={onContinue}
-            disabled={loading || !allChecked}
+            disabled={loading || !canProceed}
             loading={loading}
           />
         </View>

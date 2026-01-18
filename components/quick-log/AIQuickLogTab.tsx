@@ -6,6 +6,7 @@ import { getButtonAccessibilityProps, getInputAccessibilityProps, getLinkAccessi
 import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StepConnectorDown } from './StepConnectorDown';
 
 type Props = {
   onApplyParsed: (input: { parsed: AIQuickLogParsed; rawText: string }) => void;
@@ -129,6 +130,8 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
           </TouchableOpacity>
         </View>
 
+        <StepConnectorDown />
+
         {/* STEP 2 */}
         <View style={styles.step}>
           <Text style={[styles.stepHeader, { color: colors.text }]}>
@@ -155,6 +158,8 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
             {t('quick_log.ai.step2_helper_suffix')}
           </Text>
         </View>
+
+        <StepConnectorDown />
 
         {/* STEP 3 */}
         <View style={styles.step}>
