@@ -153,7 +153,7 @@ export default function LegalAgreementScreen() {
       });
 
       if (!updatedProfile) {
-        throw new Error('Failed to update profile');
+        throw new Error(t('legal.error_save_failed'));
       }
 
       // After DB update succeeds, update caches/stores (best-effort, no awaits required)
@@ -205,8 +205,8 @@ export default function LegalAgreementScreen() {
       // StartupGate already re-evaluates from persisted sources without requiring a full page reload.
       router.replace('/(tabs)');
     } catch (err: any) {
-      const errorMessage = err?.message || t('legal.error_loading');
-      showAppToast('Failed to save. Please try again.');
+      const errorMessage = t('legal.error_save_failed');
+      showAppToast(t('legal.error_save_failed'));
       setLoadError(errorMessage);
     } finally {
       setLoading(false);

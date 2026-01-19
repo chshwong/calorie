@@ -1,3 +1,32 @@
+# Engineering Guidelines (Web + Native)
+
+## Applicability Legend
+- [ALL] = Applies to Web + Native
+- [WEB] = Web only
+- [NATIVE] = Native only
+- [iOS] = iOS only
+- [ANDROID] = Android only
+- Tags may be combined, e.g. [NATIVE][ANDROID]
+
+## Ready-to-merge Checklist (run after every batch)
+- Diff is only in intended scope (e.g. apps/native/** for native work)
+- No component calls Supabase directly
+- One Supabase client + one AuthProvider
+- React Query used for all reads; useMutation for writes
+- Query keys include user_id where applicable
+- No hardcoded numeric limits (constraints module only)
+- Validation centralized (no inline regex/business rules)
+- [NATIVE] No browser globals (window/document/localStorage)
+- Loading / error / empty states handled
+- Works in light and dark mode
+- Accessibility basics met (labels, tap targets, no clipped text)
+- Platform sanity check (iOS + Android for native; responsive for web)
+
+---
+
+## Shared Engineering Rules
+Unless explicitly tagged otherwise below, **all rules in this document are [ALL] (Web + Native)**.
+
 CURSOR ENGINEERING RULES (AUTHORITATIVE SUMMARY)
 
 1. Components NEVER call Supabase directly.
@@ -40,8 +69,6 @@ CURSOR ENGINEERING RULES (AUTHORITATIVE SUMMARY)
 
 ENGINEERING GUIDELINES
 
-These rules apply to all code. Any deviation must include an inline comment explaining why.
-
 --------------------------------------------------
 1. TECH STACK FOUNDATIONS
 --------------------------------------------------
@@ -57,7 +84,7 @@ All code should be refactored toward these assumptions.
 2. SUPABASE CLIENT AND AUTH
 --------------------------------------------------
 • Only ONE Supabase client instance is allowed.
-• It must live in src/lib/supabaseClient.ts.
+• [ALL] It must live in the platform’s canonical supabase client module (web: src/lib/supabaseClient.ts; native: apps/native/**/supabaseClient.ts).
 • Components must never create or import Supabase clients directly.
 
 AuthProvider:
@@ -104,6 +131,10 @@ Startup rule (IMPORTANT):
 --------------------------------------------------
 5. PERSISTENT CACHING (AUTHORITATIVE)
 --------------------------------------------------
+
+Storage backend (platform-specific):
+• [WEB] Persistence uses browser storage (e.g. localStorage) via the approved persister.
+• [NATIVE] Persistence uses AsyncStorage via the approved persister. localStorage is forbidden.
 • Persistent caching is mandatory for repeatedly-read user data:
   – profile / user config (ALL goals & targets)
   – daily entries
@@ -127,11 +158,13 @@ Rules:
 --------------------------------------------------
 7. CONSTRAINTS & VALIDATION (SINGLE SOURCE)
 --------------------------------------------------
-• All numeric ranges, limits, and policies live in:
-  src/constants/constraints.ts
+• [ALL] All numeric ranges, limits, and policies live in the shared constraints module.
+  - web: src/constants/constraints.ts
+  - native: apps/native/**/constraints.ts
 
-• All validation logic lives in:
-  utils/validation.ts
+• [ALL] All validation logic lives in the centralized validation module.
+  - web: utils/validation.ts
+  - native: apps/native/**/validation/*.ts
 
 Rules:
 • No component, hook, or service may hardcode min/max values.
@@ -180,7 +213,7 @@ Rules:
 • All styles must use StyleSheet.create.
 • Inline styles allowed only for dynamic values.
 • No hardcoded colors, spacing, radii, or font sizes.
-• All tokens must come from theme.ts.
+• [ALL] All tokens must come from the theme system (web theme.ts / native theme/tokens.ts).
 
 Typography:
 • Inter is the global font.
@@ -195,6 +228,11 @@ Typography:
 --------------------------------------------------
 13. INTERNATIONALIZATION
 --------------------------------------------------
+
+Canonical English source:
+• [ALL] The single source of truth for English copy is /i18n/en.json.
+• [ALL] Web and Native must import from the canonical file; do not create per-platform en.json copies.
+• [NATIVE] If Metro ever stops allowing import of files outside apps/native, use a native-only sync script as fallback (generated copy), and document it.
 • No user-facing text may be hardcoded.
 • All UI text must come from i18n/en.json via t().
 • Translation files must mirror en.json structure.
@@ -254,3 +292,29 @@ Typography:
 Any rule violation must include:
 • an inline explanation
 • the intended future fix
+
+
+---
+
+## Platform-specific Addendums
+
+### [NATIVE]
+- Persistent cache uses AsyncStorage (via React Query persister). Do not use localStorage.
+- Browser globals are forbidden: window, document, location, localStorage.
+- Core branding assets must live under apps/native/assets/** and be imported via require().
+- Do not import or reuse web SVG assets directly in native.
+- Date inputs (e.g. DOB) must use native pickers (Expo-supported).
+- OAuth callbacks must use deep links / app scheme (Expo Router), never browser redirects.
+- Permissions (camera, photos, notifications) must be handled via centralized wrappers.
+
+### [WEB]
+- DOM- and browser-dependent APIs (localStorage, cookies, IP-based region detection) are web-only.
+- Web-specific routing (URL params, query strings) must not leak into native assumptions.
+
+### [iOS]
+- Apple-only auth (e.g. Sign in with Apple) must be isolated and optional.
+- iOS-specific UI or permissions must not block Android builds.
+
+### [ANDROID]
+- Android back-button behavior must be centralized; no ad-hoc handling in screens.
+- Notification channels (when added) must be defined explicitly.

@@ -5,14 +5,14 @@
  * Handles unit conversions and provides detailed error messages.
  */
 
-import { PROFILES, DERIVED } from '@/constants/constraints';
+import { DERIVED, PROFILES } from '@/constants/constraints';
 import {
-  MIN_DELTA_LOSE_LB,
-  MIN_DELTA_GAIN_LB,
-  MAX_DELTA_LOSE_PCT,
-  MAX_DELTA_GAIN_PCT,
-  MAINTAIN_RECOMP_PCT,
   MAINTAIN_RECOMP_ABS_CAP_LB,
+  MAINTAIN_RECOMP_PCT,
+  MAX_DELTA_GAIN_PCT,
+  MAX_DELTA_LOSE_PCT,
+  MIN_DELTA_GAIN_LB,
+  MIN_DELTA_LOSE_LB,
   kgToLb,
   lbToKg,
 } from '@/lib/domain/weight-constants';
@@ -41,27 +41,41 @@ function roundTo1(value: number): number {
 export function getGoalWeightRange(params: {
   currentWeightLb: number;
   goalType: GoalType;
-}): { minLb: number; maxLb: number; recommendedLb: number; deltaLb?: number } {
+}): { minLb: number; maxLb: number; recommendedLb: number | null; deltaLb?: number } {
   const { currentWeightLb, goalType } = params;
 
   switch (goalType) {
     case 'lose': {
       const allowedMax = currentWeightLb - MIN_DELTA_LOSE_LB;
       const allowedMin = Math.max(MIN_WEIGHT_LB, currentWeightLb * (1 - MAX_DELTA_LOSE_PCT));
+      const recommendedLb = currentWeightLb - MIN_DELTA_LOSE_LB;
+      const safeRecommend =
+        allowedMin <= allowedMax &&
+        recommendedLb >= allowedMin &&
+        recommendedLb <= allowedMax &&
+        recommendedLb >= MIN_WEIGHT_LB &&
+        recommendedLb <= MAX_WEIGHT_LB;
       return {
         minLb: allowedMin,
         maxLb: allowedMax,
-        recommendedLb: currentWeightLb - MIN_DELTA_LOSE_LB, // Default to 1lb below
+        recommendedLb: safeRecommend ? recommendedLb : null,
       };
     }
 
     case 'gain': {
       const allowedMin = currentWeightLb + MIN_DELTA_GAIN_LB;
       const allowedMax = Math.min(MAX_WEIGHT_LB, currentWeightLb * (1 + MAX_DELTA_GAIN_PCT));
+      const recommendedLb = currentWeightLb + MIN_DELTA_GAIN_LB;
+      const safeRecommend =
+        allowedMin <= allowedMax &&
+        recommendedLb >= allowedMin &&
+        recommendedLb <= allowedMax &&
+        recommendedLb >= MIN_WEIGHT_LB &&
+        recommendedLb <= MAX_WEIGHT_LB;
       return {
         minLb: allowedMin,
         maxLb: allowedMax,
-        recommendedLb: currentWeightLb + MIN_DELTA_GAIN_LB, // Default to 1lb above
+        recommendedLb: safeRecommend ? recommendedLb : null,
       };
     }
 
@@ -290,16 +304,20 @@ export function getGoalWeightRangeDisplay(params: {
 /**
  * Get recommended target weight in the specified unit
  * @param params - Parameters for recommendation
- * @returns Recommended target weight in the specified unit
+ * @returns Recommended target weight in the specified unit, or null if no valid recommendation
  */
 export function getRecommendedTargetWeight(params: {
   currentWeightLb: number;
   goalType: GoalType;
   weightUnit: WeightUnit;
-}): number {
+}): number | null {
   const { currentWeightLb, goalType, weightUnit } = params;
   const range = getGoalWeightRange({ currentWeightLb, goalType });
   const recommendedLb = range.recommendedLb;
+
+  if (recommendedLb === null) {
+    return null;
+  }
 
   if (weightUnit === 'kg') {
     return roundTo1(lbToKg(recommendedLb));

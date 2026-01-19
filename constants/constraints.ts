@@ -112,5 +112,8 @@ export const BUNDLES = {
   export const POLICY = {
     DOB: { MIN_AGE_YEARS: 13, MAX_AGE_YEARS: 120 },
     NAME: { MIN_LEN: 1, MAX_LEN: 50 }, // No contraint in DB
+    PREFERRED_NAME_MAX_LEN: 30,
+    PREFERRED_NAME_MIN_LETTERS: 2,
+    PREFERRED_NAME_MAX_EMOJIS: 1,
   } as const;
   

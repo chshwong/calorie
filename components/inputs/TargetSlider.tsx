@@ -224,8 +224,8 @@ export const TargetSlider: React.FC<TargetSliderProps> = ({
           Platform.OS === 'web' && getFocusStyle(onboardingColors.primary),
         ]}
         {...getButtonAccessibilityProps(
-          'Reset to baseline',
-          'Double tap to reset to baseline value',
+          t('onboarding.daily_targets.reset_to_baseline'),
+          t('onboarding.daily_targets.reset_to_baseline_hint'),
           disabled || isAtRecommended
         )}
       >
@@ -234,7 +234,7 @@ export const TargetSlider: React.FC<TargetSliderProps> = ({
           { color: onboardingColors.primary },
           (disabled || isAtRecommended) && styles.resetButtonTextDisabled
         ]}>
-          Reset to baseline
+          {t('onboarding.daily_targets.reset_to_baseline')}
         </ThemedText>
       </TouchableOpacity>
     </View>

@@ -349,13 +349,13 @@ export const CurrentWeightStep: React.FC<CurrentWeightStepProps> = ({
               ]}
               hitSlop={8}
               {...getButtonAccessibilityProps(
-                'Reference',
-                'Double tap to view typical body fat percentage ranges',
+                t('onboarding.current_weight.body_fat_reference_label'),
+                t('onboarding.current_weight.body_fat_reference_hint'),
                 loading
               )}
             >
               <ThemedText style={[styles.bfLinkText, { color: colors.tint }]}>
-                ℹ️ Reference
+                {t('onboarding.current_weight.body_fat_reference_label')}
               </ThemedText>
             </TouchableOpacity>
           </View>

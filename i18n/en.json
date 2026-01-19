@@ -7,6 +7,8 @@
     "cancel": "Cancel",
     "edit": "Edit",
     "close": "Close",
+    "increase": "Increase",
+    "decrease": "Decrease",
     "close_hint": "Double tap to close menu",
     "loading": "Loading",
     "error": "Error",
@@ -30,7 +32,8 @@
     "password": "Password",
     "year": "Year",
     "month": "Month",
-    "day": "Day"
+    "day": "Day",
+    "remove": "Remove"
   },
   "date": {
     "yday": "Yday"
@@ -461,7 +464,9 @@
       "needs_email_detail": "This sign-in method didn't provide an email address. Please add an email to the provider, or sign in with Google or a magic link instead.",
       "no_session_detail": "No user session was created. Please try again.",
       "please_wait": "Please wait…",
-      "back_to_login": "Back to login"
+      "back_to_login": "Back to login",
+      "timeout_detail": "Connection timed out. Please try again.",
+      "try_again": "Try Again"
     },
     "linking": {
       "title": "Link accounts",
@@ -590,7 +595,26 @@
       "not_common": "Not a common password"
     }
   },
+  "recovery": {
+    "title": "Trouble loading Avovibe",
+    "body": "Avovibe is taking longer than expected to start. This can happen after an update or when the network is unstable. You can try again, restart the app, or reset local data.",
+    "try_again": "Try again",
+    "restart_app": "Restart app",
+    "reset_confirm_title": "Reset local data?",
+    "reset_confirm_message": "This will sign you out and clear local cached data on this device.",
+    "reset_confirm_button": "Reset",
+    "reset_error_title": "Reset failed",
+    "reset_error_message": "Could not reset local data. Please try restarting the app manually.",
+    "reset_data": "Reset local data"
+  },
   "onboarding": {
+    "photoUploadError": "Couldn’t upload your photo. Please try again.",
+    "photoRemoveConfirmTitle": "Remove photo?",
+    "photoRemoveConfirmMessage": "This will remove your profile photo.",
+    "photoRemove": {
+      "title": "Remove photo?",
+      "message": "This will remove your profile photo."
+    },
     "header_prefix": "Your ",
     "plan": {
       "title": "Choose your plan",
@@ -634,9 +658,9 @@
       "tap_to_toggle": "Tap to select or deselect",
       "selected_rank": "selected as #{{rank}}",
       "exercise_title": "Exercise",
-      "exercise_subtitle": "Workouts & activity",
+      "exercise_subtitle": "Workouts & activities",
       "med_title": "Med",
-      "med_subtitle": "Meds & supplements",
+      "med_subtitle": "Medications & supplements",
       "water_title": "Water",
       "water_subtitle": "Hydration tracking"
     },
@@ -670,7 +694,9 @@
       "preferred_name_label": "Preferred Name",
       "preferred_name_placeholder": "How do you like to be called?",
       "preferred_name_helper": "Letters, numbers, spaces, and basic punctuation. One emoji max.",
-      "appearance_title": "How do your eyes like it?",
+      "photo_change_label": "Change photo",
+      "photo_edit_label": "Edit photo",
+      "appearance_title": "Appearance",
       "appearance_subtitle": "Tap here!",
       "appearance_value_system": "System",
       "appearance_value_light": "Light",
@@ -737,14 +763,42 @@
       "title": "What's your current weight?",
       "subtitle": "This is your starting point today.",
       "body_fat_label": "Body Fat % (optional)",
+      "body_fat_reference_label": "Reference",
+      "body_fat_reference_hint": "Double tap to view typical body fat percentage ranges",
       "body_fat_placeholder": "(e.g., 20)",
       "body_fat_accessibility_label": "Body fat percentage",
       "body_fat_accessibility_hint": "Enter your body fat percentage",
       "error_weight_required": "Weight is required",
       "error_weight_invalid": "Weight must be between 35 kg and 250 kg (approximately 77 lb to 550 lb)",
+      "error_body_fat_invalid": "Body fat must be between 2% and 80%",
       "weight_label": "Weight",
       "weight_kg_placeholder": "35-250",
-      "weight_lb_placeholder": "77-550"
+      "weight_lb_placeholder": "77-550",
+      "body_fat_modal": {
+        "title": "Typical body fat % ranges {{symbol}}",
+        "subtitle": "Broad population ranges by age.",
+        "no_sex": "Select sex in onboarding to view ranges.",
+        "disclaimer": "These ranges are broad population estimates based on fitness and health references. Individual body fat percentage varies by genetics, measurement method, and other factors. Use this only as a rough guide.",
+        "range_span": "{{min}}–{{max}}%",
+        "range_plus": "{{min}}%+",
+        "symbols": {
+          "male": "♂",
+          "female": "♀"
+        },
+        "age_groups": {
+          "15_29": "15–20s",
+          "30s": "30s",
+          "40_50s": "40s–50s",
+          "60_plus": "60+"
+        },
+        "categories": {
+          "athlete": "Athlete",
+          "ideal": "Ideal",
+          "average": "Average",
+          "above_average": "Above Average",
+          "overweight": "Overweight"
+        }
+      }
     },
     "goal_weight": {
       "title": "What's your goal weight?",
@@ -767,7 +821,7 @@
       "goal_weight_error_recomp_range_lb": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} lbs of your current weight.",
       "goal_weight_error_recomp_range_kg": "Recomp focuses on body composition while keeping weight stable. Choose a target within ±{{delta}} kg of your current weight.",
       "suggested_placeholder": "Based on your data, we suggest: {{weight}} {{unit}}",
-      "suggest_prefix": "A smart place to start: ",
+      "suggest_prefix": "A possible starting point: ",
       "your_goal": "Your goal",
       "your_current_weight": "Your current weight",
       "nudge_hint": "Drag the slider to fine-tune your goal.",
@@ -882,7 +936,37 @@
       "plan_custom_desc": "Set your own target",
       "below_minimum": "Below recommended minimum intake.",
       "warning_below_recommended": "Below our recommended minimum, proceed with caution",
-      "warning_critical": "ΓÜá∩╕Å This would require an unsafe calorie intake. Choose another target date or weight."
+      "warning_critical": "ΓÜá∩╕Å This would require an unsafe calorie intake. Choose another target date or weight.",
+      "adjust_activity_link": "Adjust activity level",
+      "subtitle_default": "Choose a daily calorie target:",
+      "subtitle_lose": "To reach {{weight}}, choose a calorie target below maintenance:",
+      "subtitle_maintain": "To maintain at {{weight}}, choose a calorie target near maintenance:",
+      "subtitle_recomp": "To recomposition at {{weight}}, choose a calorie target near maintenance:",
+      "subtitle_gain": "To gain toward {{weight}}, choose a daily calorie target above maintenance:",
+      "weight_loss_more_sustainable_title": "More sustainable",
+      "weight_loss_standard_title": "Standard pace",
+      "weight_loss_aggressive_title": "Fast-tracked pace",
+      "weight_loss_cautious_minimum_title": "Cautious Minimum",
+      "weight_loss_escape_hatch_subtitle": "Arrives later, easier to sustain.",
+      "extreme_edge_case_title": "⚠️ This goal is beyond what the app can guide safely.",
+      "extreme_edge_case_body": "Based on your current data, standard weight-loss targets would fall below safe limits. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you're doing, or go back and adjust your goal.",
+      "maintenance_recomp_warning_title": "⚠️ This goal is beyond what the app can guide reliably.",
+      "maintenance_warning_details": "Based on your current data, maintenance targets at this range are hard to estimate accurately and small fluctuations can shift outcomes. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you're doing, or go back and adjust your goal.",
+      "recomp_warning_details": "Based on your current data, recomposition targets at this range are hard to set because progress depends heavily on training quality, protein, and recovery. Everyone differs (genetics, body composition, activity). Increasing activity and building consistent habits may still help over time. You can set a custom target if you know what you're doing, or go back and adjust your goal.",
+      "pace_per_week": "~{{pace}} lb/week",
+      "eta_weeks": "~{{weeks}} week{{suffix}} (by {{date}})",
+      "warning_level_unsafe": "This plan is unsafe and cannot be selected.",
+      "warning_level_red": "⚠️ Unsafe for most people without professional supervision.",
+      "warning_level_neutral": "Demanding — requires careful nutrition and monitoring.",
+      "a11y_decrease_calories_label": "Decrease calories",
+      "a11y_decrease_calories_hint": "Double tap to decrease by {{step}} cal",
+      "a11y_increase_calories_label": "Increase calories",
+      "a11y_increase_calories_hint": "Double tap to increase by {{step}} cal",
+      "a11y_adjust_activity_hint": "Double tap to adjust your activity level",
+      "a11y_select_custom_plan": "Double tap to select custom calorie target",
+      "a11y_adjust_calories_hint": "Double tap to adjust calories",
+      "a11y_proceed_anyway_hint": "Double tap to proceed anyway",
+      "error_select_target": "Please select a calorie target."
     },
     "daily_targets": {
       "title": "Daily Focus Targets",
@@ -894,9 +978,91 @@
       "carbs": "Total Carbs Limit",
       "sugar": "Sugar Limit",
       "sodium": "Sodium Limit",
+      "suggested_value": "Suggested: {{value}} {{unit}}",
+      "current_value": "Current: {{value}} {{unit}}",
+      "reference_label": "Reference",
+      "reference_hint": "Double tap to view {{label}} reference information",
+      "reset_to_baseline": "Reset to baseline",
+      "reset_to_baseline_hint": "Double tap to reset to baseline value",
+      "daily_min": "Daily Min",
+      "daily_max": "Daily Max",
+      "expand_secondary": "Expand secondary targets",
+      "collapse_secondary": "Collapse secondary targets",
+      "secondary_toggle_hint": "Double tap to expand or collapse secondary targets",
+      "a11y_increase_label": "Increase {{label}}",
+      "a11y_increase_hint": "Double tap to increase {{label}} by {{step}} {{unit}}",
+      "a11y_decrease_label": "Decrease {{label}}",
+      "a11y_decrease_hint": "Double tap to decrease {{label}} by {{step}} {{unit}}",
+      "a11y_target_input_label": "{{label}} input",
+      "a11y_target_input_hint": "Enter {{label}} value in {{unit}}",
+      "constraint_settings_label": "Constraint settings",
+      "constraint_settings_hint": "Double tap to change constraint type",
+      "constraint_button": "Constraint",
+      "constraint_modal_title": "{{label}} Constraint",
+      "constraint_modal_description": "Choose how this target should be enforced",
+      "constraint_option_minimum": "Minimum",
+      "constraint_option_minimum_desc": "Ensure at least this amount",
+      "constraint_option_maximum": "Maximum",
+      "constraint_option_maximum_desc": "Stay below this amount",
+      "constraint_option_target": "Target",
+      "constraint_option_target_desc": "Aim for this amount",
+      "constraint_modal_close_hint": "Double tap to close",
       "error_missing_data": "Please complete previous steps to see suggested targets.",
       "water": "Daily Water Target",
-      "based_on_calories": "Based on your calorie target of {{calories}} cal/day"
+      "based_on_calories": "Based on your calorie target of {{calories}} cal/day",
+      "reference": {
+        "sections": {
+          "why_track": "Why track",
+          "what_to_aim_for": "What to aim for",
+          "typical_ranges": "Typical ranges",
+          "realistic_start": "A realistic start",
+          "when_not_apply": "When this may not apply"
+        },
+        "protein": {
+          "title": "Protein",
+          "why_track": "Protein helps preserve and build muscle and keeps you fuller for longer.",
+          "what_to_aim_for": "Most people do well around 0.7–1.0 g per lb of body weight per day.",
+          "typical_ranges": {
+            "female": "Females: often ~70–140 g/day",
+            "combined": "Exact needs vary with size and activity."
+          },
+          "disclaimer": "General guidance only, not medical advice. Needs vary with age, activity level, kidney or liver conditions, medications, and other factors."
+        },
+        "fiber": {
+          "title": "Fiber",
+          "why_track": "Supports digestion, fullness, and steadier energy.",
+          "what_to_aim_for": "Health guidelines suggest:",
+          "typical_ranges": {
+            "male": "Males: ~30–38 g/day",
+            "female": "Females: ~25–30 g/day",
+            "combined": "Most adults today average only ~15–20 g/day."
+          },
+          "realistic_start": "~20 g/day could be a great first goal. You can build from there.",
+          "disclaimer": "General guidance only, not medical advice."
+        },
+        "carbs": {
+          "title": "Carbs",
+          "why_track": "Capping carbs helps limit easy calorie creep and encourages better carb choices.",
+          "what_to_aim_for": "Many people do well around 30–55% of daily calories from carbs.",
+          "typical_ranges": {
+            "combined": "Intake may be much lower if you follow approaches like keto."
+          },
+          "disclaimer": "General guidance only, not medical advice. Needs vary with training, diabetes/prediabetes, medications, and other conditions."
+        },
+        "sugar": {
+          "title": "Sugar",
+          "why_track": "Capping sugar helps limit ultra-processed calories and supports heart and dental health.",
+          "what_to_aim_for": "A practical range for many people is under ~25–50 g/day.",
+          "disclaimer": "General guidance only, not medical advice. Individual needs vary."
+        },
+        "sodium": {
+          "title": "Sodium",
+          "why_track": "Capping sodium helps support healthy blood pressure and reduces hidden salt from processed foods.",
+          "what_to_aim_for": "Many people do well around ~2,000–2,300 mg/day.",
+          "when_not_apply": "This tracking is for those who want to limit sodium.\nSome very active individuals may need extra sodium to stay safe. If that applies to you, it's reasonable to opt out of this target.",
+          "disclaimer": "General guidance only, not medical advice. Sodium needs vary with blood pressure, kidney or heart conditions, sweating, and medications."
+        }
+      }
     },
     "legal": {
       "title": "Legal Agreement",
@@ -922,6 +1088,9 @@
       "double_tap_open": "Double tap to open {{title}}",
       "double_tap_close": "Double tap to close document",
       "double_tap_retry": "Double tap to retry loading legal documents",
+      "open_label": "Open {{title}}",
+      "action_check": "check",
+      "action_uncheck": "uncheck",
       "error_no_docs": "No active legal documents found. Please contact support.",
       "confirmation_caption": "By continuing, you confirm that you have read and agreed to all documents above."
     },
@@ -943,8 +1112,20 @@
     "subtitle": "Review the Terms of Service, Privacy Policy, and Health & Medical Disclaimer. You must agree before using the app.",
     "subtitle_settings": "Current legal documents and your acceptance history.",
     "loading_docs": "Loading legal content...",
+    "error_save_failed": "Failed to save. Please try again.",
     "error_loading": "Unable to load legal documents. Please try again.",
     "error_checkboxes": "Please review and check all required boxes.",
+    "documents": {
+      "terms": {
+        "content": "# Terms of Service\n\n**Version:** {{version}}\n\nThese Terms of Service (\"Terms\") apply to your use of the Calorie Tracker application and related services (\"Service\"). By creating an account, accessing, or using the Service, you agree to these Terms. If you do not agree, do not use the Service.\n\n## 1. Eligibility and Accounts\n- You must be at least 16 years old (or the minimum age of digital consent in your region) to use the Service.\n- You are responsible for maintaining the security of your account credentials and for all activity under your account.\n\n## 2. No Medical Advice; Assumption of Risk\n- The Service is **informational only** and does **not** provide medical, nutritional, or emergency advice.\n- The Service is **not a medical device** and is **not regulated** by health authorities.\n- Calorie, nutrition, weight, and health estimates are based on assumptions and may be inaccurate.\n- You must consult a licensed physician or other qualified professional for medical, nutritional, or fitness advice.\n- You assume all risks from using the Service, including the risk of **serious injury or death**. If you have any medical condition or emergency, seek in-person professional care immediately.\n\n## 3. Safe Use\n- Do not use the Service while driving or in any unsafe situation.\n- The Service is not for emergency or critical care use.\n- You are solely responsible for any actions you take based on the information provided.\n\n## 4. Acceptable Use\n- Do not misuse the Service, interfere with others, or attempt to access it using methods other than the interface provided.\n- Do not upload illegal, infringing, or harmful content.\n- We may suspend or terminate access for violations of these Terms or to protect users.\n\n## 5. Content and License\n- You retain ownership of content you submit. You grant us a non-exclusive, worldwide license to host, process, and display that content solely to operate and improve the Service.\n- We may generate aggregated and de-identified analytics from usage. We do **not** sell personally identifiable information.\n\n## 6. Privacy\n- Our [Privacy Policy](#) explains how we collect, use, and share information. By using the Service, you agree to the Privacy Policy.\n\n## 7. Changes to the Service\n- We may change, suspend, or discontinue the Service (or any part of it) at any time with or without notice.\n\n## 8. Disclaimers and Limitations of Liability\n- The Service is provided **\"as is\"** and **\"as available\"** without warranties of any kind.\n- To the maximum extent permitted by law, we disclaim all implied warranties, including fitness for a particular purpose, accuracy, and non-infringement.\n- To the maximum extent permitted by law, we are **not liable** for any indirect, incidental, special, consequential, or punitive damages, or for loss of data, profits, revenues, business, or goodwill.\n- In jurisdictions that do not allow the exclusion or limitation of liability, our liability is limited to the minimum extent permitted by law.\n\n## 9. Indemnity\nYou agree to defend and indemnify us against claims, damages, losses, and expenses (including legal fees) arising from your use of the Service or violation of these Terms, to the maximum extent permitted by law.\n\n## 10. Governing Law and Venue\nThese Terms are governed by the laws of the Province of Ontario, Canada, without regard to conflict of laws principles. Local mandatory consumer protections still apply. Any disputes will be resolved in the courts located in Toronto, Ontario, unless applicable law requires otherwise.\n\n## 11. Updates to these Terms\nWe may update these Terms. When we do, we will update the version date above. Continued use of the Service after the effective date means you accept the updated Terms.\n\n## 12. Contact\nFor questions, contact legal@calorietracker.app."
+      },
+      "privacy": {
+        "content": "# Privacy Policy\n\n**Version:** {{version}}\n\nThis Privacy Policy explains how we collect, use, and share information when you use the Calorie Tracker application (\"Service\").\n\n## 1. Information We Collect\n- **Account and contact data:** email, name (if provided), language, and authentication data.\n- **Profile and usage data:** height, weight, activity inputs, nutrition logs, goals, device and app settings.\n- **Technical data:** device identifiers, OS, app version, and diagnostics.\n- **Support interactions:** messages you send to us.\n\n## 2. How We Use Information\n- Provide, operate, and improve the Service.\n- Personalize recommendations and estimates.\n- Communicate about updates, security, and support.\n- Protect against fraud, abuse, or misuse.\n- Generate aggregated and **de-identified analytics** to improve the Service. We reserve the right to monetize aggregated insights that do not identify you.\n\n## 3. Sharing\n- **Service providers:** infrastructure, analytics, and support vendors under contractual confidentiality.\n- **Legal and safety:** to comply with law or protect rights, safety, or property.\n- **No sale of PII:** We **do not sell** personally identifiable information.\n\n## 4. International Transfers\nData may be processed in countries other than yours. We use appropriate safeguards where required by law.\n\n## 5. Data Retention\nWe keep information for as long as needed to provide the Service and comply with legal obligations. You may request deletion, subject to legal limits.\n\n## 6. Security\nWe use reasonable technical and organizational measures but cannot guarantee absolute security.\n\n## 7. Your Rights\n- You may access, correct, or delete certain personal data through the app or by contacting us.\n- Depending on your region (e.g., EU/UK/EEA), you may have rights to object, restrict processing, or portability. We honor valid requests subject to legal exceptions.\n\n## 8. Children\nThe Service is not directed to children under the age of digital consent. If we learn we have collected data from a child without proper consent, we will delete it.\n\n## 9. Changes to this Policy\nWe may update this Policy. When we do, we will update the version date above. Continued use means you accept the updated Policy.\n\n## 10. Contact\nContact us at privacy@calorietracker.app."
+      },
+      "health_disclaimer": {
+        "content": "# Health & Medical Disclaimer\n\n**Version:** {{version}}\n\n- The Calorie Tracker app is **not a medical device** and is **not regulated** by any health authority.\n- The app provides **informational estimates only** and may be incomplete, incorrect, or based on assumptions.\n- The app **does not provide medical advice**, diagnosis, treatment, or emergency services.\n- Always consult a licensed physician, dietitian, or other qualified professional before making health, nutrition, or exercise decisions.\n- You use the app entirely at your own risk, including the risk of **serious injury or death**.\n- If you experience an emergency or concerning symptoms, stop using the app and seek in-person professional care immediately.\n- By using the app, you **accept and assume all risks** to the maximum extent permitted by law."
+      }
+    },
     "checkbox_terms": "I agree to the Terms of Service",
     "checkbox_privacy": "I agree to the Privacy Policy",
     "checkbox_health": "I understand this app does not provide medical advice and I use it entirely at my own risk, including risk of serious injury or death",
