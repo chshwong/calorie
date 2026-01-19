@@ -1,8 +1,10 @@
+import AICameraPic from '@/assets/images/AI_CAMERA_PIC.png';
 import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, SemanticColors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { parseAIQuickLogReply, type AIQuickLogParsed } from '@/lib/ai/aiQuickLogParser';
 import { getButtonAccessibilityProps, getInputAccessibilityProps, getLinkAccessibilityProps, getMinTouchTargetStyle, getWebAccessibilityProps } from '@/utils/accessibility';
+import { Asset } from 'expo-asset';
 import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -28,6 +30,7 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
   const [warnings, setWarnings] = useState<Array<{ field: string; message: string }>>([]);
 
   const promptText = useMemo(() => t('quick_log.ai.prompt'), [t]);
+  const aiCameraPicUri = Asset.fromModule(AICameraPic).uri;
 
   const handleCopyPrompt = async () => {
     try {
@@ -106,9 +109,25 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
     <View style={[styles.container, { backgroundColor: isDark ? colors.card : colors.background }]}>
       <View style={styles.content}>
         {/* Disclaimer */}
-        <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
-          {t('quick_log.ai.disclaimer')}
-        </Text>
+        <View style={styles.disclaimerBlock}>
+          <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
+            {t('quick_log.ai.disclaimer')}
+          </Text>
+          {Platform.OS === 'web' ? (
+            <img
+              src={aiCameraPicUri}
+              alt="AI camera food logging flow"
+              style={{
+                width: '100%',
+                maxWidth: 520,
+                margin: Spacing.none,
+                display: 'block',
+                borderRadius: 16,
+                opacity: 0.95,
+              }}
+            />
+          ) : null}
+        </View>
 
         {/* STEP 1 */}
         <View style={styles.step}>
@@ -264,17 +283,20 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
 const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 4,
   },
   content: {
-    paddingHorizontal: 16,
-    gap: 20,
+    paddingHorizontal: Spacing.xs,
+    gap: 0,
+  },
+  disclaimerBlock: {
+    gap: 6,
   },
   disclaimer: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '400',
-    marginBottom: 10,
+    marginBottom: 0,
   },
   step: {
     gap: 8,
