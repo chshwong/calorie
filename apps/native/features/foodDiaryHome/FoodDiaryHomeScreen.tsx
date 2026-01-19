@@ -115,20 +115,20 @@ export function FoodDiaryHomeScreen() {
                   onToggleExpand={() => mealToggle(mealType)}
                   onPressHeader={() =>
                     router.push({
-                      pathname: "/(tabs)/log",
-                      params: { mealType, entryDate: selectedDateKey },
+                      pathname: "/mealtype-log",
+                      params: { mealType, date: selectedDateKey },
                     })
                   }
                   onPressAdd={() =>
                     router.push({
-                      pathname: "/(tabs)/log",
-                      params: { mealType, entryDate: selectedDateKey },
+                      pathname: "/mealtype-log",
+                      params: { mealType, date: selectedDateKey },
                     })
                   }
                   onPressEntry={() =>
                     router.push({
-                      pathname: "/(tabs)/log",
-                      params: { mealType, entryDate: selectedDateKey },
+                      pathname: "/mealtype-log",
+                      params: { mealType, date: selectedDateKey },
                     })
                   }
                 />

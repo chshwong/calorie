@@ -60,3 +60,19 @@ export async function getEntriesForDate(
     return [];
   }
 }
+
+export async function createEntry(
+  entry: Omit<CalorieEntry, "id" | "created_at" | "updated_at">
+): Promise<CalorieEntry> {
+  const { data, error } = await supabase
+    .from("calorie_entries")
+    .insert(entry)
+    .select(ENTRY_COLUMNS)
+    .single();
+
+  if (error || !data) {
+    throw error ?? new Error("Failed to create entry");
+  }
+
+  return data;
+}

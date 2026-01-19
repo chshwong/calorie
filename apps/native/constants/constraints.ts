@@ -22,3 +22,10 @@ export const DERIVED = {
 } as const;
 
 export const NUTRIENT_TARGETS = ROOT_NUTRIENT_TARGETS;
+
+export const FOOD_SEARCH = {
+  MIN_QUERY_LENGTH: 3,
+  MAX_RESULTS: 20,
+  RPC_LIMIT_MULTIPLIER: 2,
+  DEBOUNCE_MS: 300,
+} as const;
