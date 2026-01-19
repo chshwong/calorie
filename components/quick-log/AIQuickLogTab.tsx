@@ -114,18 +114,28 @@ export function AIQuickLogTab({ onApplyParsed, onClearAi, onParseErrorAnnounceme
             {t('quick_log.ai.disclaimer')}
           </Text>
           {Platform.OS === 'web' ? (
-            <img
-              src={aiCameraPicUri}
-              alt="AI camera food logging flow"
+            <div
               style={{
                 width: '100%',
                 maxWidth: 520,
-                margin: Spacing.none,
-                display: 'block',
+                margin: '0 auto 8px',
                 borderRadius: 16,
-                opacity: 0.95,
+                overflow: 'hidden',
+                aspectRatio: '16 / 9',
               }}
-            />
+            >
+              <img
+                src={aiCameraPicUri}
+                alt="AI camera food logging flow"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'block',
+                  objectFit: 'cover',
+                  opacity: 0.95,
+                }}
+              />
+            </div>
           ) : null}
         </View>
 
