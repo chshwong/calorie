@@ -1,20 +1,22 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { View, ScrollView, ActivityIndicator, TouchableOpacity, Text, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { showAppToast } from '@/components/ui/app-toast';
 import type { EnhancedFoodItem } from '@/src/domain/foodSearch';
 import type { FoodMaster } from '@/utils/nutritionMath';
-import type { Colors } from '@/constants/theme';
+import { FontWeight, Nudge, Spacing, type Colors } from '@/constants/theme';
 import { getLocalDateString } from '@/utils/calculations';
+import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 
 type CustomFoodsTabProps = {
   customFoods: EnhancedFoodItem[];
   customFoodsLoading: boolean;
   searchQuery: string;
   colors: typeof Colors.light;
-  t: (key: string) => string;
+  t: (key: string, options?: any) => string;
   onFoodSelect: (food: EnhancedFoodItem) => void;
   onQuickAdd: (food: EnhancedFoodItem) => void;
   onDelete: (food: FoodMaster) => void;
@@ -25,6 +27,7 @@ type CustomFoodsTabProps = {
   mealType: string;
   entryDate: string;
   styles: any;
+  onQuickLogTabPress?: () => void;
 };
 
 export function CustomFoodsTab({
@@ -43,9 +46,18 @@ export function CustomFoodsTab({
   mealType,
   entryDate,
   styles,
+  onQuickLogTabPress,
 }: CustomFoodsTabProps) {
   const router = useRouter();
   const [disabledButtons, setDisabledButtons] = useState<Set<string>>(new Set());
+  const [isCustomFoodInfoOpen, setIsCustomFoodInfoOpen] = useState(false);
+
+  const handleQuickLogLinkPress = () => {
+    setIsCustomFoodInfoOpen(false);
+    setTimeout(() => {
+      onQuickLogTabPress?.();
+    }, 0);
+  };
 
   const handleQuickAdd = (food: EnhancedFoodItem) => {
     // Show toast message
@@ -83,9 +95,28 @@ export function CustomFoodsTab({
           activeOpacity={0.7}
         >
           <View style={[styles.searchResultContent, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
-            <ThemedText style={[styles.searchResultName, { color: colors.tint, fontWeight: '700', flex: 1 }]}>
-              {t('mealtype_log.custom_foods.create_new')}
-            </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+              <ThemedText style={[styles.searchResultName, { color: colors.tint, fontWeight: '700', flexShrink: 1 }]}>
+                {t('mealtype_log.custom_foods.create_new')}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={(event) => {
+                  event?.stopPropagation?.();
+                  setIsCustomFoodInfoOpen(true);
+                }}
+                style={[
+                  localStyles.infoIconButton,
+                  Platform.OS === 'web' && getFocusStyle(colors.tint),
+                ]}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  t('mealtype_log.custom.info_a11y_label', { defaultValue: 'About custom food' }),
+                  t('mealtype_log.custom.info_a11y_hint', { defaultValue: 'Opens an explanation of custom food' })
+                )}
+              >
+                <IconSymbol name="info.circle.fill" size={16} color={colors.icon} decorative={true} />
+              </TouchableOpacity>
+            </View>
             {customFoods.length > 0 && (
               <TouchableOpacity
                 onPress={onToggleEditMode}
@@ -295,7 +326,80 @@ export function CustomFoodsTab({
           </ThemedText>
         </View>
       )}
+      <ConfirmModal
+        visible={isCustomFoodInfoOpen}
+        title={t('mealtype_log.custom.info_title', { defaultValue: 'Custom Food' })}
+        message={
+          <View>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.custom.info_bullet_1', { defaultValue: "For foods you can't find in the database." })}
+            </ThemedText>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.custom.info_bullet_2', { defaultValue: "Best for foods you'll log more than once." })}
+            </ThemedText>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.custom.info_bullet_3', { defaultValue: 'After you create it, it becomes searchable in the search bar.' })}
+            </ThemedText>
+            <View style={localStyles.infoBulletRow}>
+              <ThemedText style={[localStyles.infoBulletText, { color: colors.textSecondary }]}>
+                • {t('mealtype_log.custom.info_bullet_4_prefix', { defaultValue: 'For one-time foods, use ' })}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={handleQuickLogLinkPress}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  t('mealtype_log.custom.info_quick_log_a11y_label', { defaultValue: 'Go to Quick Log' }),
+                  t('mealtype_log.custom.info_quick_log_a11y_hint', { defaultValue: 'Closes this and opens Quick Log' })
+                )}
+              >
+                <Text
+                  style={[
+                    localStyles.infoQuickLogText,
+                    {
+                      color: colors.tint,
+                      textDecorationLine: Platform.OS === 'web' ? 'underline' : 'none',
+                    },
+                  ]}
+                >
+                  {t('mealtype_log.custom.info_quick_log_text', { defaultValue: 'Quick Log' })}
+                </Text>
+              </TouchableOpacity>
+              <ThemedText style={[localStyles.infoBulletText, { color: colors.textSecondary }]}>
+                {t('mealtype_log.custom.info_bullet_4_suffix', { defaultValue: '.' })}
+              </ThemedText>
+            </View>
+          </View>
+        }
+        confirmText={t('common.close', { defaultValue: 'Close' })}
+        cancelText={null}
+        onConfirm={() => setIsCustomFoodInfoOpen(false)}
+        onCancel={() => setIsCustomFoodInfoOpen(false)}
+      />
     </View>
   );
 }
 
+const localStyles = StyleSheet.create({
+  infoIconButton: {
+    marginLeft: Spacing.sm,
+    alignSelf: 'center',
+    padding: Spacing.xs + Nudge.px2,
+    minWidth: Spacing['3xl'] + Nudge.px2 * 2,
+    minHeight: Spacing['3xl'] + Nudge.px2 * 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoBullet: {
+    marginBottom: Spacing.sm,
+  },
+  infoBulletRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  infoBulletText: {
+    // Color supplied at call site
+  },
+  infoQuickLogText: {
+    fontWeight: FontWeight.semibold,
+  },
+});

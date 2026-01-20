@@ -83,6 +83,15 @@ export const FOOD_ENTRY = {
   MACRO_G: { MIN: 0, MAX: 9999.99 },
 } as const;
 
+// Custom food creation limits (UI + validation policy).
+export const CUSTOM_FOOD = {
+  NAME_MAX_LEN: 50,
+  BRAND_MAX_LEN: 30,
+  QUANTITY_MAX: 100000,
+  MACRO_MAX: 2000,
+  SODIUM_MAX: 10000,
+} as const;
+
 // Bundle limits (UI + validation policy).
 // Keep centralized to avoid hardcoding values (engineering-guidelines.md §7).
 export const BUNDLES = {

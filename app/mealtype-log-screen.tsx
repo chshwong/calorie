@@ -527,6 +527,10 @@ export default function LogFoodScreen() {
     }
   };
 
+  const handleQuickLogTabPress = () => {
+    handleTabPress('quick-log', () => scrollTabIntoView('quick-log'));
+  };
+
   // Tour: step-driven UI helpers for tabs
   const scrollTabIntoView = useCallback(
     (tab: TabKey) => {
@@ -1962,6 +1966,7 @@ export default function LogFoodScreen() {
               t={t}
               onFoodSelect={handleFoodSelect}
               onQuickAdd={handleQuickAdd}
+              onQuickLogTabPress={handleQuickLogTabPress}
               onDelete={handleDeleteCustomFood}
               editMode={customFoodEditMode}
               onToggleEditMode={() => {
@@ -1999,6 +2004,7 @@ export default function LogFoodScreen() {
               styles={styles}
               useTabBackgroundColor={useTabBackgroundColor}
               {...(useTabBackgroundColor && { getTabListBackgroundColor: getTabListBackgroundColorLocal })}
+              onQuickLogTabPress={handleQuickLogTabPress}
             />
           </View>
         );

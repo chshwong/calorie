@@ -30,9 +30,9 @@ export interface ConfirmModalProps {
   title: string;
   
   /**
-   * Message text displayed in the body of the modal
+   * Message text or custom body content displayed in the modal
    */
-  message: string;
+  message: React.ReactNode;
   
   /**
    * Text for the confirm/primary button (default: "Yes")
@@ -133,9 +133,13 @@ export function ConfirmModal({
           <ThemedText type="title" style={styles.modalTitle}>
             {title}
           </ThemedText>
-          <ThemedText style={[styles.modalMessage, { color: colors.text }]}>
-            {message}
-          </ThemedText>
+          {typeof message === 'string' ? (
+            <ThemedText style={[styles.modalMessage, { color: colors.text }]}>
+              {message}
+            </ThemedText>
+          ) : (
+            <View style={styles.modalMessageContainer}>{message}</View>
+          )}
           <View style={styles.modalButtons}>
             {cancelText && (
               <TouchableOpacity
@@ -235,6 +239,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  modalMessageContainer: {
+    marginBottom: 24,
   },
   modalButtons: {
     flexDirection: 'row',

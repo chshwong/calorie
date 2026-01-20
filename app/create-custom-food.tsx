@@ -1,31 +1,34 @@
+import { SegmentedTabs, type SegmentedTabItem } from '@/components/SegmentedTabs';
+import { AICustomFoodTab } from '@/components/create-custom-food/AICustomFoodTab';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { RANGES } from '@/constants/constraints';
+import { CUSTOM_FOOD, RANGES } from '@/constants/constraints';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import type { AICustomFoodParsed } from '@/lib/ai/aiCustomFoodParser';
 import {
-  checkDuplicateCustomFood,
-  countCustomFoods,
-  getDefaultServingForFood,
-  getFoodForCloning,
-  getFoodForEditing,
-  upsertCustomFood as upsertCustomFoodService,
-  type DefaultFoodServing,
-  type FoodMasterForCustomFood,
+    checkDuplicateCustomFood,
+    countCustomFoods,
+    getDefaultServingForFood,
+    getFoodForCloning,
+    getFoodForEditing,
+    upsertCustomFood as upsertCustomFoodService,
+    type DefaultFoodServing,
+    type FoodMasterForCustomFood,
 } from '@/lib/services/createCustomFood';
 import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle,
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 import { getLocalDateString, getMealTypeFromCurrentTime } from '@/utils/calculations';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -72,6 +75,8 @@ const VOLUME_TO_GRAMS: { [key: string]: number } = {
   'tbsp': 14.7868, // US tablespoon
   'tsp': 4.92892, // US teaspoon
 };
+
+type CustomFoodTabKey = 'manual' | 'ai';
 
 export default function CreateCustomFoodScreen() {
   const router = useRouter();
@@ -128,6 +133,8 @@ export default function CreateCustomFoodScreen() {
   const [foodName, setFoodName] = useState('');
   const [brand, setBrand] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<CustomFoodTabKey>('manual');
+  const [, setAiRawText] = useState<string | null>(null);
 
   // Serving type toggle (default: weight-based)
   const [servingType, setServingType] = useState<'weight' | 'volume'>('weight');
@@ -170,11 +177,11 @@ export default function CreateCustomFoodScreen() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   
   // Validation constants
-  const MAX_NAME_LENGTH = 50;
-  const MAX_BRAND_LENGTH = 30;
-  const MAX_QUANTITY = 100000;
+  const MAX_NAME_LENGTH = CUSTOM_FOOD.NAME_MAX_LEN;
+  const MAX_BRAND_LENGTH = CUSTOM_FOOD.BRAND_MAX_LEN;
+  const MAX_QUANTITY = CUSTOM_FOOD.QUANTITY_MAX;
   const MAX_CALORIES = RANGES.CALORIES_KCAL.MAX;
-  const MAX_MACRO = 2000;
+  const MAX_MACRO = CUSTOM_FOOD.MACRO_MAX;
 
   // Clear foodName error on mount to ensure clean start (no initial error message)
   useEffect(() => {
@@ -541,8 +548,8 @@ export default function CreateCustomFoodScreen() {
       const parsedSodium = parseFloat(weightSodium);
       if (isNaN(parsedSodium) || !isFinite(parsedSodium)) {
         newErrors.weightSodium = t('create_custom_food.validation.sodium_invalid');
-      } else if (parsedSodium > 10000) {
-        newErrors.weightSodium = t('create_custom_food.validation.sodium_exceeds_limit', { max: '10,000' });
+      } else if (parsedSodium > CUSTOM_FOOD.SODIUM_MAX) {
+        newErrors.weightSodium = t('create_custom_food.validation.sodium_exceeds_limit', { max: CUSTOM_FOOD.SODIUM_MAX.toLocaleString() });
       }
     }
     
@@ -610,7 +617,7 @@ export default function CreateCustomFoodScreen() {
     }
     if (weightSodium) {
       const parsedSodium = parseFloat(weightSodium);
-      if (isNaN(parsedSodium) || !isFinite(parsedSodium) || parsedSodium > 10000) return false;
+      if (isNaN(parsedSodium) || !isFinite(parsedSodium) || parsedSodium > CUSTOM_FOOD.SODIUM_MAX) return false;
     }
     
     return true;
@@ -925,6 +932,63 @@ export default function CreateCustomFoodScreen() {
   };
 
   const loadingFood = editQuery.isLoading || cloneQuery.isLoading;
+  const tabs: SegmentedTabItem[] = useMemo(
+    () => [
+      { key: 'manual', label: t('create_custom_food.tabs.manual', { defaultValue: 'Manual' }) },
+      { key: 'ai', label: t('create_custom_food.tabs.ai_label', { defaultValue: 'AI 📷' }) },
+    ],
+    [t]
+  );
+
+  const handleApplyAiCustomFoodParsed = (input: { parsed: AICustomFoodParsed; rawText: string }) => {
+    const { parsed, rawText } = input;
+
+    const trimmedFoodName = parsed.foodName.trim();
+    const trimmedBrand = parsed.brand?.trim() ?? '';
+
+    setFoodName(trimmedFoodName);
+    if (trimmedBrand) {
+      setBrand(trimmedBrand);
+    }
+
+    const isWeightUnit = WEIGHT_UNITS.some((unit) => unit.value === parsed.servingUnit);
+    const nextServingType: 'weight' | 'volume' = isWeightUnit ? 'weight' : 'volume';
+    setServingType(nextServingType);
+
+    if (nextServingType === 'weight') {
+      setWeightQuantity(parsed.servingSize.toString());
+      setWeightUnit(parsed.servingUnit);
+      setWeightCalories(parsed.totalKcal.toString());
+    } else {
+      setVolumeQuantity(parsed.servingSize.toString());
+      setVolumeUnit(parsed.servingUnit);
+      setVolumeCalories(parsed.totalKcal.toString());
+    }
+
+    setWeightProtein(parsed.proteinG != null ? parsed.proteinG.toFixed(1) : '');
+    setWeightCarbs(parsed.carbsG != null ? parsed.carbsG.toFixed(1) : '');
+    setWeightFat(parsed.fatG != null ? parsed.fatG.toFixed(1) : '');
+    setWeightFiber(parsed.fibreG != null ? parsed.fibreG.toFixed(1) : '');
+    setWeightSaturatedFat(parsed.saturatedFatG != null ? parsed.saturatedFatG.toFixed(1) : '');
+    setWeightTransFat(parsed.transFatG != null ? parsed.transFatG.toFixed(1) : '');
+    setWeightSugar(parsed.totalSugarG != null ? parsed.totalSugarG.toFixed(1) : '');
+    setWeightSodium(parsed.sodiumMg != null ? parsed.sodiumMg.toString() : '');
+
+    const hasAdvanced = Boolean(
+      parsed.fibreG != null ||
+        parsed.saturatedFatG != null ||
+        parsed.transFatG != null ||
+        parsed.totalSugarG != null ||
+        parsed.sodiumMg != null
+    );
+    setShowAdvancedNutrients(hasAdvanced);
+
+    setErrors({});
+    setAiRawText(rawText);
+    setActiveTab('manual');
+    setShowWeightUnitDropdown(false);
+    setShowVolumeUnitDropdown(false);
+  };
 
   // Show loading state while loading food data for editing
   if (loadingFood) {
@@ -1000,6 +1064,21 @@ export default function CreateCustomFoodScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.segmentedContainer}>
+          <SegmentedTabs
+            items={tabs}
+            activeKey={activeTab}
+            onChange={(key) => {
+              setActiveTab(key as CustomFoodTabKey);
+              setShowWeightUnitDropdown(false);
+              setShowVolumeUnitDropdown(false);
+            }}
+            useContrastingTextOnActive={true}
+          />
+        </View>
+
+        {activeTab === 'manual' ? (
+          <>
         {/* Food Identity */}
         <View style={[styles.requiredSection, { backgroundColor: colors.background, borderColor: colors.tint + '30' }]}>
           <View style={styles.sectionContent}>
@@ -1475,6 +1554,15 @@ export default function CreateCustomFoodScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+          </>
+        ) : (
+          <AICustomFoodTab
+            onApplyParsed={handleApplyAiCustomFoodParsed}
+            onClearAi={() => {
+              setAiRawText(null);
+            }}
+          />
+        )}
       </ScrollView>
       
       {/* Weight Unit Dropdown - Rendered at root level for proper z-index */}
@@ -1614,6 +1702,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     paddingTop: Platform.OS === 'ios' ? 8 : 0,
+  },
+  segmentedContainer: {
+    width: '100%',
+    paddingHorizontal: 2,
+    marginBottom: 12,
   },
   backButton: {
     marginRight: 12,

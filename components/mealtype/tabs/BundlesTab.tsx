@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, ScrollView, ActivityIndicator, TouchableOpacity, Text, Alert, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { HighlightableRow } from '@/components/common/highlightable-row';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
   getWebAccessibilityProps,
   getFocusStyle,
 } from '@/utils/accessibility';
-import type { Colors } from '@/constants/theme';
+import { FontWeight, Nudge, Spacing, type Colors } from '@/constants/theme';
 import { BUNDLES } from '@/constants/constraints';
 import { getLocalDateString } from '@/utils/calculations';
 
@@ -44,7 +46,7 @@ type BundlesTabProps = {
   bundlesLoading: boolean;
   searchQuery: string;
   colors: typeof Colors.light;
-  t: (key: string) => string;
+  t: (key: string, options?: any) => string;
   onAddBundle: (bundle: Bundle) => void;
   onDelete: (bundle: Bundle) => void;
   formatBundleItemsList: (bundle: Bundle) => string;
@@ -57,6 +59,7 @@ type BundlesTabProps = {
   styles: any;
   useTabBackgroundColor?: boolean;
   getTabListBackgroundColor?: (tab: string) => string;
+  onQuickLogTabPress?: () => void;
 };
 
 export function BundlesTab({
@@ -77,8 +80,17 @@ export function BundlesTab({
   styles,
   useTabBackgroundColor = false,
   getTabListBackgroundColor,
+  onQuickLogTabPress,
 }: BundlesTabProps) {
   const router = useRouter();
+  const [isBundlesInfoOpen, setIsBundlesInfoOpen] = useState(false);
+
+  const handleQuickLogLinkPress = () => {
+    setIsBundlesInfoOpen(false);
+    setTimeout(() => {
+      onQuickLogTabPress?.();
+    }, 0);
+  };
 
   const containerStyle = useTabBackgroundColor && getTabListBackgroundColor
     ? { backgroundColor: getTabListBackgroundColor('bundle'), borderColor: colors.icon + '20' }
@@ -132,23 +144,42 @@ export function BundlesTab({
             )}
             {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
           >
-            <ThemedText style={[
-              styles.searchResultName, 
-              { 
-                color: bundles.length >= BUNDLES.COUNT.MAX ? colors.icon : colors.tint, 
-                fontWeight: '700',
-                flex: 1,
-              }
-            ]}>
-              {t('mealtype_log.bundles.create_new')}{' '}
-              <ThemedText style={{
-                fontWeight: '400',
-                fontSize: 13,
-                color: bundles.length >= BUNDLES.COUNT.MAX ? colors.icon + '80' : colors.tint + 'CC',
-              }}>
-                {t('mealtype_log.bundles.bundles_count', { count: bundles.length })}
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+              <ThemedText style={[
+                styles.searchResultName, 
+                { 
+                  color: bundles.length >= BUNDLES.COUNT.MAX ? colors.icon : colors.tint, 
+                  fontWeight: '700',
+                  flexShrink: 1,
+                }
+              ]}>
+                {t('mealtype_log.bundles.create_new')}{' '}
+                <ThemedText style={{
+                  fontWeight: '400',
+                  fontSize: 13,
+                  color: bundles.length >= BUNDLES.COUNT.MAX ? colors.icon + '80' : colors.tint + 'CC',
+                }}>
+                  {t('mealtype_log.bundles.bundles_count', { count: bundles.length })}
+                </ThemedText>
               </ThemedText>
-            </ThemedText>
+              <TouchableOpacity
+                onPress={(event) => {
+                  event?.stopPropagation?.();
+                  setIsBundlesInfoOpen(true);
+                }}
+                style={[
+                  localStyles.infoIconButton,
+                  Platform.OS === 'web' && getFocusStyle(colors.tint),
+                ]}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  t('mealtype_log.bundles.info_a11y_label', { defaultValue: 'About bundles' }),
+                  t('mealtype_log.bundles.info_a11y_hint', { defaultValue: 'Opens an explanation of bundles' })
+                )}
+              >
+                <IconSymbol name="info.circle.fill" size={16} color={colors.icon} decorative={true} />
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
           {bundles.length > 0 && (
             <TouchableOpacity
@@ -338,7 +369,100 @@ export function BundlesTab({
           </ThemedText>
         </View>
       )}
+      <ConfirmModal
+        visible={isBundlesInfoOpen}
+        title={t('mealtype_log.bundles.info_title', { defaultValue: 'Bundles' })}
+        message={
+          <View>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.bundles.info_bullet_1', { defaultValue: 'For meals you log often.' })}
+            </ThemedText>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.bundles.info_bullet_2', { defaultValue: 'Save a group of foods as one bundle.' })}
+            </ThemedText>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.bundles.info_bullet_3', { defaultValue: 'Log the whole bundle in one tap.' })}
+            </ThemedText>
+            <ThemedText style={[localStyles.infoBullet, { color: colors.textSecondary }]}>
+              • {t('mealtype_log.bundles.info_bullet_4', { defaultValue: 'Great for repeat breakfasts, lunches, and snacks.' })}
+            </ThemedText>
+            {(() => {
+              const bullet = t('mealtype_log.bundles.info_bullet_5', {
+                defaultValue: 'For one-time meals, use Quick Log.',
+              });
+              const quickLogText = t('mealtype_log.custom.info_quick_log_text', { defaultValue: 'Quick Log' });
+              const [prefix, ...rest] = bullet.split(quickLogText);
+              const suffix = rest.length > 0 ? rest.join(quickLogText) : '';
+              if (rest.length === 0) {
+                return (
+                  <ThemedText style={{ color: colors.textSecondary }}>
+                    • {bullet}
+                  </ThemedText>
+                );
+              }
+              return (
+                <View style={localStyles.infoBulletRow}>
+                  <ThemedText style={[localStyles.infoBulletText, { color: colors.textSecondary }]}>
+                    • {prefix}
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={handleQuickLogLinkPress}
+                    activeOpacity={0.7}
+                    {...getButtonAccessibilityProps(
+                      t('mealtype_log.custom.info_quick_log_a11y_label', { defaultValue: 'Go to Quick Log' }),
+                      t('mealtype_log.custom.info_quick_log_a11y_hint', { defaultValue: 'Closes this and opens Quick Log' })
+                    )}
+                  >
+                    <Text
+                      style={[
+                        localStyles.infoQuickLogText,
+                        {
+                          color: colors.tint,
+                          textDecorationLine: Platform.OS === 'web' ? 'underline' : 'none',
+                        },
+                      ]}
+                    >
+                      {quickLogText}
+                    </Text>
+                  </TouchableOpacity>
+                  <ThemedText style={[localStyles.infoBulletText, { color: colors.textSecondary }]}>
+                    {suffix}
+                  </ThemedText>
+                </View>
+              );
+            })()}
+          </View>
+        }
+        confirmText={t('common.close', { defaultValue: 'Close' })}
+        cancelText={null}
+        onConfirm={() => setIsBundlesInfoOpen(false)}
+        onCancel={() => setIsBundlesInfoOpen(false)}
+      />
     </View>
   );
 }
 
+const localStyles = StyleSheet.create({
+  infoIconButton: {
+    marginLeft: Spacing.sm,
+    alignSelf: 'center',
+    padding: Spacing.xs + Nudge.px2,
+    minWidth: Spacing['3xl'] + Nudge.px2 * 2,
+    minHeight: Spacing['3xl'] + Nudge.px2 * 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoBullet: {
+    marginBottom: Spacing.sm,
+  },
+  infoBulletRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  infoBulletText: {
+    // Color supplied at call site
+  },
+  infoQuickLogText: {
+    fontWeight: FontWeight.semibold,
+  },
+});

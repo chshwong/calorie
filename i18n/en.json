@@ -1584,7 +1584,15 @@
       "title": "Bundles",
       "create_hint": "Create bundles to quickly log multiple foods at once",
       "example_hint": "i.e., Weekday Protein Breakfast A",
-      "example_desc": "4 whole eggs, 20g Whey, 2 cups skim milk, 1 tbsp olive oil, 5oz ham"
+      "example_desc": "4 whole eggs, 20g Whey, 2 cups skim milk, 1 tbsp olive oil, 5oz ham",
+      "info_title": "Bundles",
+      "info_bullet_1": "For meals you log often.",
+      "info_bullet_2": "Save a group of foods as one bundle.",
+      "info_bullet_3": "Log the whole bundle in one tap.",
+      "info_bullet_4": "Great for repeat breakfasts, lunches, and snacks.",
+      "info_bullet_5": "For one-time meals, use Quick Log.",
+      "info_a11y_label": "About bundles",
+      "info_a11y_hint": "Opens an explanation of bundles"
     },
     "custom_foods": {
       "empty": "Create your own custom food collection",
@@ -1593,6 +1601,20 @@
       "title": "Custom Foods",
       "create_hint": "Create custom foods for items you eat regularly",
       "custom_foods_count": "custom foods"
+    },
+    "custom": {
+      "info_title": "Custom Food",
+      "info_bullet_1": "For foods not in the database.",
+      "info_bullet_2": "Best for foods you’ll log again.",
+      "info_bullet_3": "Becomes searchable after creation.",
+      "info_bullet_4": "For one-time foods, use Quick Log.",
+      "info_bullet_4_prefix": "For one-time foods, use ",
+      "info_bullet_4_suffix": ".",
+      "info_quick_log_text": "Quick Log",
+      "info_quick_log_a11y_label": "Go to Quick Log",
+      "info_quick_log_a11y_hint": "Closes this and opens Quick Log",
+      "info_a11y_label": "About custom food",
+      "info_a11y_hint": "Opens an explanation of custom food"
     },
     "frequent_foods": {
       "loading": "Loading frequent foods...",
@@ -1836,6 +1858,36 @@
     "title_clone": "Clone Custom Food",
     "loading": "Loading food data...",
     "step1_title": "Step 1: Your Food's Name",
+    "tabs": {
+      "manual": "Manual",
+      "ai_label": "AI 📷"
+    },
+    "ai": {
+      "disclaimer": "Powered by your own AI assistant (keeps it free).",
+      "step1_header": "① 📷 Snap food image or nutrition label \n→ Copy Prompt",
+      "step1_helper": "Take a food photo or nutrition label, then click this button.",
+      "step2_header": "② Paste prompt + image to AI",
+      "step2_helper_prefix": "Paste the copied prompt into any AI assistant like",
+      "step2_helper_suffix": "with your food or label image attached.",
+      "step3_header": "③ Paste reply → Submit",
+      "step3_helper": "Paste the AI's reply below, then submit.",
+      "copy_prompt_button": "Copy Prompt",
+      "copy_prompt_success": "AI prompt copied",
+      "copy_prompt_accessibility_label": "Copy AI prompt",
+      "paste_reply_placeholder": "Paste the AI assistant reply here…",
+      "paste_reply_accessibility_label": "Paste AI reply",
+      "paste_reply_accessibility_hint": "Paste the AI reply text. Then parse and fill the custom food.",
+      "parse_button": "Submit → Fill Custom Food",
+      "parse_accessibility_label": "Parse and fill custom food",
+      "clear_button": "Clear",
+      "clear_accessibility_label": "Clear AI reply",
+      "parse_failed_title": "Couldn't parse nutrition label",
+      "warnings_title": "Some fields were ignored",
+      "parse_success_announcement": "Custom food filled from AI.",
+      "cleared_announcement": "AI reply cleared.",
+      "parse_error_fallback_announcement": "Could not parse AI reply.",
+      "prompt": "You are helping me create a custom food in Avovibe using a nutrition label image or meal photo.\n\nOUTPUT FORMAT (STRICT):\nRespond with EXACTLY ONE code block.\nInside the block, return ONLY the header fields below, one per line, in the exact order.\nDo not include any text outside the single code block. (No explanations, no extra sentences, no emojis.)\nIf code blocks are not supported, output the same lines without any surrounding text.\n\nHEADER FIELDS:\nFOOD_NAME: <short name>\nBRAND: <optional brand, or blank>\nSERVING_SIZE: <number>\nSERVING_UNIT: <one of g, kg, oz, lb, ml, L, fl oz, cup, pint, quart, gallon, tbsp, tsp>\nTOTAL_KCAL: <number 0-5000>\nProtein_G: <number with up to 1 decimal place, 0-2000>\nTotal_Carb_G: <number with up to 1 decimal place, 0-2000>\nTotal_Fat_G: <number with up to 1 decimal place, 0-2000>\nFIBRE_G: <number with up to 1 decimal place, 0-2000>\nSaturated_Fat_G: <number with up to 1 decimal place, 0-2000>\nTrans_Fat_G: <number with up to 1 decimal place, 0-2000>\nTotal_Sugar_G: <number with up to 1 decimal place, 0-2000>\nSODIUM_MG: <integer 0-30000>\n\nRULES:\nFOOD_NAME must be as short as possible and MUST NOT exceed 50 characters.If the image is a nutrition label and the product/food name is not visible, set FOOD_NAME: to blank (just FOOD_NAME: with nothing after it). Do not guess.\nIf BRAND is unknown, leave it blank.\nUse numbers only (no units in values, no commas).\nDecimal fields may have at most 1 digit after the decimal point.\nSERVING_UNIT must match one of the allowed units exactly.\nIf a meal image is provided, estimate nutrition per reasonable serving.\nIf unsure, estimate.\nDO NOT include explanations, descriptions, or reasoning.\nDO NOT include any text outside the single code block."
+    },
     "sections": {
       "food_identity_title": "Food Identity",
       "food_identity_helper": "Start with a name, then define the serving and nutrition.",
