@@ -1,46 +1,46 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, ActivityIndicator, Dimensions, Platform, Pressable } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
+import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
+import { NumberInput } from '@/components/input/NumberInput';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
-import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
-import { computeAvoScore, normalizeAvoScoreInputToBasis, type AvoScoreBasis, type AvoScoreInput } from '@/utils/avoScore';
-import { Colors, Spacing, SemanticColors } from '@/constants/theme';
+import { PortionGuideSheet, type PortionGuideTabKey } from '@/components/portion-guide/PortionGuideSheet';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { showAppToast } from '@/components/ui/app-toast';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FOOD_ENTRY, RANGES } from '@/constants/constraints';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors, SemanticColors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CalorieEntry } from '@/utils/types';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { clampDateKey } from '@/lib/date-guard';
+import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { deleteEntry as deleteEntryService, getEntriesForDate, updateEntryForUser } from '@/lib/services/calorieEntries';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
+import { applyFoodEditEntrySaveSuccessSideEffects, createEntryWithFoodEditSideEffects } from '@/lib/services/foodEntrySave';
+import { getFoodMasterById } from '@/lib/services/foodMaster';
+import { getServingsForFood } from '@/lib/servings';
+import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { computeAvoScore, normalizeAvoScoreInputToBasis, type AvoScoreBasis, type AvoScoreInput } from '@/utils/avoScore';
 import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
+import { toDateKey } from '@/utils/dateKey';
 import {
+  buildServingOptions,
   calculateNutrientsSimple,
   convertToMasterUnit,
-  isVolumeUnit,
-  buildServingOptions,
   getDefaultServingSelection,
+  isVolumeUnit,
   type FoodMaster,
   type FoodServing,
   type ServingOption,
 } from '@/utils/nutritionMath';
-import { getServingsForFood } from '@/lib/servings';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { PortionGuideSheet, type PortionGuideTabKey } from '@/components/portion-guide/PortionGuideSheet';
-import { createEntry, getEntriesForDate, updateEntryForUser } from '@/lib/services/calorieEntries';
-import { getFoodMasterById } from '@/lib/services/foodMaster';
-import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
-import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
-import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
-import { clampDateKey } from '@/lib/date-guard';
-import { toDateKey } from '@/utils/dateKey';
-import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { deleteEntry as deleteEntryService } from '@/lib/services/calorieEntries';
-import { showAppToast } from '@/components/ui/app-toast';
-import { NumberInput } from '@/components/input/NumberInput';
+import type { CalorieEntry } from '@/utils/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Hide default Expo Router header; we render our own in-screen header
 export const options = {
@@ -53,6 +53,7 @@ type FoodEditRouteParams = {
   date?: string;
   mealType?: string;
   entryPayload?: string;
+  returnTo?: string; // e.g. 'mealtypeLogCustom'
 };
 
 const ENTRY_STALE_MS = 15 * 60 * 1000; // 15 minutes
@@ -733,42 +734,18 @@ export default function FoodEditScreen() {
       if (!params.entryForCreate) {
         throw new Error('Missing entry payload for create mutation');
       }
-      const created = await createEntry(params.entryForCreate);
-      if (!created) throw new Error('Failed to create entry');
-      return created;
+      return await createEntryWithFoodEditSideEffects(queryClient, {
+        userId: params.userId,
+        entryForCreate: params.entryForCreate,
+      });
     },
     onSuccess: (saved, vars) => {
-      // Update the cache immediately, then invalidate for server truth.
-      // (engineering-guidelines.md §4.2)
-      const savedKey = ['entries', vars.userId, saved.entry_date] as const;
-
-      queryClient.setQueryData<CalorieEntry[]>(savedKey, (prev) => {
-        const list = prev ?? [];
-        const idx = list.findIndex((e) => e.id === saved.id);
-        if (idx >= 0) {
-          const next = list.slice();
-          next[idx] = saved;
-          return next;
-        }
-        return [...list, saved];
-      });
-
-      if (vars.previousDateKey && vars.previousDateKey !== saved.entry_date) {
-        const prevKey = ['entries', vars.userId, vars.previousDateKey] as const;
-        queryClient.setQueryData<CalorieEntry[]>(prevKey, (prev) =>
-          (prev ?? []).filter((e) => e.id !== saved.id)
-        );
+      // Create-mode side-effects are already applied inside createEntryWithFoodEditSideEffects().
+      if (vars.mode === 'create') {
+        return;
       }
 
-      queryClient.invalidateQueries({ queryKey: savedKey });
-      invalidateDailySumConsumedRangesForDate(queryClient, vars.userId, saved.entry_date);
-
-      if (vars.previousDateKey && vars.previousDateKey !== saved.entry_date) {
-        queryClient.invalidateQueries({
-          queryKey: ['entries', vars.userId, vars.previousDateKey],
-        });
-        invalidateDailySumConsumedRangesForDate(queryClient, vars.userId, vars.previousDateKey);
-      }
+      applyFoodEditEntrySaveSuccessSideEffects(queryClient, saved, vars);
     },
   });
 
@@ -1045,9 +1022,25 @@ export default function FoodEditScreen() {
 
       const savedDateKey = (updatesForEdit.entry_date ?? entryDate ?? entryDateParam) as string | undefined;
 
-    // Use safe navigation: go back if possible, else navigate to mealtype-log
-    goBackSafely({ entryDate: entryDate || entryDateParam, mealType: mealType || mealTypeParam });
-    // Note: Don't reset isSavingRef here since we're navigating away
+      const returnTo =
+        (Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo) as string | undefined;
+
+      if (mode === 'create' && returnTo === 'mealtypeLogCustom') {
+        router.replace({
+          pathname: '/(tabs)/mealtype-log',
+          params: {
+            entryDate: entryDate || entryDateParam || getLocalDateString(),
+            mealType: mealType || mealTypeParam || 'breakfast',
+            activeTab: 'custom',
+            refreshCustomFoods: Date.now().toString(),
+          },
+        });
+        return;
+      }
+
+      // Use safe navigation: go back if possible, else navigate to mealtype-log
+      goBackSafely({ entryDate: entryDate || entryDateParam, mealType: mealType || mealTypeParam });
+      // Note: Don't reset isSavingRef here since we're navigating away
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : undefined;
       Alert.alert(t('alerts.error_title'), message || t('common.unexpected_error'));
@@ -1327,7 +1320,9 @@ export default function FoodEditScreen() {
                     },
                     isDeleting && { opacity: 0.6 },
                   ]}
-                  {...getButtonAccessibilityProps('Delete food entry')}
+                  {...getButtonAccessibilityProps(
+                    t('mealtype_log.accessibility.delete_food_entry', { defaultValue: 'Delete food entry' })
+                  )}
                 >
                   <IconSymbol name="trash.fill" size={18} color={colors.error} decorative />
                 </Pressable>

@@ -22,6 +22,8 @@
     "last_7_days": "Last 7 days",
     "add": "Add",
     "go_back": "Go Back",
+    "go_back_hint": "Double tap to go back",
+    "save_hint": "Double tap to save",
     "not_set": "Not set",
     "no_target": "No target",
     "less_than_one_percent": "<1%",
@@ -1779,6 +1781,7 @@
       "manual_tab": "Manual entry tab",
       "quick_log_tab": "Quick Log tab",
       "quick_add_hint": "Double tap to add with default serving",
+      "delete_food_entry": "Delete food entry",
       "searching": "Searching for food",
       "favorite_tab": "Favorite foods tab"
     },
@@ -1833,6 +1836,20 @@
     "title_clone": "Clone Custom Food",
     "loading": "Loading food data...",
     "step1_title": "Step 1: Your Food's Name",
+    "sections": {
+      "food_identity_title": "Food Identity",
+      "food_identity_helper": "Start with a name, then define the serving and nutrition.",
+      "serving_title": "Serving Definition",
+      "serving_helper": "Weight = solids (grams/oz). Volume = liquids (ml/cup).",
+      "serving_applies_to": "Calories & macros apply to {{quantity}} {{unit}}",
+      "default_serving_hint": "Saved as default serving for quick add.",
+      "nutrition_title": "Nutrition",
+      "macros_helper": "Macros below are per serving (same for weight/volume).",
+      "more_nutrients_title": "More nutrients (optional)",
+      "more_nutrients_show": "Show",
+      "more_nutrients_hide": "Hide",
+      "more_nutrients_a11y_hint": "Double tap to expand advanced nutrients"
+    },
     "serving_type_toggle": {
       "weight_based": "Weight-Based",
       "volume_based": "Volume-Based"
@@ -1846,7 +1863,7 @@
       "quantity_label": "Quantity *",
       "quantity_placeholder": "100",
       "unit_label": "Unit *",
-      "calories_label": "Calories (cal) *",
+      "calories_label": "Calories *",
       "calories_placeholder": "0",
       "title": "Weight-Based Serving *",
       "description": "Enter nutritional information based on weight. This is required for accurate calculations."
@@ -1855,7 +1872,7 @@
       "quantity_label": "Quantity *",
       "quantity_placeholder": "1",
       "unit_label": "Unit *",
-      "calories_label": "Calories (cal) *",
+      "calories_label": "Calories *",
       "calories_placeholder": "0",
       "title": "Volume-Based Serving *",
       "description": "Enter nutritional information based on volume. This is required for accurate calculations."
@@ -1884,11 +1901,15 @@
     "buttons": {
       "cancel": "Cancel",
       "create": "Create Food",
+      "create_and_log": "Create & Log Food",
       "update": "Update Food",
       "clone": "Clone Food",
       "creating": "Creating...",
       "updating": "Updating...",
       "cloning": "Cloning..."
+    },
+    "clone": {
+      "copy_prefix": "Copy of "
     },
     "validation": {
       "name_required": "Enter a meaningful name :)",
@@ -1920,6 +1941,8 @@
       "sugar_exceeds_limit": "Sugar cannot exceed {{max}}g",
       "sodium_invalid": "Sodium must be a valid number",
       "sodium_exceeds_limit": "Sodium cannot exceed {{max}} mg",
+      "invalid_weight_unit": "Invalid weight unit.",
+      "invalid_volume_unit": "Invalid volume unit.",
       "invalid_serving_quantity": "Invalid serving quantity: {{value}}",
       "invalid_calories": "Invalid calories: {{value}}",
       "fix_errors": "Please fix the errors before saving."

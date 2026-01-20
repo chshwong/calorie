@@ -1,45 +1,55 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { Colors } from '@/constants/theme';
 import { RANGES } from '@/constants/constraints';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { getLocalDateString } from '@/utils/calculations';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  checkDuplicateCustomFood,
+  countCustomFoods,
+  getDefaultServingForFood,
+  getFoodForCloning,
+  getFoodForEditing,
+  upsertCustomFood as upsertCustomFoodService,
+  type DefaultFoodServing,
+  type FoodMasterForCustomFood,
+} from '@/lib/services/createCustomFood';
 import {
   getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
   getFocusStyle,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { getLocalDateString, getMealTypeFromCurrentTime } from '@/utils/calculations';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // Weight units (for mandatory serving)
 const WEIGHT_UNITS = [
-  { value: 'g', label: 'Gram (g)' },
-  { value: 'kg', label: 'Kilogram (kg)' },
-  { value: 'oz', label: 'Ounce (oz)' },
-  { value: 'lb', label: 'Pound (lb)' },
+  { value: 'g', label: 'g' },
+  { value: 'kg', label: 'kg' },
+  { value: 'oz', label: 'oz' },
+  { value: 'lb', label: 'lb' },
 ];
 
 // Volume units (for optional serving)
 const VOLUME_UNITS = [
-  { value: 'ml', label: 'Milliliter (ml)' },
-  { value: 'L', label: 'Liter (L)' },
-  { value: 'fl oz', label: 'Fluid Ounce (fl oz)' },
-  { value: 'cup', label: 'Cup' },
-  { value: 'pint', label: 'Pint' },
-  { value: 'quart', label: 'Quart' },
-  { value: 'gallon', label: 'Gallon' },
-  { value: 'tbsp', label: 'Tablespoon (tbsp)' },
-  { value: 'tsp', label: 'Teaspoon (tsp)' },
+  { value: 'ml', label: 'ml' },
+  { value: 'L', label: 'L' },
+  { value: 'fl oz', label: 'fl oz' },
+  { value: 'cup', label: 'cup' },
+  { value: 'pint', label: 'pint' },
+  { value: 'quart', label: 'quart' },
+  { value: 'gallon', label: 'gallon' },
+  { value: 'tbsp', label: 'tbsp' },
+  { value: 'tsp', label: 'tsp' },
 ];
+
 
 // Conversion factors to grams (for weight units)
 const WEIGHT_TO_GRAMS: { [key: string]: number } = {
@@ -80,11 +90,44 @@ export default function CreateCustomFoodScreen() {
   const cloneFoodId = params.cloneFoodId as string | undefined;
   const isEditing = !!foodId; // Only true if editing (not cloning)
 
+  const resolveLogContext = (): { mealType: string; entryDate: string } => {
+    const rawMealType = Array.isArray(params.mealType) ? params.mealType[0] : params.mealType;
+    const rawEntryDate = Array.isArray(params.entryDate) ? params.entryDate[0] : params.entryDate;
+
+    const hasMealType = typeof rawMealType === 'string' && rawMealType.trim().length > 0;
+    const hasEntryDate = typeof rawEntryDate === 'string' && rawEntryDate.trim().length > 0;
+
+    if (!hasMealType || !hasEntryDate) {
+      return {
+        mealType: getMealTypeFromCurrentTime(),
+        entryDate: getLocalDateString(),
+      };
+    }
+
+    return {
+      mealType: rawMealType as string,
+      entryDate,
+    };
+  };
+
+  const goToMealtypeLogCustom = (extraParams?: Record<string, string>) => {
+    const { mealType: resolvedMealType, entryDate: resolvedEntryDate } = resolveLogContext();
+    router.push({
+      pathname: '/(tabs)/mealtype-log',
+      params: {
+        mealType: resolvedMealType,
+        entryDate: resolvedEntryDate,
+        activeTab: 'custom',
+        refreshCustomFoods: Date.now().toString(),
+        ...(extraParams ?? {}),
+      },
+    });
+  };
+
   // Form state
   const [foodName, setFoodName] = useState('');
   const [brand, setBrand] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingFood, setLoadingFood] = useState(false);
 
   // Serving type toggle (default: weight-based)
   const [servingType, setServingType] = useState<'weight' | 'volume'>('weight');
@@ -104,13 +147,18 @@ export default function CreateCustomFoodScreen() {
   const [weightSodium, setWeightSodium] = useState('');
 
   // Volume-based serving fields
-  const [volumeQuantity, setVolumeQuantity] = useState('1');
+  const [volumeQuantity, setVolumeQuantity] = useState('100');
   const [volumeUnit, setVolumeUnit] = useState('ml');
   const [volumeCalories, setVolumeCalories] = useState('0');
 
   // Dropdown states
   const [showWeightUnitDropdown, setShowWeightUnitDropdown] = useState(false);
   const [showVolumeUnitDropdown, setShowVolumeUnitDropdown] = useState(false);
+  const [showAdvancedNutrients, setShowAdvancedNutrients] = useState(false);
+
+  const servingBasis: 'g' | 'ml' = isWeightBased ? 'g' : 'ml';
+  const servingQuantityText = isWeightBased ? weightQuantity : volumeQuantity;
+  const servingUnitValue = isWeightBased ? weightUnit : volumeUnit;
   
   // Refs and layout for dropdown positioning
   const weightUnitButtonRef = useRef<View>(null);
@@ -140,58 +188,190 @@ export default function CreateCustomFoodScreen() {
     });
   }, []); // Only run on mount
 
-  // Load food data for editing
+  const editQuery = useQuery<FoodMasterForCustomFood | null>({
+    queryKey: ['createCustomFood', 'edit', user?.id, foodId],
+    queryFn: () => {
+      if (!user?.id || !foodId) return Promise.resolve(null);
+      return getFoodForEditing({ userId: user.id, foodId });
+    },
+    enabled: !!user?.id && !!foodId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const cloneQuery = useQuery<{ food: FoodMasterForCustomFood | null; defaultServing: DefaultFoodServing | null }>({
+    queryKey: ['createCustomFood', 'clone', user?.id, cloneFoodId],
+    queryFn: async () => {
+      if (!cloneFoodId) return { food: null, defaultServing: null };
+      const food = await getFoodForCloning({ foodId: cloneFoodId });
+      const defaultServing = await getDefaultServingForFood({ foodId: cloneFoodId });
+      return { food, defaultServing };
+    },
+    enabled: !!user?.id && !!cloneFoodId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const editHydratedRef = useRef<string | null>(null);
+  const cloneHydratedRef = useRef<string | null>(null);
+  const loadErrorShownRef = useRef<{ edit?: boolean; clone?: boolean }>({});
+
   useEffect(() => {
-    if (foodId && user?.id) {
-      loadFoodForEditing();
-    } else if (cloneFoodId && user?.id) {
-      loadFoodForCloning();
-    }
-  }, [foodId, cloneFoodId, user?.id]);
+    if (!foodId) return;
+    if (!editQuery.isFetched) return;
+    if (editHydratedRef.current === foodId) return;
 
-  const loadFoodForEditing = async () => {
-    if (!foodId || !user?.id) return;
-
-    setLoadingFood(true);
-    try {
-      // Fetch food data
-      const { data: foodData, error: foodError } = await supabase
-        .from('food_master')
-        .select('*')
-        .eq('id', foodId)
-        .eq('owner_user_id', user.id)
-        .single();
-
-      if (foodError || !foodData) {
+    if (!editQuery.data) {
+      if (!loadErrorShownRef.current.edit) {
+        loadErrorShownRef.current.edit = true;
         Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.load_failed'));
-        router.back();
-        return;
+        goToMealtypeLogCustom();
+      }
+      return;
+    }
+
+    editHydratedRef.current = foodId;
+    const foodData = editQuery.data;
+
+    setFoodName(foodData.name);
+    setBrand(foodData.brand || '');
+
+    const servingSize = foodData.serving_size;
+    const servingUnit = foodData.serving_unit || 'g';
+
+    const isWeightUnit = WEIGHT_UNITS.some((u) => u.value === servingUnit);
+    setServingType(isWeightUnit ? 'weight' : 'volume');
+
+    if (isWeightUnit) {
+      setWeightQuantity(servingSize.toString());
+      setWeightUnit(servingUnit);
+      const caloriesForServing = foodData.calories_kcal;
+      setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+    } else {
+      setVolumeQuantity(servingSize.toString());
+      setVolumeUnit(servingUnit);
+      const caloriesForServing = foodData.calories_kcal;
+      setVolumeCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+    }
+
+    const proteinForServing = foodData.protein_g || 0;
+    setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
+
+    const carbsForServing = foodData.carbs_g || 0;
+    setWeightCarbs(carbsForServing > 0 ? carbsForServing.toFixed(1) : '');
+
+    const fatForServing = foodData.fat_g || 0;
+    setWeightFat(fatForServing > 0 ? fatForServing.toFixed(1) : '');
+
+    const fiberForServing = foodData.fiber_g || 0;
+    setWeightFiber(fiberForServing > 0 ? fiberForServing.toFixed(1) : '');
+
+    const satFatForServing = foodData.saturated_fat_g || 0;
+    setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
+
+    const transFatForServing = foodData.trans_fat_g || 0;
+    setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
+
+    const sugarForServing = foodData.sugar_g || 0;
+    setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
+
+    const sodiumForServing = foodData.sodium_mg || 0;
+    setWeightSodium(sodiumForServing > 0 ? sodiumForServing.toFixed(1) : '');
+  }, [editQuery.data, editQuery.isFetched, foodId, goToMealtypeLogCustom, t]);
+
+  useEffect(() => {
+    if (!cloneFoodId) return;
+    if (!cloneQuery.isFetched) return;
+    if (cloneHydratedRef.current === cloneFoodId) return;
+
+    const { food: foodData, defaultServing } = cloneQuery.data ?? { food: null, defaultServing: null };
+
+    if (!foodData) {
+      if (!loadErrorShownRef.current.clone) {
+        loadErrorShownRef.current.clone = true;
+        Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.clone_load_failed'));
+        goToMealtypeLogCustom();
+      }
+      return;
+    }
+
+    cloneHydratedRef.current = cloneFoodId;
+
+    const copyPrefix = t('create_custom_food.clone.copy_prefix', { defaultValue: 'Copy of ' });
+    const originalName = foodData.name;
+    const newName = copyPrefix + originalName;
+    const truncatedName = newName.length > MAX_NAME_LENGTH
+      ? copyPrefix + originalName.substring(0, MAX_NAME_LENGTH - copyPrefix.length)
+      : newName;
+
+    setFoodName(truncatedName);
+    setBrand(foodData.brand || '');
+
+    let hasSetFromServings = false;
+
+    if (defaultServing) {
+      hasSetFromServings = true;
+      const servingMatch = defaultServing.serving_name.match(/^([\d.]+)\s*(.+)$/);
+      if (servingMatch) {
+        setWeightQuantity(servingMatch[1]);
+        setWeightUnit(servingMatch[2].trim());
+      } else {
+        const servingValue = defaultServing.weight_g ?? defaultServing.volume_ml ?? 0;
+        setWeightQuantity(servingValue.toString());
+        setWeightUnit('g');
       }
 
-      // Populate form with food data
-      setFoodName(foodData.name);
-      setBrand(foodData.brand || '');
+      const servingGrams = defaultServing.weight_g ?? defaultServing.volume_ml ?? 0;
+      const caloriesForServing = (foodData.calories_kcal / 100) * servingGrams;
+      setWeightCalories(caloriesForServing.toFixed(1));
 
-      // Use serving_size and serving_unit directly from food_master
-      // Note: Custom foods store serving info in food_master, not in food_servings
+      const proteinForServing = foodData.protein_g ? (foodData.protein_g / 100) * servingGrams : 0;
+      setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
+
+      const carbsForServing = foodData.carbs_g ? (foodData.carbs_g / 100) * servingGrams : 0;
+      setWeightCarbs(carbsForServing > 0 ? carbsForServing.toFixed(1) : '');
+
+      const fatForServing = foodData.fat_g ? (foodData.fat_g / 100) * servingGrams : 0;
+      setWeightFat(fatForServing > 0 ? fatForServing.toFixed(1) : '');
+
+      const fiberForServing = foodData.fiber_g ? (foodData.fiber_g / 100) * servingGrams : 0;
+      setWeightFiber(fiberForServing > 0 ? fiberForServing.toFixed(1) : '');
+
+      const satFatForServing = foodData.saturated_fat_g ? (foodData.saturated_fat_g / 100) * servingGrams : 0;
+      setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
+
+      const transFatForServing = foodData.trans_fat_g ? (foodData.trans_fat_g / 100) * servingGrams : 0;
+      setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
+
+      const sugarForServing = foodData.sugar_g ? (foodData.sugar_g / 100) * servingGrams : 0;
+      setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
+
+      const sodiumForServing = foodData.sodium_mg ? (foodData.sodium_mg / 100) * servingGrams : 0;
+      setWeightSodium(sodiumForServing > 0 ? sodiumForServing.toFixed(1) : '');
+    }
+
+    if (!hasSetFromServings) {
       const servingSize = foodData.serving_size;
       const servingUnit = foodData.serving_unit || 'g';
-      
-        // Determine if this is weight-based or volume-based
-        const isWeightUnit = WEIGHT_UNITS.some(u => u.value === servingUnit);
-        setServingType(isWeightUnit ? 'weight' : 'volume');
-        
-        if (isWeightUnit) {
-          setWeightQuantity(servingSize.toString());
-          setWeightUnit(servingUnit);
-          const caloriesForServing = foodData.calories_kcal;
-          setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
-        } else {
-          setVolumeQuantity(servingSize.toString());
-          setVolumeUnit(servingUnit);
-          const caloriesForServing = foodData.calories_kcal;
-          setVolumeCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
-        }
+
+      const isWeightUnit = WEIGHT_UNITS.some((u) => u.value === servingUnit);
+      setServingType(isWeightUnit ? 'weight' : 'volume');
+
+      if (isWeightUnit) {
+        setWeightQuantity(servingSize.toString());
+        setWeightUnit(servingUnit);
+        const caloriesForServing = foodData.calories_kcal;
+        setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+      } else {
+        setVolumeQuantity(servingSize.toString());
+        setVolumeUnit(servingUnit);
+        const caloriesForServing = foodData.calories_kcal;
+        setVolumeCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
+      }
 
       const proteinForServing = foodData.protein_g || 0;
       setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
@@ -216,157 +396,8 @@ export default function CreateCustomFoodScreen() {
 
       const sodiumForServing = foodData.sodium_mg || 0;
       setWeightSodium(sodiumForServing > 0 ? sodiumForServing.toFixed(1) : '');
-
-    } catch (error: any) {
-      Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.load_error', { error: error.message || t('common.unexpected_error') }));
-      router.back();
-    } finally {
-      setLoadingFood(false);
     }
-  };
-
-  const loadFoodForCloning = async () => {
-    if (!cloneFoodId || !user?.id) return;
-
-    setLoadingFood(true);
-    try {
-      // Fetch food data (can be from any user since we're cloning)
-      const { data: foodData, error: foodError } = await supabase
-        .from('food_master')
-        .select('*')
-        .eq('id', cloneFoodId)
-        .single();
-
-      if (foodError || !foodData) {
-        Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.clone_load_failed'));
-        router.back();
-        return;
-      }
-
-      // Populate form with food data (same as editing, but we're creating a new food)
-      // Add "Copy of " prefix and truncate if needed
-      const copyPrefix = 'Copy of ';
-      const originalName = foodData.name;
-      const newName = copyPrefix + originalName;
-      // Truncate if exceeds MAX_NAME_LENGTH
-      const truncatedName = newName.length > MAX_NAME_LENGTH 
-        ? copyPrefix + originalName.substring(0, MAX_NAME_LENGTH - copyPrefix.length)
-        : newName;
-      setFoodName(truncatedName);
-      setBrand(foodData.brand || '');
-
-      // Check if this is a custom food (uses food_master directly) or standard food (uses food_servings)
-      // For custom foods created with new logic, we use food_master directly
-      // For standard foods, we try to use food_servings first
-      
-      let hasSetFromServings = false;
-      
-      // Try to fetch servings to get the default serving (for standard foods)
-      const { data: servingsData } = await supabase
-        .from('food_servings')
-        .select('*')
-        .eq('food_id', cloneFoodId)
-        .eq('is_default', true)
-        .single();
-
-      if (servingsData) {
-        hasSetFromServings = true;
-        // Parse serving name to get quantity and unit (e.g., "100 g" -> 100, "g")
-        const servingMatch = servingsData.serving_name.match(/^([\d.]+)\s*(.+)$/);
-        if (servingMatch) {
-          setWeightQuantity(servingMatch[1]);
-          setWeightUnit(servingMatch[2].trim());
-        } else {
-          // Fallback: use weight_g or volume_ml from serving
-          const servingValue = servingsData.weight_g ?? servingsData.volume_ml ?? 0;
-          setWeightQuantity(servingValue.toString());
-          setWeightUnit('g');
-        }
-
-        // Calculate values for the serving size
-        const servingGrams = servingsData.weight_g ?? servingsData.volume_ml ?? 0;
-        const caloriesForServing = (foodData.calories_kcal / 100) * servingGrams;
-        setWeightCalories(caloriesForServing.toFixed(1));
-
-        // Set macronutrients (same for both weight and volume)
-        const proteinForServing = foodData.protein_g ? (foodData.protein_g / 100) * servingGrams : 0;
-        setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
-
-        const carbsForServing = foodData.carbs_g ? (foodData.carbs_g / 100) * servingGrams : 0;
-        setWeightCarbs(carbsForServing > 0 ? carbsForServing.toFixed(1) : '');
-
-        const fatForServing = foodData.fat_g ? (foodData.fat_g / 100) * servingGrams : 0;
-        setWeightFat(fatForServing > 0 ? fatForServing.toFixed(1) : '');
-
-        const fiberForServing = foodData.fiber_g ? (foodData.fiber_g / 100) * servingGrams : 0;
-        setWeightFiber(fiberForServing > 0 ? fiberForServing.toFixed(1) : '');
-
-        const satFatForServing = foodData.saturated_fat_g ? (foodData.saturated_fat_g / 100) * servingGrams : 0;
-        setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
-
-        const transFatForServing = foodData.trans_fat_g ? (foodData.trans_fat_g / 100) * servingGrams : 0;
-        setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
-
-        const sugarForServing = foodData.sugar_g ? (foodData.sugar_g / 100) * servingGrams : 0;
-        setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
-
-        const sodiumForServing = foodData.sodium_mg ? (foodData.sodium_mg / 100) * servingGrams : 0;
-        setWeightSodium(sodiumForServing > 0 ? sodiumForServing.toFixed(1) : '');
-      }
-      
-      // If no food_servings found, use food_master directly (for custom foods)
-      if (!hasSetFromServings) {
-        const servingSize = foodData.serving_size;
-        const servingUnit = foodData.serving_unit || 'g';
-        
-        // Determine if this is weight-based or volume-based
-        const isWeightUnit = WEIGHT_UNITS.some(u => u.value === servingUnit);
-        setServingType(isWeightUnit ? 'weight' : 'volume');
-        
-        if (isWeightUnit) {
-          setWeightQuantity(servingSize.toString());
-          setWeightUnit(servingUnit);
-          const caloriesForServing = foodData.calories_kcal;
-          setWeightCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
-        } else {
-          setVolumeQuantity(servingSize.toString());
-          setVolumeUnit(servingUnit);
-          const caloriesForServing = foodData.calories_kcal;
-          setVolumeCalories(caloriesForServing > 0 ? caloriesForServing.toFixed(1) : '0');
-        }
-
-        const proteinForServing = foodData.protein_g || 0;
-        setWeightProtein(proteinForServing > 0 ? proteinForServing.toFixed(1) : '');
-
-        const carbsForServing = foodData.carbs_g || 0;
-        setWeightCarbs(carbsForServing > 0 ? carbsForServing.toFixed(1) : '');
-
-        const fatForServing = foodData.fat_g || 0;
-        setWeightFat(fatForServing > 0 ? fatForServing.toFixed(1) : '');
-
-        const fiberForServing = foodData.fiber_g || 0;
-        setWeightFiber(fiberForServing > 0 ? fiberForServing.toFixed(1) : '');
-
-        const satFatForServing = foodData.saturated_fat_g || 0;
-        setWeightSaturatedFat(satFatForServing > 0 ? satFatForServing.toFixed(1) : '');
-
-        const transFatForServing = foodData.trans_fat_g || 0;
-        setWeightTransFat(transFatForServing > 0 ? transFatForServing.toFixed(1) : '');
-
-        const sugarForServing = foodData.sugar_g || 0;
-        setWeightSugar(sugarForServing > 0 ? sugarForServing.toFixed(1) : '');
-
-        const sodiumForServing = foodData.sodium_mg || 0;
-        setWeightSodium(sodiumForServing > 0 ? sodiumForServing.toFixed(1) : '');
-      }
-
-    } catch (error: any) {
-      Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.load_error', { error: error.message || t('common.unexpected_error') }));
-      router.back();
-    } finally {
-      setLoadingFood(false);
-    }
-  };
+  }, [cloneFoodId, cloneQuery.data, cloneQuery.isFetched, goToMealtypeLogCustom, t]);
 
   // Helper: keep only digits/one dot, cap at 4 digits before and 2 after decimal
   const formatNumberInput = (text: string): string => {
@@ -598,23 +629,14 @@ export default function CreateCustomFoodScreen() {
       if (!isEditing && user?.id) {
         const nameTrimmed = foodName.trim();
         const brandTrimmed = brand.trim() || null;
-        
-        let query = supabase
-          .from('food_master')
-          .select('id')
-          .eq('owner_user_id', user.id)
-          .eq('is_custom', true)
-          .eq('name', nameTrimmed);
-        
-        if (brandTrimmed) {
-          query = query.eq('brand', brandTrimmed);
-        } else {
-          query = query.is('brand', null);
-        }
-        
-        const { data: existingFoods, error: checkError } = await query;
-        
-        if (!checkError && existingFoods && existingFoods.length > 0) {
+
+        const isDuplicate = await checkDuplicateCustomFood({
+          userId: user.id,
+          name: nameTrimmed,
+          brand: brandTrimmed,
+        });
+
+        if (isDuplicate) {
           newErrors.foodName = brandTrimmed 
             ? t('create_custom_food.validation.duplicate_name_brand', { brand: brandTrimmed })
             : t('create_custom_food.validation.duplicate_name');
@@ -653,6 +675,137 @@ export default function CreateCustomFoodScreen() {
     return { isValid: Object.keys(newErrors).length === 0, errors: newErrors };
   };
 
+  const upsertCustomFoodMutation = useMutation({
+    mutationFn: async (vars: {
+      userId: string;
+      isEditing: boolean;
+      foodId?: string;
+      foodUpdateData: {
+        name: string;
+        brand: string | null;
+        serving_size: number;
+        serving_unit: string;
+        calories_kcal: number;
+        protein_g: number | null;
+        carbs_g: number | null;
+        fat_g: number | null;
+        fiber_g: number | null;
+        saturated_fat_g: number | null;
+        trans_fat_g: number | null;
+        sugar_g: number | null;
+        sodium_mg: number | null;
+      };
+    }) => {
+      return upsertCustomFoodService(vars);
+    },
+    onSuccess: (saved, vars) => {
+      if (saved?.id) {
+        queryClient.invalidateQueries({ queryKey: ['customFoods', vars.userId] });
+      }
+    },
+  });
+
+  const upsertCustomFood = async (): Promise<{ foodData: { id: string }; isEditing: boolean } | null> => {
+    const validation = await validateForm();
+
+    if (!validation.isValid) {
+      // Show first error
+      const firstErrorKey = Object.keys(validation.errors)[0];
+      if (firstErrorKey) {
+        Alert.alert(t('alerts.validation_error'), `${t('create_custom_food.validation.fix_errors')}\n\n${validation.errors[firstErrorKey]}`);
+      } else {
+        Alert.alert(t('alerts.validation_error'), t('create_custom_food.validation.fix_errors'));
+      }
+      return null;
+    }
+
+    // Check custom food limit when creating new food (not editing)
+    // Note: Cloning also creates a new food, so it's subject to the limit
+    if (!isEditing && user?.id) {
+      const count = await countCustomFoods({ userId: user.id });
+
+      if (count !== null && count >= 50) {
+        Alert.alert(
+          t('create_custom_food.errors.limit_reached_title'),
+          t('create_custom_food.errors.limit_reached_message')
+        );
+        return null;
+      }
+    }
+
+    // Get values based on serving type
+    const quantity = isWeightBased ? parseFloat(weightQuantity) : parseFloat(volumeQuantity);
+    const unit = isWeightBased ? weightUnit : volumeUnit;
+    const calories = isWeightBased ? parseFloat(weightCalories) : parseFloat(volumeCalories);
+    const servingBasis: 'g' | 'ml' = isWeightBased ? 'g' : 'ml';
+
+    // Defensive validation: ensure unit matches serving type
+    if (isWeightBased && !WEIGHT_UNITS.some(u => u.value === unit)) {
+      throw new Error(t('create_custom_food.validation.invalid_weight_unit', { defaultValue: 'Invalid weight unit.', servingBasis }));
+    }
+    if (!isWeightBased && !VOLUME_UNITS.some(u => u.value === unit)) {
+      throw new Error(t('create_custom_food.validation.invalid_volume_unit', { defaultValue: 'Invalid volume unit.', servingBasis }));
+    }
+
+    // Validate
+    if (isNaN(quantity) || quantity <= 0) {
+      throw new Error(t('create_custom_food.validation.invalid_serving_quantity', { value: quantity }));
+    }
+
+    if (isNaN(calories) || calories < 0) {
+      throw new Error(t('create_custom_food.validation.invalid_calories', { value: calories }));
+    }
+
+    // For custom foods, store values directly for the serving_size
+    // serving_size and serving_unit represent the user's input (e.g., 1 oz, 100 g, 250 ml)
+    // Nutrients are stored per serving_size × serving_unit
+    const foodUpdateData = {
+      name: foodName.trim(),
+      brand: brand.trim() || null,
+      serving_size: quantity,   // Store the user's quantity directly
+      serving_unit: unit,      // Store the user's unit directly
+      calories_kcal: calories, // Store directly for serving_size
+      protein_g: weightProtein ? parseFloat(weightProtein) : null,
+      carbs_g: weightCarbs ? parseFloat(weightCarbs) : null,
+      fat_g: weightFat ? parseFloat(weightFat) : null,
+      fiber_g: weightFiber ? parseFloat(weightFiber) : null,
+      saturated_fat_g: weightSaturatedFat ? parseFloat(weightSaturatedFat) : null,
+      trans_fat_g: weightTransFat ? parseFloat(weightTransFat) : null,
+      sugar_g: weightSugar ? parseFloat(weightSugar) : null,
+      sodium_mg: weightSodium ? parseFloat(weightSodium) : null,
+    };
+
+    try {
+      const saved = await upsertCustomFoodMutation.mutateAsync({
+        userId: user!.id,
+        isEditing,
+        foodId: isEditing ? foodId : undefined,
+        foodUpdateData,
+      });
+
+      if (!saved?.id) {
+        throw new Error(isEditing ? t('create_custom_food.errors.update_no_data') : t('create_custom_food.errors.create_no_data'));
+      }
+
+      return { foodData: { id: saved.id }, isEditing };
+    } catch (error: any) {
+      const underlyingError =
+        error?.message || (typeof error === 'string' ? error : (() => {
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return String(error);
+          }
+        })());
+
+      throw new Error(
+        isEditing
+          ? t('create_custom_food.errors.update_failed', { error: underlyingError })
+          : t('create_custom_food.errors.create_failed', { error: underlyingError })
+      );
+    }
+  };
+
   // Handle save
   const handleSave = async () => {
     // Prevent multiple submissions
@@ -672,141 +825,15 @@ export default function CreateCustomFoodScreen() {
     // Set loading early to prevent multiple submissions
     setLoading(true);
 
-    const validation = await validateForm();
-
-    if (!validation.isValid) {
-      // Show first error
-      const firstErrorKey = Object.keys(validation.errors)[0];
-      if (firstErrorKey) {
-        Alert.alert(t('alerts.validation_error'), `${t('create_custom_food.validation.fix_errors')}\n\n${validation.errors[firstErrorKey]}`);
-      } else {
-        Alert.alert(t('alerts.validation_error'), t('create_custom_food.validation.fix_errors'));
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Check custom food limit when creating new food (not editing)
-    // Note: Cloning also creates a new food, so it's subject to the limit
-    if (!isEditing && user?.id) {
-      const { count, error: countError } = await supabase
-        .from('food_master')
-        .select('*', { count: 'exact', head: true })
-        .eq('owner_user_id', user.id)
-        .eq('is_custom', true);
-
-      if (!countError && count !== null && count >= 50) {
-        Alert.alert(
-          t('create_custom_food.errors.limit_reached_title'),
-          t('create_custom_food.errors.limit_reached_message')
-        );
-        setLoading(false);
-        return;
-      }
-    }
-
     try {
-      // Get values based on serving type
-      const quantity = isWeightBased ? parseFloat(weightQuantity) : parseFloat(volumeQuantity);
-      const unit = isWeightBased ? weightUnit : volumeUnit;
-      const calories = isWeightBased ? parseFloat(weightCalories) : parseFloat(volumeCalories);
+      const result = await upsertCustomFood();
+      if (!result) return;
 
-      // Validate
-      if (isNaN(quantity) || quantity <= 0) {
-        throw new Error(t('create_custom_food.validation.invalid_serving_quantity', { value: quantity }));
-      }
-
-      if (isNaN(calories) || calories < 0) {
-        throw new Error(t('create_custom_food.validation.invalid_calories', { value: calories }));
-      }
-
-      // For custom foods, store values directly for the serving_size
-      // serving_size and serving_unit represent the user's input (e.g., 1 oz, 100 g, 250 ml)
-      // Nutrients are stored per serving_size × serving_unit
-      const foodUpdateData = {
-        name: foodName.trim(),
-        brand: brand.trim() || null,
-        serving_size: quantity,   // Store the user's quantity directly
-        serving_unit: unit,      // Store the user's unit directly
-        calories_kcal: calories, // Store directly for serving_size
-        protein_g: weightProtein ? parseFloat(weightProtein) : null,
-        carbs_g: weightCarbs ? parseFloat(weightCarbs) : null,
-        fat_g: weightFat ? parseFloat(weightFat) : null,
-        fiber_g: weightFiber ? parseFloat(weightFiber) : null,
-        saturated_fat_g: weightSaturatedFat ? parseFloat(weightSaturatedFat) : null,
-        trans_fat_g: weightTransFat ? parseFloat(weightTransFat) : null,
-        sugar_g: weightSugar ? parseFloat(weightSugar) : null,
-        sodium_mg: weightSodium ? parseFloat(weightSodium) : null,
-      };
-
-      let foodData;
-
-      if (isEditing && foodId) {
-        // Update existing food
-        const { data: updatedFood, error: foodError } = await supabase
-          .from('food_master')
-          .update(foodUpdateData)
-          .eq('id', foodId)
-          .eq('owner_user_id', user.id)
-          .select()
-          .single();
-
-        if (foodError) {
-          throw new Error(t('create_custom_food.errors.update_failed', { error: foodError.message || JSON.stringify(foodError) }));
-        }
-
-        if (!updatedFood) {
-          throw new Error(t('create_custom_food.errors.update_no_data'));
-        }
-
-        foodData = updatedFood;
-      } else {
-        // Create new food
-        // When cloning, explicitly exclude barcode (set to null)
-        const { data: newFood, error: foodError } = await supabase
-          .from('food_master')
-          .insert({
-            ...foodUpdateData,
-            barcode: null, // Explicitly set barcode to null when creating/cloning
-            is_custom: true,
-            owner_user_id: user.id,
-            source: 'user_created',
-          })
-          .select()
-          .single();
-
-        if (foodError) {
-          throw new Error(t('create_custom_food.errors.create_failed', { error: foodError.message || JSON.stringify(foodError) }));
-        }
-
-        if (!newFood) {
-          throw new Error(t('create_custom_food.errors.create_no_data'));
-        }
-
-        foodData = newFood;
-      }
-
-      // Note: No food_servings records are created for custom foods
-      // The serving info is stored directly in food_master (serving_size, serving_unit)
-      
-      // Invalidate custom foods cache immediately so it appears right away
-      queryClient.invalidateQueries({ queryKey: ['customFoods', user.id] });
-      
-      // Navigate back to mealtype-log page with custom tab selected
-      // Use push instead of replace to ensure params are updated
-      router.push({
-        pathname: '/(tabs)/mealtype-log',
-        params: {
-          mealType,
-          entryDate,
-          activeTab: 'custom',
-          refreshCustomFoods: Date.now().toString(), // Force refresh detection
-          ...(isEditing 
-            ? { newlyEditedFoodId: foodData.id } // Pass the ID of the edited food
-            : { newlyAddedFoodId: foodData.id }  // Pass the ID of the newly created food
-          ),
-        },
-      });
+      goToMealtypeLogCustom(
+        result.isEditing
+          ? { newlyEditedFoodId: result.foodData.id }
+          : { newlyAddedFoodId: result.foodData.id }
+      );
     } catch (error: any) {
       let errorMessage = t('create_custom_food.errors.save_failed');
       
@@ -829,6 +856,75 @@ export default function CreateCustomFoodScreen() {
       setLoading(false);
     }
   };
+
+  const handleCreateAndLog = async () => {
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+
+    // Close any open dropdowns
+    setShowWeightUnitDropdown(false);
+    setShowVolumeUnitDropdown(false);
+
+    if (!user?.id) {
+      Alert.alert(t('alerts.error_title'), t('create_custom_food.errors.not_logged_in'));
+      return;
+    }
+
+    // Set loading early to prevent multiple submissions
+    setLoading(true);
+
+    try {
+      const result = await upsertCustomFood();
+      if (!result) return;
+
+      const { entryDate: resolvedEntryDate, mealType: resolvedMealType } = resolveLogContext();
+
+      try {
+        // Navigate into the same flow as tapping this custom food in mealtype-log (food-edit create mode).
+        router.push({
+          pathname: '/food-edit',
+          params: {
+            foodId: result.foodData.id,
+            date: resolvedEntryDate,
+            mealType: resolvedMealType,
+            returnTo: 'mealtypeLogCustom',
+            activeTab: 'custom',
+          },
+        });
+      } catch {
+        // Rare fallback: if navigation fails, return to mealtype-log custom tab.
+        goToMealtypeLogCustom(
+          result.isEditing
+            ? { newlyEditedFoodId: result.foodData.id }
+            : { newlyAddedFoodId: result.foodData.id }
+        );
+      }
+    } catch (error: any) {
+      let errorMessage = t('create_custom_food.errors.save_failed');
+
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error_description) {
+        errorMessage = error.error_description;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error) {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch (e) {
+          errorMessage = String(error);
+        }
+      }
+
+      Alert.alert(t('alerts.error_title'), errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadingFood = editQuery.isLoading || cloneQuery.isLoading;
 
   // Show loading state while loading food data for editing
   if (loadingFood) {
@@ -864,11 +960,11 @@ export default function CreateCustomFoodScreen() {
               getMinTouchTargetStyle(),
               { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
             ]}
-            onPress={() => router.back()}
+            onPress={() => goToMealtypeLogCustom()}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              'Go back',
-              'Double tap to go back'
+              t('common.go_back', { defaultValue: 'Go back' }),
+              t('common.go_back_hint', { defaultValue: 'Double tap to go back' })
             )}
           >
             <ThemedText style={[styles.backButtonText, { color: colors.tint }]}>←</ThemedText>
@@ -892,8 +988,8 @@ export default function CreateCustomFoodScreen() {
             disabled={loading || !isFormValid()}
             activeOpacity={0.7}
             {...getButtonAccessibilityProps(
-              'Save',
-              'Double tap to save'
+              t('common.save', { defaultValue: 'Save' }),
+              t('common.save_hint', { defaultValue: 'Double tap to save' })
             )}
           >
             <IconSymbol 
@@ -904,11 +1000,14 @@ export default function CreateCustomFoodScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Step 1: Your Food's Name */}
+        {/* Food Identity */}
         <View style={[styles.requiredSection, { backgroundColor: colors.background, borderColor: colors.tint + '30' }]}>
           <View style={styles.sectionContent}>
-            <ThemedText style={[styles.stepTitle, { color: colors.text }]}>
-              {t('create_custom_food.step1_title')}
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+              {t('create_custom_food.sections.food_identity_title', { defaultValue: 'Food Identity' })}
+            </ThemedText>
+            <ThemedText style={[styles.sectionHelperText, { color: colors.textSecondary }]}>
+              {t('create_custom_food.sections.food_identity_helper', { defaultValue: 'Start with a name, then define the serving and nutrition.' })}
             </ThemedText>
             
             {/* Food Name */}
@@ -947,6 +1046,26 @@ export default function CreateCustomFoodScreen() {
               )}
             </View>
 
+            {/* Brand (Optional) */}
+            <View style={styles.field}>
+              <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.optional_section.brand_label')}</ThemedText>
+              <TextInput
+                style={[styles.input, { borderColor: errors.brand ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                placeholder={t('create_custom_food.optional_section.brand_placeholder')}
+                placeholderTextColor={colors.textSecondary}
+                value={brand}
+                onChangeText={setBrand}
+                maxLength={MAX_BRAND_LENGTH}
+                autoCapitalize="words"
+              />
+              {errors.brand && <Text style={styles.errorText}>{errors.brand}</Text>}
+            </View>
+
+            {/* Serving Definition */}
+            <ThemedText style={[styles.sectionSubTitle, { color: colors.text }]}>
+              {t('create_custom_food.sections.serving_title', { defaultValue: 'Serving Definition' })}
+            </ThemedText>
+
             {/* Serving Type Toggle */}
             <View style={styles.field}>
               <SegmentedToggle
@@ -955,9 +1074,17 @@ export default function CreateCustomFoodScreen() {
                   { key: 'volume', label: t('create_custom_food.serving_type_toggle.volume_based') },
                 ]}
                 value={servingType}
-                onChange={setServingType}
+                onChange={(next) => {
+                  setServingType(next as 'weight' | 'volume');
+                  setShowWeightUnitDropdown(false);
+                  setShowVolumeUnitDropdown(false);
+                  setShowAdvancedNutrients(false);
+                }}
               />
             </View>
+            <ThemedText style={[styles.sectionHelperText, { color: colors.textSecondary }]}>
+              {t('create_custom_food.sections.serving_helper', { defaultValue: 'Weight = solids (grams/oz). Volume = liquids (ml/cup).' })}
+            </ThemedText>
 
             {/* Weight-Based Serving Fields */}
             {isWeightBased && (
@@ -980,6 +1107,13 @@ export default function CreateCustomFoodScreen() {
                     />
                     {errors.weightQuantity && <Text style={styles.errorText}>{errors.weightQuantity}</Text>}
                   </View>
+
+                  <View style={styles.timesSymbolContainer}>
+                    <ThemedText style={[styles.timesSymbol, { color: colors.textSecondary }]}>
+                      ×
+                    </ThemedText>
+                  </View>
+
                   <View style={{ flex: 1, marginHorizontal: 4 }}>
                     <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.unit_label')}</ThemedText>
                     <View
@@ -1007,6 +1141,13 @@ export default function CreateCustomFoodScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
+
+                  <View style={styles.timesSymbolContainer}>
+                    <ThemedText style={[styles.timesSymbol, { color: colors.textSecondary }]}>
+                      =
+                    </ThemedText>
+                  </View>
+
                   <View style={{ flex: 1, marginLeft: 4 }}>
                     <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.weight_serving.calories_label')}</ThemedText>
                     <TextInput
@@ -1025,6 +1166,9 @@ export default function CreateCustomFoodScreen() {
                     {errors.weightCalories && <Text style={styles.errorText}>{errors.weightCalories}</Text>}
                   </View>
                 </View>
+                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                  {t('create_custom_food.sections.default_serving_hint', { defaultValue: 'Saved as default serving for quick add.' })}
+                </ThemedText>
               </View>
             )}
 
@@ -1049,6 +1193,13 @@ export default function CreateCustomFoodScreen() {
                     />
                     {errors.volumeQuantity && <Text style={styles.errorText}>{errors.volumeQuantity}</Text>}
                   </View>
+
+                  <View style={styles.timesSymbolContainer}>
+                    <ThemedText style={[styles.timesSymbol, { color: colors.textSecondary }]}>
+                      ×
+                    </ThemedText>
+                  </View>
+
                   <View style={{ flex: 1, marginHorizontal: 4 }}>
                     <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.unit_label')}</ThemedText>
                     <View
@@ -1076,6 +1227,13 @@ export default function CreateCustomFoodScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
+
+                  <View style={styles.timesSymbolContainer}>
+                    <ThemedText style={[styles.timesSymbol, { color: colors.textSecondary }]}>
+                      =
+                    </ThemedText>
+                  </View>
+
                   <View style={{ flex: 1, marginLeft: 4 }}>
                     <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.volume_serving.calories_label')}</ThemedText>
                     <TextInput
@@ -1094,8 +1252,23 @@ export default function CreateCustomFoodScreen() {
                     {errors.volumeCalories && <Text style={styles.errorText}>{errors.volumeCalories}</Text>}
                   </View>
                 </View>
+                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                  {t('create_custom_food.sections.default_serving_hint', { defaultValue: 'Saved as default serving for quick add.' })}
+                </ThemedText>
               </View>
             )}
+
+            {/* Nutrition */}
+            <ThemedText style={[styles.sectionSubTitle, { color: colors.text }]}>
+              {t('create_custom_food.sections.nutrition_title', { defaultValue: 'Nutrition' })}
+            </ThemedText>
+            <ThemedText style={[styles.sectionHelperText, { color: colors.textSecondary }]}>
+              {t('create_custom_food.sections.serving_applies_to', {
+                defaultValue: 'Calories & macros apply to {{quantity}} {{unit}}',
+                quantity: servingQuantityText,
+                unit: servingUnitValue,
+              })}
+            </ThemedText>
 
             {/* Macronutrients */}
             <View style={styles.field}>
@@ -1154,114 +1327,152 @@ export default function CreateCustomFoodScreen() {
 
             {/* Other Nutrients (Optional) */}
             <View style={styles.field}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.other_nutrients.title')}</ThemedText>
-              <View style={styles.row}>
-                <View style={[styles.field, { flex: 1, marginRight: 4 }]}>
-                  <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.saturated_fat')}</ThemedText>
-                  <TextInput
-                    style={[styles.input, { borderColor: errors.weightSaturatedFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
-                    placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    value={weightSaturatedFat}
-                    onChangeText={(text) => setWeightSaturatedFat(formatNumberInput(text))}
-                    keyboardType="decimal-pad"
-                  />
-                  {errors.weightSaturatedFat && <Text style={styles.errorText}>{errors.weightSaturatedFat}</Text>}
+              <TouchableOpacity
+                style={[
+                  styles.advancedToggleRow,
+                  getMinTouchTargetStyle(),
+                  {
+                    borderColor: colors.icon + '30',
+                    backgroundColor: colors.background,
+                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                  },
+                ]}
+                onPress={() => setShowAdvancedNutrients((prev) => !prev)}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  t('create_custom_food.sections.more_nutrients_title', { defaultValue: 'More nutrients (optional)' }),
+                  t('create_custom_food.sections.more_nutrients_a11y_hint', { defaultValue: 'Double tap to expand advanced nutrients' }),
+                )}
+              >
+                <ThemedText style={[styles.advancedToggleLabel, { color: colors.text }]}>
+                  {t('create_custom_food.sections.more_nutrients_title', { defaultValue: 'More nutrients (optional)' })}
+                </ThemedText>
+                <ThemedText style={[styles.advancedToggleAction, { color: colors.textSecondary }]}>
+                  {showAdvancedNutrients
+                    ? t('create_custom_food.sections.more_nutrients_hide', { defaultValue: 'Hide' })
+                    : t('create_custom_food.sections.more_nutrients_show', { defaultValue: 'Show' })}
+                </ThemedText>
+              </TouchableOpacity>
+
+              {showAdvancedNutrients && (
+                <View style={styles.row}>
+                  <View style={[styles.field, { flex: 1, marginRight: 4 }]}>
+                    <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.saturated_fat')}</ThemedText>
+                    <TextInput
+                      style={[styles.input, { borderColor: errors.weightSaturatedFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                      placeholder={t('create_custom_food.other_nutrients.placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                      value={weightSaturatedFat}
+                      onChangeText={(text) => setWeightSaturatedFat(formatNumberInput(text))}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.weightSaturatedFat && <Text style={styles.errorText}>{errors.weightSaturatedFat}</Text>}
+                  </View>
+                  <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                    <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.trans_fat')}</ThemedText>
+                    <TextInput
+                      style={[styles.input, { borderColor: errors.weightTransFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                      placeholder={t('create_custom_food.other_nutrients.placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                      value={weightTransFat}
+                      onChangeText={(text) => setWeightTransFat(formatNumberInput(text))}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.weightTransFat && <Text style={styles.errorText}>{errors.weightTransFat}</Text>}
+                  </View>
+                  <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
+                    <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.sugar')}</ThemedText>
+                    <TextInput
+                      style={[styles.input, { borderColor: errors.weightSugar ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                      placeholder={t('create_custom_food.other_nutrients.placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                      value={weightSugar}
+                      onChangeText={(text) => setWeightSugar(formatNumberInput(text))}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.weightSugar && <Text style={styles.errorText}>{errors.weightSugar}</Text>}
+                  </View>
+                  <View style={[styles.field, { flex: 1, marginLeft: 4 }]}>
+                    <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.sodium')}</ThemedText>
+                    <TextInput
+                      style={[styles.input, { borderColor: errors.weightSodium ? '#EF4444' : colors.icon + '30', color: colors.text }]}
+                      placeholder={t('create_custom_food.other_nutrients.placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                      value={weightSodium}
+                      onChangeText={(text) => setWeightSodium(formatNumberInput(text))}
+                      keyboardType="decimal-pad"
+                    />
+                    {errors.weightSodium && <Text style={styles.errorText}>{errors.weightSodium}</Text>}
+                  </View>
                 </View>
-                <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
-                  <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.trans_fat')}</ThemedText>
-                  <TextInput
-                    style={[styles.input, { borderColor: errors.weightTransFat ? '#EF4444' : colors.icon + '30', color: colors.text }]}
-                    placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    value={weightTransFat}
-                    onChangeText={(text) => setWeightTransFat(formatNumberInput(text))}
-                    keyboardType="decimal-pad"
-                  />
-                  {errors.weightTransFat && <Text style={styles.errorText}>{errors.weightTransFat}</Text>}
-                </View>
-                <View style={[styles.field, { flex: 1, marginHorizontal: 4 }]}>
-                  <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.sugar')}</ThemedText>
-                  <TextInput
-                    style={[styles.input, { borderColor: errors.weightSugar ? '#EF4444' : colors.icon + '30', color: colors.text }]}
-                    placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    value={weightSugar}
-                    onChangeText={(text) => setWeightSugar(formatNumberInput(text))}
-                    keyboardType="decimal-pad"
-                  />
-                  {errors.weightSugar && <Text style={styles.errorText}>{errors.weightSugar}</Text>}
-                </View>
-                <View style={[styles.field, { flex: 1, marginLeft: 4 }]}>
-                  <ThemedText style={[styles.subLabel, { color: colors.text }]}>{t('create_custom_food.other_nutrients.sodium')}</ThemedText>
-                  <TextInput
-                    style={[styles.input, { borderColor: errors.weightSodium ? '#EF4444' : colors.icon + '30', color: colors.text }]}
-                    placeholder={t('create_custom_food.other_nutrients.placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    value={weightSodium}
-                    onChangeText={(text) => setWeightSodium(formatNumberInput(text))}
-                    keyboardType="decimal-pad"
-                  />
-                  {errors.weightSodium && <Text style={styles.errorText}>{errors.weightSodium}</Text>}
-                </View>
-              </View>
+              )}
             </View>
 
-            {/* Brand (Optional) */}
-            <View style={styles.field}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>{t('create_custom_food.optional_section.brand_label')}</ThemedText>
-              <TextInput
-                style={[styles.input, { borderColor: errors.brand ? '#EF4444' : colors.icon + '30', color: colors.text }]}
-                placeholder={t('create_custom_food.optional_section.brand_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={brand}
-                onChangeText={setBrand}
-                maxLength={MAX_BRAND_LENGTH}
-                autoCapitalize="words"
-              />
-              {errors.brand && <Text style={styles.errorText}>{errors.brand}</Text>}
-            </View>
           </View>
         </View>
 
         {/* Action Buttons */}
-        <View style={[styles.formActions, { zIndex: 1 }]}>
-          <TouchableOpacity
-            style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
-            onPress={() => {
-              setShowWeightUnitDropdown(false);
-              setShowVolumeUnitDropdown(false);
-              router.back();
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('create_custom_food.buttons.cancel')}</Text>
-          </TouchableOpacity>
+        <View style={[styles.formActionsContainer, { zIndex: 1 }]}>
+          <View style={styles.formActions}>
+            <TouchableOpacity
+              style={[styles.cancelButton, { borderColor: colors.icon + '30' }]}
+              onPress={() => {
+                setShowWeightUnitDropdown(false);
+                setShowVolumeUnitDropdown(false);
+                goToMealtypeLogCustom();
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('create_custom_food.buttons.cancel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                { 
+                  backgroundColor: (loading || !isFormValid()) ? colors.icon : colors.tint,
+                  opacity: (loading || !isFormValid()) ? 0.5 : 1
+                },
+                (loading || !isFormValid()) && styles.saveButtonDisabled
+              ]}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                handleSave();
+              }}
+              disabled={loading || !isFormValid()}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>
+                {loading 
+                  ? (isEditing ? t('create_custom_food.buttons.updating') : cloneFoodId ? t('create_custom_food.buttons.cloning') : t('create_custom_food.buttons.creating')) 
+                  : (isEditing ? t('create_custom_food.buttons.update') : cloneFoodId ? t('create_custom_food.buttons.clone') : t('create_custom_food.buttons.create'))}
+              </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={[
               styles.saveButton,
-              { 
+              styles.createAndLogButton,
+              {
                 backgroundColor: (loading || !isFormValid()) ? colors.icon : colors.tint,
-                opacity: (loading || !isFormValid()) ? 0.5 : 1
+                opacity: (loading || !isFormValid()) ? 0.5 : 1,
               },
-              (loading || !isFormValid()) && styles.saveButtonDisabled
+              (loading || !isFormValid()) && styles.saveButtonDisabled,
             ]}
             onPress={(e) => {
               e?.stopPropagation?.();
-              handleSave();
+              handleCreateAndLog();
             }}
             disabled={loading || !isFormValid()}
             activeOpacity={0.8}
           >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.saveButtonText}>
-              {loading 
-                ? (isEditing ? t('create_custom_food.buttons.updating') : cloneFoodId ? t('create_custom_food.buttons.cloning') : t('create_custom_food.buttons.creating')) 
-                : (isEditing ? t('create_custom_food.buttons.update') : cloneFoodId ? t('create_custom_food.buttons.clone') : t('create_custom_food.buttons.create'))}
+            <Text style={styles.saveButtonText}>
+              {t('create_custom_food.buttons.create_and_log', { defaultValue: 'Create & Log Food' })}
             </Text>
-            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -1414,9 +1625,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: 'bold',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
     flex: 1,
   },
   checkmarkButton: {
@@ -1589,11 +1800,13 @@ const styles = StyleSheet.create({
   dropdownItemText: {
     fontSize: 14,
   },
+  formActionsContainer: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
   formActions: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 4,
-    marginBottom: 4,
     justifyContent: 'space-between',
   },
   cancelButton: {
@@ -1623,6 +1836,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  createAndLogButton: {
+    marginTop: 8,
+    // Layout only; visual styling matches `saveButton`
+  },
+  createAndLogButtonText: {
+    // Deprecated: Create & Log button now reuses `saveButtonText`
+    fontSize: 14,
+    fontWeight: '700',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1632,6 +1854,56 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  sectionHelperText: {
+    fontSize: 11,
+    marginBottom: 10,
+    opacity: 0.8,
+  },
+  sectionSubTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  servingSummaryText: {
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  advancedToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  advancedToggleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  advancedToggleAction: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timesSymbolContainer: {
+    width: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 18,
+  },
+  timesSymbol: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
   },
   stepTitle: {
     fontSize: 18,
