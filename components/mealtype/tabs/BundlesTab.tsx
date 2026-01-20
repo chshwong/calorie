@@ -110,41 +110,42 @@ export function BundlesTab({
           opacity: bundles.length >= BUNDLES.COUNT.MAX ? 0.6 : 1,
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
         }]}>
-          <TouchableOpacity
-            style={[
-              styles.searchResultContent,
-              getMinTouchTargetStyle(),
-              { 
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-              }
-            ]}
-            onPress={() => {
-              if (bundles.length >= BUNDLES.COUNT.MAX) {
-                Alert.alert(t('alerts.limit_reached'), t('mealtype_log.bundles.limit_reached'));
-                return;
-              }
-              router.push({
-                pathname: '/create-bundle',
-                params: {
-                  mealType: mealType || 'breakfast',
-                  entryDate: entryDate || new Date().toISOString().split('T')[0],
-                },
-              });
-            }}
-            disabled={bundles.length >= BUNDLES.COUNT.MAX}
-            activeOpacity={0.7}
-            {...getButtonAccessibilityProps(
-              t('mealtype_log.bundles.create_new'),
-              'Double tap to create a new bundle',
-              bundles.length >= BUNDLES.COUNT.MAX
-            )}
-            {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 }}>
+            <TouchableOpacity
+              style={[
+                styles.searchResultContent,
+                getMinTouchTargetStyle(),
+                { 
+                  flexShrink: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  minWidth: 0,
+                }
+              ]}
+              onPress={() => {
+                if (bundles.length >= BUNDLES.COUNT.MAX) {
+                  Alert.alert(t('alerts.limit_reached'), t('mealtype_log.bundles.limit_reached'));
+                  return;
+                }
+                router.push({
+                  pathname: '/create-bundle',
+                  params: {
+                    mealType: mealType || 'breakfast',
+                    entryDate: entryDate || new Date().toISOString().split('T')[0],
+                  },
+                });
+              }}
+              disabled={bundles.length >= BUNDLES.COUNT.MAX}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps(
+                t('mealtype_log.bundles.create_new'),
+                'Double tap to create a new bundle',
+                bundles.length >= BUNDLES.COUNT.MAX
+              )}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+            >
               <ThemedText style={[
                 styles.searchResultName, 
                 { 
@@ -162,25 +163,25 @@ export function BundlesTab({
                   {t('mealtype_log.bundles.bundles_count', { count: bundles.length })}
                 </ThemedText>
               </ThemedText>
-              <TouchableOpacity
-                onPress={(event) => {
-                  event?.stopPropagation?.();
-                  setIsBundlesInfoOpen(true);
-                }}
-                style={[
-                  localStyles.infoIconButton,
-                  Platform.OS === 'web' && getFocusStyle(colors.tint),
-                ]}
-                activeOpacity={0.7}
-                {...getButtonAccessibilityProps(
-                  t('mealtype_log.bundles.info_a11y_label', { defaultValue: 'About bundles' }),
-                  t('mealtype_log.bundles.info_a11y_hint', { defaultValue: 'Opens an explanation of bundles' })
-                )}
-              >
-                <IconSymbol name="info.circle.fill" size={16} color={colors.icon} decorative={true} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setIsBundlesInfoOpen(true);
+              }}
+              style={[
+                localStyles.infoIconButton,
+                { marginLeft: 8 },
+                Platform.OS === 'web' && getFocusStyle(colors.tint),
+              ]}
+              activeOpacity={0.7}
+              {...getButtonAccessibilityProps(
+                t('mealtype_log.bundles.info_a11y_label', { defaultValue: 'About bundles' }),
+                t('mealtype_log.bundles.info_a11y_hint', { defaultValue: 'Opens an explanation of bundles' })
+              )}
+            >
+              <IconSymbol name="info.circle.fill" size={16} color={colors.icon} decorative={true} />
+            </TouchableOpacity>
+          </View>
           {bundles.length > 0 && (
             <TouchableOpacity
               onPress={onToggleEditMode}

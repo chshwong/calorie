@@ -510,6 +510,7 @@ export default function LogFoodScreen() {
     ? openFoodSearchParam[0] === 'true' 
     : openFoodSearchParam === 'true';
   const [tabContentCollapsed, setTabContentCollapsed] = useState(!shouldStartExpanded);
+  const COLLAPSED_HEIGHT = 140;
   
   // Helper function to handle tab press - toggles content collapse if already active
   const handleTabPress = (tab: 'frequent' | 'recent' | 'custom' | 'bundle' | 'quick-log', additionalActions?: () => void) => {
@@ -2236,8 +2237,84 @@ export default function LogFoodScreen() {
               )}
             </View>
 
-            {/* Collapsed Content Hint - Show when content is collapsed */}
-            {tabContentCollapsed && (
+            <View>
+              <View
+                style={[
+                  tabContentCollapsed
+                    ? {
+                        maxHeight: COLLAPSED_HEIGHT,
+                        overflow: 'hidden',
+                      }
+                    : null,
+                ]}
+              >
+                {/* Tab Content - Animated with attached popover styling */}
+                {!tabContentCollapsed && activeTabLayout ? (
+                  <View style={{ position: 'relative', marginTop: Spacing.xs }}>
+                    {/* Connector pill - horizontal bridge between tab and dropdown */}
+                    <View
+                      style={[
+                        {
+                          position: 'absolute',
+                          top: -6, // Overlap bottom of tab
+                          left: activeTabLayout.x - tabsScrollOffsetRef.current + activeTabLayout.width / 2 - 13, // Centered horizontally on active tab (width 26 / 2 = 13)
+                          width: 26,
+                          height: 11,
+                          borderRadius: 999,
+                          backgroundColor: getTabListBackgroundColorLocal(activeTab), // Match the dropdown background
+                          zIndex: 1001,
+                        }
+                      ]}
+                    />
+                    {/* Wrapper for tab content with attached popover styling - full width, matches inner list styling */}
+                    <View
+                      style={[
+                        {
+                          backgroundColor: getTabListBackgroundColorLocal(activeTab), // Match the list background color
+                          borderColor: colors.icon + '20',
+                          borderWidth: 1,
+                          borderRadius: 12, // Match searchResultsContainer borderRadius
+                          left: 0,
+                          right: 0,
+                          overflow: 'hidden',
+                          ...Platform.select({
+                            ios: {
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 4 },
+                              shadowOpacity: 0.1,
+                              shadowRadius: 12,
+                            },
+                            android: {
+                              elevation: 4,
+                            },
+                            web: {
+                              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                            },
+                          }),
+                        },
+                      ]}
+                    >
+                      <AnimatedTabContent
+                        activeKey={activeTab}
+                        previousKey={previousTabKey}
+                        isExpanded={!tabContentCollapsed}
+                        collapsedHeight={COLLAPSED_HEIGHT}
+                        renderContent={(key: TabKey) => renderTabContent(key, false)}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <AnimatedTabContent
+                    activeKey={activeTab}
+                    previousKey={previousTabKey}
+                    isExpanded={!tabContentCollapsed}
+                    collapsedHeight={COLLAPSED_HEIGHT}
+                    renderContent={(key: TabKey) => renderTabContent(key, true)}
+                  />
+                )}
+              </View>
+
+              {/* Collapsed Content Hint - anchored below clipped content */}
               <TouchableOpacity
                 onPress={() => setTabContentCollapsed(false)}
                 activeOpacity={0.7}
@@ -2246,8 +2323,10 @@ export default function LogFoodScreen() {
                   paddingHorizontal: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  opacity: 0.5,
+                  opacity: tabContentCollapsed ? 0.5 : 0,
+                  marginTop: 8,
                 }}
+                pointerEvents={tabContentCollapsed ? 'auto' : 'none'}
                 accessibilityLabel={t('mealtype_log.expand_content')}
                 accessibilityHint={t('mealtype_log.expand_content_hint')}
               >
@@ -2260,70 +2339,7 @@ export default function LogFoodScreen() {
                   />
                 </View>
               </TouchableOpacity>
-            )}
-
-            {/* Tab Content - Animated with attached popover styling */}
-            {!tabContentCollapsed && activeTabLayout ? (
-              <View style={{ position: 'relative', marginTop: Spacing.xs }}>
-                {/* Connector pill - horizontal bridge between tab and dropdown */}
-                <View
-                  style={[
-                    {
-                      position: 'absolute',
-                      top: -6, // Overlap bottom of tab
-                      left: activeTabLayout.x - tabsScrollOffsetRef.current + activeTabLayout.width / 2 - 13, // Centered horizontally on active tab (width 26 / 2 = 13)
-                      width: 26,
-                      height: 11,
-                      borderRadius: 999,
-                      backgroundColor: getTabListBackgroundColorLocal(activeTab), // Match the dropdown background
-                      zIndex: 1001,
-                    }
-                  ]}
-                />
-                {/* Wrapper for tab content with attached popover styling - full width, matches inner list styling */}
-                <View
-                  style={[
-                    {
-                      backgroundColor: getTabListBackgroundColorLocal(activeTab), // Match the list background color
-                      borderColor: colors.icon + '20',
-                      borderWidth: 1,
-                      borderRadius: 12, // Match searchResultsContainer borderRadius
-                      left: 0,
-                      right: 0,
-                      overflow: 'hidden',
-                      ...Platform.select({
-                        ios: {
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.1,
-                          shadowRadius: 12,
-                        },
-                        android: {
-                          elevation: 4,
-                        },
-                        web: {
-                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-                        },
-                      }),
-                    },
-                  ]}
-                >
-                  <AnimatedTabContent
-                    activeKey={activeTab}
-                    previousKey={previousTabKey}
-                    isExpanded={!tabContentCollapsed}
-                    renderContent={(key: TabKey) => renderTabContent(key, false)}
-                  />
-                </View>
-              </View>
-            ) : (
-              <AnimatedTabContent
-                activeKey={activeTab}
-                previousKey={previousTabKey}
-                isExpanded={!tabContentCollapsed}
-                renderContent={(key: TabKey) => renderTabContent(key, true)}
-              />
-            )}
+            </View>
           </View>
 
         {/* Food Log */}

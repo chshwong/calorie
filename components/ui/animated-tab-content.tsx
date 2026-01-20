@@ -40,6 +40,8 @@ export type AnimatedTabContentProps = {
   previousKey?: TabKey;
   /** Whether content is expanded (true = visible, false = collapsed) */
   isExpanded: boolean;
+  /** Optional collapsed height for partial-collapse behavior */
+  collapsedHeight?: number;
   /** Function to render content for a given tab key */
   renderContent: (key: TabKey) => React.ReactNode;
   /** Disable animations for reduced motion accessibility */
@@ -59,6 +61,7 @@ export function AnimatedTabContent({
   activeKey,
   previousKey: previousKeyProp,
   isExpanded,
+  collapsedHeight,
   renderContent,
   reduceMotion = false,
 }: AnimatedTabContentProps) {
@@ -195,19 +198,30 @@ export function AnimatedTabContent({
       });
   
   // Calculate expand/collapse transforms
+  const collapsedHeightValue = collapsedHeight ?? 0;
+  const measuredHeight = contentHeight || 0;
+  const expandedTargetHeight = measuredHeight > 0 ? measuredHeight : collapsedHeightValue;
+  const collapsedTargetHeight =
+    collapsedHeightValue > 0 && expandedTargetHeight > 0
+      ? Math.min(collapsedHeightValue, expandedTargetHeight)
+      : collapsedHeightValue;
+  const useOpacityCollapse = collapsedHeightValue === 0;
+
   const animatedHeight = expandProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, contentHeight || 0],
+    outputRange: [collapsedTargetHeight, expandedTargetHeight],
     extrapolate: 'clamp',
   });
   
-  const expandOpacity = expandProgress;
+  const expandOpacity = useOpacityCollapse ? expandProgress : 1;
   
-  const expandTranslateY = expandProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-8, 0],
-    extrapolate: 'clamp',
-  });
+  const expandTranslateY = useOpacityCollapse
+    ? expandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-8, 0],
+        extrapolate: 'clamp',
+      })
+    : 0;
   
   // Render current and previous content during slide animation
   const shouldShowPrevious = !reduceMotion && isAnimatingRef.current && previousKey !== activeKey;
@@ -217,8 +231,8 @@ export function AnimatedTabContent({
       style={[
         styles.container,
         {
-          height: reduceMotion ? (isExpanded ? undefined : 0) : animatedHeight,
-          opacity: reduceMotion ? (isExpanded ? 1 : 0) : expandOpacity,
+          height: reduceMotion ? (isExpanded ? undefined : collapsedTargetHeight) : animatedHeight,
+          opacity: reduceMotion ? (isExpanded ? 1 : useOpacityCollapse ? 0 : 1) : expandOpacity,
           overflow: 'hidden',
         },
       ]}
