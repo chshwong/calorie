@@ -127,6 +127,15 @@
     "reset_toast": "Tour guide reset. Go to Food Diary or Meal Log to start again."
   },
   "home": {
+    "ai_camera_funnel": {
+      "title": "AI 📸",
+      "subtitle": "Choose how you want to log",
+      "quicklog_title": "Quick Log a Meal",
+      "quicklog_helper": "Log 1-time meal now",
+      "customfood_title": "Create Custom Food",
+      "customfood_helper": "For foods you’ll log again",
+      "close": "Close"
+    },
     "greeting": {
       "morning": "Good Morning",
       "afternoon": "Good Afternoon",

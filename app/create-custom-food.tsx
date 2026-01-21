@@ -90,6 +90,7 @@ export default function CreateCustomFoodScreen() {
   // Get meal type and entry date from params (for navigation back)
   const mealType = params.mealType as string || 'breakfast';
   const entryDateParam = params.entryDate as string | undefined;
+  const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const { dateKey: entryDate } = useClampedDateParam({ paramKey: 'entryDate' });
   const foodId = params.foodId as string | undefined;
   const cloneFoodId = params.cloneFoodId as string | undefined;
@@ -135,6 +136,12 @@ export default function CreateCustomFoodScreen() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<CustomFoodTabKey>('manual');
   const [, setAiRawText] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tabParam === 'ai') {
+      setActiveTab('ai');
+    }
+  }, [tabParam]);
 
   // Serving type toggle (default: weight-based)
   const [servingType, setServingType] = useState<'weight' | 'volume'>('weight');

@@ -13,6 +13,7 @@ import { NoteEditor } from '@/components/note-editor';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AICameraFunnelModal } from '@/components/ui/AICameraFunnelModal';
 import { showAppToast } from '@/components/ui/app-toast';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -491,6 +492,10 @@ export default function FoodLogHomeScreen() {
   
   // Menu state for meal type options
   const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
+  const [aiCameraFunnel, setAiCameraFunnel] = useState<{ visible: boolean; mealType: string | null }>({
+    visible: false,
+    mealType: null,
+  });
   
   // Meal view mode state (collapsed/semi/expanded per meal)
   const [mealViewModes, setMealViewModes] = useState<Record<string, MealViewMode>>({
@@ -1628,14 +1633,7 @@ export default function FoodLogHomeScreen() {
                             <TouchableOpacity
                               style={[styles.aiCameraButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
                               onPress={() => {
-                                router.push({
-                                  pathname: '/quick-log',
-                                  params: {
-                                    date: selectedDateString,
-                                    mealType: mealType,
-                                    tab: 'ai',
-                                  }
-                                });
+                                setAiCameraFunnel({ visible: true, mealType });
                               }}
                               activeOpacity={0.7}
                               {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
@@ -2075,6 +2073,13 @@ export default function FoodLogHomeScreen() {
           mode={transferMealtypeModal.mode}
         />
       )}
+
+      <AICameraFunnelModal
+        visible={aiCameraFunnel.visible}
+        onClose={() => setAiCameraFunnel({ visible: false, mealType: null })}
+        date={selectedDateString}
+        mealType={aiCameraFunnel.mealType ?? 'breakfast'}
+      />
 
       <BurnedCaloriesModal
         visible={burnedModalVisible}
