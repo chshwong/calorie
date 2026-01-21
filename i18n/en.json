@@ -129,11 +129,11 @@
   "home": {
     "ai_camera_funnel": {
       "title": "AI 📸",
-      "subtitle": "Choose how you want to log",
+      "subtitle": "Quick 1-time VS repeat meals",
       "quicklog_title": "Quick Log a Meal",
-      "quicklog_helper": "Log 1-time meal now",
+      "quicklog_helper": "1-time log now",
       "customfood_title": "Create Custom Food",
-      "customfood_helper": "For foods you’ll log again",
+      "customfood_helper": "Save for repeat use",
       "close": "Close"
     },
     "greeting": {

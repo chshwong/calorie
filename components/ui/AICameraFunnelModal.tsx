@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     borderRadius: BorderRadius['2xl'],
-    padding: Spacing.xl,
+    padding: Spacing.md,
     ...Shadows.lg,
   },
   headerRow: {
