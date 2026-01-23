@@ -66,6 +66,14 @@ export async function getOrCreateDailySumBurned(
     active_cal: defaults.system_active_cal,
     tdee_cal: defaults.system_tdee_cal,
 
+    // Option 2: RAW is always populated. Default raw is the system activity burn baseline.
+    burn_reduction_pct_int: 0,
+    raw_burn: defaults.system_active_cal,
+    raw_tdee: null,
+    raw_burn_source: 'system',
+    // Option 2 invariant: when pct=0 and raw_burn is present, raw_last_synced_at must be non-null.
+    raw_last_synced_at: new Date().toISOString(),
+
     system_bmr_cal: defaults.system_bmr_cal,
     system_active_cal: defaults.system_active_cal,
     system_tdee_cal: defaults.system_tdee_cal,

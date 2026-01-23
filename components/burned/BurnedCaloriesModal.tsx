@@ -1,18 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { BURNED, RANGES } from '@/constants/constraints';
-import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
-import { useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
+import { BorderRadius, Colors, FontSize, SemanticColors, Spacing } from '@/constants/theme';
+import { useApplyRawToFinals, useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
+import { useDisconnectFitbit, useFitbitConnectionPublic, useSyncFitbitNow } from '@/hooks/use-fitbit-connection';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { getTodayKey, getYesterdayKey, toDateKey } from '@/utils/dateKey';
+
+import FitbitLogo from '@/assets/images/fitbit_logo.svg';
+import { BurnReductionModal } from '@/components/burned/BurnReductionModal';
+import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
 
 type Props = {
   visible: boolean;
@@ -26,6 +31,15 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
+  const logoChipBg = scheme === 'dark' ? Colors.light.card : colors.backgroundSecondary;
+  const [centerToastText, setCenterToastText] = useState<string | null>(null);
+  const centerToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showCenterToast = (msg: string) => {
+    setCenterToastText(msg);
+    if (centerToastTimerRef.current) clearTimeout(centerToastTimerRef.current);
+    centerToastTimerRef.current = setTimeout(() => setCenterToastText(null), 2600);
+  };
 
   const titleText = useMemo(() => {
     const key = toDateKey(entryDate);
@@ -35,17 +49,45 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   }, [entryDate, t]);
 
   // MUST call getOrCreate before rendering (spec) — enable only when visible.
-  const { data: burnedRow, isLoading, isFetching, error } = useDailySumBurned(entryDate, { enabled: visible });
+  const { data: burnedRow, isLoading, isFetching, error, refetch: refetchBurned } = useDailySumBurned(entryDate, { enabled: visible });
   const saveMutation = useSaveDailySumBurned();
   const resetMutation = useResetDailySumBurned();
+  const applyFromRawMutation = useApplyRawToFinals();
+
+  const fitbitEnabled = Platform.OS === 'web';
+  const { data: fitbitConn } = useFitbitConnectionPublic({ enabled: fitbitEnabled && visible });
+  const syncFitbit = useSyncFitbitNow();
+  const disconnectFitbit = useDisconnectFitbit();
+
+  const fitbitStatusLine = useMemo(() => {
+    if (!fitbitEnabled) return null;
+    if (!fitbitConn) return 'Not connected';
+    const last = fitbitConn.last_sync_at;
+    if (fitbitConn.status === 'active' && last) {
+      let ts = last;
+      try {
+        ts = new Date(last).toLocaleString();
+      } catch {
+        // keep original
+      }
+      return `Connected • Last sync ${ts}`;
+    }
+    if (fitbitConn.status === 'active') return 'Connected';
+    // Treat non-active as “not connected” for this lightweight card UI.
+    return 'Not connected';
+  }, [fitbitConn, fitbitEnabled]);
 
   const [systemDefaults, setSystemDefaults] = useState<{ bmr: number; active: number; tdee: number } | null>(null);
   const [bmrText, setBmrText] = useState('');
   const [activeText, setActiveText] = useState('');
   const [tdeeText, setTdeeText] = useState('');
+  const [baseActivityText, setBaseActivityText] = useState('');
+  const [hasUserEditedThisSession, setHasUserEditedThisSession] = useState(false);
   const [touched, setTouched] = useState({ bmr: false, active: false, tdee: false });
   const [validationError, setValidationError] = useState<string | null>(null);
   const [didResetToSystem, setDidResetToSystem] = useState(false);
+  const [fitbitModalVisible, setFitbitModalVisible] = useState(false);
+  const [burnCorrectionModalVisible, setBurnCorrectionModalVisible] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -53,6 +95,12 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       setValidationError(null);
       setDidResetToSystem(false);
       setSystemDefaults(null);
+      setBaseActivityText('');
+      setHasUserEditedThisSession(false);
+      setFitbitModalVisible(false);
+      setBurnCorrectionModalVisible(false);
+      setCenterToastText(null);
+      if (centerToastTimerRef.current) clearTimeout(centerToastTimerRef.current);
       return;
     }
     if (burnedRow) {
@@ -62,16 +110,65 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
         active: burnedRow.system_active_cal,
         tdee: burnedRow.system_tdee_cal,
       });
-      setBmrText(String(burnedRow.bmr_cal));
-      setActiveText(String(burnedRow.active_cal));
-      setTdeeText(String(burnedRow.tdee_cal));
-      setTouched({ bmr: false, active: false, tdee: false });
-      setValidationError(null);
-      setDidResetToSystem(false);
-    }
-  }, [visible, burnedRow?.id]);
 
-  const isBusy = isLoading || isFetching || saveMutation.isPending || resetMutation.isPending;
+      const shouldHydrateFromRow =
+        !hasUserEditedThisSession && !touched.bmr && !touched.active && !touched.tdee;
+
+      if (shouldHydrateFromRow) {
+        const base =
+          typeof burnedRow.raw_burn === 'number'
+            ? burnedRow.raw_burn
+            : typeof burnedRow.active_cal === 'number'
+              ? burnedRow.active_cal
+              : typeof burnedRow.system_active_cal === 'number'
+                ? burnedRow.system_active_cal
+                : 0;
+        const pct = burnedRow.burn_reduction_pct_int ?? 0;
+        const f = 1 - pct / 100;
+        const derivedActive = Math.round(base * f);
+        const derivedTdee = Math.round(burnedRow.bmr_cal + derivedActive);
+
+        setBaseActivityText(String(base));
+        setBmrText(String(burnedRow.bmr_cal));
+        setActiveText(String(derivedActive));
+        setTdeeText(String(derivedTdee));
+        setTouched({ bmr: false, active: false, tdee: false });
+        setValidationError(null);
+        setDidResetToSystem(false);
+      }
+    }
+  }, [
+    visible,
+    burnedRow?.id,
+    burnedRow?.updated_at,
+    burnedRow?.bmr_cal,
+    burnedRow?.active_cal,
+    burnedRow?.tdee_cal,
+    hasUserEditedThisSession,
+    baseActivityText,
+    touched.active,
+    touched.bmr,
+    touched.tdee,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (centerToastTimerRef.current) clearTimeout(centerToastTimerRef.current);
+    };
+  }, []);
+
+  const reductionPct = burnedRow?.burn_reduction_pct_int ?? 0;
+  const reductionEnabled = reductionPct > 0;
+  const factor = 1 - reductionPct / 100;
+
+  const isBusy =
+    isLoading ||
+    isFetching ||
+    saveMutation.isPending ||
+    resetMutation.isPending ||
+    syncFitbit.isPending ||
+    applyFromRawMutation.isPending ||
+    disconnectFitbit.isPending;
 
   const parsed = useMemo(() => {
     const bmr = parseInt(bmrText, 10);
@@ -80,13 +177,35 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     return { bmr, active, tdee };
   }, [bmrText, activeText, tdeeText]);
 
+  const baseActivity = useMemo(() => {
+    const n = parseFloat(baseActivityText);
+    if (Number.isFinite(n)) return n;
+    if (typeof burnedRow?.raw_burn === 'number' && Number.isFinite(burnedRow.raw_burn)) return burnedRow.raw_burn;
+    if (typeof burnedRow?.active_cal === 'number' && Number.isFinite(burnedRow.active_cal)) return burnedRow.active_cal;
+    if (typeof burnedRow?.system_active_cal === 'number' && Number.isFinite(burnedRow.system_active_cal)) return burnedRow.system_active_cal;
+    return 0;
+  }, [baseActivityText, burnedRow?.active_cal, burnedRow?.raw_burn, burnedRow?.system_active_cal]);
+
+  const derivedFinalActive = useMemo(() => Math.round(baseActivity * factor), [baseActivity, factor]);
+  const derivedFinalTdee = useMemo(() => {
+    const bmrForCalc =
+      Number.isFinite(parsed.bmr) ? parsed.bmr : typeof burnedRow?.bmr_cal === 'number' ? burnedRow.bmr_cal : 0;
+    return Math.round(bmrForCalc + derivedFinalActive);
+  }, [burnedRow?.bmr_cal, burnedRow?.id, derivedFinalActive, parsed.bmr]);
+
+  // Keep displayed finals in sync with the underlying base activity + pct factor.
+  useEffect(() => {
+    if (!visible) return;
+    if (!burnedRow) return;
+    setActiveText(String(derivedFinalActive));
+    setTdeeText(String(derivedFinalTdee));
+    // NOTE: we intentionally do not touch baseActivityText here.
+  }, [burnedRow?.id, derivedFinalActive, derivedFinalTdee, visible]);
+
   const candidateTdeeToSave = useMemo(() => {
     if (!burnedRow) return null;
-    const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : burnedRow.bmr_cal;
-    const active = Number.isFinite(parsed.active) ? parsed.active : burnedRow.active_cal;
-    // Spec invariant: tdee = bmr + active when saving manual overrides via this modal UI.
-    return bmr + active;
-  }, [burnedRow?.id, parsed.bmr, parsed.active]);
+    return derivedFinalTdee;
+  }, [burnedRow?.id, derivedFinalTdee]);
 
   const isTooHighBurn =
     candidateTdeeToSave !== null && candidateTdeeToSave >= BURNED.TDEE_KCAL.MAX;
@@ -96,41 +215,41 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     candidateTdeeToSave >= BURNED.WARNING_KCAL &&
     candidateTdeeToSave < BURNED.TDEE_KCAL.MAX;
 
-  const validate = (): boolean => {
+  const validate = (): 'ok' | 'no_changes' | 'error' => {
+    if (!burnedRow) {
+      setValidationError(t('burned.errors.save_failed'));
+      return 'error';
+    }
+
     if (!didResetToSystem && !touched.bmr && !touched.active && !touched.tdee) {
-      setValidationError(t('burned.errors.no_changes'));
-      return false;
+      // UX: saving with no changes should just close (no error message).
+      setValidationError(null);
+      return 'no_changes';
     }
 
     if (
       (touched.bmr && (!Number.isFinite(parsed.bmr) || parsed.bmr < RANGES.CALORIES_KCAL.MIN)) ||
-      (touched.active && (!Number.isFinite(parsed.active) || parsed.active < RANGES.CALORIES_KCAL.MIN)) ||
-      (touched.tdee && (!Number.isFinite(parsed.tdee) || parsed.tdee < RANGES.CALORIES_KCAL.MIN))
+      ((touched.active || touched.tdee) && (!Number.isFinite(baseActivity) || baseActivity < RANGES.CALORIES_KCAL.MIN))
     ) {
       setValidationError(t('burned.errors.invalid_number'));
-      return false;
-    }
-
-    if (touched.tdee && burnedRow && Number.isFinite(parsed.tdee) && parsed.tdee < burnedRow.system_bmr_cal) {
-      setValidationError(t('burned.errors.tdee_below_bmr'));
-      return false;
+      return 'error';
     }
 
     // Only validate against hard limit (>= 15000). Warning for 6000-14999 is non-blocking.
     if (candidateTdeeToSave !== null) {
       if (candidateTdeeToSave >= BURNED.TDEE_KCAL.MAX) {
         setValidationError(t('burned.errors.max_kcal'));
-        return false;
+        return 'error';
       }
       // Check for invalid values (negative or non-finite)
       if (!Number.isFinite(candidateTdeeToSave) || candidateTdeeToSave < BURNED.TDEE_KCAL.MIN) {
         setValidationError(t('burned.errors.invalid_number'));
-        return false;
+        return 'error';
       }
     }
 
     setValidationError(null);
-    return true;
+    return 'ok';
   };
 
   const markTouched = (field: Field) => {
@@ -142,9 +261,10 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const handleResetLocal = () => {
     if (!systemDefaults) return;
     setBmrText(String(systemDefaults.bmr));
-    setActiveText(String(systemDefaults.active));
-    setTdeeText(String(systemDefaults.tdee));
-    setTouched({ bmr: false, active: false, tdee: false });
+    setBaseActivityText(String(systemDefaults.active));
+    // Mark touched so Save persists even if user tweaks after reset.
+    setTouched({ bmr: true, active: true, tdee: true });
+    setHasUserEditedThisSession(false);
     setDidResetToSystem(true);
     setValidationError(null);
     // IMPORTANT: no onClose(), no network calls.
@@ -152,18 +272,21 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
 
   const persistSave = async () => {
     if (!burnedRow) return;
-    if (!validate()) return;
+    const v = validate();
+    if (v === 'no_changes') {
+      onClose();
+      return;
+    }
+    if (v !== 'ok') return;
 
     // If user reset to system defaults (local) and hasn't changed them, persist via RESET service on Save.
     if (
       didResetToSystem &&
       systemDefaults &&
       Number.isFinite(parsed.bmr) &&
-      Number.isFinite(parsed.active) &&
-      Number.isFinite(parsed.tdee) &&
-      parsed.bmr === systemDefaults.bmr &&
-      parsed.active === systemDefaults.active &&
-      parsed.tdee === systemDefaults.tdee
+      Math.round(parsed.bmr) === systemDefaults.bmr &&
+      Math.round(baseActivity) === systemDefaults.active &&
+      Math.round(derivedFinalTdee) === systemDefaults.tdee
     ) {
       try {
         const result = await resetMutation.mutateAsync({ entryDate });
@@ -179,10 +302,16 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       return;
     }
 
+    const bmrCal = Number.isFinite(parsed.bmr) ? Math.round(parsed.bmr) : burnedRow.bmr_cal;
+    const rawToSave = baseActivity;
+
+    // Keep payload consistent with what will be stored/derived.
+    const nextFinalActive = Math.round(rawToSave * factor);
+    const nextFinalTdee = Math.round(bmrCal + nextFinalActive);
     const values = {
-      bmr_cal: Number.isFinite(parsed.bmr) ? parsed.bmr : burnedRow.bmr_cal,
-      active_cal: Number.isFinite(parsed.active) ? parsed.active : burnedRow.active_cal,
-      tdee_cal: Number.isFinite(parsed.tdee) ? parsed.tdee : burnedRow.tdee_cal,
+      bmr_cal: bmrCal,
+      active_cal: nextFinalActive,
+      tdee_cal: nextFinalTdee,
     };
 
     try {
@@ -190,6 +319,12 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
         entryDate,
         touched,
         values,
+        reduction: {
+          burn_reduction_pct_int: reductionPct,
+          raw_burn: rawToSave,
+          raw_tdee: null,
+          raw_burn_source: didResetToSystem ? 'system' : 'manual',
+        },
       });
 
       if (result) {
@@ -225,6 +360,69 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const handleReset = async () => {
     // Deprecated: reset is now local only. Kept name for minimal diff.
     handleResetLocal();
+  };
+
+  // Debug UI removed.
+
+  const handleSyncAndApply = async () => {
+    if (!fitbitEnabled) return;
+    if (fitbitConn?.status !== 'active') {
+      setFitbitModalVisible(true);
+      return;
+    }
+    try {
+      await syncFitbit.mutateAsync();
+      await refetchBurned();
+      await applyFromRawMutation.mutateAsync({ entryDate });
+      const res = await refetchBurned();
+      const row = res.data ?? null;
+      if (row && !hasUserEditedThisSession && !touched.active && !touched.tdee) {
+        const base =
+          typeof row.raw_burn === 'number'
+            ? row.raw_burn
+            : typeof row.active_cal === 'number'
+              ? row.active_cal
+              : typeof row.system_active_cal === 'number'
+                ? row.system_active_cal
+                : 0;
+        setBaseActivityText(String(base));
+      }
+      showAppToast(t('burned.fitbit.toast.synced_applied'));
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (msg === 'RATE_LIMIT') {
+        showCenterToast(t('burned.fitbit.errors.rate_limit_15m'));
+      } else if (msg === 'MISSING_ACTIVITY_CALORIES') {
+        showAppToast(t('burned.fitbit.errors.missing_activity_calories'));
+      } else if (msg === 'UNAUTHORIZED' || msg === 'MISSING_TOKENS') {
+        showAppToast(t('burned.fitbit.errors.reconnect_required'));
+      } else {
+        showAppToast(t('burned.fitbit.toast.sync_failed'));
+      }
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!fitbitEnabled) return;
+    try {
+      await disconnectFitbit.mutateAsync();
+      const res = await refetchBurned();
+      const row = res.data ?? null;
+      if (row && !hasUserEditedThisSession && !touched.active && !touched.tdee) {
+        const base =
+          typeof row.raw_burn === 'number'
+            ? row.raw_burn
+            : typeof row.active_cal === 'number'
+              ? row.active_cal
+              : typeof row.system_active_cal === 'number'
+                ? row.system_active_cal
+                : 0;
+        setBaseActivityText(String(base));
+      }
+      showAppToast(t('burned.fitbit.toast.disconnected'));
+    } catch {
+      showAppToast(t('burned.fitbit.toast.disconnect_failed'));
+    }
   };
 
   return (
@@ -263,8 +461,13 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
               </ThemedText>
             </View>
           ) : (
-            <View style={styles.body}>
-              <View style={styles.row}>
+            <View style={styles.bodyShell}>
+              <ScrollView
+                style={styles.bodyScroll}
+                contentContainerStyle={styles.bodyScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.row}>
                 <View style={styles.labelWrap}>
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.bmr')}</ThemedText>
                 </View>
@@ -272,15 +475,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                   <InlineEditableNumberChip
                     value={Number.isFinite(parsed.bmr) ? parsed.bmr : null}
                     disabled
-                    onCommit={(next) => {
-                      const nextBmr = next ?? 0;
-                      markTouched('bmr');
-                      setBmrText(String(nextBmr));
-                      if (!touched.tdee) {
-                        const active = Number.isFinite(parsed.active) ? parsed.active : 0;
-                        setTdeeText(String(nextBmr + active));
-                      }
-                    }}
+                    onCommit={() => {}}
                     placeholder={t('burned.fields.placeholder')}
                     unitSuffix={t('home.food_log.kcal')}
                     min={RANGES.CALORIES_KCAL.MIN}
@@ -289,8 +484,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                     badgeBackgroundColor={colors.backgroundSecondary}
                     badgeBorderColor={colors.border}
                     badgeTextColor={colors.text}
-                    badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
-                    inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                    badgeTextStyle={{ fontSize: FontSize.sm + 2, lineHeight: FontSize.sm + 20 }}
+                    inputTextStyle={{ fontSize: FontSize.xs + 2, lineHeight: FontSize.xs + 20 }}
                     accessibilityLabel={t('burned.fields.bmr')}
                     inputWidth={64}
                     commitOnBlur
@@ -298,7 +493,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                 </View>
               </View>
 
-              <View style={styles.row}>
+              <View style={[styles.row, styles.activityRowTight]}>
                 <View style={styles.labelWrap}>
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.active')}</ThemedText>
                 </View>
@@ -310,16 +505,20 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                       </ThemedText>
                     </View>
                     <InlineEditableNumberChip
-                      value={Number.isFinite(parsed.active) ? parsed.active : null}
+                      value={derivedFinalActive}
+                      disabled={false}
                       showEditIcon
                       onCommit={(next) => {
-                        const nextActive = next ?? 0;
+                        const base = next ?? 0;
                         markTouched('active');
-                        setActiveText(String(nextActive));
-                        if (!touched.tdee) {
-                          const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
-                          setTdeeText(String(bmr + nextActive));
-                        }
+                        setHasUserEditedThisSession(true);
+                        const bmr =
+                          Number.isFinite(parsed.bmr) ? parsed.bmr : typeof burnedRow?.bmr_cal === 'number' ? burnedRow.bmr_cal : 0;
+                        const nextFinalActive = Math.round(base * factor);
+                        const nextFinalTdee = Math.round(bmr + nextFinalActive);
+                        setBaseActivityText(String(base));
+                        setActiveText(String(nextFinalActive));
+                        setTdeeText(String(nextFinalTdee));
                       }}
                       placeholder={t('burned.fields.placeholder')}
                       unitSuffix={t('home.food_log.kcal')}
@@ -329,8 +528,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                       badgeBackgroundColor={colors.backgroundSecondary}
                       badgeBorderColor={colors.border}
                       badgeTextColor={colors.text}
-                      badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
-                      inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                      badgeTextStyle={{ fontSize: FontSize.sm + 2, lineHeight: FontSize.sm + 20 }}
+                      inputTextStyle={{ fontSize: FontSize.xs + 2, lineHeight: FontSize.xs + 20 }}
                       accessibilityLabel={t('burned.fields.active')}
                       inputWidth={64}
                       commitOnBlur
@@ -339,7 +538,13 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                 </View>
               </View>
 
-              <View style={styles.row}>
+              {reductionEnabled && (
+                <ThemedText style={[styles.helperText, styles.burnHintTight, { color: colors.textSecondary }]}>
+                  {t('burned.burn_correction.applied_hint', { pct: reductionPct, base: Math.round(baseActivity) })}
+                </ThemedText>
+              )}
+
+              <View style={[styles.row, styles.tdeeRowTight]}>
                 <View style={styles.labelWrap}>
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.tdee')}</ThemedText>
                 </View>
@@ -351,19 +556,24 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                       </ThemedText>
                     </View>
                     <InlineEditableNumberChip
-                      value={Number.isFinite(parsed.tdee) ? parsed.tdee : null}
+                      value={derivedFinalTdee}
+                      disabled={false}
                       showEditIcon
                       onCommit={(next) => {
-                        const bmr = Number.isFinite(parsed.bmr) ? parsed.bmr : 0;
+                        const bmr =
+                          Number.isFinite(parsed.bmr) ? parsed.bmr : typeof burnedRow?.bmr_cal === 'number' ? burnedRow.bmr_cal : 0;
                         const requestedTdee = next ?? 0;
-                        const nextTdee = Math.max(bmr, requestedTdee);
-                        const nextActive = nextTdee - bmr;
+                        const desiredTdee = Math.max(bmr, requestedTdee);
+                        const desiredFinalActivity = Math.max(0, desiredTdee - bmr);
+                        const base = desiredFinalActivity;
+                        const nextFinalActive = Math.round(base * factor);
+                        const nextFinalTdee = Math.round(bmr + nextFinalActive);
 
-                        // Treat "edit TDEE" as "solve for Activity" so that TDEE always equals BMR + Activity.
-                        // This also ensures save uses the BMR/Active branch where TDEE is derived.
-                        markTouched('active');
-                        setActiveText(String(nextActive));
-                        setTdeeText(String(nextTdee));
+                        markTouched('tdee');
+                        setHasUserEditedThisSession(true);
+                        setBaseActivityText(String(base));
+                        setActiveText(String(nextFinalActive));
+                        setTdeeText(String(nextFinalTdee));
                       }}
                       placeholder={t('burned.fields.placeholder')}
                       unitSuffix={t('home.food_log.kcal')}
@@ -373,8 +583,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                       badgeBackgroundColor={colors.backgroundSecondary}
                       badgeBorderColor={colors.border}
                       badgeTextColor={colors.text}
-                      badgeTextStyle={{ fontSize: FontSize.sm + 2 }}
-                      inputTextStyle={{ fontSize: FontSize.xs + 2 }}
+                      badgeTextStyle={{ fontSize: FontSize.sm + 2, lineHeight: FontSize.sm + 20 }}
+                      inputTextStyle={{ fontSize: FontSize.xs + 2, lineHeight: FontSize.xs + 20 }}
                       accessibilityLabel={t('burned.fields.tdee')}
                       inputWidth={64}
                       commitOnBlur
@@ -383,17 +593,153 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                 </View>
               </View>
 
+              {/* Wearable device card (web-only) */}
+              {fitbitEnabled && (
+                <>
+                  <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>Wearable device</ThemedText>
+                  <View style={[styles.fitbitCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                  <View style={styles.fitbitCardRow}>
+                    <View style={styles.fitbitLogoWrap} accessible accessibilityLabel="Fitbit">
+                      <View style={[styles.logoChip, { backgroundColor: logoChipBg }]} accessible={false}>
+                        <View style={styles.fitbitLogoBox} accessible={false}>
+                          <FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.fitbitMain}>
+                      <View style={styles.fitbitStatusRow}>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            {
+                              backgroundColor:
+                                fitbitConn?.status === 'active' ? SemanticColors.success : colors.textMuted,
+                            },
+                          ]}
+                          accessible={false}
+                        />
+                        <ThemedText style={[styles.fitbitStatus, { color: colors.textSecondary }]}>
+                          {fitbitStatusLine ?? 'Not connected'}
+                        </ThemedText>
+                      </View>
+
+                      <View style={styles.fitbitActionRow}>
+                        {fitbitConn?.status === 'active' ? (
+                          <View style={styles.fitbitBtnRow}>
+                            <TouchableOpacity
+                              onPress={handleSyncAndApply}
+                              disabled={isBusy}
+                              activeOpacity={0.85}
+                              style={[
+                                styles.fitbitPrimaryBtn,
+                                { backgroundColor: colors.tint, opacity: isBusy ? 0.6 : 1 },
+                                Platform.OS === 'web' && getFocusStyle('#fff'),
+                              ]}
+                              {...getButtonAccessibilityProps(t('burned.fitbit.actions.sync_now'))}
+                            >
+                              <ThemedText style={[styles.fitbitPrimaryBtnText, { color: colors.textInverse }]}>
+                                {t('burned.fitbit.actions.sync_now')}
+                              </ThemedText>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={handleDisconnect}
+                              disabled={isBusy}
+                              activeOpacity={0.85}
+                              style={[
+                                styles.fitbitSecondaryBtn,
+                                { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: isBusy ? 0.6 : 1 },
+                                Platform.OS === 'web' && getFocusStyle(colors.tint),
+                              ]}
+                              {...getButtonAccessibilityProps(t('burned.fitbit.actions.disconnect'))}
+                            >
+                              <ThemedText style={[styles.fitbitSecondaryBtnText, { color: colors.text }]}>
+                                {t('burned.fitbit.actions.disconnect')}
+                              </ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => setFitbitModalVisible(true)}
+                            disabled={isBusy}
+                            activeOpacity={0.85}
+                            style={[
+                              styles.fitbitPrimaryBtn,
+                              { backgroundColor: colors.tint, opacity: isBusy ? 0.6 : 1 },
+                              Platform.OS === 'web' && getFocusStyle('#fff'),
+                            ]}
+                            {...getButtonAccessibilityProps(t('burned.fitbit.actions.connect'))}
+                          >
+                            <ThemedText style={[styles.fitbitPrimaryBtnText, { color: colors.textInverse }]}>
+                              {t('burned.fitbit.actions.connect')}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+                </>
+              )}
+
+              {/* Advanced section */}
+              <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>Advanced</ThemedText>
               <TouchableOpacity
-                onPress={handleReset}
+                onPress={() => setBurnCorrectionModalVisible(true)}
                 disabled={isBusy}
-                activeOpacity={0.8}
-                style={[styles.resetLinkWrap, Platform.OS === 'web' && getFocusStyle(colors.info)]}
-                {...getButtonAccessibilityProps(t('burned.actions.reset_estimates'))}
+                activeOpacity={0.85}
+                style={[
+                  styles.advancedRow,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: isBusy ? 0.7 : 1 },
+                  Platform.OS === 'web' && getFocusStyle(colors.tint),
+                ]}
+                {...getButtonAccessibilityProps('Burn correction', 'Adjust how wearable burn is applied')}
               >
-                <ThemedText style={[styles.resetLinkText, { color: colors.info }]}>
-                  {t('burned.actions.reset_estimates')}
-                </ThemedText>
+                <View style={styles.advancedRowText}>
+                  <ThemedText style={[styles.advancedRowTitle, { color: colors.text }]}>
+                    {t('burned.burn_correction.title')}
+                  </ThemedText>
+                  <ThemedText style={[styles.advancedRowSubtitle, { color: colors.textSecondary }]}>
+                    {t('burned.burn_correction.row_subtitle')}
+                  </ThemedText>
+                </View>
+                <View style={styles.advancedRowRight}>
+                  {reductionEnabled ? (
+                    <View style={[styles.statusPill, { backgroundColor: colors.tint + '20', borderColor: colors.tint }]}>
+                      <ThemedText style={[styles.statusPillTextOn, { color: colors.tint }]}>
+                        {t('burned.burn_correction.status.on_with_pct', { pct: reductionPct })}
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.statusPill,
+                        { backgroundColor: colors.backgroundTertiary, borderColor: colors.border },
+                      ]}
+                    >
+                      <ThemedText style={[styles.statusPillTextOff, { color: colors.textSecondary }]}>
+                        {t('burned.burn_correction.status.off')}
+                      </ThemedText>
+                    </View>
+                  )}
+                  <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} decorative />
+                </View>
               </TouchableOpacity>
+
+              {!reductionEnabled && (
+                <TouchableOpacity
+                  onPress={handleReset}
+                  disabled={isBusy}
+                  activeOpacity={0.8}
+                  style={[styles.resetLinkWrap, Platform.OS === 'web' && getFocusStyle(colors.info)]}
+                  {...getButtonAccessibilityProps(t('burned.actions.reset_estimates'))}
+                >
+                  <ThemedText style={[styles.resetLinkText, { color: colors.info }]}>
+                    {t('burned.actions.reset_estimates')}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
 
               {shouldWarnHighBurn && (
                 <View style={[styles.warnRow, { backgroundColor: colors.warningLight, borderColor: colors.warning }]}>
@@ -416,6 +762,9 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
               {validationError && (
                 <ThemedText style={[styles.errorText, { color: colors.chartRed }]}>{validationError}</ThemedText>
               )}
+
+              {/* Debug card removed */}
+              </ScrollView>
 
               <View style={styles.footer}>
                 <TouchableOpacity
@@ -453,6 +802,32 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
           )}
         </View>
       </View>
+
+      {centerToastText ? (
+        <View style={styles.centerToastOverlay} pointerEvents="none">
+          <View style={[styles.centerToastCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ThemedText style={[styles.centerToastText, { color: colors.text }]}>{centerToastText}</ThemedText>
+          </View>
+        </View>
+      ) : null}
+
+      <FitbitConnectModal
+        visible={fitbitModalVisible}
+        onClose={() => setFitbitModalVisible(false)}
+        entryDate={entryDate}
+        refetchBurned={async () => {
+          await refetchBurned();
+        }}
+      />
+      <BurnReductionModal
+        visible={burnCorrectionModalVisible}
+        onClose={() => setBurnCorrectionModalVisible(false)}
+        entryDate={entryDate}
+        burnedRow={burnedRow ?? null}
+        refetchBurned={async () => {
+          await refetchBurned();
+        }}
+      />
     </Modal>
   );
 }
@@ -467,9 +842,31 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  centerToastOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerToastCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    maxWidth: 320,
+  },
+  centerToastText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -504,11 +901,152 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: FontSize.sm,
   },
-  body: {
+  bodyShell: {
+    flex: 1,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
     paddingTop: Spacing.sm,
+  },
+  bodyScroll: {
+    flex: 1,
+  },
+  bodyScrollContent: {
+    paddingBottom: Spacing.md,
     gap: Spacing.md,
+  },
+  fitbitCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  fitbitCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  fitbitLogoWrap: {
+    flexShrink: 0,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  logoChip: {
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fitbitLogoBox: {
+    height: 34,
+    aspectRatio: 3.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fitbitMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+    alignItems: 'flex-start',
+  },
+  fitbitStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  fitbitStatus: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  fitbitActionRow: {
+    marginTop: Spacing.sm,
+  },
+  fitbitBtnRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  fitbitPrimaryBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    ...getMinTouchTargetStyle(),
+  },
+  fitbitPrimaryBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+  },
+  fitbitSecondaryBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    ...getMinTouchTargetStyle(),
+  },
+  fitbitSecondaryBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+  },
+  sectionHeader: {
+    fontSize: FontSize.xs,
+    fontWeight: '800',
+    marginTop: Spacing.xs,
+    marginBottom: -Spacing.xs,
+  },
+  advancedRow: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    ...getMinTouchTargetStyle(),
+  },
+  advancedRowText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  advancedRowTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+  },
+  advancedRowSubtitle: {
+    fontSize: FontSize.xs - 1,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  advancedRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusPillTextOn: {
+    fontSize: FontSize.xs - 1,
+    fontWeight: '800',
+  },
+  statusPillTextOff: {
+    fontSize: FontSize.xs - 1,
+    fontWeight: '800',
   },
   resetLinkWrap: {
     alignSelf: 'center',
@@ -535,6 +1073,113 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: '700',
   },
+  advancedCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+  },
+  advancedHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  advancedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  advancedTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  advancedTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+  },
+  advancedHelper: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  advancedBody: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  fitbitHeaderRow: {
+    marginTop: Spacing.xs,
+  },
+  fitbitStatusText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    marginTop: -Spacing.xs,
+  },
+  fitbitErrorText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    marginTop: -Spacing.xs,
+  },
+  fitbitActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  smallBtn: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    ...getMinTouchTargetStyle(),
+  },
+  smallBtnText: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: '800',
+  },
+  advancedDivider: {
+    borderTopWidth: 1,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  sectionHeading: {
+    fontSize: FontSize.xs,
+    fontWeight: '800',
+    marginTop: Spacing.xs,
+  },
+  stepperWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.xs,
+  },
+  stepperBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  stepperBtnText: {
+    fontSize: FontSize.lg,
+    fontWeight: '900',
+    lineHeight: FontSize.lg + 2,
+  },
+  stepperValueWrap: {
+    minWidth: 64,
+    height: 34,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+  },
+  stepperValueText: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -548,6 +1193,21 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FontSize.md,
     fontWeight: '400',
+  },
+  helperText: {
+    fontSize: FontSize.xs,
+    fontWeight: '500',
+  },
+  // Tighten spacing between Activity → hint → TDEE (without affecting other sections).
+  activityRowTight: {
+    marginBottom: -Spacing.sm,
+  },
+  burnHintTight: {
+    marginTop: -Spacing.md + 3, // results in ~3px after parent gap
+    marginBottom: -Spacing.md + 6, // results in ~6px before next row
+  },
+  tdeeRowTight: {
+    marginTop: -Spacing.xs,
   },
   chipWrap: {
     width: '30%',
@@ -567,11 +1227,33 @@ const styles = StyleSheet.create({
   },
   operatorText: {
     fontSize: FontSize.md,
+    lineHeight: FontSize.md,
     fontWeight: '800',
   },
   errorText: {
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  debugCard: {
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    opacity: 0.7,
+  },
+  debugTitle: {
+    fontSize: FontSize.xs - 1,
+    fontWeight: '700',
+    marginBottom: Spacing.xs,
+  },
+  debugLine: {
+    fontSize: FontSize.xs - 1,
+    marginTop: 2,
+  },
+  debugDivider: {
+    fontSize: FontSize.xs - 1,
+    fontWeight: '700',
+    marginTop: Spacing.sm,
   },
   footer: {
     flexDirection: 'row',

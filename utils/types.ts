@@ -151,6 +151,19 @@ export interface DailySumBurned {
   active_cal: number;
   tdee_cal: number;
 
+  /**
+   * Optional burn reduction support (used ONLY by the Burn/TDEE pencil modal).
+   *
+   * IMPORTANT: The rest of the app must continue to rely only on:
+   * - active_cal (final burn)
+   * - tdee_cal (final tdee)
+   */
+  burn_reduction_pct_int: number; // 0..50 integer
+  raw_burn: number | null;
+  raw_tdee: number | null;
+  raw_burn_source: RawBurnSource | null;
+  raw_last_synced_at: string | null;
+
   // System-calculated defaults (for reset and reproducibility)
   system_bmr_cal: number;
   system_active_cal: number;
@@ -169,6 +182,27 @@ export interface DailySumBurned {
   vendor_external_id: string | null;
   vendor_payload_hash: string | null;
   synced_at: string | null;
+}
+
+export type RawBurnSource = 'system' | 'manual' | 'fitbit' | 'legacy_backfill';
+
+/**
+ * Fitbit connection (public, user-readable) row.
+ * Maps to the 'fitbit_connections_public' table.
+ *
+ * IMPORTANT: This type intentionally contains NO tokens.
+ */
+export interface FitbitConnectionPublic {
+  user_id: string;
+  fitbit_user_id: string;
+  scopes: string[];
+  status: 'active' | 'revoked' | 'error' | string;
+  last_sync_at: string | null;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  last_error_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================================================

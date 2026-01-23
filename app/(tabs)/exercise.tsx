@@ -1,63 +1,62 @@
-import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, TextInput, Alert, Animated, ViewStyle, useWindowDimensions, Switch, Pressable } from 'react-native';
-import { useRouter, useLocalSearchParams, useSegments } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useFocusEffect } from '@react-navigation/native';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { SurfaceCard } from '@/components/common/surface-card';
-import { QuickAddHeading } from '@/components/common/quick-add-heading';
+import { CloneDayModal } from '@/components/clone-day-modal';
+import { HighlightableRow } from '@/components/common/highlightable-row';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
-import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { SummaryCardHeader } from '@/components/layout/summary-card-header';
+import { QuickAddHeading } from '@/components/common/quick-add-heading';
+import { SurfaceCard } from '@/components/common/surface-card';
+import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
+import { IntensityBottomSheet } from '@/components/exercise/IntensityBottomSheet';
+import { RepsRangeBottomSheet } from '@/components/exercise/RepsRangeBottomSheet';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
-import { CloneDayModal } from '@/components/clone-day-modal';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { showAppToast } from '@/components/ui/app-toast';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { MultiSelectItem } from '@/components/multi-select-item';
-import { useMultiSelect } from '@/hooks/use-multi-select';
-import { HighlightableRow } from '@/components/common/highlightable-row';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { showAppToast } from '@/components/ui/app-toast';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
+import { RANGES, TEXT_LIMITS } from '@/constants/constraints';
+import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessages';
+import { BorderRadius, Colors, FontSize, Layout, ModuleThemes, SemanticColors, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
+import { isTourCompleted } from '@/features/tour/storage';
+import { useTour } from '@/features/tour/TourProvider';
+import { V1_EXERCISES_TOUR_STEPS } from '@/features/tour/tourSteps';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
-import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
-import { useUpdateProfile } from '@/hooks/use-profile-mutations';
-import { useQueryClient } from '@tanstack/react-query';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, ModuleThemes, SemanticColors } from '@/constants/theme';
-import { TEXT_LIMITS, RANGES } from '@/constants/constraints';
-import { getLocalDateKey } from '@/utils/dateTime';
+import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useSelectedDate } from '@/hooks/use-selected-date';
-import { useUserConfig } from '@/hooks/use-user-config';
+import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
 import {
+  useCreateExerciseLog,
+  useDeleteExerciseLog,
   useExerciseLogsForDate,
   useExerciseSummaryForRecentDays,
   useRecentAndFrequentExercises,
-  useCreateExerciseLog,
   useUpdateExerciseLog,
-  useDeleteExerciseLog,
 } from '@/hooks/use-exercise-logs';
+import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
+import { useMultiSelect } from '@/hooks/use-multi-select';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { useSelectedDate } from '@/hooks/use-selected-date';
+import { useUserConfig } from '@/hooks/use-user-config';
+import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
 import { RecentFrequentDayRange } from '@/lib/services/exerciseLogs';
 import {
   getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
   getFocusStyle,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
-import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
-import { RepsRangeBottomSheet } from '@/components/exercise/RepsRangeBottomSheet';
-import { IntensityBottomSheet } from '@/components/exercise/IntensityBottomSheet';
-import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
-import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessages';
-import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
-import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
+import { getLocalDateKey } from '@/utils/dateTime';
 import type { DailyLogStatus } from '@/utils/types';
-import { useTour } from '@/features/tour/TourProvider';
-import { useTourAnchor } from '@/features/tour/useTourAnchor';
-import { isTourCompleted } from '@/features/tour/storage';
-import { V1_EXERCISES_TOUR_STEPS } from '@/features/tour/tourSteps';
+import { useFocusEffect } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View, ViewStyle, useWindowDimensions } from 'react-native';
 
 // Constants for responsive breakpoints and conversion factors
 // These are UI layout constants, not spacing tokens, so they live here per guideline 11
@@ -314,6 +313,8 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                   accessibilityLabel={t('exercise.chip.edit_minutes')}
                   commitOnBlur
                   chipPaddingHorizontal={Spacing.xs}
+                  badgeTextStyle={{ fontSize: FontSize.sm, lineHeight: FontSize.sm + 20 }}
+                  inputTextStyle={{ fontSize: FontSize.xs, lineHeight: FontSize.xs + 20 }}
                 />
               )}
               {trackingPrefs?.cardio_distance !== false && (
@@ -352,6 +353,8 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                   commitOnBlur
                   chipPaddingHorizontal={Spacing.xs}
                   allowDecimal={true}
+                  badgeTextStyle={{ fontSize: FontSize.sm, lineHeight: FontSize.sm + 20 }}
+                  inputTextStyle={{ fontSize: FontSize.xs, lineHeight: FontSize.xs + 20 }}
                 />
               )}
               {trackingPrefs?.cardio_effort === true && (
@@ -397,6 +400,8 @@ function ExerciseRow({ log, colors, onEdit, onMinutesUpdate, onSetsUpdate, onRep
                     accessibilityLabel={t('exercise.chip.edit_sets')}
                     commitOnBlur
                     chipPaddingHorizontal={Spacing.xs}
+                    badgeTextStyle={{ fontSize: FontSize.sm, lineHeight: FontSize.sm + 20 }}
+                    inputTextStyle={{ fontSize: FontSize.xs, lineHeight: FontSize.xs + 20 }}
                   />
                 )}
                 {trackingPrefs?.strength_reps === true && (
@@ -1165,7 +1170,6 @@ export default function ExerciseHomeScreen() {
 
     const name = formName.trim();
     const notes = formNotes.trim() || null;
-    const category = formCategory || 'cardio_mind_body';
 
     // Validation
     if (!name) {
@@ -1178,7 +1182,7 @@ export default function ExerciseHomeScreen() {
       return;
     }
 
-    if (!editingLog && !category) {
+    if (!formCategory) {
       Alert.alert(t('exercise.form.select_category'));
       return;
     }
@@ -1194,7 +1198,8 @@ export default function ExerciseHomeScreen() {
     }
 
     // Prepare updates based on category
-    const finalCategory = editingLog ? editingLog.category : (category as 'cardio_mind_body' | 'strength');
+    const finalCategory = (formCategory as 'cardio_mind_body' | 'strength') || 'cardio_mind_body';
+    const isSwitchingCategory = Boolean(editingLog && editingLog.category !== finalCategory);
     // Partial update object for exercise log - type is complex due to category-specific fields
     let updates: any = { name, notes, category: finalCategory }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -1217,6 +1222,11 @@ export default function ExerciseHomeScreen() {
       updates.sets = null;
       updates.reps_min = null;
       updates.reps_max = null;
+      if (isSwitchingCategory) {
+        // Clear incompatible fields when switching from strength -> cardio
+        updates.distance_km = null;
+        updates.intensity = null;
+      }
     } else {
       const setsValue = formSets.trim();
       const sets = setsValue ? parseInt(setsValue, 10) : null;
@@ -1234,8 +1244,9 @@ export default function ExerciseHomeScreen() {
       }
       updates.sets = sets;
       updates.minutes = null;
+      updates.distance_km = null;
       // Keep existing reps/intensity if editing, otherwise null
-      if (!editingLog) {
+      if (!editingLog || isSwitchingCategory) {
         updates.reps_min = null;
         updates.reps_max = null;
         updates.intensity = null;
@@ -2164,8 +2175,7 @@ export default function ExerciseHomeScreen() {
                   />
                 </View>
 
-                {/* Category selector - required for new exercises */}
-                {!editingLog && (
+                {(
                   <View>
                     <ThemedText style={[styles.formLabel, { color: colors.text }]}>
                       Category

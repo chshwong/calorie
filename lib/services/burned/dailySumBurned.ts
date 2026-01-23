@@ -19,6 +19,12 @@ export const DAILY_SUM_BURNED_COLUMNS = `
   active_cal,
   tdee_cal,
 
+  burn_reduction_pct_int,
+  raw_burn,
+  raw_tdee,
+  raw_burn_source,
+  raw_last_synced_at,
+
   system_bmr_cal,
   system_active_cal,
   system_tdee_cal,

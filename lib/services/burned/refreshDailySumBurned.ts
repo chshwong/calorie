@@ -123,6 +123,12 @@ export async function refreshBurnedFromWeightChange(params: {
       updates.bmr_cal = defaults.system_bmr_cal;
       updates.active_cal = defaults.system_active_cal;
       updates.tdee_cal = defaults.system_tdee_cal;
+      // Option 2: keep RAW baseline consistent for purely-system rows.
+      updates.burn_reduction_pct_int = 0;
+      updates.raw_burn = defaults.system_active_cal;
+      updates.raw_tdee = null;
+      updates.raw_burn_source = 'system';
+      updates.raw_last_synced_at = null;
       updates.bmr_overridden = false;
       updates.active_overridden = false;
       updates.tdee_overridden = false;
@@ -179,6 +185,12 @@ export async function refreshBurnedTodayFromProfileChange(userId: string): Promi
     updates.bmr_cal = defaults.system_bmr_cal;
     updates.active_cal = defaults.system_active_cal;
     updates.tdee_cal = defaults.system_tdee_cal;
+    // Option 2: keep RAW baseline consistent for purely-system rows.
+    updates.burn_reduction_pct_int = 0;
+    updates.raw_burn = defaults.system_active_cal;
+    updates.raw_tdee = null;
+    updates.raw_burn_source = 'system';
+    updates.raw_last_synced_at = null;
     updates.bmr_overridden = false;
     updates.active_overridden = false;
     updates.tdee_overridden = false;

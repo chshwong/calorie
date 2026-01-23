@@ -263,6 +263,104 @@
       "high_value_warning": "La valeur semble inhabituellement élevée, veuillez vérifier",
       "too_high": "La valeur est trop élevée, veuillez corriger"
     },
+    "fields": {
+      "bmr": "Métabolisme de base (BMR)",
+      "active": "Activité",
+      "active_reduced": "Activité ({{pct}}% réduite)",
+      "tdee": "Dépense énergétique quotidienne totale",
+      "placeholder": "0"
+    },
+    "links": {
+      "fitbit": "Appareil / Fitbit…",
+      "burn_correction": "Correction de dépense…"
+    },
+    "fitbit": {
+      "title": "Appareil / Fitbit",
+      "web_only": "La connexion Fitbit est disponible sur le web.",
+      "web_only_detail": "La connexion Fitbit est disponible uniquement sur le web. Ouvrez AvoVibe sur le web pour connecter votre Fitbit.",
+      "status": {
+        "not_connected": "Non connecté",
+        "connected": "Connecté",
+        "needs_attention": "Nécessite une attention",
+        "other": "Fitbit : {{status}}",
+        "last_sync": "Dernière synchro : {{at}}"
+      },
+      "actions": {
+        "connect": "Connecter Fitbit",
+        "integrate": "Intégrer Fitbit?",
+        "sync_now": "Synchroniser",
+        "disconnect": "Déconnecter",
+        "reconnect": "Reconnecter Fitbit"
+      },
+      "toast": {
+        "connected": "Fitbit connecté.",
+        "connect_failed": "Échec de connexion Fitbit.",
+        "synced": "Fitbit synchronisé.",
+        "synced_applied": "Synchronisé et appliqué.",
+        "sync_failed": "Échec de synchronisation Fitbit.",
+        "disconnected": "Fitbit déconnecté.",
+        "disconnect_failed": "Échec de déconnexion."
+      },
+      "errors": {
+        "popup_blocked": "Fenêtre bloquée. Autorisez les popups puis réessayez.",
+        "popup_timeout": "Délai dépassé. Veuillez réessayer.",
+        "popup_closed": "Fenêtre fermée avant la fin de la connexion.",
+        "rate_limit": "Veuillez attendre avant de resynchroniser.",
+        "rate_limit_15m": "Synchronisation Fitbit disponible dans 15 min.",
+        "missing_activity_calories": "Les données Fitbit n’incluent pas les calories d’activité pour ce jour.",
+        "reconnect_required": "Reconnectez Fitbit pour synchroniser."
+      }
+    },
+    "burn_correction": {
+      "title": "Correction de dépense",
+      "row_subtitle": "Ajuster l’application de la dépense de l’appareil",
+      "applied_hint": "Correction de {{pct}}% appliquée · {{base}} cal",
+      "status": {
+        "off": "Désactivé",
+        "on_with_pct": "Activé • {{pct}}%"
+      },
+      "toggle": {
+        "on": "Activé",
+        "off": "Désactivé"
+      },
+      "pct_label": "% de réduction",
+      "pct_helper": "S’applique uniquement aux calories d’activité",
+      "raw_burn_label": "Entrée d’activité",
+      "apply_button": "Appliquer la correction",
+      "why_title": "Pourquoi la correction existe",
+      "why_body": "Les appareils estiment les calories à partir de la fréquence cardiaque, des mouvements et de modèles populationnels. Pour certaines activités, cela peut surestimer la dépense réelle. La correction permet d’appliquer un ajustement constant pour garder des chiffres quotidiens réalistes.",
+      "why_footer": "Les résultats varient selon la personne, la forme physique et l’activité.",
+      "benchmarks_title": "Plages typiques de surestimation",
+      "benchmarks": {
+        "run_walk": "• 5–10% pour la course et la marche régulières",
+        "cycling": "• 10–20% pour le vélo et les machines cardio",
+        "strength_hiit": "• 20–30% pour la musculation et le HIIT",
+        "footer": "Commencez petit. Une correction de 5–10% suffit souvent."
+      },
+      "source_label": "Source : {{source}}",
+      "source": {
+        "fitbit": "Fitbit",
+        "manual": "Manuel",
+        "system": "Système",
+        "legacy_backfill": "Ancien"
+      },
+      "result_preview_title": "Aperçu du résultat",
+      "preview_bmr_used": "BMR (utilisé) : {{bmr}}",
+      "preview_raw_activity": "Entrée d’activité : {{raw}}",
+      "preview_reduction_applied": "Réduction appliquée : {{pct}}%",
+      "preview_final_burn_value": "Dépense finale : {{burn}}",
+      "preview_final_tdee_value": "TDEE final : {{tdee}}",
+      "off_note": "Définissez un % au-dessus de 0 pour activer la correction. Revenir à 0 désactive la correction (la dépense brute reste identique).",
+      "errors": {
+        "missing_row": "Impossible de charger les calories brûlées pour ce jour.",
+        "pct_invalid": "La réduction doit être un nombre entier (0–50).",
+        "raw_required": "La dépense brute est requise lorsque la correction est activée."
+      },
+      "toast": {
+        "saved": "Correction enregistrée.",
+        "applied": "Correction appliquée"
+      }
+    },
     "actions": {
       "reset_estimates": "Réinitialiser les estimations"
     },

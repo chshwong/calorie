@@ -39,6 +39,14 @@ export async function resetDailySumBurned(
       active_cal: row.system_active_cal,
       tdee_cal: row.system_tdee_cal,
 
+      // Option 2: reset restores RAW baseline + turns off reduction.
+      burn_reduction_pct_int: 0,
+      raw_burn: row.system_active_cal,
+      raw_tdee: null,
+      raw_burn_source: 'system',
+      // Option 2 invariant: when pct=0 and raw_burn is present, raw_last_synced_at must be non-null.
+      raw_last_synced_at: new Date().toISOString(),
+
       bmr_overridden: false,
       active_overridden: false,
       tdee_overridden: false,

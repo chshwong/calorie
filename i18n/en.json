@@ -293,15 +293,107 @@
       "title_yesterday": "🔥 Calories burned yesterday",
       "title_today": "🔥 Calories to be burned today",
       "title_default": "🔥 Calories burned",
-      "estimated_banner": "Estimates are based on your profile. For better accuracy, use data from your wearable device.",
+      "estimated_banner": "Update with your wearable’s data for better accuracy.",
       "high_value_warning": "Value looks unusually high, please double check",
       "too_high": "Value is too high, please correct"
     },
     "fields": {
       "bmr": "Basal Metabolic Rate (BMR)",
       "active": "Activity",
+      "active_reduced": "Activity ({{pct}}% reduced)",
       "tdee": "Total Daily Energy Expenditure",
       "placeholder": "0"
+    },
+    "links": {
+      "fitbit": "Wearable / Fitbit…",
+      "burn_correction": "Burn correction…"
+    },
+    "fitbit": {
+      "title": "Wearable / Fitbit",
+      "web_only": "Fitbit connect is available on web.",
+      "web_only_detail": "Fitbit connect is available on web only. Please open AvoVibe on web to connect your Fitbit.",
+      "status": {
+        "not_connected": "Not connected",
+        "connected": "Connected",
+        "needs_attention": "Needs attention",
+        "other": "Fitbit: {{status}}",
+        "last_sync": "Last sync: {{at}}"
+      },
+      "actions": {
+        "connect": "Connect Fitbit",
+        "integrate": "Integrate with Fitbit?",
+        "sync_now": "Sync now",
+        "disconnect": "Disconnect",
+        "reconnect": "Reconnect Fitbit"
+      },
+      "toast": {
+        "connected": "Fitbit connected.",
+        "connect_failed": "Fitbit connection failed.",
+        "synced": "Fitbit synced.",
+        "synced_applied": "Synced and applied.",
+        "sync_failed": "Fitbit sync failed.",
+        "disconnected": "Fitbit disconnected.",
+        "disconnect_failed": "Disconnect failed."
+      },
+      "errors": {
+        "popup_blocked": "Popup blocked. Please allow popups and try again.",
+        "popup_timeout": "Timed out waiting for Fitbit. Please try again.",
+        "popup_closed": "Popup closed before completing Fitbit connection.",
+        "rate_limit": "Please wait before syncing again.",
+        "rate_limit_15m": "Fitbit sync available every 15 min only.",
+        "missing_activity_calories": "Fitbit data is missing activity calories for that day.",
+        "reconnect_required": "Reconnect Fitbit to sync."
+      }
+    },
+    "burn_correction": {
+      "title": "Burn correction",
+      "row_subtitle": "Adjust how wearable burn is applied",
+      "applied_hint": "{{pct}}% burn correction applied {{base}} cal",
+      "status": {
+        "off": "Off",
+        "on_with_pct": "On • {{pct}}%"
+      },
+      "toggle": {
+        "on": "On",
+        "off": "Off"
+      },
+      "pct_label": "Burn Reduction %",
+      "pct_helper": "Applies to activity calories only (not BMR)",
+      "raw_burn_label": "Activity input",
+      "apply_button": "Apply correction",
+      "why_title": "Why burn correction exists",
+      "why_body": "Wearables can overestimate calories for some activities. Burn correction lets you adjust activity calories so your daily burn stays realistic and consistent.",
+      "why_footer": "Results vary by person, fitness level, and activity.",
+      "benchmarks_title": "Typical overestimation ranges",
+      "benchmarks": {
+        "run_walk": "• 5–10% for steady running and walking",
+        "cycling": "• 10–20% for cycling and cardio machines",
+        "strength_hiit": "• 20–30% for strength training and HIIT",
+        "footer": "Adjust as needed as you know more about your device "
+      },
+      "source_label": "Source: {{source}}",
+      "source": {
+        "fitbit": "Fitbit",
+        "manual": "Manual",
+        "system": "System",
+        "legacy_backfill": "Legacy"
+      },
+      "result_preview_title": "Result preview",
+      "preview_bmr_used": "BMR (used): {{bmr}}",
+      "preview_raw_activity": "Activity input: {{raw}}",
+      "preview_reduction_applied": "Reduction applied: {{pct}}%",
+      "preview_final_burn_value": "Final Burn: {{burn}}",
+      "preview_final_tdee_value": "Final TDEE: {{tdee}}",
+      "off_note": "Set % above 0 to enable burn correction. Setting it back to 0 disables correction (raw stays the same).",
+      "errors": {
+        "missing_row": "Could not load burned calories for this day.",
+        "pct_invalid": "Reduction must be a whole number (0–50).",
+        "raw_required": "Raw burn is required when burn correction is enabled."
+      },
+      "toast": {
+        "saved": "Burn correction saved.",
+        "applied": "Burn correction applied"
+      }
     },
     "actions": {
       "reset_estimates": "Reset Estimates",
@@ -309,7 +401,6 @@
     },
     "errors": {
       "load_failed": "Could not load burned calories.",
-      "no_changes": "Make a change before saving.",
       "invalid_number": "Please enter a valid non-negative number.",
       "tdee_below_bmr": "TDEE cannot be below your system BMR.",
       "max_kcal": "Max is 15,000 cal.",
@@ -327,7 +418,7 @@
     },
     "energy_balance": {
       "labels": {
-        "burned": "🔥 Burned",
+        "burned": "🔥Daily Burn",
         "deficit": "Deficit",
         "surplus": "Surplus",
         "eaten": "≡ƒì┤ Eaten"

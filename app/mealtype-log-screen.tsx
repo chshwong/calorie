@@ -18,6 +18,7 @@ import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
+import { AICameraFunnelModal } from '@/components/ui/AICameraFunnelModal';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { showAppToast } from '@/components/ui/app-toast';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -270,6 +271,9 @@ export default function LogFoodScreen() {
 
   // Loading state for async operations (mass delete, bundle operations, etc.)
   const [loading, setLoading] = useState(false);
+
+  // AI Camera Funnel modal (match Index behavior)
+  const [aiCameraFunnelVisible, setAiCameraFunnelVisible] = useState(false);
   
   // Consolidated modal state
   type ModalType = 'delete_entry' | 'delete_bundle' | 'delete_custom' | 'mass_delete' | 'menu' | 'add_bundle' | 'bundle_warning' | null;
@@ -1804,15 +1808,8 @@ export default function LogFoodScreen() {
   }, [router, entryDate, mealType]);
 
   const handleAiCamera = useCallback(() => {
-    router.push({
-      pathname: '/quick-log',
-      params: {
-        date: entryDate,
-        mealType: mealType,
-        tab: 'ai',
-      }
-    });
-  }, [router, entryDate, mealType]);
+    setAiCameraFunnelVisible(true);
+  }, []);
 
   // Handle barcode scan button press
   const handleBarcodeScanPress = useCallback(async () => {
@@ -2017,6 +2014,8 @@ export default function LogFoodScreen() {
             mealType={mealType}
             colors={colors}
             t={t}
+            onManualLog={handleQuickLog}
+            onAiCamera={handleAiCamera}
           />
         );
       
@@ -2050,6 +2049,8 @@ export default function LogFoodScreen() {
     isBundleNewlyAdded,
     bundleEditMode,
     setBundleEditMode,
+    handleQuickLog,
+    handleAiCamera,
     loading,
     getTabListBackgroundColorLocal,
   ]);
@@ -2831,6 +2832,13 @@ export default function LogFoodScreen() {
           isLoading={upsertMealtypeMetaMutation.isPending}
         />
       )}
+
+      <AICameraFunnelModal
+        visible={aiCameraFunnelVisible}
+        onClose={() => setAiCameraFunnelVisible(false)}
+        date={selectedDateString}
+        mealType={selectedMealType}
+      />
     </ThemedView>
   );
 }

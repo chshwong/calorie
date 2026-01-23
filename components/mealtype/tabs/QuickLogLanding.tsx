@@ -7,24 +7,22 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Spacing, BorderRadius, Shadows, Layout, Typography, FontSize, FontWeight, LineHeight } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { Colors, Spacing, BorderRadius, Shadows, Layout, FontSize, FontWeight, LineHeight } from '@/constants/theme';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
 
 type QuickLogLandingProps = {
   entryDate: string;
   mealType: string;
   colors: typeof Colors.light | typeof Colors.dark;
   t: (key: string, options?: any) => string;
+  onManualLog?: () => void;
+  onAiCamera?: () => void;
 };
 
-export function QuickLogLanding({ entryDate, mealType, colors, t }: QuickLogLandingProps) {
+export function QuickLogLanding({ entryDate, mealType, colors, t, onManualLog, onAiCamera }: QuickLogLandingProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme();
 
   const goToQuickLog = (tab?: 'ai' | 'quick-log') => {
     router.push({
@@ -38,10 +36,12 @@ export function QuickLogLanding({ entryDate, mealType, colors, t }: QuickLogLand
   };
 
   const handleManualLog = () => {
+    if (onManualLog) return onManualLog();
     goToQuickLog('quick-log');
   };
 
   const handleAiCamera = () => {
+    if (onAiCamera) return onAiCamera();
     goToQuickLog('ai');
   };
 

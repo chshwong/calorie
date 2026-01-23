@@ -1,0 +1,18 @@
+[functions.fitbit-start]
+verify_jwt = false
+
+[functions.fitbit-callback]
+verify_jwt = false
+
+[functions.fitbit-sync]
+verify_jwt = false
+
+[functions.fitbit-sync-now]
+verify_jwt = false
+
+[functions.fitbit-disconnect]
+verify_jwt = false
+
+[functions.delete-auth-user]
+verify_jwt = false
+
