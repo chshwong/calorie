@@ -373,3 +373,32 @@ export interface ExternalFoodCache {
  */
 export type BarcodeLookupSource = 'food_master' | 'external_food_cache' | 'openfoodfacts' | 'none';
 
+// ============================================================================
+// ANNOUNCEMENTS + NOTIFICATIONS TYPES
+// ============================================================================
+
+export type AnnouncementI18n = Record<string, string>;
+
+export interface Announcement {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  published_at: string | null;
+  is_published: boolean;
+  title_i18n: AnnouncementI18n;
+  body_i18n: AnnouncementI18n;
+  link_path: string | null;
+}
+
+export interface Notification {
+  id: string;
+  created_at: string;
+  user_id: string;
+  type: string;
+  announcement_id: string | null;
+  link_path: string | null;
+  read_at: string | null;
+  meta: Record<string, any> | null;
+}
+

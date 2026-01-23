@@ -20,6 +20,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
+import { useUnreadNotificationCount } from '@/hooks/use-notifications';
 import {
   getButtonAccessibilityProps,
   getLinkAccessibilityProps,
@@ -94,6 +95,7 @@ export default function SettingsScreen() {
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility in this file
   const updateProfileMutation = useUpdateProfile();
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
   
   // Fetch legal documents for version display
   const { data: legalDocuments = [] } = useLegalDocuments();
@@ -107,6 +109,8 @@ export default function SettingsScreen() {
   const firstName =
     (profile?.first_name ?? '').trim() || t('settings.profile_section.user_fallback');
   const email = profile?.email || user?.email || '';
+  const showUnreadBadge = unreadCount > 0;
+  const isAdmin = !!profile?.is_admin;
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
   useEffect(() => {
     setAvatarUrl(profile?.avatar_url ?? null);
@@ -428,6 +432,26 @@ export default function SettingsScreen() {
         {/* Preferences */}
         <SettingSection title={t('settings.preferences.title')}>
           <SettingItem
+            icon="bell.fill"
+            title={t('inbox.title')}
+            subtitle={t('inbox.settings_subtitle')}
+            onPress={() => {
+              appRouter.push('/inbox');
+            }}
+            rightComponent={
+              <View style={styles.settingRight}>
+                {showUnreadBadge && (
+                  <View style={[styles.unreadBadge, { backgroundColor: colors.tint }]}>
+                    <ThemedText style={[styles.unreadBadgeText, { color: colors.textOnTint }]}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </ThemedText>
+                  </View>
+                )}
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </View>
+            }
+          />
+          <SettingItem
             icon="globe"
             title={t('settings.preferences.language')}
             subtitle={languageNames[currentLanguage]}
@@ -476,6 +500,19 @@ export default function SettingsScreen() {
             showChevron={false}
           />
         </SettingSection>
+
+        {isAdmin && (
+          <SettingSection title={t('settings.admin.title')}>
+            <SettingItem
+              icon="doc.text.fill"
+              title={t('settings.admin.announcements')}
+              subtitle={t('settings.admin.announcements_subtitle')}
+              onPress={() => {
+                appRouter.push('/settings/admin/announcements');
+              }}
+            />
+          </SettingSection>
+        )}
 
         {/* Legal */}
         <SettingSection title={t('settings.legal.title')}>
@@ -767,6 +804,23 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  settingRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  unreadBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   logoutButton: {
     flexDirection: 'row',

@@ -51,6 +51,7 @@ import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import { ensureContrast } from '@/theme/contrast';
 import {
+  AccessibilityHints,
   getButtonAccessibilityProps,
   getFocusStyle,
   getMinTouchTargetStyle,
@@ -1222,6 +1223,7 @@ export default function FoodLogHomeScreen() {
     });
     return unsubscribe;
   }, [isMiniGaugesCollapsed, registerOnStepChange, requestRemeasure]);
+
 
   return (
     <ThemedView style={styles.container}>

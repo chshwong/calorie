@@ -1342,6 +1342,42 @@
       "water_units_metric": "Metric (ml)",
       "water_units_imperial": "Imperial (fl oz)"
     },
+    "admin": {
+      "title": "Admin",
+      "announcements": "Announcements",
+      "announcements_subtitle": "Create and publish updates",
+      "access_denied_title": "Access Denied",
+      "access_denied_message": "You do not have permission to access this page.",
+      "create_announcement": "Create announcement",
+      "editor_title": "Announcement Editor",
+      "status_draft": "Draft",
+      "status_published": "Published",
+      "read_stats": "Read {{read}} / {{total}}",
+      "untitled_announcement": "Untitled announcement",
+      "draft_saved": "Draft saved.",
+      "published": "Announcement published.",
+      "save_draft": "Save Draft",
+      "publish_action": "Publish",
+      "publish_title": "Publish announcement?",
+      "publish_confirm": "Publish this announcement to all users?",
+      "publish_failed_title": "Publish failed",
+      "save_failed_title": "Save failed",
+      "validation_title": "Missing required fields",
+      "validation_required_en": "English title and body are required.",
+      "validation_link_path": "Link path must start with '/'.",
+      "locked_after_publish": "Published announcements cannot be edited.",
+      "title_en": "Title (EN)",
+      "body_en": "Body (EN)",
+      "title_fr": "Title (FR)",
+      "body_fr": "Body (FR)",
+      "link_path": "Link path",
+      "link_path_placeholder": "/updates/...",
+      "title_placeholder": "Announcement title",
+      "body_placeholder": "Write the update...",
+      "preview": "Preview",
+      "preview_placeholder_title": "Preview title",
+      "preview_placeholder_body": "Preview body"
+    },
     "errors": {
       "save_preference_failed": "Failed to save preference. Please try again.",
       "save_language_failed": "Failed to save language preference. Please try again.",
@@ -1394,10 +1430,6 @@
       "export_data": "Export Data",
       "export_data_subtitle": "Download your data",
       "privacy_policy": "Privacy Policy"
-    },
-    "admin": {
-      "title": "Admin",
-      "subtitle": "Admin panel and tools"
     }
   },
   "edit_profile": {
@@ -2925,6 +2957,22 @@
       "target_date_format": "Target date must be in YYYY-MM-DD format",
       "target_date_future": "Target date must be in the future",
       "target_date_max": "Target date must be within 10 years from today"
+    }
+  },
+  "inbox": {
+    "title": "Inbox",
+    "settings_subtitle": "Release updates and announcements",
+    "empty_title": "No messages yet",
+    "empty_body": "Release updates and support replies will show up here.",
+    "load_more": "Load more",
+    "view_update": "View update",
+    "announcement_default_title": "Update",
+    "announcement_not_found": "Announcement not found",
+    "unread": "Unread",
+    "read": "Read",
+    "accessibility": {
+      "unread_messages": "{{count}} unread messages",
+      "no_unread_messages": "No unread messages"
     }
   },
   "validation": {

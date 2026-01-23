@@ -15,6 +15,11 @@ export type ValidationResult = {
   error?: string;
 };
 
+export type AnnouncementValidationResult = {
+  valid: boolean;
+  errorKey?: string;
+};
+
 export type BurnedTdeeValidationResult = {
   valid: boolean;
   errorKey?: string;
@@ -72,6 +77,32 @@ export function validatePreferredName(rawValue: string): ValidationResult {
 
   if (letterCount < 2) {
     return { valid: false, error: 'Name must contain at least 2 letters.' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validates announcement draft inputs.
+ * Rules:
+ * - English title/body must be non-empty when saving or publishing
+ * - link_path must be empty or start with '/'
+ */
+export function validateAnnouncementDraft(params: {
+  titleEn: string;
+  bodyEn: string;
+  linkPath?: string;
+}): AnnouncementValidationResult {
+  const title = params.titleEn.trim();
+  const body = params.bodyEn.trim();
+  const linkPath = params.linkPath?.trim() ?? '';
+
+  if (!title || !body) {
+    return { valid: false, errorKey: 'settings.admin.validation_required_en' };
+  }
+
+  if (linkPath && !linkPath.startsWith('/')) {
+    return { valid: false, errorKey: 'settings.admin.validation_link_path' };
   }
 
   return { valid: true };

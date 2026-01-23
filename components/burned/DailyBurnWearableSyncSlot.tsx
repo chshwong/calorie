@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
@@ -31,14 +31,10 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync }: Props) {
     };
   }, []);
 
-  const chipBackground = useMemo(() => {
-    const alpha = scheme === 'dark' ? '38' : '1A';
-    return `${colors.chartOrange}${alpha}`;
-  }, [colors.chartOrange, scheme]);
-  const chipBorder = useMemo(() => `${colors.chartOrange}8C`, [colors.chartOrange]);
+  const linkColor = useMemo(() => `${colors.chartOrange}B3`, [colors.chartOrange]);
 
   const label = status === 'syncing'
-    ? t('wearable_syncing_label')
+    ? '↻ Syncing…'
     : status === 'success'
       ? t('wearable_updated_label')
       : t('wearable_sync_label');
@@ -76,23 +72,21 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync }: Props) {
   return (
     <View style={styles.slotContainer}>
       {isConnected ? (
-        <TouchableOpacity
+        <Pressable
           style={[
-            styles.chip,
-            { backgroundColor: chipBackground },
-            { borderColor: chipBorder },
+            styles.link,
+            status === 'syncing' ? styles.linkDisabled : null,
             Platform.OS === 'web' ? ({ cursor: status === 'syncing' ? 'default' : 'pointer' } as any) : null,
           ]}
           onPress={handleSync}
           disabled={status === 'syncing'}
-          activeOpacity={0.85}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           {...getButtonAccessibilityProps(t('wearable_sync_label'), undefined, status === 'syncing')}
         >
-          <ThemedText style={[styles.chipText, { color: colors.chartOrange }]} numberOfLines={1}>
+          <ThemedText style={[styles.linkText, { color: linkColor }]} numberOfLines={1}>
             {label}
           </ThemedText>
-        </TouchableOpacity>
+        </Pressable>
       ) : (
         <ThemedText style={[styles.placeholderText, { color: colors.textMuted }]} numberOfLines={1}>
           {t('wearable_none_short')}
@@ -108,22 +102,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: Spacing.xxs,
   },
-  chip: {
+  link: {
     alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    minHeight: 26,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    backgroundColor: 'transparent',
   },
-  chipText: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
+  linkDisabled: {
+    opacity: 0.6,
+  },
+  linkText: {
+    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
+    fontWeight: FontWeight.semibold,
     letterSpacing: 0.1,
   },
   placeholderText: {
-    fontSize: FontSize.xs,
+    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
     fontWeight: FontWeight.medium,
   },
 });

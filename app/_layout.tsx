@@ -215,6 +215,8 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
               <Stack.Screen name="settings/my-goal/edit-goal" options={{ headerShown: false, presentation: 'modal' }} />
               <Stack.Screen name="settings/my-goal/edit-calories" options={{ headerShown: false, presentation: 'modal' }} />
               <Stack.Screen name="settings/my-goal/edit-targets" options={{ headerShown: false, presentation: 'modal' }} />
+              <Stack.Screen name="inbox" options={{ headerShown: false }} />
+              <Stack.Screen name="inbox/announcements/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
             <TourOverlay />

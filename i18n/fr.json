@@ -991,7 +991,39 @@
     },
     "admin": {
       "title": "Admin",
-      "subtitle": "Panneau d'administration et outils"
+      "announcements": "Annonces",
+      "announcements_subtitle": "Créer et publier des mises à jour",
+      "access_denied_title": "Accès refusé",
+      "access_denied_message": "Vous n'avez pas la permission d'accéder à cette page.",
+      "create_announcement": "Créer une annonce",
+      "editor_title": "Éditeur d'annonce",
+      "status_draft": "Brouillon",
+      "status_published": "Publié",
+      "read_stats": "Lu {{read}} / {{total}}",
+      "untitled_announcement": "Annonce sans titre",
+      "draft_saved": "Brouillon enregistré.",
+      "published": "Annonce publiée.",
+      "save_draft": "Enregistrer le brouillon",
+      "publish_action": "Publier",
+      "publish_title": "Publier l'annonce ?",
+      "publish_confirm": "Publier cette annonce à tous les utilisateurs ?",
+      "publish_failed_title": "Échec de la publication",
+      "save_failed_title": "Échec de l'enregistrement",
+      "validation_title": "Champs requis manquants",
+      "validation_required_en": "Le titre et le contenu en anglais sont requis.",
+      "validation_link_path": "Le lien doit commencer par '/'.",
+      "locked_after_publish": "Les annonces publiées ne peuvent pas être modifiées.",
+      "title_en": "Titre (EN)",
+      "body_en": "Contenu (EN)",
+      "title_fr": "Titre (FR)",
+      "body_fr": "Contenu (FR)",
+      "link_path": "Chemin du lien",
+      "link_path_placeholder": "/mises-a-jour/...",
+      "title_placeholder": "Titre de l'annonce",
+      "body_placeholder": "Rédigez la mise à jour...",
+      "preview": "Aperçu",
+      "preview_placeholder_title": "Titre d'aperçu",
+      "preview_placeholder_body": "Contenu d'aperçu"
     },
     "danger_zone": {
       "title": "Zone dangereuse",
@@ -2124,6 +2156,22 @@
     "accessibility": {
       "cancel_hint": "Annuler et fermer le formulaire d’ajout rapide",
       "save_hint": "Enregistrer l’entrée d’ajout rapide"
+    }
+  },
+  "inbox": {
+    "title": "Boîte de réception",
+    "settings_subtitle": "Mises à jour et annonces",
+    "empty_title": "Aucun message pour l’instant",
+    "empty_body": "Les mises à jour et réponses du support apparaîtront ici.",
+    "load_more": "Charger plus",
+    "view_update": "Voir la mise à jour",
+    "announcement_default_title": "Mise à jour",
+    "announcement_not_found": "Annonce introuvable",
+    "unread": "Non lu",
+    "read": "Lu",
+    "accessibility": {
+      "unread_messages": "{{count}} messages non lus",
+      "no_unread_messages": "Aucun message non lu"
     }
   },
   "weight": {

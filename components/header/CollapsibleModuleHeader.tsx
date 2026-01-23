@@ -6,10 +6,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTranslation } from 'react-i18next';
 import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
 import { useRouter } from 'expo-router';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useUnreadNotificationCount } from '@/hooks/use-notifications';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
   getFocusStyle,
+  AccessibilityHints,
 } from '@/utils/accessibility';
 
 type Props = {
@@ -59,6 +62,8 @@ export function CollapsibleModuleHeader({
   const { t } = useTranslation();
   const moduleAccent = module && ModuleThemes[module] ? ModuleThemes[module].accent : colors.tint;
   const scrollY = useRef(new Animated.Value(0)).current;
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
+  const showUnreadBadge = unreadCount > 0;
 
   const topMaxHeight = useMemo(() => {
     // total height for collapsible block including safe-area
@@ -126,31 +131,68 @@ export function CollapsibleModuleHeader({
             <View style={styles.logoContainer}>
               <BrandLogoNameOnly width={130} />
             </View>
-            <View style={styles.avatarContainer}>
-              {preferredName && (
-                <Text style={[styles.preferredName, { color: colors.text }]} numberOfLines={1}>
-                  {preferredName}
-                </Text>
-              )}
-              <Pressable
-                onPress={() => router.push('/settings')}
+            <View style={styles.rightActions}>
+              {/* Bell Icon */}
+              <TouchableOpacity
                 style={[
+                  styles.bellButton,
                   getMinTouchTargetStyle(),
                   Platform.OS === 'web' ? getFocusStyle(moduleAccent) : {},
                 ]}
-                {...getButtonAccessibilityProps(t('settings.title'), t('settings.title'))}
-              >
-                {rightAvatarUri ? (
-                  <Image source={{ uri: rightAvatarUri }} style={styles.avatar} />
-                ) : (
-                  <View
-                    style={[
-                      styles.avatarPlaceholder,
-                      { backgroundColor: colors.backgroundSecondary },
-                    ]}
-                  />
+                onPress={() => router.push('/inbox')}
+                activeOpacity={0.7}
+                {...getButtonAccessibilityProps(
+                  showUnreadBadge
+                    ? t('inbox.accessibility.unread_messages', { count: unreadCount })
+                    : t('inbox.accessibility.no_unread_messages'),
+                  AccessibilityHints.NAVIGATE
                 )}
-              </Pressable>
+              >
+                <View style={styles.bellIconContainer}>
+                  <IconSymbol name="bell.fill" size={20} color={colors.text} decorative={true} />
+                  {showUnreadBadge && (
+                    <View
+                      style={[
+                        styles.unreadBadge,
+                        {
+                          backgroundColor: colors.tint,
+                          borderColor: colors.background,
+                        },
+                      ]}
+                      accessibilityElementsHidden={true}
+                      importantForAccessibility="no-hide-descendants"
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              {/* Name + Avatar */}
+              <View style={styles.avatarContainer}>
+                {preferredName && (
+                  <Text style={[styles.preferredName, { color: colors.text }]} numberOfLines={1}>
+                    {preferredName}
+                  </Text>
+                )}
+                <Pressable
+                  onPress={() => router.push('/settings')}
+                  style={[
+                    getMinTouchTargetStyle(),
+                    Platform.OS === 'web' ? getFocusStyle(moduleAccent) : {},
+                  ]}
+                  {...getButtonAccessibilityProps(t('settings.title'), t('settings.title'))}
+                >
+                  {rightAvatarUri ? (
+                    <Image source={{ uri: rightAvatarUri }} style={styles.avatar} />
+                  ) : (
+                    <View
+                      style={[
+                        styles.avatarPlaceholder,
+                        { backgroundColor: colors.backgroundSecondary },
+                      ]}
+                    />
+                  )}
+                </Pressable>
+              </View>
             </View>
           </View>
         </Animated.View>
@@ -261,6 +303,33 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  bellButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.full,
+  },
+  bellIconContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    borderWidth: 2,
+    zIndex: 1,
   },
   avatarContainer: {
     flexDirection: 'row',
