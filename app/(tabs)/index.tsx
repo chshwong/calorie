@@ -1,4 +1,5 @@
 import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
+import { DailyBurnWearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import type { TransferMode } from '@/components/copy-mealtype-modal';
@@ -32,6 +33,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
+import { useFitbitConnectionQuery, useFitbitSyncAndApplyMutation } from '@/hooks/use-fitbit-connection';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useTransferMealtypeEntries } from '@/hooks/use-transfer-mealtype-entries';
@@ -284,8 +286,9 @@ function EnergyBalanceBlock(props: {
   onEditBurned?: () => void;
   tourContainerRef?: React.RefObject<any>;
   tourBurnedPencilRef?: React.RefObject<any>;
+  wearableSyncSlot?: React.ReactNode;
 }) {
-  const { burnedCal, eatenCal, goalType, colors, t, onEditBurned, tourContainerRef, tourBurnedPencilRef } = props;
+  const { burnedCal, eatenCal, goalType, colors, t, onEditBurned, tourContainerRef, tourBurnedPencilRef, wearableSyncSlot } = props;
   const [isBurnedHover, setIsBurnedHover] = useState(false);
   const scheme = useColorScheme();
   const modeKey = (scheme ?? 'light') as 'light' | 'dark';
@@ -431,6 +434,15 @@ function EnergyBalanceBlock(props: {
           </ThemedText>
         </View>
       </View>
+      {wearableSyncSlot ? (
+        <View style={styles.energyBalanceRowAccessory}>
+          <View style={styles.energyBalanceCol}>{wearableSyncSlot}</View>
+          <View style={styles.energyBalanceOpSpacer} />
+          <View style={styles.energyBalanceCol} />
+          <View style={styles.energyBalanceOpSpacer} />
+          <View style={styles.energyBalanceCol} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -664,6 +676,9 @@ export default function FoodLogHomeScreen() {
 
   // Burned daily cache (lazy create on day view open per spec).
   const { data: dailyBurned } = useDailySumBurned(selectedDateString, { enabled: !!user?.id });
+  const fitbitEnabled = Platform.OS === 'web';
+  const fitbit = useFitbitConnectionQuery({ enabled: fitbitEnabled });
+  const syncAndApply = useFitbitSyncAndApplyMutation();
 
   // Prefetch adjacent dates for instant navigation
   useEffect(() => {
@@ -1320,6 +1335,15 @@ export default function FoodLogHomeScreen() {
                   onEditBurned={() => setBurnedModalVisible(true)}
                   tourContainerRef={tourBurnedEatenNetRef}
                   tourBurnedPencilRef={tourBurnedPencilRef}
+                  wearableSyncSlot={
+                    fitbitEnabled ? (
+                      <DailyBurnWearableSyncSlot
+                        isConnected={fitbit.isConnected}
+                        lastSyncAt={fitbit.lastSyncAt}
+                        onSync={() => syncAndApply.mutateAsync({ dateKey: selectedDateString }).then(() => undefined)}
+                      />
+                    ) : null
+                  }
                 />
 
                 {/* Macro Gauges block (tour: home.macrosAndOtherLimits) */}
@@ -2385,6 +2409,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  energyBalanceRowAccessory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   energyBalanceCol: {
     flex: 1,
     alignItems: 'center',
@@ -2397,8 +2426,11 @@ const styles = StyleSheet.create({
     fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
     fontWeight: '600',
   },
+  energyBalanceOpSpacer: {
+    width: 16,
+  },
   energyBalanceNumber: {
-    fontSize: Platform.select({ web: FontSize.lg, default: FontSize.md }),
+    fontSize: Platform.select({ web: FontSize.md, default: FontSize.md }),
     fontWeight: '600',
     letterSpacing: -0.2,
   },

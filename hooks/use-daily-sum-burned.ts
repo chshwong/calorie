@@ -13,6 +13,8 @@ import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
 
 const DAILY_BURNED_MAX_AGE_MS = 120 * 24 * 60 * 60 * 1000; // ~180 days
 
+export const dailySumBurnedQueryKey = (userId: string, dateKey: string) => ['dailySumBurned', userId, dateKey];
+
 export function useDailySumBurned(entryDate: string | Date, opts?: { enabled?: boolean }) {
   const { user } = useAuth();
   const userId = user?.id;
@@ -26,7 +28,7 @@ export function useDailySumBurned(entryDate: string | Date, opts?: { enabled?: b
     cacheKey !== null ? getPersistentCache<DailySumBurned | null>(cacheKey, DAILY_BURNED_MAX_AGE_MS) : null;
 
   return useQuery<DailySumBurned | null>({
-    queryKey: ['dailySumBurned', userId, dateKey],
+    queryKey: dailySumBurnedQueryKey(userId, dateKey),
     queryFn: async () => {
       if (!userId) throw new Error('User not authenticated');
       const row = await getOrCreateDailySumBurned(userId, dateKey);
@@ -43,7 +45,7 @@ export function useDailySumBurned(entryDate: string | Date, opts?: { enabled?: b
     placeholderData: (previousData) => {
       if (previousData !== undefined) return previousData;
 
-      const cached = queryClient.getQueryData<DailySumBurned | null>(['dailySumBurned', userId, dateKey]);
+      const cached = queryClient.getQueryData<DailySumBurned | null>(dailySumBurnedQueryKey(userId, dateKey));
       if (cached !== undefined) return cached;
 
       return snapshot ?? undefined;

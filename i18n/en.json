@@ -37,6 +37,10 @@
     "day": "Day",
     "remove": "Remove"
   },
+  "wearable_sync_label": "⌚ Sync",
+  "wearable_syncing_label": "⏳ Syncing…",
+  "wearable_updated_label": "✓ Updated",
+  "wearable_none_short": "No device",
   "date": {
     "yday": "Yday"
   },
