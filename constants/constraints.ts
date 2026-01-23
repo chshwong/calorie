@@ -99,6 +99,28 @@ export const BUNDLES = {
   ITEMS: { MIN: 2 },  // Minimum items required per bundle
 } as const;
 
+// Support cases (MVP) — UI policy (server remains authoritative for rate limit/dedupe).
+export const SUPPORT_CASES = {
+  RATE_LIMIT: {
+    MAX_PER_24H: 2,
+  },
+  SCREENSHOT: {
+    MAX_DIMENSION_PX: 1280,
+    TARGET_BYTES: 350 * 1024,
+    HARD_CAP_BYTES: 500 * 1024,
+  },
+} as const;
+
+// Announcements (MVP) — image attachment policy for web.
+export const ANNOUNCEMENTS = {
+  IMAGES: {
+    MAX_COUNT: 3,
+    MAX_DIMENSION_PX: 1280,
+    TARGET_BYTES: 350 * 1024,
+    HARD_CAP_BYTES: 500 * 1024,
+  },
+} as const;
+
   // Daily nutrient target ranges (for onboarding and daily focus targets)
   export const NUTRIENT_TARGETS = {
     PROTEIN_G: { MIN: 80, MAX: 250, STEP: 5 },

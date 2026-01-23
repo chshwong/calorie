@@ -993,6 +993,8 @@
       "title": "Admin",
       "announcements": "Annonces",
       "announcements_subtitle": "Créer et publier des mises à jour",
+      "support_cases": "Cas de support",
+      "support_cases_subtitle": "Voir et répondre aux cas de support",
       "access_denied_title": "Accès refusé",
       "access_denied_message": "Vous n'avez pas la permission d'accéder à cette page.",
       "create_announcement": "Créer une annonce",
@@ -1019,6 +1021,19 @@
       "body_fr": "Contenu (FR)",
       "link_path": "Chemin du lien",
       "link_path_placeholder": "/mises-a-jour/...",
+      "images_label": "Images (optionnel)",
+      "images_helper": "PNG/JPG/WebP. Jusqu’à 3 images. Nous optimiserons automatiquement la taille.",
+      "images_add": "Ajouter des images",
+      "images_remove": "Retirer",
+      "images_move_left": "Déplacer à gauche",
+      "images_move_right": "Déplacer à droite",
+      "images_save_draft_first": "Veuillez d’abord enregistrer le brouillon pour ajouter des images.",
+      "images_too_many": "Vous pouvez ajouter jusqu’à 3 images.",
+      "images_invalid_type": "Type de fichier invalide. Veuillez sélectionner une image PNG, JPG ou WebP.",
+      "images_too_large": "Cette image est trop volumineuse après compression. Veuillez choisir une autre image.",
+      "images_processing_failed": "Impossible de traiter cette image. Veuillez en essayer une autre.",
+      "images_invalid_paths": "Chemins d’images invalides. Veuillez réessayer.",
+      "images_web_only": "L’envoi d’images est disponible sur le web seulement.",
       "title_placeholder": "Titre de l'annonce",
       "body_placeholder": "Rédigez la mise à jour...",
       "preview": "Aperçu",
@@ -2158,11 +2173,96 @@
       "save_hint": "Enregistrer l’entrée d’ajout rapide"
     }
   },
+  "support": {
+    "title": "Contacter le support",
+    "subtitle": "Envoyez un message à l’équipe. Ajoutez une capture d’écran si cela aide.",
+    "native_placeholder": "Les cas de support sont disponibles sur le web seulement pour le moment.",
+    "categories": {
+      "bug": "Bug",
+      "feature_request": "Demande de fonctionnalité",
+      "food_addition": "Suggestion d’ajout d’aliment",
+      "other": "Autre"
+    },
+    "status": {
+      "new": "Nouveau",
+      "in_progress": "En cours",
+      "resolved": "Résolu"
+    },
+    "form": {
+      "category_label": "Catégorie",
+      "subject_label": "Sujet (optionnel)",
+      "subject_placeholder": "Résumé court",
+      "message_label": "Message",
+      "message_placeholder": "Décrivez le problème ou la demande...",
+      "screenshot_label": "Capture d’écran (optionnelle)",
+      "screenshot_choose": "Choisir une image",
+      "screenshot_remove": "Retirer",
+      "screenshot_none": "Aucune capture sélectionnée",
+      "screenshot_hint": "Nous compresserons votre capture avant l’envoi.",
+      "submit": "Envoyer"
+    },
+    "success": {
+      "title": "Cas reçu",
+      "body": "Merci — nous avons enregistré votre cas et nous l’examinerons dès que possible. La plupart des cas reçoivent une réponse sous 2 jours (non garanti).",
+      "primary": "Voir mes cas",
+      "secondary": "Retour au journal"
+    },
+    "errors": {
+      "title": "Impossible d’envoyer le cas",
+      "message_required": "Veuillez entrer un message.",
+      "rate_limit_exceeded": "Vous avez atteint la limite de 2 nouveaux cas en 24 heures. Veuillez réessayer plus tard.",
+      "duplicate_case": "Cela ressemble à un envoi en double. Attendez un moment et réessayez si nécessaire.",
+      "screenshot_not_image": "Veuillez sélectionner un fichier image.",
+      "screenshot_too_large": "Cette capture est trop volumineuse après compression. Veuillez choisir une autre image.",
+      "screenshot_processing_failed": "Impossible de traiter cette image. Veuillez en essayer une autre."
+    },
+    "my_cases": {
+      "title": "Mes cas",
+      "empty_title": "Aucun cas pour l’instant",
+      "empty_body": "Lorsque vous envoyez un cas, il apparaîtra ici."
+    },
+    "case_detail": {
+      "title": "Cas",
+      "not_found": "Cas introuvable",
+      "attachments": "Pièces jointes",
+      "no_attachments": "Aucune pièce jointe.",
+      "attachment_load_failed": "Impossible de charger la pièce jointe.",
+      "attachment_a11y": "Pièce jointe du cas",
+      "replies": "Réponses",
+      "no_replies": "Aucune réponse pour l’instant."
+    },
+    "admin": {
+      "inbox_title": "Cas de support",
+      "case_detail_title": "Cas de support",
+      "created_by": "Créé par",
+      "status": "Statut",
+      "status_updated": "Statut mis à jour.",
+      "internal_note": "Note interne",
+      "internal_note_placeholder": "Écrire une note interne (admin seulement)...",
+      "add_internal_note": "Ajouter une note interne",
+      "note_added": "Note interne ajoutée.",
+      "public_reply": "Réponse publique",
+      "public_reply_placeholder": "Écrire une réponse à l’utilisateur...",
+      "send_public_reply": "Envoyer la réponse",
+      "reply_sent": "Réponse envoyée.",
+      "thread": "Fil",
+      "no_messages": "Aucun message pour l’instant.",
+      "internal": "Interne",
+      "public": "Public",
+      "filters": {
+        "all": "Tous",
+        "status": "Statut",
+        "category": "Catégorie"
+      }
+    }
+  },
   "inbox": {
     "title": "Boîte de réception",
     "settings_subtitle": "Mises à jour et annonces",
     "empty_title": "Aucun message pour l’instant",
     "empty_body": "Les mises à jour et réponses du support apparaîtront ici.",
+    "case_reply_title": "Support",
+    "case_reply_body": "Vous avez une nouvelle réponse sur un cas de support.",
     "load_more": "Charger plus",
     "view_update": "Voir la mise à jour",
     "announcement_default_title": "Mise à jour",

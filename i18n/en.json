@@ -1346,6 +1346,8 @@
       "title": "Admin",
       "announcements": "Announcements",
       "announcements_subtitle": "Create and publish updates",
+      "support_cases": "Support Cases",
+      "support_cases_subtitle": "View and reply to support cases",
       "access_denied_title": "Access Denied",
       "access_denied_message": "You do not have permission to access this page.",
       "create_announcement": "Create announcement",
@@ -1372,6 +1374,19 @@
       "body_fr": "Body (FR)",
       "link_path": "Link path",
       "link_path_placeholder": "/updates/...",
+      "images_label": "Images (optional)",
+      "images_helper": "PNG/JPG/WebP. Up to 3 images. We’ll optimize size automatically.",
+      "images_add": "Add images",
+      "images_remove": "Remove",
+      "images_move_left": "Move left",
+      "images_move_right": "Move right",
+      "images_save_draft_first": "Please save the draft first to add images.",
+      "images_too_many": "You can add up to 3 images.",
+      "images_invalid_type": "Invalid file type. Please select a PNG, JPG, or WebP image.",
+      "images_too_large": "This image is too large after compression. Please choose a different image.",
+      "images_processing_failed": "Could not process this image. Please try another one.",
+      "images_invalid_paths": "Invalid image paths. Please try again.",
+      "images_web_only": "Image upload is available on web only.",
       "title_placeholder": "Announcement title",
       "body_placeholder": "Write the update...",
       "preview": "Preview",
@@ -2959,11 +2974,96 @@
       "target_date_max": "Target date must be within 10 years from today"
     }
   },
+  "support": {
+    "title": "Contact Support",
+    "subtitle": "Send a message to the team. Include a screenshot if it helps.",
+    "native_placeholder": "Support Cases is currently available on web only.",
+    "categories": {
+      "bug": "Bug",
+      "feature_request": "Feature request",
+      "food_addition": "Food addition suggestion",
+      "other": "Other"
+    },
+    "status": {
+      "new": "New",
+      "in_progress": "In Progress",
+      "resolved": "Resolved"
+    },
+    "form": {
+      "category_label": "Category",
+      "subject_label": "Subject (optional)",
+      "subject_placeholder": "Short summary",
+      "message_label": "Message",
+      "message_placeholder": "Describe the issue or request...",
+      "screenshot_label": "Screenshot (optional)",
+      "screenshot_choose": "Choose image",
+      "screenshot_remove": "Remove",
+      "screenshot_none": "No screenshot selected",
+      "screenshot_hint": "We’ll compress your screenshot before upload.",
+      "submit": "Submit case"
+    },
+    "success": {
+      "title": "Case received",
+      "body": "Thanks — we’ve logged your case and will review it as soon as we can. Most cases get a response within 2 days (not guaranteed).",
+      "primary": "View my cases",
+      "secondary": "Back to log"
+    },
+    "errors": {
+      "title": "Couldn’t submit case",
+      "message_required": "Please enter a message.",
+      "rate_limit_exceeded": "You’ve reached the limit of 2 new cases in 24 hours. Please try again later.",
+      "duplicate_case": "This looks like a duplicate submission. Please wait a moment and try again if needed.",
+      "screenshot_not_image": "Please select an image file.",
+      "screenshot_too_large": "This screenshot is too large after compression. Please choose a different image.",
+      "screenshot_processing_failed": "Could not process this image. Please try another one."
+    },
+    "my_cases": {
+      "title": "My Cases",
+      "empty_title": "No cases yet",
+      "empty_body": "When you submit a case, it will appear here."
+    },
+    "case_detail": {
+      "title": "Case",
+      "not_found": "Case not found",
+      "attachments": "Attachments",
+      "no_attachments": "No attachments.",
+      "attachment_load_failed": "Unable to load attachment.",
+      "attachment_a11y": "Case attachment",
+      "replies": "Replies",
+      "no_replies": "No replies yet."
+    },
+    "admin": {
+      "inbox_title": "Support Cases",
+      "case_detail_title": "Support Case",
+      "created_by": "Created by",
+      "status": "Status",
+      "status_updated": "Status updated.",
+      "internal_note": "Internal note",
+      "internal_note_placeholder": "Write an internal note (admin only)...",
+      "add_internal_note": "Add internal note",
+      "note_added": "Internal note added.",
+      "public_reply": "Public reply",
+      "public_reply_placeholder": "Write a reply to the user...",
+      "send_public_reply": "Send reply",
+      "reply_sent": "Reply sent.",
+      "thread": "Thread",
+      "no_messages": "No messages yet.",
+      "internal": "Internal",
+      "public": "Public",
+      "filters": {
+        "all": "All",
+        "status": "Status",
+        "category": "Category"
+      }
+    }
+  },
   "inbox": {
     "title": "Inbox",
     "settings_subtitle": "Release updates and announcements",
     "empty_title": "No messages yet",
     "empty_body": "Release updates and support replies will show up here.",
+    "case_reply_title": "Support",
+    "case_reply_body": "You have a new reply on a support case.",
     "load_more": "Load more",
     "view_update": "View update",
     "announcement_default_title": "Update",

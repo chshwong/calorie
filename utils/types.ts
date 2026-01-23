@@ -389,6 +389,7 @@ export interface Announcement {
   title_i18n: AnnouncementI18n;
   body_i18n: AnnouncementI18n;
   link_path: string | null;
+  image_paths: string[] | null;
 }
 
 export interface Notification {
@@ -400,5 +401,49 @@ export interface Notification {
   link_path: string | null;
   read_at: string | null;
   meta: Record<string, any> | null;
+}
+
+// ============================================================================
+// SUPPORT CASES TYPES
+// ============================================================================
+
+export type SupportCaseCategory = 'bug' | 'feature_request' | 'food_addition' | 'other';
+export type SupportCaseStatus = 'new' | 'in_progress' | 'resolved';
+
+export interface SupportCase {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  category: SupportCaseCategory;
+  subject: string | null;
+  message: string;
+  status: SupportCaseStatus;
+  resolved_at: string | null;
+  page_path: string | null;
+  user_agent: string | null;
+  app_version: string | null;
+  fingerprint: string;
+}
+
+export interface SupportCaseMessage {
+  id: string;
+  case_id: string;
+  created_at: string;
+  created_by: string;
+  message: string;
+  is_internal: boolean;
+}
+
+export interface SupportCaseAttachment {
+  id: string;
+  case_id: string;
+  created_at: string;
+  created_by: string;
+  storage_path: string;
+  bytes: number | null;
+  content_type: string | null;
+  width: number | null;
+  height: number | null;
 }
 

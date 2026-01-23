@@ -511,6 +511,14 @@ export default function SettingsScreen() {
                 appRouter.push('/settings/admin/announcements');
               }}
             />
+            <SettingItem
+              icon="questionmark.circle.fill"
+              title={t('settings.admin.support_cases')}
+              subtitle={t('settings.admin.support_cases_subtitle')}
+              onPress={() => {
+                appRouter.push('/settings/admin/support-cases');
+              }}
+            />
           </SettingSection>
         )}
 
@@ -553,10 +561,9 @@ export default function SettingsScreen() {
           />
           <SettingItem
             icon="questionmark.circle.fill"
-            title={t('settings.about.help_support')}
+            title={t('support.title')}
             onPress={() => {
-              // TODO: Navigate to support
-              Alert.alert(t('settings.coming_soon'), t('settings.feature_coming_soon', { feature: t('settings.about.help_support') }));
+              appRouter.push('/support');
             }}
           />
         </SettingSection>

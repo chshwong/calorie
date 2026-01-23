@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { Image } from 'expo-image';
 
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -26,6 +27,8 @@ import {
   usePublishAnnouncement,
   useUpdateAnnouncementDraft,
 } from '@/hooks/use-announcements';
+import { useAddAnnouncementImages, useReorderAnnouncementImages, useRemoveAnnouncementImage } from '@/hooks/use-announcement-images';
+import { getAnnouncementImagePublicUrl } from '@/lib/services/announcements';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { AccessibilityHints, getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
@@ -54,9 +57,16 @@ export default function AdminAnnouncementEditorScreen() {
   const [linkPath, setLinkPath] = useState('');
   const [previewLocale, setPreviewLocale] = useState<'en' | 'fr'>('en');
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [imagePaths, setImagePaths] = useState<string[]>([]);
+  const [imagesError, setImagesError] = useState<string | null>(null);
 
   const isPublished = announcement?.is_published ?? false;
   const canEdit = !isPublished;
+  const announcementId = !isNew && id ? id : null;
+
+  const addImages = useAddAnnouncementImages();
+  const removeImage = useRemoveAnnouncementImage();
+  const reorderImages = useReorderAnnouncementImages();
 
   useFocusEffect(
     useCallback(() => {
@@ -74,12 +84,14 @@ export default function AdminAnnouncementEditorScreen() {
     setTitleFr(announcement.title_i18n?.fr ?? '');
     setBodyFr(announcement.body_i18n?.fr ?? '');
     setLinkPath(announcement.link_path ?? '');
+    setImagePaths(Array.isArray(announcement.image_paths) ? announcement.image_paths.filter((x) => typeof x === 'string') : []);
   }, [announcement]);
 
   const previewTitle = previewLocale === 'fr' ? titleFr : titleEn;
   const previewBody = previewLocale === 'fr' ? bodyFr : bodyEn;
 
-  const isBusy = createDraft.isPending || updateDraft.isPending || publishDraft.isPending;
+  const isImagesBusy = addImages.isPending || removeImage.isPending || reorderImages.isPending;
+  const isBusy = createDraft.isPending || updateDraft.isPending || publishDraft.isPending || isImagesBusy;
 
   const validateDraft = () => {
     const result = validateAnnouncementDraft({ titleEn, bodyEn, linkPath });
@@ -127,6 +139,136 @@ export default function AdminAnnouncementEditorScreen() {
     } catch (error: any) {
       Alert.alert(t('settings.admin.save_failed_title'), error?.message ?? t('common.unexpected_error'));
     }
+  };
+
+  const pickImagesWeb = async (): Promise<File[]> => {
+    if (Platform.OS !== 'web') return [];
+    if (typeof document === 'undefined') return [];
+
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.style.display = 'none';
+      input.onchange = () => {
+        const files = Array.from(input.files ?? []);
+        input.remove();
+        resolve(files);
+      };
+      document.body.appendChild(input);
+      input.click();
+    });
+  };
+
+  const handleAddImages = async () => {
+    if (Platform.OS !== 'web') {
+      showAppToast(t('settings.admin.images_web_only'));
+      return;
+    }
+    if (!announcementId) {
+      showAppToast(t('settings.admin.images_save_draft_first'));
+      return;
+    }
+    if (!canEdit) return;
+
+    setImagesError(null);
+    const files = await pickImagesWeb();
+    if (!files.length) return;
+
+    try {
+      const result = await addImages.mutateAsync({
+        announcementId,
+        existingPaths: imagePaths,
+        files,
+      });
+      const next = Array.isArray(result.updated.image_paths)
+        ? result.updated.image_paths.filter((x) => typeof x === 'string')
+        : [];
+      setImagePaths(next);
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (msg.startsWith('settings.')) {
+        setImagesError(t(msg));
+      } else {
+        setImagesError(msg || t('common.unexpected_error'));
+      }
+    }
+  };
+
+  const handleRemoveImage = async (storagePath: string) => {
+    if (!announcementId) return;
+    if (!canEdit) return;
+
+    setImagesError(null);
+    try {
+      const result = await removeImage.mutateAsync({
+        announcementId,
+        existingPaths: imagePaths,
+        storagePath,
+      });
+      const next = Array.isArray(result.updated.image_paths)
+        ? result.updated.image_paths.filter((x) => typeof x === 'string')
+        : [];
+      setImagePaths(next);
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (msg.startsWith('settings.')) {
+        setImagesError(t(msg));
+      } else {
+        setImagesError(msg || t('common.unexpected_error'));
+      }
+    }
+  };
+
+  const moveImage = async (from: number, to: number) => {
+    if (!announcementId) return;
+    if (!canEdit) return;
+    if (to < 0 || to >= imagePaths.length) return;
+
+    setImagesError(null);
+
+    const next = [...imagePaths];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    setImagePaths(next);
+
+    try {
+      const result = await reorderImages.mutateAsync({ announcementId, imagePaths: next });
+      const normalized = Array.isArray(result.updated.image_paths)
+        ? result.updated.image_paths.filter((x) => typeof x === 'string')
+        : [];
+      setImagePaths(normalized);
+    } catch (e: any) {
+      // Revert on failure
+      setImagePaths(imagePaths);
+      const msg = String(e?.message ?? '');
+      if (msg.startsWith('settings.')) {
+        setImagesError(t(msg));
+      } else {
+        setImagesError(msg || t('common.unexpected_error'));
+      }
+    }
+  };
+
+  const renderImagesPreview = (paths: string[]) => {
+    if (!paths.length) return null;
+    const urls = paths.map((p) => getAnnouncementImagePublicUrl(p)).filter(Boolean);
+    if (!urls.length) return null;
+
+    const [first, ...rest] = urls;
+    return (
+      <View style={styles.imagesPreview}>
+        <Image source={{ uri: first }} style={styles.previewHeroImage} contentFit="cover" transition={150} />
+        {rest.length > 0 && (
+          <View style={styles.previewThumbGrid}>
+            {rest.map((u) => (
+              <Image key={u} source={{ uri: u }} style={styles.previewThumb} contentFit="cover" transition={150} />
+            ))}
+          </View>
+        )}
+      </View>
+    );
   };
 
   const handlePublish = () => {
@@ -285,6 +427,77 @@ export default function AdminAnnouncementEditorScreen() {
           />
         </View>
 
+        <View style={styles.fieldGroup}>
+          <ThemedText style={[styles.fieldLabel, { color: colors.text }]}>{t('settings.admin.images_label')}</ThemedText>
+          <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+            {t('settings.admin.images_helper')}
+          </ThemedText>
+
+          {!!imagesError && (
+            <ThemedText style={[styles.errorText, { color: colors.error }]}>{imagesError}</ThemedText>
+          )}
+
+          <View style={styles.imagesActionRow}>
+            <Button
+              variant="secondary"
+              size="md"
+              onPress={handleAddImages}
+              disabled={!canEdit || isBusy}
+              fullWidth
+            >
+              {t('settings.admin.images_add')}
+            </Button>
+          </View>
+
+          {imagePaths.length > 0 && (
+            <View style={styles.imagesGrid}>
+              {imagePaths.map((p, idx) => {
+                const url = getAnnouncementImagePublicUrl(p);
+                return (
+                  <View key={p} style={[styles.imageTile, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                    {!!url && <Image source={{ uri: url }} style={styles.imageThumb} contentFit="cover" transition={150} />}
+                    <View style={styles.imageTileActions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.iconButton,
+                          Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                        ]}
+                        onPress={() => moveImage(idx, idx - 1)}
+                        disabled={!canEdit || isBusy || idx === 0}
+                        {...getButtonAccessibilityProps(t('settings.admin.images_move_left'), AccessibilityHints.BUTTON)}
+                      >
+                        <IconSymbol name="chevron.left" size={18} color={colors.textSecondary} decorative={true} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.iconButton,
+                          Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                        ]}
+                        onPress={() => moveImage(idx, idx + 1)}
+                        disabled={!canEdit || isBusy || idx === imagePaths.length - 1}
+                        {...getButtonAccessibilityProps(t('settings.admin.images_move_right'), AccessibilityHints.BUTTON)}
+                      >
+                        <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} decorative={true} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.iconButton,
+                          Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                        ]}
+                        onPress={() => handleRemoveImage(p)}
+                        disabled={!canEdit || isBusy}
+                        {...getButtonAccessibilityProps(t('settings.admin.images_remove'), AccessibilityHints.BUTTON)}
+                      >
+                        <IconSymbol name="xmark" size={18} color={colors.textSecondary} decorative={true} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         <View style={styles.previewHeader}>
           <ThemedText style={[styles.fieldLabel, { color: colors.text }]}>{t('settings.admin.preview')}</ThemedText>
           <View style={styles.previewToggle}>
@@ -315,6 +528,7 @@ export default function AdminAnnouncementEditorScreen() {
           <ThemedText style={[styles.previewTitle, { color: colors.text }]}>
             {previewTitle || t('settings.admin.preview_placeholder_title')}
           </ThemedText>
+          {renderImagesPreview(imagePaths)}
           <ThemedText style={[styles.previewBody, { color: colors.textSecondary }]}>
             {previewBody || t('settings.admin.preview_placeholder_body')}
           </ThemedText>
@@ -421,6 +635,67 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     minHeight: 120,
     textAlignVertical: 'top',
+  },
+  helperText: {
+    fontSize: FontSize.sm,
+    lineHeight: 18,
+  },
+  errorText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semiBold,
+  },
+  imagesActionRow: {
+    marginTop: Spacing.xs,
+  },
+  imagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  imageTile: {
+    width: '31%',
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  imageThumb: {
+    width: '100%',
+    height: 90,
+  },
+  imageTileActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagesPreview: {
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  previewHeroImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  previewThumbGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  previewThumb: {
+    width: '31%',
+    height: 90,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
   },
   previewHeader: {
     flexDirection: 'row',

@@ -217,6 +217,11 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
               <Stack.Screen name="settings/my-goal/edit-targets" options={{ headerShown: false, presentation: 'modal' }} />
               <Stack.Screen name="inbox" options={{ headerShown: false }} />
               <Stack.Screen name="inbox/announcements/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="support/index" options={{ headerShown: false }} />
+              <Stack.Screen name="support/cases/index" options={{ headerShown: false }} />
+              <Stack.Screen name="support/cases/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="settings/admin/support-cases" options={{ headerShown: false }} />
+              <Stack.Screen name="settings/admin/support-cases/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
             <TourOverlay />

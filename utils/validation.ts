@@ -20,6 +20,11 @@ export type AnnouncementValidationResult = {
   errorKey?: string;
 };
 
+export type SupportCaseValidationResult = {
+  valid: boolean;
+  errorKey?: string;
+};
+
 export type BurnedTdeeValidationResult = {
   valid: boolean;
   errorKey?: string;
@@ -105,6 +110,17 @@ export function validateAnnouncementDraft(params: {
     return { valid: false, errorKey: 'settings.admin.validation_link_path' };
   }
 
+  return { valid: true };
+}
+
+/**
+ * Validates support case submission (MVP).
+ * Rules:
+ * - Message must be non-empty after trimming
+ */
+export function validateSupportCaseSubmission(params: { message: string }): SupportCaseValidationResult {
+  const message = params.message.trim();
+  if (!message) return { valid: false, errorKey: 'support.errors.message_required' };
   return { valid: true };
 }
 

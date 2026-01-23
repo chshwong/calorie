@@ -1,7 +1,9 @@
 import React from 'react';
 import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { Image } from 'expo-image';
 
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -11,6 +13,7 @@ import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useAnnouncementById } from '@/hooks/use-announcements';
+import { getAnnouncementImagePublicUrl } from '@/lib/services/announcements';
 import { pickI18n } from '@/utils/i18n';
 import { formatUTCDate } from '@/utils/calculations';
 import { formatDate } from '@/utils/formatters';
@@ -55,6 +58,9 @@ export default function AnnouncementDetailScreen() {
   const body = pickI18n(announcement.body_i18n, locale);
   const dateLabel = formatDate(formatUTCDate(announcement.published_at ?? announcement.created_at), t);
   const linkPath = announcement.link_path;
+  const imagePaths = Array.isArray(announcement.image_paths) ? announcement.image_paths.filter((x) => typeof x === 'string') : [];
+  const imageUrls = imagePaths.map((p) => getAnnouncementImagePublicUrl(p)).filter(Boolean);
+  const [heroUrl, ...thumbUrls] = imageUrls;
 
   return (
     <ThemedView style={styles.container}>
@@ -86,6 +92,37 @@ export default function AnnouncementDetailScreen() {
           </ThemedText>
           <ThemedText style={[styles.date, { color: colors.textSecondary }]}>{dateLabel}</ThemedText>
           <ThemedText style={[styles.body, { color: colors.text }]}>{body}</ThemedText>
+
+          {imageUrls.length > 0 && (
+            <View style={styles.imagesSection}>
+              {!!heroUrl && (
+                <TouchableOpacity
+                  style={styles.heroImageWrap}
+                  onPress={() => {
+                    if (heroUrl) Linking.openURL(heroUrl);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Image source={{ uri: heroUrl }} style={styles.heroImage} contentFit="cover" transition={150} />
+                </TouchableOpacity>
+              )}
+              {thumbUrls.length > 0 && (
+                <View style={styles.thumbGrid}>
+                  {thumbUrls.map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      style={styles.thumbWrap}
+                      onPress={() => Linking.openURL(u)}
+                      accessibilityRole="button"
+                    >
+                      <Image source={{ uri: u }} style={styles.thumb} contentFit="cover" transition={150} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
           {!!linkPath && (
             <View style={styles.ctaRow}>
               <Button
@@ -156,6 +193,32 @@ const styles = StyleSheet.create({
   },
   ctaRow: {
     marginTop: Spacing.sm,
+  },
+  imagesSection: {
+    marginTop: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  heroImageWrap: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    width: '100%',
+    height: 320,
+  },
+  thumbGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  thumbWrap: {
+    width: '31%',
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  thumb: {
+    width: '100%',
+    height: 90,
   },
   footerSpacer: {
     marginTop: Spacing.lg,

@@ -176,11 +176,19 @@ export default function InboxScreen() {
 
   const renderItem = ({ item }: { item: Notification }) => {
     const announcement = item.announcement_id ? announcementMap.get(item.announcement_id) : null;
-    const title = announcement
-      ? pickI18n(announcement.title_i18n, locale)
-      : t('inbox.announcement_default_title');
-    const body = announcement ? pickI18n(announcement.body_i18n, locale) : '';
-    const preview = buildPreview(body);
+    const isAnnouncement = item.type === 'announcement';
+    const isCaseReply = item.type === 'case_reply';
+
+    const title = isAnnouncement
+      ? announcement
+        ? pickI18n(announcement.title_i18n, locale)
+        : t('inbox.announcement_default_title')
+      : isCaseReply
+        ? t('inbox.case_reply_title')
+        : t('inbox.announcement_default_title');
+
+    const body = isAnnouncement && announcement ? pickI18n(announcement.body_i18n, locale) : '';
+    const preview = isCaseReply ? t('inbox.case_reply_body') : buildPreview(body);
     const dateLabel = formatDate(formatUTCDate(item.created_at), t);
     const isUnread = !item.read_at;
 
@@ -193,8 +201,16 @@ export default function InboxScreen() {
           if (isUnread) {
             markRead.mutate(item.id);
           }
-          if (item.announcement_id) {
+          if (isAnnouncement && item.announcement_id) {
             router.push(`/inbox/announcements/${item.announcement_id}`);
+            return;
+          }
+          if (isCaseReply) {
+            const metaCaseId = (item.meta as any)?.case_id ? String((item.meta as any).case_id) : null;
+            const path = item.link_path || (metaCaseId ? `/support/cases/${metaCaseId}` : null);
+            if (path) {
+              router.push(path);
+            }
           }
         }}
         {...getButtonAccessibilityProps(
