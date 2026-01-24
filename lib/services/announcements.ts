@@ -307,3 +307,48 @@ export function getAnnouncementImagePublicUrl(storagePath: string): string {
   const { data } = supabase.storage.from(ANNOUNCEMENT_IMAGES_BUCKET).getPublicUrl(storagePath);
   return data?.publicUrl ?? '';
 }
+
+// ============================================================================
+// Announcement delete (admin-only)
+// ============================================================================
+
+export type DeleteAnnouncementResult = {
+  imageDeleteFailed: boolean;
+};
+
+export async function deleteAnnouncement(announcementId: string): Promise<DeleteAnnouncementResult> {
+  if (!announcementId) throw new Error('Announcement ID is required');
+
+  // 1) Fetch minimal data needed for storage cleanup
+  const { data: row, error: fetchError } = await supabase
+    .from('announcements')
+    .select('id,is_published,image_paths')
+    .eq('id', announcementId)
+    .single<Pick<Announcement, 'id' | 'is_published' | 'image_paths'>>();
+
+  if (fetchError) {
+    throw new Error(fetchError.message || 'Failed to fetch announcement');
+  }
+
+  const paths = Array.isArray(row?.image_paths)
+    ? row.image_paths.filter((x): x is string => typeof x === 'string')
+    : [];
+
+  // 2) Delete storage objects (best-effort; continue on failure)
+  let imageDeleteFailed = false;
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage.from(ANNOUNCEMENT_IMAGES_BUCKET).remove(paths);
+    if (storageError) {
+      imageDeleteFailed = true;
+      console.warn('[deleteAnnouncement] Failed to delete some announcement images:', storageError);
+    }
+  }
+
+  // 3) Delete announcement row (notifications cleanup via FK ON DELETE CASCADE)
+  const { error: deleteError } = await supabase.from('announcements').delete().eq('id', announcementId);
+  if (deleteError) {
+    throw new Error(deleteError.message || 'Failed to delete announcement');
+  }
+
+  return { imageDeleteFailed };
+}

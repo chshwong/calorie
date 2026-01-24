@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Announcement } from '@/utils/types';
 import {
   createAnnouncementDraft,
+  deleteAnnouncement,
   getAdminAnnouncements,
   getAnnouncementById,
   getAnnouncementNotificationStats,
@@ -12,7 +13,7 @@ import {
   type AnnouncementCursor,
   type AnnouncementNotificationStats,
 } from '@/lib/services/announcements';
-import { unreadNotificationCountQueryKey } from '@/hooks/use-notifications';
+import { inboxNotificationsQueryKeyBase, unreadNotificationCountQueryKey } from '@/hooks/use-notifications';
 
 export type AnnouncementPage = {
   items: Announcement[];
@@ -144,6 +145,47 @@ export function usePublishAnnouncement() {
       if (!userId) return;
       queryClient.invalidateQueries({ queryKey: adminAnnouncementsQueryKeyBase(userId) });
       queryClient.invalidateQueries({ queryKey: unreadNotificationCountQueryKey(userId) });
+    },
+  });
+}
+
+export function useDeleteAnnouncement() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (announcementId: string) => {
+      return deleteAnnouncement(announcementId);
+    },
+    onSuccess: async (_result, announcementId) => {
+      if (!userId) return;
+      // Update caches immediately (do not rely on remounts)
+      queryClient.setQueriesData<AnnouncementPage>(
+        { queryKey: adminAnnouncementsQueryKeyBase(userId) },
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            items: current.items.filter((a) => a.id !== announcementId),
+          };
+        }
+      );
+
+      queryClient.setQueryData(announcementQueryKey(userId, announcementId), null);
+      queryClient.setQueriesData<Announcement[]>(
+        { queryKey: ['announcementsByIds', userId] },
+        (current) => {
+          if (!current) return current;
+          return current.filter((a) => a.id !== announcementId);
+        }
+      );
+
+      queryClient.invalidateQueries({ queryKey: adminAnnouncementsQueryKeyBase(userId) });
+      queryClient.invalidateQueries({ queryKey: announcementQueryKey(userId, announcementId) });
+      queryClient.invalidateQueries({ queryKey: ['announcementsByIds', userId] });
+      queryClient.invalidateQueries({ queryKey: unreadNotificationCountQueryKey(userId) });
+      queryClient.invalidateQueries({ queryKey: inboxNotificationsQueryKeyBase(userId) });
     },
   });
 }

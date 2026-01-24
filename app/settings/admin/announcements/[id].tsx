@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   useAnnouncementById,
   useCreateAnnouncementDraft,
+  useDeleteAnnouncement,
   usePublishAnnouncement,
   useUpdateAnnouncementDraft,
 } from '@/hooks/use-announcements';
@@ -49,6 +50,7 @@ export default function AdminAnnouncementEditorScreen() {
   const createDraft = useCreateAnnouncementDraft();
   const updateDraft = useUpdateAnnouncementDraft();
   const publishDraft = usePublishAnnouncement();
+  const deleteAnnouncementMutation = useDeleteAnnouncement();
 
   const [titleEn, setTitleEn] = useState('');
   const [bodyEn, setBodyEn] = useState('');
@@ -57,6 +59,7 @@ export default function AdminAnnouncementEditorScreen() {
   const [linkPath, setLinkPath] = useState('');
   const [previewLocale, setPreviewLocale] = useState<'en' | 'fr'>('en');
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [imagePaths, setImagePaths] = useState<string[]>([]);
   const [imagesError, setImagesError] = useState<string | null>(null);
 
@@ -91,7 +94,12 @@ export default function AdminAnnouncementEditorScreen() {
   const previewBody = previewLocale === 'fr' ? bodyFr : bodyEn;
 
   const isImagesBusy = addImages.isPending || removeImage.isPending || reorderImages.isPending;
-  const isBusy = createDraft.isPending || updateDraft.isPending || publishDraft.isPending || isImagesBusy;
+  const isBusy =
+    createDraft.isPending ||
+    updateDraft.isPending ||
+    publishDraft.isPending ||
+    deleteAnnouncementMutation.isPending ||
+    isImagesBusy;
 
   const validateDraft = () => {
     const result = validateAnnouncementDraft({ titleEn, bodyEn, linkPath });
@@ -272,19 +280,14 @@ export default function AdminAnnouncementEditorScreen() {
   };
 
   const handlePublish = () => {
-    console.log('Publish button clicked:', { id, isNew, canEdit, isPublished });
-    
     if (!id || isNew) {
-      console.log('Publish blocked: missing id or isNew');
       return;
     }
 
     if (!validateDraft()) {
-      console.log('Publish blocked: validation failed');
       return;
     }
 
-    console.log('Showing publish confirmation modal');
     setShowPublishConfirm(true);
   };
 
@@ -293,12 +296,27 @@ export default function AdminAnnouncementEditorScreen() {
     setShowPublishConfirm(false);
 
     try {
-      console.log('Publishing announcement:', id);
       await publishDraft.mutateAsync(id);
       showAppToast(t('settings.admin.published'));
     } catch (error: any) {
-      console.error('Publish error:', error);
       Alert.alert(t('settings.admin.publish_failed_title'), error?.message ?? t('common.unexpected_error'));
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!announcementId) return;
+    setShowDeleteConfirm(false);
+
+    try {
+      const result = await deleteAnnouncementMutation.mutateAsync(announcementId);
+      if (result.imageDeleteFailed) {
+        showAppToast(t('settings.admin.announcement_deleted_images_warning'));
+      } else {
+        showAppToast(t('settings.admin.announcement_deleted'));
+      }
+      router.replace('/settings/admin/announcements');
+    } catch (error: any) {
+      Alert.alert(t('settings.admin.delete_failed_title'), error?.message ?? t('common.unexpected_error'));
     }
   };
 
@@ -548,6 +566,18 @@ export default function AdminAnnouncementEditorScreen() {
           >
             {t('settings.admin.publish_action')}
           </Button>
+          {!isNew && !!announcementId && (
+            <Button
+              variant="danger"
+              size="md"
+              onPress={() => setShowDeleteConfirm(true)}
+              loading={deleteAnnouncementMutation.isPending}
+              fullWidth
+              disabled={isBusy}
+            >
+              {t('settings.admin.delete_announcement')}
+            </Button>
+          )}
         </View>
       </ScrollView>
 
@@ -559,6 +589,17 @@ export default function AdminAnnouncementEditorScreen() {
         cancelText={t('common.cancel')}
         onConfirm={confirmPublish}
         onCancel={() => setShowPublishConfirm(false)}
+        confirmButtonStyle={{ backgroundColor: colors.error }}
+      />
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title={isPublished ? t('settings.admin.delete_published_title') : t('settings.admin.delete_draft_title')}
+        message={isPublished ? t('settings.admin.delete_published_body') : t('settings.admin.delete_draft_body')}
+        confirmText={t('settings.admin.delete_confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
         confirmButtonStyle={{ backgroundColor: colors.error }}
       />
     </ThemedView>
