@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -70,7 +70,7 @@ export default function AnnouncementDetailScreen() {
         onPressAvatar={() => router.push('/settings')}
       />
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <TouchableOpacity
           style={[
             styles.backLink,
@@ -141,7 +141,7 @@ export default function AnnouncementDetailScreen() {
         <View style={styles.footerSpacer}>
           <IconSymbol name="sparkles" size={18} color={colors.textTertiary} decorative={true} />
         </View>
-      </View>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -150,8 +150,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
     paddingHorizontal: Layout.screenPadding,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xl,
