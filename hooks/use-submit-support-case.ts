@@ -5,6 +5,7 @@ import { createCase } from '@/lib/services/cases';
 import { insertCaseAttachmentRow, uploadCaseAttachment } from '@/lib/services/caseAttachments';
 import { compressSupportScreenshot } from '@/utils/compressImage';
 import { myCasesQueryKeyBase } from '@/hooks/use-cases';
+import type { SupportSubmitError } from '@/lib/services/supportSubmitErrors';
 
 export function useSubmitSupportCase() {
   const { user } = useAuth();
@@ -21,7 +22,10 @@ export function useSubmitSupportCase() {
       appVersion?: string | null;
       screenshotFile?: File | null;
     }) => {
-      if (!userId) throw new Error('User not authenticated');
+      if (!userId) {
+        const out: SupportSubmitError = { kind: 'auth' };
+        throw out;
+      }
 
       const caseId = await createCase({
         category: params.category,

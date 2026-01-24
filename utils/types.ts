@@ -407,7 +407,14 @@ export interface Notification {
 // SUPPORT CASES TYPES
 // ============================================================================
 
-export type SupportCaseCategory = 'bug' | 'feature_request' | 'food_addition' | 'other';
+// Must stay in sync with DB CHECK constraint in supabase-support-cases.sql
+export type SupportCaseCategory =
+  | 'bug'
+  | 'feature_request'
+  | 'food_addition'
+  | 'improvement'
+  | 'appreciation'
+  | 'other';
 export type SupportCaseStatus = 'new' | 'in_progress' | 'resolved';
 
 export interface SupportCase {

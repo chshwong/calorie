@@ -51,7 +51,9 @@ export default function AdminSupportCasesScreen() {
       { value: 'all', labelKey: 'support.admin.filters.all' },
       { value: 'bug', labelKey: 'support.categories.bug' },
       { value: 'feature_request', labelKey: 'support.categories.feature_request' },
+      { value: 'improvement', labelKey: 'support.categories.improvement' },
       { value: 'food_addition', labelKey: 'support.categories.food_addition' },
+      { value: 'appreciation', labelKey: 'support.categories.appreciation' },
       { value: 'other', labelKey: 'support.categories.other' },
     ],
     []
@@ -272,6 +274,9 @@ export default function AdminSupportCasesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: Layout.desktopMaxWidth,
+    alignSelf: 'center',
     paddingHorizontal: Layout.screenPadding,
     paddingTop: Spacing.lg,
   },

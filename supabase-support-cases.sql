@@ -23,7 +23,9 @@ create table if not exists public.cases (
   user_agent text null,
   app_version text null,
   fingerprint text not null,
-  constraint cases_category_valid check (category in ('bug', 'feature_request', 'food_addition', 'other')),
+  constraint cases_category_valid check (
+    category in ('bug', 'feature_request', 'food_addition', 'improvement', 'appreciation', 'other')
+  ),
   constraint cases_status_valid check (status in ('new', 'in_progress', 'resolved')),
   constraint cases_fingerprint_nonempty check (length(btrim(fingerprint)) > 0)
 );
@@ -109,7 +111,7 @@ declare
 begin
   v_user_id := auth.uid();
   if v_user_id is null then
-    raise exception 'not authenticated';
+    raise exception 'not_authenticated' using errcode = 'P0001';
   end if;
 
   -- Rate limit: max 2 cases per rolling 24 hours per user
@@ -120,7 +122,7 @@ begin
     and c.created_at >= now() - interval '24 hours';
 
   if v_recent_count >= 2 then
-    raise exception 'rate_limit_exceeded';
+    raise exception 'rate_limit_exceeded' using errcode = 'P0001';
   end if;
 
   v_subject := coalesce(p_subject, '');
@@ -148,7 +150,7 @@ begin
       and c.fingerprint = v_fingerprint
       and c.created_at >= now() - interval '10 minutes'
   ) then
-    raise exception 'duplicate_case';
+    raise exception 'duplicate_case' using errcode = 'P0001';
   end if;
 
   insert into public.cases (

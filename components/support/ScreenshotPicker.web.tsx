@@ -85,9 +85,7 @@ export function ScreenshotPicker({ value, onChange, disabled = false }: Screensh
         onChange={handleChange}
       />
 
-      <ThemedText style={[styles.hint, { color: colors.textTertiary }]}>
-        {t('support.form.screenshot_hint')}
-      </ThemedText>
+      {/* Hint removed per request */}
     </View>
   );
 }

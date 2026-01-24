@@ -2190,6 +2190,8 @@
       "bug": "Bug",
       "feature_request": "Demande de fonctionnalité",
       "food_addition": "Suggestion d’ajout d’aliment",
+      "improvement": "Suggestions d’amélioration",
+      "appreciation": "Appréciation / remerciements",
       "other": "Autre"
     },
     "status": {
@@ -2207,7 +2209,6 @@
       "screenshot_choose": "Choisir une image",
       "screenshot_remove": "Retirer",
       "screenshot_none": "Aucune capture sélectionnée",
-      "screenshot_hint": "Nous compresserons votre capture avant l’envoi.",
       "submit": "Envoyer"
     },
     "success": {
@@ -2219,6 +2220,14 @@
     "errors": {
       "title": "Impossible d’envoyer le cas",
       "message_required": "Veuillez entrer un message.",
+      "rate_limit_title": "Vous avez atteint la limite du jour",
+      "rate_limit_body": "Veuillez réessayer après 24 heures. Pour éviter le spam, vous pouvez envoyer jusqu’à 2 cas par jour.",
+      "duplicate_title": "Cela ressemble à un doublon",
+      "duplicate_body": "Cela ressemble à un doublon récent. Veuillez attendre quelques minutes ou ajouter plus de détails.",
+      "auth_title": "Connexion requise",
+      "auth_body": "Veuillez vous connecter pour contacter le support.",
+      "unknown_title": "Impossible d’envoyer le cas",
+      "unknown_body": "Nous n’avons pas pu envoyer votre cas pour le moment. Veuillez réessayer.",
       "rate_limit_exceeded": "Vous avez atteint la limite de 2 nouveaux cas en 24 heures. Veuillez réessayer plus tard.",
       "duplicate_case": "Cela ressemble à un envoi en double. Attendez un moment et réessayez si nécessaire.",
       "screenshot_not_image": "Veuillez sélectionner un fichier image.",

@@ -2985,12 +2985,14 @@
   },
   "support": {
     "title": "Contact Support",
-    "subtitle": "Send a message to the team. Include a screenshot if it helps.",
+    "subtitle": "Send a message to the team.",
     "native_placeholder": "Support Cases is currently available on web only.",
     "categories": {
       "bug": "Bug",
       "feature_request": "Feature request",
       "food_addition": "Food addition suggestion",
+      "improvement": "Suggestions for improvement",
+      "appreciation": "Appreciation / thanks",
       "other": "Other"
     },
     "status": {
@@ -3000,7 +3002,7 @@
     },
     "form": {
       "category_label": "Category",
-      "subject_label": "Subject (optional)",
+      "subject_label": "Subject",
       "subject_placeholder": "Short summary",
       "message_label": "Message",
       "message_placeholder": "Describe the issue or request...",
@@ -3008,7 +3010,6 @@
       "screenshot_choose": "Choose image",
       "screenshot_remove": "Remove",
       "screenshot_none": "No screenshot selected",
-      "screenshot_hint": "We’ll compress your screenshot before upload.",
       "submit": "Submit case"
     },
     "success": {
@@ -3020,6 +3021,14 @@
     "errors": {
       "title": "Couldn’t submit case",
       "message_required": "Please enter a message.",
+      "rate_limit_title": "You’ve reached today’s limit",
+      "rate_limit_body": "Please try again after 24 hours. To prevent spam, you can submit up to 2 cases per day.",
+      "duplicate_title": "This looks like a duplicate",
+      "duplicate_body": "This looks like a duplicate of a recent submission. Please wait a few minutes or add more details.",
+      "auth_title": "Please sign in",
+      "auth_body": "Please sign in to contact support.",
+      "unknown_title": "Couldn’t submit case",
+      "unknown_body": "We couldn’t submit your case right now. Please try again.",
       "rate_limit_exceeded": "You’ve reached the limit of 2 new cases in 24 hours. Please try again later.",
       "duplicate_case": "This looks like a duplicate submission. Please wait a moment and try again if needed.",
       "screenshot_not_image": "Please select an image file.",

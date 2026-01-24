@@ -8,6 +8,11 @@
 
 import { supabase } from '@/lib/supabase';
 import type { SupportCase, SupportCaseCategory, SupportCaseStatus } from '@/utils/types';
+import {
+  mapCreateCaseRpcErrorToKind,
+  type SupportSubmitError,
+  type SupportSubmitErrorKind,
+} from '@/lib/services/supportSubmitErrors';
 
 const CASE_COLUMNS = `
   id,
@@ -50,11 +55,19 @@ export async function createCase(params: {
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to create case');
+    const kind: SupportSubmitErrorKind = mapCreateCaseRpcErrorToKind(error);
+    if (process.env.NODE_ENV !== 'production') {
+      // Dev-only: log raw error for debugging (never show this to users)
+      // eslint-disable-next-line no-console
+      console.warn('[createCase] create_case RPC failed:', error);
+    }
+    const out: SupportSubmitError = { kind, raw: error };
+    throw out;
   }
 
   if (!data) {
-    throw new Error('No case ID returned');
+    const out: SupportSubmitError = { kind: 'unknown', raw: { message: 'No case ID returned' } };
+    throw out;
   }
 
   return String(data);

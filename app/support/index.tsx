@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +25,10 @@ import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/c
 import { AccessibilityHints, getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import type { SupportCaseCategory } from '@/utils/types';
 import { validateSupportCaseSubmission } from '@/utils/validation';
+import {
+  isSupportSubmitError,
+  type SupportSubmitErrorKind,
+} from '@/lib/services/supportSubmitErrors';
 
 type CategoryOption = { value: SupportCaseCategory; labelKey: string };
 
@@ -59,7 +63,9 @@ export default function SupportNewCaseScreen() {
     () => [
       { value: 'bug', labelKey: 'support.categories.bug' },
       { value: 'feature_request', labelKey: 'support.categories.feature_request' },
+      { value: 'improvement', labelKey: 'support.categories.improvement' },
       { value: 'food_addition', labelKey: 'support.categories.food_addition' },
+      { value: 'appreciation', labelKey: 'support.categories.appreciation' },
       { value: 'other', labelKey: 'support.categories.other' },
     ],
     []
@@ -70,6 +76,8 @@ export default function SupportNewCaseScreen() {
   const [message, setMessage] = useState('');
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [successCaseId, setSuccessCaseId] = useState<string | null>(null);
+  const [submitErrorKind, setSubmitErrorKind] = useState<SupportSubmitErrorKind | null>(null);
+  const [submitErrorOverrideKey, setSubmitErrorOverrideKey] = useState<string | null>(null);
 
   const appVersion = getAppVersionLabel();
   const userAgent = Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.userAgent : null;
@@ -77,11 +85,40 @@ export default function SupportNewCaseScreen() {
 
   const isBusy = submit.isPending;
 
+  const SETTINGS_ROUTE = '/settings';
+
+  const handleBack = useCallback(() => {
+    // Prefer router's canGoBack() when available
+    try {
+      if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+        router.back();
+        return;
+      }
+    } catch {
+      // Fall through to web history check / fallback route
+    }
+
+    // Web-only: if browser history exists, go back (covers direct loads where canGoBack is false)
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+    }
+
+    // Deterministic fallback after hard refresh/direct entry
+    router.replace(SETTINGS_ROUTE);
+  }, [router]);
+
   const handleSubmit = async () => {
+    setSubmitErrorKind(null);
+    setSubmitErrorOverrideKey(null);
+
     const trimmedMessage = message.trim();
     const v = validateSupportCaseSubmission({ message: trimmedMessage });
     if (!v.valid) {
-      Alert.alert(t('support.errors.title'), t(v.errorKey ?? 'common.unexpected_error'));
+      setSubmitErrorKind('unknown');
+      setSubmitErrorOverrideKey(v.errorKey ?? 'support.errors.unknown_body');
       return;
     }
 
@@ -97,20 +134,24 @@ export default function SupportNewCaseScreen() {
       });
       setSuccessCaseId(result.caseId);
     } catch (e: any) {
-      const msg = String(e?.message ?? '');
-      if (msg.toLowerCase().includes('rate_limit_exceeded')) {
-        Alert.alert(t('support.errors.title'), t('support.errors.rate_limit_exceeded'));
+      if (isSupportSubmitError(e)) {
+        setSubmitErrorKind(e.kind);
+        if (e.kind === 'rate_limit' && process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('Rate limit hit');
+        }
         return;
       }
-      if (msg.toLowerCase().includes('duplicate_case')) {
-        Alert.alert(t('support.errors.title'), t('support.errors.duplicate_case'));
-        return;
-      }
+
+      // Support screenshot/compression errors propagate as i18n keys.
+      const msg = typeof e?.message === 'string' ? e.message : '';
       if (msg.startsWith('support.')) {
-        Alert.alert(t('support.errors.title'), t(msg));
+        setSubmitErrorKind('unknown');
+        setSubmitErrorOverrideKey(msg);
         return;
       }
-      Alert.alert(t('support.errors.title'), msg || t('common.unexpected_error'));
+
+      setSubmitErrorKind('unknown');
     }
   };
 
@@ -145,7 +186,7 @@ export default function SupportNewCaseScreen() {
             getMinTouchTargetStyle(),
             Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
           ]}
-          onPress={() => router.back()}
+          onPress={handleBack}
           disabled={isBusy}
           {...getButtonAccessibilityProps(t('common.back'), AccessibilityHints.BACK, isBusy)}
         >
@@ -219,6 +260,17 @@ export default function SupportNewCaseScreen() {
 
         <ScreenshotPicker value={screenshotFile} onChange={setScreenshotFile} disabled={isBusy} />
 
+        {(submitErrorKind || submitErrorOverrideKey) && (
+          <View style={[styles.errorBanner, { borderColor: colors.error, backgroundColor: colors.errorLight }]}>
+            <ThemedText style={[styles.errorTitle, { color: colors.error }]}>
+              {t(`support.errors.${submitErrorKind ?? 'unknown'}_title`)}
+            </ThemedText>
+            <ThemedText style={[styles.errorBody, { color: colors.textSecondary }]}>
+              {submitErrorOverrideKey ? t(submitErrorOverrideKey) : t(`support.errors.${submitErrorKind ?? 'unknown'}_body`)}
+            </ThemedText>
+          </View>
+        )}
+
         <View style={styles.actionRow}>
           <Button variant="primary" size="md" onPress={handleSubmit} loading={isBusy} fullWidth>
             {t('support.form.submit')}
@@ -238,6 +290,9 @@ export default function SupportNewCaseScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: Layout.desktopMaxWidth,
+    alignSelf: 'center',
     paddingHorizontal: Layout.screenPadding,
     paddingTop: Spacing.lg,
   },
@@ -315,6 +370,20 @@ const styles = StyleSheet.create({
   loadingRow: {
     alignItems: 'center',
     paddingTop: Spacing.sm,
+  },
+  errorBanner: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: Spacing.xs,
+  },
+  errorTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
+  errorBody: {
+    fontSize: FontSize.sm,
+    lineHeight: 18,
   },
   content: {
     flex: 1,
