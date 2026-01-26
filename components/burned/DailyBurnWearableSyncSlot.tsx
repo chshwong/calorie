@@ -96,16 +96,20 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync }: Props) {
   );
 }
 
+// Generic alias (preferred for reuse outside Daily Burn).
+// Keep the DailyBurnWearableSyncSlot export to avoid churn.
+export const WearableSyncSlot = DailyBurnWearableSyncSlot;
+
 const styles = StyleSheet.create({
   slotContainer: {
-    minHeight: 26,
+    minHeight: 0,
     justifyContent: 'center',
-    paddingTop: Spacing.xxs,
+    paddingTop: 0,
   },
   link: {
     alignSelf: 'flex-start',
     paddingHorizontal: 0,
-    paddingVertical: 2,
+    paddingVertical: 0,
     backgroundColor: 'transparent',
   },
   linkDisabled: {

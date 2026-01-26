@@ -31,9 +31,11 @@ type Props = {
   selectedDate: Date;
   todayLocal: Date; // local midnight
   unit: Unit;
+  /** Optional right-side slot in the 7-day card header (e.g., wearable Sync). */
+  headerRightSlot?: React.ReactNode;
 };
 
-export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLatest, selectedDate, todayLocal, unit }: Props) {
+export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLatest, selectedDate, todayLocal, unit, headerRightSlot }: Props) {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -252,11 +254,18 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
           return (
             <View style={[styles.page, pageWidth > 0 && { width: pageWidth }]}>
               <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
-                <View style={{ gap: Spacing.xs }}>
-                  <ThemedText style={{ color: colors.text, fontWeight: '600' }}>{item.title}</ThemedText>
-                  <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>
-                    {formatRange(ds.start, ds.end)}
-                  </ThemedText>
+                <View style={styles.headerRow}>
+                  <View style={{ gap: Spacing.xs, flex: 1, minWidth: 0 }}>
+                    <ThemedText style={{ color: colors.text, fontWeight: '600' }}>{item.title}</ThemedText>
+                    <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>
+                      {formatRange(ds.start, ds.end)}
+                    </ThemedText>
+                  </View>
+                  {item.id === '7d' && headerRightSlot ? (
+                    <View style={styles.headerRight} pointerEvents="box-none">
+                      {headerRightSlot}
+                    </View>
+                  ) : null}
                 </View>
 
                 <WeightTrendLineChart 
@@ -347,6 +356,17 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     gap: Spacing.lg,
     marginHorizontal: Platform.OS === 'web' ? 0 : 0,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingTop: 1, // aligns with title baseline (no visual redesign)
   },
   dotsRow: {
     flexDirection: 'row',

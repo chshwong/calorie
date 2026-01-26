@@ -20,9 +20,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
-import { useFitbitConnectionPublic, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
+import { useFitbitConnectionQuery, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
 import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
 import { useSyncFitbitWeightNow } from '@/hooks/use-fitbit-weight-sync';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
 import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
@@ -33,7 +34,8 @@ import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
 import { showAppToast } from '@/components/ui/app-toast';
 import { WeightSettingsModal } from '@/components/weight/WeightSettingsModal';
 import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
-import { SegmentedToggle } from '@/components/ui';
+import { ConfirmModal, SegmentedToggle } from '@/components/ui';
+import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 
 import FitbitLogo from '@/assets/images/fitbit_logo.svg';
 
@@ -68,13 +70,16 @@ export default function WeightHomeScreen() {
   const updateProfileForSettings = useUpdateProfile();
   const [showMenu, setShowMenu] = useState(false);
   const [fitbitModalVisible, setFitbitModalVisible] = useState(false);
+  const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
   const fitbitEnabled = Platform.OS === 'web';
-  const { data: fitbitConn, isLoading: fitbitConnLoading, isFetching: fitbitConnFetching } = useFitbitConnectionPublic({
-    enabled: fitbitEnabled && (showMenu || fitbitModalVisible),
-  });
+  const fitbit = useFitbitConnectionQuery({ enabled: fitbitEnabled });
+  const fitbitConn = fitbit.data ?? null;
+  const fitbitConnLoading = fitbit.isLoading;
+  const fitbitConnFetching = fitbit.isFetching;
   const disconnectFitbit = useDisconnectFitbit();
   const connectFitbit = useFitbitConnectPopup();
   const syncWeightNow = useSyncFitbitWeightNow();
+  const fitbitOrchestrator = useFitbitSyncOrchestrator();
   const weight366Query = useWeightLogs366d();
   const rawLogs = weight366Query.data ?? [];
   const dailyLatest = useMemo(() => deriveDailyLatestWeight(rawLogs), [rawLogs]);
@@ -99,6 +104,7 @@ export default function WeightHomeScreen() {
   const unit: 'kg' | 'lbs' = profile?.weight_unit === 'kg' ? 'kg' : 'lbs';
   const weightSyncProvider: 'none' | 'fitbit' =
     profile?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none';
+  const weightSyncEnabled = weightSyncProvider === 'fitbit';
 
   const [draftUnit, setDraftUnit] = useState<'lbs' | 'kg'>(unit);
   const [draftWeightProvider, setDraftWeightProvider] = useState<'none' | 'fitbit'>(weightSyncProvider);
@@ -229,7 +235,26 @@ export default function WeightHomeScreen() {
         module="weight"
       >
         <DesktopPageContainer>
-          <WeightChartCarousel dailyLatest={dailyLatest} selectedDate={selectedDate} todayLocal={todayLocal} unit={unit} />
+          <WeightChartCarousel
+            dailyLatest={dailyLatest}
+            selectedDate={selectedDate}
+            todayLocal={todayLocal}
+            unit={unit}
+            headerRightSlot={
+              fitbitEnabled && weightSyncEnabled && fitbit.isConnected ? (
+                <WearableSyncSlot
+                  isConnected={fitbit.isConnected}
+                  lastSyncAt={fitbit.lastSyncAt}
+                  onSync={async () => {
+                    const res = await fitbitOrchestrator.syncFitbitAllNow({ includeBurnApply: false });
+                    if (res.weightOk === false && res.weightErrorCode === 'INSUFFICIENT_SCOPE') {
+                      showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
+                    }
+                  }}
+                />
+              ) : null
+            }
+          />
 
             <View style={[styles.card, { backgroundColor: colors.card, ...Shadows.md }]}>
               {isLoading ? (
@@ -350,8 +375,11 @@ export default function WeightHomeScreen() {
 
       <WeightSettingsModal
         visible={showMenu}
-        title={t('common.settings')}
-        onClose={() => setShowMenu(false)}
+        title={t('weight.settings.title')}
+        onClose={() => {
+          setShowMenu(false);
+          setDisconnectConfirmVisible(false);
+        }}
         onSave={async () => {
           if (updateProfileForSettings.isPending) return;
           const updates: { weight_unit?: 'lbs' | 'kg'; weight_sync_provider?: 'none' | 'fitbit' } = {};
@@ -449,20 +477,12 @@ export default function WeightHomeScreen() {
                 fitbitConn?.status === 'active'
                   ? {
                       label: t('burned.fitbit.actions.disconnect'),
-                      onPress: async () => {
-                        try {
-                          await disconnectFitbit.mutateAsync();
-                          showAppToast(t('burned.fitbit.toast.disconnected'));
-                          setFitbitModalVisible(false);
-                        } catch {
-                          showAppToast(t('burned.fitbit.toast.disconnect_failed'));
-                        }
-                      },
-                      disabled: disconnectFitbit.isPending,
-                      loading: disconnectFitbit.isPending,
+                      onPress: () => setDisconnectConfirmVisible(true),
+                      disabled: disconnectFitbit.isPending || disconnectConfirmVisible,
                     }
                   : null
               }
+              secondaryActionVariant="tertiary"
             >
               <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700' }}>
                 {t('weight.settings.wearable.weight_sync_label')}
@@ -522,6 +542,31 @@ export default function WeightHomeScreen() {
           } catch {
             showAppToast(t('burned.fitbit.toast.connect_failed'));
           }
+        }}
+      />
+
+      <ConfirmModal
+        visible={disconnectConfirmVisible}
+        title={t('burned.fitbit.confirm_disconnect.title')}
+        message={t('burned.fitbit.confirm_disconnect.message')}
+        confirmText={t('burned.fitbit.actions.disconnect')}
+        cancelText={t('common.cancel')}
+        confirmButtonStyle={{ backgroundColor: colors.error }}
+        confirmDisabled={disconnectFitbit.isPending}
+        onConfirm={async () => {
+          if (disconnectFitbit.isPending) return;
+          try {
+            await disconnectFitbit.mutateAsync();
+            showAppToast(t('burned.fitbit.toast.disconnected'));
+            setDisconnectConfirmVisible(false);
+            setFitbitModalVisible(false);
+          } catch {
+            showAppToast(t('burned.fitbit.toast.disconnect_failed'));
+          }
+        }}
+        onCancel={() => {
+          if (disconnectFitbit.isPending) return;
+          setDisconnectConfirmVisible(false);
         }}
       />
     </ThemedView>

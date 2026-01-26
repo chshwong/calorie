@@ -2421,7 +2421,7 @@ const styles = StyleSheet.create({
   energyBalanceRowAccessory: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: -4,
   },
   energyBalanceCol: {
     flex: 1,

@@ -67,17 +67,17 @@ export function WeightSettingsModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        style={[styles.overlay, { backgroundColor: colors.overlay }]}
-        onPress={onClose}
-        disabled={isSaving}
-        accessibilityRole="button"
-        {...getButtonAccessibilityProps(t('common.close'), t('common.close_hint'))}
-      >
+      <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+        {/* Backdrop layer (must NOT wrap buttons on web) */}
         <Pressable
-          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={(e) => e.stopPropagation()}
-        >
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          disabled={isSaving}
+          accessibilityRole="button"
+          {...getButtonAccessibilityProps(t('common.close'), t('common.close_hint'))}
+        />
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.header, { borderBottomColor: colors.separator }]}>
             <ThemedText style={[styles.title, { color: colors.text }]}>{title}</ThemedText>
             <TouchableOpacity
@@ -138,8 +138,8 @@ export function WeightSettingsModal({
               <ThemedText style={[styles.saveText, { color: colors.textInverse }]}>{t('common.save')}</ThemedText>
             </TouchableOpacity>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

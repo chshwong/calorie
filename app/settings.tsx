@@ -35,6 +35,8 @@ import { deleteUserAccountData } from '@/lib/services/accountDeletion';
 import { showAppToast } from '@/components/ui/app-toast';
 import { resetTour } from '@/features/tour/storage';
 import { ShareButton } from '@/src/components/share/ShareButton';
+import { useAddToHomeScreen } from '@/src/features/install/useAddToHomeScreen';
+import { AddToHomeScreenModal } from '@/src/features/install/AddToHomeScreenModal';
 import {
   loadSettingsPreferences,
   saveSettingsPreferences,
@@ -130,7 +132,11 @@ export default function SettingsScreen() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showRestartTourConfirm, setShowRestartTourConfirm] = useState(false);
   const [restartTourLoading, setRestartTourLoading] = useState(false);
+  const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
+  const [addToHomeScreenModalMode, setAddToHomeScreenModalMode] = useState<'ios' | 'fallback'>('fallback');
   const scrollRef = useRef<ScrollView>(null);
+
+  const { isStandalone, isIosSafari, promptInstall } = useAddToHomeScreen();
 
   // Always reset scroll position when returning to Settings
   useFocusEffect(
@@ -438,6 +444,29 @@ export default function SettingsScreen() {
               appRouter.push('/edit-profile');
             }}
           />
+          <SettingItem
+            icon="house.fill"
+            title={t('settings.account.add_to_home_screen')}
+            subtitle={t('settings.account.add_to_home_screen_subtitle')}
+            onPress={async () => {
+              if (isStandalone) {
+                showAppToast(t('settings.add_to_home_screen.toast_already_added'));
+                return;
+              }
+              if (isIosSafari) {
+                setAddToHomeScreenModalMode('ios');
+                setShowAddToHomeScreenModal(true);
+                return;
+              }
+              const result = await promptInstall();
+              if (result === 'accepted') {
+                showAppToast(t('settings.add_to_home_screen.toast_added'));
+              } else if (result === 'unavailable') {
+                setAddToHomeScreenModalMode('fallback');
+                setShowAddToHomeScreenModal(true);
+              }
+            }}
+          />
         </SettingSection>
 
         {/* Preferences */}
@@ -703,6 +732,12 @@ export default function SettingsScreen() {
         confirmDisabled={restartTourLoading}
         animationType="fade"
         loading={restartTourLoading}
+      />
+
+      <AddToHomeScreenModal
+        visible={showAddToHomeScreenModal}
+        onClose={() => setShowAddToHomeScreenModal(false)}
+        mode={addToHomeScreenModalMode}
       />
     </ThemedView>
   );

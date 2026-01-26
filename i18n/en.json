@@ -299,7 +299,8 @@
       "title_default": "🔥 Calories burned",
       "estimated_banner": "Update with your wearable’s data for better accuracy.",
       "high_value_warning": "Value looks unusually high, please double check",
-      "too_high": "Value is too high, please correct"
+      "too_high": "Value is too high, please correct",
+      "wearable_integration": "Wearable Integration"
     },
     "fields": {
       "bmr": "Basal Metabolic Rate (BMR)",
@@ -329,6 +330,10 @@
         "sync_now": "Sync now",
         "disconnect": "Disconnect",
         "reconnect": "Reconnect Fitbit"
+      },
+      "confirm_disconnect": {
+        "title": "Disconnect Fitbit?",
+        "message": "You can reconnect anytime."
       },
       "toast": {
         "connected": "Fitbit connected.",
@@ -1321,8 +1326,27 @@
       "title": "Account",
       "edit_profile": "Edit Profile",
       "edit_profile_subtitle": "Update your personal info, gender, height",
+      "add_to_home_screen": "Add AvoVibe to Home Screen",
+      "add_to_home_screen_subtitle": "Adds an app icon to your phone's home screen",
       "email_settings": "Email Settings",
       "change_password": "Change Password"
+    },
+    "add_to_home_screen": {
+      "title": "Add AvoVibe to Home Screen",
+      "modal_got_it": "Got it",
+      "modal_ios_step_1": "Tap the Share button in Safari",
+      "modal_ios_step_2": "Choose \"Add to Home Screen\"",
+      "modal_ios_step_3": "Tap Add",
+      "modal_fallback_title": "Add AvoVibe to Your Phone",
+      "modal_fallback_primary": "You can add AvoVibe to your phone's home screen so it opens like a real app.",
+      "modal_fallback_secondary": "Your browser doesn't support one-tap install here.",
+      "modal_fallback_ios": "If you're on iPhone (Safari): Tap Share → Add to Home Screen",
+      "modal_fallback_android": "If you're on Android: Tap the menu (⋮) → Add to Home Screen or Install app",
+      "toast_already_added": "Already added to your home screen",
+      "toast_added": "Added to home screen"
+    },
+    "share": {
+      "button_label": "Share AvoVibe"
     },
     "preferences": {
       "title": "Preferences",
@@ -2904,8 +2928,9 @@
       "log_weight_a11y": "Log weight"
     },
     "settings": {
+      "title": "Weight Settings",
       "wearable": {
-        "title": "Wearable",
+        "title": "Wearable Integration",
         "web_only": "Wearables are web-only for now.",
         "status": {
           "connected": "Fitbit connected",

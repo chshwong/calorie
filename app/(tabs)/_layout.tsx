@@ -13,6 +13,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
 import { BigCircleMenuTokens, Colors, FontSize, FontWeight, Layout, MoreSheetTokens } from '@/constants/theme';
 import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
+import { ShareChip } from '@/src/components/share/ShareChip';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
@@ -946,10 +947,13 @@ function TabLayoutContent() {
                   isDark={isDark}
                   title={t('tabs.more')}
                   titleNode={
-                    <BrandLogoMascotOnly
-                      width={MoreSheetTokens.header.logoWidth}
-                      accessibilityLabel={t('tabs.more')}
-                    />
+                    <View style={styles.moreHeaderRow}>
+                      <BrandLogoMascotOnly
+                        width={MoreSheetTokens.header.logoWidth}
+                        accessibilityLabel={t('tabs.more')}
+                      />
+                      <ShareChip />
+                    </View>
                   }
                   items={moreSheetItems}
                   iconColor={colors.tint}
@@ -1056,5 +1060,11 @@ const styles = StyleSheet.create({
     maxWidth: Layout.desktopMaxWidth, // Match DesktopPageContainer max-width (same as main content)
     alignSelf: 'center',
     alignItems: 'center',
+  },
+  moreHeaderRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
 });

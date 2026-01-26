@@ -4,6 +4,7 @@ import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, TouchableOp
 
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { BURNED, RANGES } from '@/constants/constraints';
@@ -57,11 +58,17 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const resetMutation = useResetDailySumBurned();
 
   const fitbitEnabled = Platform.OS === 'web';
-  const { data: fitbitConn, isLoading: fitbitConnLoading, isFetching: fitbitConnFetching } = useFitbitConnectionPublic({ enabled: fitbitEnabled && visible });
+  const {
+    data: fitbitConn,
+    isLoading: fitbitConnLoading,
+    isFetching: fitbitConnFetching,
+    refetch: refetchFitbitConn,
+  } = useFitbitConnectionPublic({ enabled: fitbitEnabled && visible });
   const disconnectFitbit = useDisconnectFitbit();
   const connectFitbit = useFitbitConnectPopup();
   const fitbitOrchestrator = useFitbitSyncOrchestrator();
   const [fitbitSyncing, setFitbitSyncing] = useState(false);
+  const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
 
   const fitbitStatusLine = useMemo(() => {
     if (!fitbitEnabled) return null;
@@ -103,6 +110,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       setHasUserEditedThisSession(false);
       setFitbitModalVisible(false);
       setBurnCorrectionModalVisible(false);
+      setDisconnectConfirmVisible(false);
       setCenterToastText(null);
       if (centerToastTimerRef.current) clearTimeout(centerToastTimerRef.current);
       return;
@@ -412,8 +420,16 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
 
   const handleDisconnect = async () => {
     if (!fitbitEnabled) return;
+    if (disconnectFitbit.isPending) return;
     try {
       await disconnectFitbit.mutateAsync();
+      setDisconnectConfirmVisible(false);
+      // Ensure UI flips to disconnected state (Fitbit card / actions).
+      try {
+        await refetchFitbitConn();
+      } catch {
+        // ignore
+      }
       const res = await refetchBurned();
       const row = res.data ?? null;
       if (row && !hasUserEditedThisSession && !touched.active && !touched.tdee) {
@@ -628,7 +644,9 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
               {/* Wearable device card (web-only) */}
               {fitbitEnabled && (
                 <>
-                  <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>Wearable device</ThemedText>
+                  <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>
+                    {t('burned.modal.wearable_integration')}
+                  </ThemedText>
                   <FitbitConnectionCard
                     statusLine={fitbitStatusLine ?? 'Not connected'}
                     connected={fitbitConn?.status === 'active'}
@@ -650,11 +668,12 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                       fitbitConn?.status === 'active'
                         ? {
                             label: t('burned.fitbit.actions.disconnect'),
-                            onPress: handleDisconnect,
-                            disabled: isBusy,
+                            onPress: () => setDisconnectConfirmVisible(true),
+                            disabled: isBusy || disconnectConfirmVisible,
                           }
                         : null
                     }
+                    secondaryActionVariant="tertiary"
                   />
                 </>
               )}
@@ -809,6 +828,20 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
         burnedRow={burnedRow ?? null}
         refetchBurned={async () => {
           await refetchBurned();
+        }}
+      />
+      <ConfirmModal
+        visible={disconnectConfirmVisible}
+        title={t('burned.fitbit.confirm_disconnect.title')}
+        message={t('burned.fitbit.confirm_disconnect.message')}
+        confirmText={t('burned.fitbit.actions.disconnect')}
+        cancelText={t('common.cancel')}
+        confirmButtonStyle={{ backgroundColor: colors.error }}
+        confirmDisabled={disconnectFitbit.isPending}
+        onConfirm={handleDisconnect}
+        onCancel={() => {
+          if (disconnectFitbit.isPending) return;
+          setDisconnectConfirmVisible(false);
         }}
       />
     </Modal>

@@ -4,7 +4,9 @@ import {
   Text,
   StyleSheet,
   Modal,
+  Pressable,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Platform,
   type StyleProp,
   type TextStyle,
@@ -129,75 +131,80 @@ export function ConfirmModal({
       onRequestClose={onCancel}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <ThemedText type="title" style={styles.modalTitle}>
-            {title}
-          </ThemedText>
-          {typeof message === 'string' ? (
-            <ThemedText style={[styles.modalMessage, { color: colors.text }]}>
-              {message}
+        {/* Backdrop layer (sibling, avoids nested <button> on web) */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} disabled={confirmDisabled} accessible={false} />
+
+        <TouchableWithoutFeedback>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <ThemedText type="title" style={styles.modalTitle}>
+              {title}
             </ThemedText>
-          ) : (
-            <View style={styles.modalMessageContainer}>{message}</View>
-          )}
-          <View style={styles.modalButtons}>
-            {cancelText && (
+            {typeof message === 'string' ? (
+              <ThemedText style={[styles.modalMessage, { color: colors.text }]}>
+                {message}
+              </ThemedText>
+            ) : (
+              <View style={styles.modalMessageContainer}>{message}</View>
+            )}
+            <View style={styles.modalButtons}>
+              {cancelText && (
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.modalButtonCancel,
+                    { borderColor: colors.border },
+                    getMinTouchTargetStyle(),
+                    cancelButtonStyle,
+                    ...(Platform.OS === 'web' ? [getFocusStyle(colors.tint)] : []),
+                  ]}
+                  onPress={onCancel}
+                  activeOpacity={0.7}
+                  {...getButtonAccessibilityProps(
+                    cancelText,
+                    `Cancel ${title.toLowerCase()}`
+                  )}
+                >
+                  <Text
+                    style={[
+                      styles.modalButtonText,
+                      {
+                        color: cancelButtonStyle?.backgroundColor ? '#fff' : colors.text,
+                      },
+                      cancelTextStyle,
+                    ]}
+                  >
+                    {cancelText}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[
                   styles.modalButton,
-                  styles.modalButtonCancel,
-                  { borderColor: colors.border },
+                  styles.modalButtonConfirm,
+                  {
+                    backgroundColor: colors.tint,
+                    opacity: confirmDisabled ? 0.6 : 1,
+                    ...(cancelText ? {} : { flex: 1 }), // Full width if no cancel button
+                  },
                   getMinTouchTargetStyle(),
-                  cancelButtonStyle,
-                  ...(Platform.OS === 'web' ? [getFocusStyle(colors.tint)] : []),
+                  confirmButtonStyle,
+                  ...(Platform.OS === 'web' ? [getFocusStyle('#fff')] : []),
                 ]}
-                onPress={onCancel}
+                onPress={onConfirm}
+                disabled={confirmDisabled}
                 activeOpacity={0.7}
                 {...getButtonAccessibilityProps(
-                  cancelText,
-                  `Cancel ${title.toLowerCase()}`
+                  confirmText,
+                  `Confirm ${title.toLowerCase()}`
                 )}
               >
-                <Text
-                  style={[
-                    styles.modalButtonText,
-                    {
-                      color: cancelButtonStyle?.backgroundColor ? '#fff' : colors.text,
-                    },
-                    cancelTextStyle,
-                  ]}
-                >
-                  {cancelText}
+                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                  {confirmText}
                 </Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[
-                styles.modalButton,
-                styles.modalButtonConfirm,
-                { 
-                  backgroundColor: colors.tint,
-                  opacity: confirmDisabled ? 0.6 : 1,
-                  ...(cancelText ? {} : { flex: 1 }), // Full width if no cancel button
-                },
-                getMinTouchTargetStyle(),
-                confirmButtonStyle,
-                ...(Platform.OS === 'web' ? [getFocusStyle('#fff')] : []),
-              ]}
-              onPress={onConfirm}
-              disabled={confirmDisabled}
-              activeOpacity={0.7}
-              {...getButtonAccessibilityProps(
-                confirmText,
-                `Confirm ${title.toLowerCase()}`
-              )}
-            >
-              <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                {confirmText}
-              </Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </View>
     </Modal>
   );

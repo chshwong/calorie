@@ -27,6 +27,7 @@ type Props = {
   logo: React.ReactNode;
   primaryAction?: Action | null;
   secondaryAction?: Action | null;
+  secondaryActionVariant?: 'secondary' | 'tertiary';
   children?: React.ReactNode;
   style?: ViewStyle;
 };
@@ -42,6 +43,7 @@ export function FitbitConnectionCard({
   logo,
   primaryAction,
   secondaryAction,
+  secondaryActionVariant = 'secondary',
   children,
   style,
 }: Props) {
@@ -49,20 +51,33 @@ export function FitbitConnectionCard({
   const colors = Colors[scheme ?? 'light'];
   const logoChipBg = scheme === 'dark' ? Colors.light.card : colors.backgroundSecondary;
 
-  const renderButton = (action: Action, variant: 'primary' | 'secondary') => {
+  const renderButton = (action: Action, variant: 'primary' | 'secondary' | 'tertiary') => {
     const isPrimary = variant === 'primary';
+    const isTertiary = variant === 'tertiary';
     const disabled = Boolean(action.disabled);
     return (
       <TouchableOpacity
         onPress={action.onPress}
         disabled={disabled}
         activeOpacity={0.85}
+        hitSlop={
+          isTertiary
+            ? {
+                top: 8,
+                bottom: 8,
+                left: 10,
+                right: 10,
+              }
+            : undefined
+        }
         style={[
-          isPrimary ? styles.primaryBtn : styles.secondaryBtn,
+          isPrimary ? styles.primaryBtn : isTertiary ? styles.tertiaryBtn : styles.secondaryBtn,
           isPrimary
             ? { backgroundColor: colors.tint, opacity: disabled ? 0.6 : 1 }
-            : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: disabled ? 0.6 : 1 },
-          getMinTouchTargetStyle(),
+            : isTertiary
+              ? { opacity: disabled ? 0.6 : 1 }
+              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: disabled ? 0.6 : 1 },
+          !isTertiary && getMinTouchTargetStyle(),
           Platform.OS === 'web' && getFocusStyle(isPrimary ? '#fff' : colors.tint),
         ]}
         {...getButtonAccessibilityProps(action.accessibilityLabel ?? action.label)}
@@ -70,7 +85,7 @@ export function FitbitConnectionCard({
         {action.loading ? (
           <ActivityIndicator size="small" color={isPrimary ? colors.textInverse : colors.tint} />
         ) : (
-          <ThemedText style={[isPrimary ? styles.primaryBtnText : styles.secondaryBtnText, { color: isPrimary ? colors.textInverse : colors.text }]}>
+          <ThemedText style={[isPrimary ? styles.primaryBtnText : isTertiary ? styles.tertiaryBtnText : styles.secondaryBtnText, { color: isPrimary ? colors.textInverse : isTertiary ? colors.textSecondary : colors.text }]}>
             {action.label}
           </ThemedText>
         )}
@@ -108,7 +123,7 @@ export function FitbitConnectionCard({
               {connected && primaryAction && secondaryAction ? (
                 <View style={styles.btnRow}>
                   {renderButton(primaryAction, 'primary')}
-                  {renderButton(secondaryAction, 'secondary')}
+                  {renderButton(secondaryAction, secondaryActionVariant)}
                 </View>
               ) : primaryAction ? (
                 renderButton(primaryAction, 'primary')
@@ -205,6 +220,19 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     fontSize: FontSize.sm,
     fontWeight: '700',
+  },
+  tertiaryBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: BorderRadius.md,
+    height: 30,
+    paddingVertical: 0,
+    paddingHorizontal: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tertiaryBtnText: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
   },
   childrenWrap: {
     marginTop: Spacing.md,
