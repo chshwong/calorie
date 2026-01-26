@@ -285,6 +285,7 @@ export function useSaveWeightEntry() {
 
       const saved = isUpdate
         ? await updateWeightLogRow({
+            userId: user.id,
             id: input.entryId!,
             weighedAt: input.weighedAt,
             weightLb: input.weightLb,

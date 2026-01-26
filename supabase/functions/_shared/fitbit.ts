@@ -18,12 +18,38 @@ export function jsonResponse(body: unknown, init?: ResponseInit) {
 }
 
 export function htmlResponse(html: string, init?: ResponseInit) {
+  // Build headers object, ensuring Content-Type is always set correctly
+  const headersObj: Record<string, string> = {
+    'Content-Type': 'text/html; charset=utf-8',
+  }
+  
+  // Copy existing headers if provided (Content-Type above ensures it won't be overridden)
+  if (init?.headers) {
+    if (init.headers instanceof Headers) {
+      init.headers.forEach((value, key) => {
+        if (key.toLowerCase() !== 'content-type') {
+          headersObj[key] = value
+        }
+      })
+    } else if (Array.isArray(init.headers)) {
+      for (const [key, value] of init.headers) {
+        if (key.toLowerCase() !== 'content-type') {
+          headersObj[key] = value
+        }
+      }
+    } else {
+      for (const [key, value] of Object.entries(init.headers)) {
+        if (key.toLowerCase() !== 'content-type') {
+          headersObj[key] = String(value)
+        }
+      }
+    }
+  }
+  
   return new Response(html, {
-    ...init,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      ...(init?.headers ?? {}),
-    },
+    status: init?.status ?? 200,
+    statusText: init?.statusText,
+    headers: headersObj,
   })
 }
 

@@ -13,6 +13,9 @@ verify_jwt = false
 [functions.fitbit-disconnect]
 verify_jwt = false
 
+[functions.fitbit-sync-weight]
+verify_jwt = false
+
 [functions.delete-auth-user]
 verify_jwt = false
 

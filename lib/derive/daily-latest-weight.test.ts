@@ -17,6 +17,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -40,6 +42,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -48,6 +52,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -70,6 +76,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -78,6 +86,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '3',
@@ -86,6 +96,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 152,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -108,6 +120,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 152,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '1',
@@ -116,6 +130,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -124,6 +140,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -143,6 +161,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -151,6 +171,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -171,6 +193,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -179,6 +203,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -200,6 +226,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -208,6 +236,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 150.5,
         body_fat_percent: 20.5,
         note: null,
+        source: null,
+        external_id: null,
       },
       // Day 2: 1 entry
       {
@@ -217,6 +247,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
       // Day 3: 3 entries
       {
@@ -226,6 +258,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 151.5,
         body_fat_percent: 21.5,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '5',
@@ -234,6 +268,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 152,
         body_fat_percent: 22,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '6',
@@ -242,6 +278,8 @@ describe('deriveDailyLatestWeight', () => {
         weight_lb: 152.5,
         body_fat_percent: 22.5,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 

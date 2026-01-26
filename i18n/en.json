@@ -2903,6 +2903,28 @@
       "log_weight": "+ Log weight",
       "log_weight_a11y": "Log weight"
     },
+    "settings": {
+      "wearable": {
+        "title": "Wearable",
+        "web_only": "Wearables are web-only for now.",
+        "status": {
+          "connected": "Fitbit connected",
+          "not_connected": "Not connected"
+        },
+        "weight_sync_label": "Weight sync",
+        "weight_sync_helper": "Activity sync will also update weight.",
+        "off": "Off",
+        "fitbit": "Fitbit",
+        "actions": {
+          "connect": "Connect Fitbit",
+          "sync_weight": "Sync weight"
+        },
+        "toast": {
+          "weight_updated": "Weight updated",
+          "reconnect_to_enable_weight_sync": "Reconnect Fitbit to enable weight sync"
+        }
+      }
+    },
     "body_fat": "{{value}}% body fat",
     "day": {
       "title": "Weigh-ins of the day",

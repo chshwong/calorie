@@ -33,7 +33,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
-import { useFitbitConnectionQuery, useFitbitSyncAndApplyMutation } from '@/hooks/use-fitbit-connection';
+import { useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useTransferMealtypeEntries } from '@/hooks/use-transfer-mealtype-entries';
@@ -679,7 +680,7 @@ export default function FoodLogHomeScreen() {
   const { data: dailyBurned } = useDailySumBurned(selectedDateString, { enabled: !!user?.id });
   const fitbitEnabled = Platform.OS === 'web';
   const fitbit = useFitbitConnectionQuery({ enabled: fitbitEnabled });
-  const syncAndApply = useFitbitSyncAndApplyMutation();
+  const fitbitOrchestrator = useFitbitSyncOrchestrator();
 
   // Prefetch adjacent dates for instant navigation
   useEffect(() => {
@@ -1342,7 +1343,13 @@ export default function FoodLogHomeScreen() {
                       <DailyBurnWearableSyncSlot
                         isConnected={fitbit.isConnected}
                         lastSyncAt={fitbit.lastSyncAt}
-                        onSync={() => syncAndApply.mutateAsync({ dateKey: selectedDateString }).then(() => undefined)}
+            onSync={async () => {
+              const res = await fitbitOrchestrator.syncFitbitAllNow({ dateKey: selectedDateString, includeBurnApply: true });
+              if (res.weightOk === false && res.weightErrorCode === 'INSUFFICIENT_SCOPE') {
+                // Activity sync succeeded; weight sync failed non-fatally.
+                showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
+              }
+            }}
                       />
                     ) : null
                   }

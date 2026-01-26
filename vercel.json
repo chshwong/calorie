@@ -4,6 +4,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/fitbit-oauth-complete.html",
+      "destination": "/fitbit-oauth-complete.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

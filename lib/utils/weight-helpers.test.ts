@@ -39,6 +39,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -55,6 +57,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -63,6 +67,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '3',
@@ -71,6 +77,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 150.5,
         body_fat_percent: 20.5,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -88,6 +96,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -96,6 +106,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 152,
         body_fat_percent: 22,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '3',
@@ -104,6 +116,8 @@ describe('getLatestWeightEntry', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -128,6 +142,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 150,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -136,6 +152,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 151,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -152,6 +170,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -160,6 +180,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '3',
@@ -168,6 +190,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 152,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -185,6 +209,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -193,6 +219,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 151,
         body_fat_percent: null, // No body fat
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '3',
@@ -201,6 +229,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 152,
         body_fat_percent: null,
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 
@@ -218,6 +248,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 150,
         body_fat_percent: 20,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '2',
@@ -226,6 +258,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 150.5,
         body_fat_percent: null, // No body fat
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '3',
@@ -234,6 +268,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 151,
         body_fat_percent: 21,
         note: null,
+        source: null,
+        external_id: null,
       },
       {
         id: '4',
@@ -242,6 +278,8 @@ describe('getLatestBodyFatEntry', () => {
         weight_lb: 152,
         body_fat_percent: null, // No body fat
         note: null,
+        source: null,
+        external_id: null,
       },
     ];
 

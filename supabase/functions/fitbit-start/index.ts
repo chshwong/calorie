@@ -9,6 +9,23 @@ import {
   supabaseAdminClient,
 } from '../_shared/fitbit.ts'
 
+function getRequestOrigin(req: Request): string | null {
+  // Browser fetch requests will include Origin; fall back to Referer if needed.
+  const origin = req.headers.get('origin')?.trim()
+  if (origin) return origin.replace(/\/+$/g, '')
+
+  const referer = req.headers.get('referer')?.trim()
+  if (referer) {
+    try {
+      return new URL(referer).origin
+    } catch {
+      // ignore
+    }
+  }
+
+  return null
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -24,7 +41,9 @@ serve(async (req) => {
 
     const clientId = requireEnv('FITBIT_CLIENT_ID')
     const redirectUri = requireEnv('FITBIT_REDIRECT_URI')
-    const scopes = (Deno.env.get('FITBIT_SCOPES') ?? 'activity').trim()
+    // Scopes are controlled via FITBIT_SCOPES env var.
+    // Default includes activity + body measurements (weight scope covers weight + body fat per Fitbit Web API).
+    const scopes = (Deno.env.get('FITBIT_SCOPES') ?? 'activity weight').trim()
 
     // PKCE + CSRF state
     const state = randomBase64Url(32)
@@ -33,12 +52,14 @@ serve(async (req) => {
 
     const admin = supabaseAdminClient()
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min
+    const appOrigin = getRequestOrigin(req)
 
     const { error } = await admin.from('fitbit_oauth_sessions').insert({
       state,
       user_id: userId,
       code_verifier: codeVerifier,
       expires_at: expiresAt,
+      app_origin: appOrigin,
     })
     if (error) {
       throw new Error(`DB_INSERT_FAILED:${error.message}`)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -20,12 +20,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { useFitbitConnectionPublic, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
+import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
+import { useSyncFitbitWeightNow } from '@/hooks/use-fitbit-weight-sync';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
 import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { toDateKey } from '@/utils/dateKey';
 import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
 import { getButtonAccessibilityProps } from '@/utils/accessibility';
+import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
+import { showAppToast } from '@/components/ui/app-toast';
+import { WeightSettingsModal } from '@/components/weight/WeightSettingsModal';
+import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
+import { SegmentedToggle } from '@/components/ui';
+
+import FitbitLogo from '@/assets/images/fitbit_logo.svg';
 
 export default function WeightHomeScreen() {
   const { t } = useTranslation();
@@ -54,8 +64,17 @@ export default function WeightHomeScreen() {
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
   const effectiveProfile = userConfig || authProfile; // For avatar
-  const updateProfile = useUpdateProfile();
+  // Settings modal must own its own mutation instance (avoid cross-screen pending-state mismatch).
+  const updateProfileForSettings = useUpdateProfile();
   const [showMenu, setShowMenu] = useState(false);
+  const [fitbitModalVisible, setFitbitModalVisible] = useState(false);
+  const fitbitEnabled = Platform.OS === 'web';
+  const { data: fitbitConn, isLoading: fitbitConnLoading, isFetching: fitbitConnFetching } = useFitbitConnectionPublic({
+    enabled: fitbitEnabled && (showMenu || fitbitModalVisible),
+  });
+  const disconnectFitbit = useDisconnectFitbit();
+  const connectFitbit = useFitbitConnectPopup();
+  const syncWeightNow = useSyncFitbitWeightNow();
   const weight366Query = useWeightLogs366d();
   const rawLogs = weight366Query.data ?? [];
   const dailyLatest = useMemo(() => deriveDailyLatestWeight(rawLogs), [rawLogs]);
@@ -78,6 +97,36 @@ export default function WeightHomeScreen() {
   };
 
   const unit: 'kg' | 'lbs' = profile?.weight_unit === 'kg' ? 'kg' : 'lbs';
+  const weightSyncProvider: 'none' | 'fitbit' =
+    profile?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none';
+
+  const [draftUnit, setDraftUnit] = useState<'lbs' | 'kg'>(unit);
+  const [draftWeightProvider, setDraftWeightProvider] = useState<'none' | 'fitbit'>(weightSyncProvider);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    setDraftUnit(unit);
+    setDraftWeightProvider(weightSyncProvider);
+  }, [showMenu, unit, weightSyncProvider]);
+
+  const hasDraftChanges = draftUnit !== unit || draftWeightProvider !== weightSyncProvider;
+
+  const fitbitStatusLine = useMemo(() => {
+    if (!fitbitEnabled) return null;
+    if (!fitbitConn) return 'Not connected';
+    const last = fitbitConn.last_sync_at;
+    if (fitbitConn.status === 'active' && last) {
+      let ts = last;
+      try {
+        ts = new Date(last).toLocaleString();
+      } catch {
+        // keep original
+      }
+      return `Connected • Last sync ${ts}`;
+    }
+    if (fitbitConn.status === 'active') return 'Connected';
+    return 'Not connected';
+  }, [fitbitConn, fitbitEnabled]);
   const latestEntry = weight366Query.data ? getLatestWeightEntry(weight366Query.data) : null;
   const latestBodyFatEntry = weight366Query.data ? getLatestBodyFatEntry(weight366Query.data) : null;
   const latestWeightValueLb = latestEntry?.weight_lb ?? null;
@@ -299,45 +348,182 @@ export default function WeightHomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal
+      <WeightSettingsModal
         visible={showMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMenu(false)}
+        title={t('common.settings')}
+        onClose={() => setShowMenu(false)}
+        onSave={async () => {
+          if (updateProfileForSettings.isPending) return;
+          const updates: { weight_unit?: 'lbs' | 'kg'; weight_sync_provider?: 'none' | 'fitbit' } = {};
+          if (draftUnit !== unit) updates.weight_unit = draftUnit;
+          if (draftWeightProvider !== weightSyncProvider) updates.weight_sync_provider = draftWeightProvider;
+          if (Object.keys(updates).length === 0) {
+            setShowMenu(false);
+            return;
+          }
+          try {
+            await updateProfileForSettings.mutateAsync(updates);
+            setShowMenu(false);
+          } catch {
+            showAppToast(t('common.unexpected_error'));
+          }
+        }}
+        isSaving={updateProfileForSettings.isPending}
+        disableSave={!hasDraftChanges}
       >
-        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setShowMenu(false)}>
-          <Pressable style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={(e) => e.stopPropagation()}>
-            <ThemedText style={[styles.menuTitle, { color: colors.textSecondary }]}>
-              Weight unit
-            </ThemedText>
-            <View style={styles.menuOptions}>
-              {(['lbs', 'kg'] as const).map((opt) => {
-                const isActive = unit === opt;
-                return (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[
-                      styles.menuOption,
-                      isActive && { backgroundColor: colors.tint + '15', borderColor: colors.tint },
-                    ]}
-                    onPress={() => {
-                      if (opt !== unit) {
-                        updateProfile.mutate({ weight_unit: opt });
-                      }
-                      setShowMenu(false);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <ThemedText style={{ color: colors.text }}>
-                      {opt === 'lbs' ? 'lbs' : 'kg'}
-                    </ThemedText>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>Weight unit</ThemedText>
+        <View style={styles.menuOptions}>
+          {(['lbs', 'kg'] as const).map((opt) => {
+            const isActive = draftUnit === opt;
+            return (
+              <TouchableOpacity
+                key={opt}
+                style={[
+                  styles.menuOption,
+                  isActive && { backgroundColor: colors.tint + '15', borderColor: colors.tint },
+                ]}
+                onPress={() => setDraftUnit(opt)}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={{ color: colors.text }}>
+                  {opt === 'lbs' ? 'lbs' : 'kg'}
+                </ThemedText>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+        <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>
+          {t('weight.settings.wearable.title')}
+        </ThemedText>
+
+        {!fitbitEnabled ? (
+          <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+            {t('weight.settings.wearable.web_only')}
+          </ThemedText>
+        ) : (
+          <>
+            <FitbitConnectionCard
+              statusLine={fitbitStatusLine ?? 'Not connected'}
+              connected={fitbitConn?.status === 'active'}
+              logo={<FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />}
+              primaryAction={
+                fitbitConn?.status === 'active'
+                  ? {
+                      label: t('weight.settings.wearable.actions.sync_weight'),
+                      onPress: async () => {
+                        if (fitbitConn?.status !== 'active') {
+                          setFitbitModalVisible(true);
+                          return;
+                        }
+                        try {
+                          await syncWeightNow.mutateAsync();
+                          showAppToast(t('weight.settings.wearable.toast.weight_updated'));
+                        } catch (e: any) {
+                          const msg = String(e?.message ?? '');
+                          if (msg === 'INSUFFICIENT_SCOPE') {
+                            showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
+                            setFitbitModalVisible(true);
+                          } else if (msg === 'RATE_LIMIT') {
+                            showAppToast(t('burned.fitbit.errors.rate_limit_15m'));
+                          } else if (msg === 'UNAUTHORIZED' || msg === 'MISSING_TOKENS') {
+                            showAppToast(t('burned.fitbit.errors.reconnect_required'));
+                            setFitbitModalVisible(true);
+                          } else {
+                            showAppToast(t('burned.fitbit.toast.sync_failed'));
+                          }
+                        }
+                      },
+                      disabled: draftWeightProvider !== 'fitbit' || syncWeightNow.isPending,
+                      loading: syncWeightNow.isPending,
+                    }
+                  : {
+                      label: t('weight.settings.wearable.actions.connect'),
+                      onPress: () => setFitbitModalVisible(true),
+                      disabled: connectFitbit.isPending,
+                    }
+              }
+              secondaryAction={
+                fitbitConn?.status === 'active'
+                  ? {
+                      label: t('burned.fitbit.actions.disconnect'),
+                      onPress: async () => {
+                        try {
+                          await disconnectFitbit.mutateAsync();
+                          showAppToast(t('burned.fitbit.toast.disconnected'));
+                          setFitbitModalVisible(false);
+                        } catch {
+                          showAppToast(t('burned.fitbit.toast.disconnect_failed'));
+                        }
+                      },
+                      disabled: disconnectFitbit.isPending,
+                      loading: disconnectFitbit.isPending,
+                    }
+                  : null
+              }
+            >
+              <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700' }}>
+                {t('weight.settings.wearable.weight_sync_label')}
+              </ThemedText>
+              <SegmentedToggle<'none' | 'fitbit'>
+                options={[
+                  { key: 'none', label: t('weight.settings.wearable.off') },
+                  { key: 'fitbit', label: t('weight.settings.wearable.fitbit') },
+                ]}
+                value={draftWeightProvider}
+                onChange={(next) => setDraftWeightProvider(next)}
+              />
+              {draftWeightProvider === 'fitbit' ? (
+                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                  {t('weight.settings.wearable.weight_sync_helper')}
+                </ThemedText>
+              ) : null}
+            </FitbitConnectionCard>
+
+            {fitbitEnabled && (fitbitConnLoading || fitbitConnFetching) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <ActivityIndicator size="small" color={colors.tint} />
+                <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs }}>
+                  {t('common.loading')}
+                </ThemedText>
+              </View>
+            ) : null}
+          </>
+        )}
+      </WeightSettingsModal>
+
+      <FitbitConnectModal
+        visible={fitbitModalVisible}
+        onClose={() => setFitbitModalVisible(false)}
+        mode="connectOnly"
+        fitbitEnabled={fitbitEnabled}
+        connection={fitbitConn ?? null}
+        isFetching={fitbitConnLoading || fitbitConnFetching}
+        isBusy={connectFitbit.isPending}
+        onConnect={async () => {
+          try {
+            const res = await connectFitbit.mutateAsync();
+            if (res.ok) {
+              showAppToast(t('burned.fitbit.toast.connected'));
+              setFitbitModalVisible(false);
+              return;
+            }
+            const msg =
+              res.errorCode === 'popup_blocked'
+                ? t('burned.fitbit.errors.popup_blocked')
+                : res.errorCode === 'timeout'
+                  ? t('burned.fitbit.errors.popup_timeout')
+                  : res.errorCode === 'closed'
+                    ? t('burned.fitbit.errors.popup_closed')
+                    : null;
+            showAppToast(msg ?? res.message ?? t('burned.fitbit.toast.connect_failed'));
+          } catch {
+            showAppToast(t('burned.fitbit.toast.connect_failed'));
+          }
+        }}
+      />
     </ThemedView>
   );
 }
@@ -588,6 +774,12 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     ...Shadows.md,
   },
+  sectionHeader: {
+    fontSize: FontSize.xs,
+    fontWeight: '800',
+    marginTop: Spacing.xs,
+    marginBottom: -Spacing.xs,
+  },
   menuTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
@@ -602,6 +794,24 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     borderColor: 'transparent',
+  },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    width: '100%',
+    marginVertical: Spacing.sm,
+  },
+  helperText: {
+    fontSize: FontSize.xs,
+    lineHeight: FontSize.xs + 4,
+  },
+  menuActionBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    flex: 1,
   },
 });
 

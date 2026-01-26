@@ -8,16 +8,19 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { BURNED, RANGES } from '@/constants/constraints';
 import { BorderRadius, Colors, FontSize, SemanticColors, Spacing } from '@/constants/theme';
-import { useApplyRawToFinals, useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
+import { useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
-import { useDisconnectFitbit, useFitbitConnectionPublic, useSyncFitbitNow } from '@/hooks/use-fitbit-connection';
+import { useDisconnectFitbit, useFitbitConnectionPublic } from '@/hooks/use-fitbit-connection';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { getTodayKey, getYesterdayKey, toDateKey } from '@/utils/dateKey';
 
 import FitbitLogo from '@/assets/images/fitbit_logo.svg';
 import { BurnReductionModal } from '@/components/burned/BurnReductionModal';
 import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
+import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
 
 type Props = {
   visible: boolean;
@@ -52,12 +55,13 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const { data: burnedRow, isLoading, isFetching, error, refetch: refetchBurned } = useDailySumBurned(entryDate, { enabled: visible });
   const saveMutation = useSaveDailySumBurned();
   const resetMutation = useResetDailySumBurned();
-  const applyFromRawMutation = useApplyRawToFinals();
 
   const fitbitEnabled = Platform.OS === 'web';
-  const { data: fitbitConn } = useFitbitConnectionPublic({ enabled: fitbitEnabled && visible });
-  const syncFitbit = useSyncFitbitNow();
+  const { data: fitbitConn, isLoading: fitbitConnLoading, isFetching: fitbitConnFetching } = useFitbitConnectionPublic({ enabled: fitbitEnabled && visible });
   const disconnectFitbit = useDisconnectFitbit();
+  const connectFitbit = useFitbitConnectPopup();
+  const fitbitOrchestrator = useFitbitSyncOrchestrator();
+  const [fitbitSyncing, setFitbitSyncing] = useState(false);
 
   const fitbitStatusLine = useMemo(() => {
     if (!fitbitEnabled) return null;
@@ -166,8 +170,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     isFetching ||
     saveMutation.isPending ||
     resetMutation.isPending ||
-    syncFitbit.isPending ||
-    applyFromRawMutation.isPending ||
+    fitbitSyncing ||
     disconnectFitbit.isPending;
 
   const parsed = useMemo(() => {
@@ -371,9 +374,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       return;
     }
     try {
-      await syncFitbit.mutateAsync();
-      await refetchBurned();
-      await applyFromRawMutation.mutateAsync({ entryDate });
+      setFitbitSyncing(true);
+      const orch = await fitbitOrchestrator.syncFitbitAllNow({ dateKey: entryDate, includeBurnApply: true });
       const res = await refetchBurned();
       const row = res.data ?? null;
       if (row && !hasUserEditedThisSession && !touched.active && !touched.tdee) {
@@ -387,18 +389,24 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                 : 0;
         setBaseActivityText(String(base));
       }
-      showAppToast(t('burned.fitbit.toast.synced_applied'));
+      // Use in-modal toast so it's visible above the modal overlay.
+      showCenterToast(t('burned.fitbit.toast.synced_applied'));
+      if (orch.weightOk === false && orch.weightErrorCode === 'INSUFFICIENT_SCOPE') {
+        showCenterToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
+      }
     } catch (e: any) {
       const msg = String(e?.message ?? '');
       if (msg === 'RATE_LIMIT') {
         showCenterToast(t('burned.fitbit.errors.rate_limit_15m'));
       } else if (msg === 'MISSING_ACTIVITY_CALORIES') {
-        showAppToast(t('burned.fitbit.errors.missing_activity_calories'));
+        showCenterToast(t('burned.fitbit.errors.missing_activity_calories'));
       } else if (msg === 'UNAUTHORIZED' || msg === 'MISSING_TOKENS') {
-        showAppToast(t('burned.fitbit.errors.reconnect_required'));
+        showCenterToast(t('burned.fitbit.errors.reconnect_required'));
       } else {
-        showAppToast(t('burned.fitbit.toast.sync_failed'));
+        showCenterToast(t('burned.fitbit.toast.sync_failed'));
       }
+    } finally {
+      setFitbitSyncing(false);
     }
   };
 
@@ -419,9 +427,33 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                 : 0;
         setBaseActivityText(String(base));
       }
-      showAppToast(t('burned.fitbit.toast.disconnected'));
+      showCenterToast(t('burned.fitbit.toast.disconnected'));
     } catch {
-      showAppToast(t('burned.fitbit.toast.disconnect_failed'));
+      showCenterToast(t('burned.fitbit.toast.disconnect_failed'));
+    }
+  };
+
+  const handleConnectFromModal = async () => {
+    if (!fitbitEnabled) return;
+    try {
+      const res = await connectFitbit.mutateAsync();
+      if (res.ok) {
+        showCenterToast(t('burned.fitbit.toast.connected'));
+        setFitbitModalVisible(false);
+        await Promise.resolve(refetchBurned());
+        return;
+      }
+      const msg =
+        res.errorCode === 'popup_blocked'
+          ? t('burned.fitbit.errors.popup_blocked')
+          : res.errorCode === 'timeout'
+            ? t('burned.fitbit.errors.popup_timeout')
+            : res.errorCode === 'closed'
+              ? t('burned.fitbit.errors.popup_closed')
+              : null;
+      showCenterToast(msg ?? res.message ?? t('burned.fitbit.toast.connect_failed'));
+    } catch {
+      showCenterToast(t('burned.fitbit.toast.connect_failed'));
     }
   };
 
@@ -597,89 +629,33 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
               {fitbitEnabled && (
                 <>
                   <ThemedText style={[styles.sectionHeader, { color: colors.textSecondary }]}>Wearable device</ThemedText>
-                  <View style={[styles.fitbitCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                  <View style={styles.fitbitCardRow}>
-                    <View style={styles.fitbitLogoWrap} accessible accessibilityLabel="Fitbit">
-                      <View style={[styles.logoChip, { backgroundColor: logoChipBg }]} accessible={false}>
-                        <View style={styles.fitbitLogoBox} accessible={false}>
-                          <FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
-                        </View>
-                      </View>
-                    </View>
-
-                    <View style={styles.fitbitMain}>
-                      <View style={styles.fitbitStatusRow}>
-                        <View
-                          style={[
-                            styles.statusDot,
-                            {
-                              backgroundColor:
-                                fitbitConn?.status === 'active' ? SemanticColors.success : colors.textMuted,
-                            },
-                          ]}
-                          accessible={false}
-                        />
-                        <ThemedText style={[styles.fitbitStatus, { color: colors.textSecondary }]}>
-                          {fitbitStatusLine ?? 'Not connected'}
-                        </ThemedText>
-                      </View>
-
-                      <View style={styles.fitbitActionRow}>
-                        {fitbitConn?.status === 'active' ? (
-                          <View style={styles.fitbitBtnRow}>
-                            <TouchableOpacity
-                              onPress={handleSyncAndApply}
-                              disabled={isBusy}
-                              activeOpacity={0.85}
-                              style={[
-                                styles.fitbitPrimaryBtn,
-                                { backgroundColor: colors.tint, opacity: isBusy ? 0.6 : 1 },
-                                Platform.OS === 'web' && getFocusStyle('#fff'),
-                              ]}
-                              {...getButtonAccessibilityProps(t('burned.fitbit.actions.sync_now'))}
-                            >
-                              <ThemedText style={[styles.fitbitPrimaryBtnText, { color: colors.textInverse }]}>
-                                {t('burned.fitbit.actions.sync_now')}
-                              </ThemedText>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={handleDisconnect}
-                              disabled={isBusy}
-                              activeOpacity={0.85}
-                              style={[
-                                styles.fitbitSecondaryBtn,
-                                { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: isBusy ? 0.6 : 1 },
-                                Platform.OS === 'web' && getFocusStyle(colors.tint),
-                              ]}
-                              {...getButtonAccessibilityProps(t('burned.fitbit.actions.disconnect'))}
-                            >
-                              <ThemedText style={[styles.fitbitSecondaryBtnText, { color: colors.text }]}>
-                                {t('burned.fitbit.actions.disconnect')}
-                              </ThemedText>
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            onPress={() => setFitbitModalVisible(true)}
-                            disabled={isBusy}
-                            activeOpacity={0.85}
-                            style={[
-                              styles.fitbitPrimaryBtn,
-                              { backgroundColor: colors.tint, opacity: isBusy ? 0.6 : 1 },
-                              Platform.OS === 'web' && getFocusStyle('#fff'),
-                            ]}
-                            {...getButtonAccessibilityProps(t('burned.fitbit.actions.connect'))}
-                          >
-                            <ThemedText style={[styles.fitbitPrimaryBtnText, { color: colors.textInverse }]}>
-                              {t('burned.fitbit.actions.connect')}
-                            </ThemedText>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                </View>
+                  <FitbitConnectionCard
+                    statusLine={fitbitStatusLine ?? 'Not connected'}
+                    connected={fitbitConn?.status === 'active'}
+                    logo={<FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />}
+                    primaryAction={
+                      fitbitConn?.status === 'active'
+                        ? {
+                            label: t('burned.fitbit.actions.sync_now'),
+                            onPress: handleSyncAndApply,
+                            disabled: isBusy,
+                          }
+                        : {
+                            label: t('burned.fitbit.actions.connect'),
+                            onPress: () => setFitbitModalVisible(true),
+                            disabled: isBusy,
+                          }
+                    }
+                    secondaryAction={
+                      fitbitConn?.status === 'active'
+                        ? {
+                            label: t('burned.fitbit.actions.disconnect'),
+                            onPress: handleDisconnect,
+                            disabled: isBusy,
+                          }
+                        : null
+                    }
+                  />
                 </>
               )}
 
@@ -814,9 +790,16 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       <FitbitConnectModal
         visible={fitbitModalVisible}
         onClose={() => setFitbitModalVisible(false)}
-        entryDate={entryDate}
-        refetchBurned={async () => {
-          await refetchBurned();
+        mode="burned"
+        fitbitEnabled={fitbitEnabled}
+        connection={fitbitConn ?? null}
+        isFetching={fitbitConnLoading || fitbitConnFetching}
+        isBusy={connectFitbit.isPending}
+        onConnect={handleConnectFromModal}
+        onSyncNow={async () => {
+          // Close the modal before syncing so in-modal errors don't get buried.
+          setFitbitModalVisible(false);
+          await handleSyncAndApply();
         }}
       />
       <BurnReductionModal

@@ -7,6 +7,20 @@ export const FITBIT_CONNECTION_PUBLIC_COLUMNS = `
   scopes,
   status,
   last_sync_at,
+  last_weight_sync_at,
+  last_error_code,
+  last_error_message,
+  last_error_at,
+  created_at,
+  updated_at
+`;
+
+export const FITBIT_CONNECTION_PUBLIC_COLUMNS_LEGACY = `
+  user_id,
+  fitbit_user_id,
+  scopes,
+  status,
+  last_sync_at,
   last_error_code,
   last_error_message,
   last_error_at,
@@ -16,11 +30,15 @@ export const FITBIT_CONNECTION_PUBLIC_COLUMNS = `
 
 export async function getFitbitConnectionPublic(userId: string): Promise<FitbitConnectionPublic | null> {
   if (!userId) return null;
-  const { data, error } = await supabase
-    .from('fitbit_connections_public')
-    .select(FITBIT_CONNECTION_PUBLIC_COLUMNS)
-    .eq('user_id', userId)
-    .maybeSingle();
+  // Backward compatible: if the DB hasn't been migrated yet (missing last_weight_sync_at),
+  // retry with the legacy select list instead of treating it as "not connected".
+  const trySelect = async (columns: string) => {
+    return await supabase.from('fitbit_connections_public').select(columns).eq('user_id', userId).maybeSingle();
+  };
+  let { data, error } = await trySelect(FITBIT_CONNECTION_PUBLIC_COLUMNS);
+  if (error && typeof (error as any)?.message === 'string' && (error as any).message.toLowerCase().includes('last_weight_sync_at')) {
+    ({ data, error } = await trySelect(FITBIT_CONNECTION_PUBLIC_COLUMNS_LEGACY));
+  }
 
   if (error) {
     // Do not throw; callers treat null as "not connected" or "unavailable".
@@ -83,6 +101,27 @@ export async function syncFitbitNow(): Promise<{ raw_last_synced_at?: string; ra
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const code = typeof json?.error === 'string' ? json.error : 'FITBIT_SYNC_FAILED';
+    throw new Error(code);
+  }
+
+  return json as any;
+}
+
+export async function syncFitbitWeightNow(): Promise<{ ok: true; processed?: number; inserted?: number; updated_existing?: number; updated_capped?: number }> {
+  const supabaseUrl = requireSupabaseUrl();
+  const token = await requireSessionAccessToken();
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/fitbit-sync-weight`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const code = typeof json?.error === 'string' ? json.error : 'FITBIT_WEIGHT_SYNC_FAILED';
     throw new Error(code);
   }
 

@@ -198,6 +198,8 @@ export interface FitbitConnectionPublic {
   scopes: string[];
   status: 'active' | 'revoked' | 'error' | string;
   last_sync_at: string | null;
+  /** Independent from activity sync; used only for weight/body sync. */
+  last_weight_sync_at?: string | null;
   last_error_code: string | null;
   last_error_message: string | null;
   last_error_at: string | null;

@@ -15,7 +15,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
@@ -34,6 +34,7 @@ import { openMyGoalEdit } from '@/lib/navigation/my-goal';
 import { deleteUserAccountData } from '@/lib/services/accountDeletion';
 import { showAppToast } from '@/components/ui/app-toast';
 import { resetTour } from '@/features/tour/storage';
+import { ShareButton } from '@/src/components/share/ShareButton';
 import {
   loadSettingsPreferences,
   saveSettingsPreferences,
@@ -366,14 +367,16 @@ export default function SettingsScreen() {
               <ActivityIndicator size="small" color={colors.tint} />
             ) : (
               <>
-                <ProfileAvatarPicker
-                  avatarUrl={avatarUrl}
-                  onAvatarUpdated={setAvatarUrl}
-                  size={130}
-                  editable={!loading && !userConfigLoading}
-                  persistToProfile={true}
-                  successToastMessage={t('settings.profile_photo_updated')}
-                />
+                <View style={styles.mascotRow}>
+                  <ProfileAvatarPicker
+                    avatarUrl={avatarUrl}
+                    onAvatarUpdated={setAvatarUrl}
+                    size={130}
+                    editable={!loading && !userConfigLoading}
+                    persistToProfile={true}
+                    successToastMessage={t('settings.profile_photo_updated')}
+                  />
+                </View>
                 {!!email && (
                   <ThemedText style={[styles.emailText, { color: colors.textSecondary }]}>
                     {email}
@@ -381,6 +384,14 @@ export default function SettingsScreen() {
                 )}
               </>
             )}
+          </View>
+
+          {/* Web-only Share CTA (not a list row). */}
+          <View style={styles.shareCtaRow}>
+            <ShareButton />
+            <ThemedText style={[styles.shareCaption, { color: colors.textSecondary }]}>
+              Share AvoVibe with a friend
+            </ThemedText>
           </View>
 
         {/* My Journey */}
@@ -755,6 +766,25 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 10,
     marginBottom: 18,
+  },
+  mascotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  shareCtaRow: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -4,
+    marginBottom: 14,
+  },
+  shareCaption: {
+    ...Typography.caption,
+    textAlign: 'center',
+    marginTop: 6,
   },
   emailText: {
     fontSize: 14,

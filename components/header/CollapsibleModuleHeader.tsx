@@ -8,6 +8,7 @@ import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useUnreadNotificationCount } from '@/hooks/use-notifications';
+import { HOME_ROUTE } from '@/lib/navigation/routes';
 import {
   getButtonAccessibilityProps,
   getMinTouchTargetStyle,
@@ -128,9 +129,22 @@ export function CollapsibleModuleHeader({
           }}
         >
           <View style={styles.brandRow}>
-            <View style={styles.logoContainer}>
-              <BrandLogoNameOnly width={130} />
-            </View>
+            <Pressable
+              onPress={() => router.push(HOME_ROUTE)}
+              style={({ pressed, hovered }: any) => [
+                styles.logoPressable,
+                getMinTouchTargetStyle(),
+                Platform.OS === 'web' ? getFocusStyle(moduleAccent) : {},
+                Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {},
+                hovered ? styles.logoHovered : null,
+                pressed ? styles.logoPressed : null,
+              ]}
+              {...getButtonAccessibilityProps('Go to home', AccessibilityHints.NAVIGATE)}
+            >
+              <View style={styles.logoContainer}>
+                <BrandLogoNameOnly width={130} />
+              </View>
+            </Pressable>
             <View style={styles.rightActions}>
               {/* Bell Icon */}
               <TouchableOpacity
@@ -303,6 +317,16 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  logoPressable: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+  },
+  logoHovered: {
+    opacity: 0.92,
+  },
+  logoPressed: {
+    opacity: 0.75,
   },
   rightActions: {
     flexDirection: 'row',

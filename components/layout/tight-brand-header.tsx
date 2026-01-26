@@ -8,6 +8,7 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
 import BrandLogoFull from '@/components/brand/BrandLogoFull';
+import { HOME_ROUTE } from '@/lib/navigation/routes';
 import { useUnreadNotificationCount } from '@/hooks/use-notifications';
 import {
   getButtonAccessibilityProps,
@@ -64,13 +65,26 @@ export function TightBrandHeader({
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Left: Logo */}
-        <View style={styles.logoContainer}>
-          {logoVariant === 'full' ? (
-            <BrandLogoFull width={logoWidth} />
-          ) : (
-            <BrandLogoNameOnly width={logoWidth} />
-          )}
-        </View>
+        <Pressable
+          onPress={() => router.push(HOME_ROUTE)}
+          style={({ pressed, hovered }: any) => [
+            styles.logoPressable,
+            getMinTouchTargetStyle(),
+            Platform.OS === 'web' ? getFocusStyle(colors.tint) : {},
+            Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {},
+            hovered ? styles.logoHovered : null,
+            pressed ? styles.logoPressed : null,
+          ]}
+          {...getButtonAccessibilityProps('Go to home', AccessibilityHints.NAVIGATE)}
+        >
+          <View style={styles.logoContainer}>
+            {logoVariant === 'full' ? (
+              <BrandLogoFull width={logoWidth} />
+            ) : (
+              <BrandLogoNameOnly width={logoWidth} />
+            )}
+          </View>
+        </Pressable>
         
         {/* Right: Bell + Name + Avatar */}
         <View style={styles.rightActions}>
@@ -187,6 +201,16 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  logoPressable: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+  },
+  logoHovered: {
+    opacity: 0.92,
+  },
+  logoPressed: {
+    opacity: 0.75,
   },
   rightActions: {
     flexDirection: 'row',

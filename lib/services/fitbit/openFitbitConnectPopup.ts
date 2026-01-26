@@ -34,6 +34,18 @@ export function openFitbitConnectPopup(authorizeUrl: string, opts: Options): Pro
     const timeoutMs = Math.max(5_000, opts.timeoutMs ?? 180_000);
     const pollIntervalMs = Math.max(500, opts.pollIntervalMs ?? 1_500);
     const functionsOrigin = opts.functionsOrigin.replace(/\/+$/g, '');
+    const appOrigin = window.location.origin;
+    const configuredAppOrigin = (
+      process.env.EXPO_PUBLIC_APP_BASE_URL ??
+      process.env.EXPO_PUBLIC_APP_ORIGIN ??
+      process.env.EXPO_PUBLIC_WEB_ORIGIN
+    )
+      ?.trim()
+      .replace(/\/+$/g, '');
+
+    const allowedOrigins = new Set(
+      [functionsOrigin, appOrigin, configuredAppOrigin].filter((v): v is string => Boolean(v)),
+    );
 
     const popup = window.open(authorizeUrl, 'fitbit_oauth', 'width=520,height=720');
     if (!popup) {
@@ -71,7 +83,9 @@ export function openFitbitConnectPopup(authorizeUrl: string, opts: Options): Pro
 
     const onMessage = (event: MessageEvent) => {
       // Strict sender origin validation.
-      if (event.origin !== functionsOrigin) return;
+      // We accept messages either from the functions origin (legacy) or from the app origin.
+      // The callback flow can redirect the popup back to the app origin to avoid sandboxed scripts.
+      if (!allowedOrigins.has(event.origin)) return;
 
       // Strict source validation: message must come from the popup we opened.
       if (event.source !== popup) return;

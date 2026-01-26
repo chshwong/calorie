@@ -10,6 +10,11 @@
 import { supabase } from '@/lib/supabase';
 import { roundTo2, roundTo3 } from '@/utils/bodyMetrics';
 import { updateUserProfile } from '@/lib/services/profile';
+import {
+  buildWeightLogUpdatePayload,
+  type WeightLogUserChanged,
+  computeWeightLogUserChanged,
+} from '@/lib/services/weightLogProvenance';
 
 export type WeightLogRow = {
   id: string;
@@ -18,6 +23,8 @@ export type WeightLogRow = {
   weight_lb: number;
   body_fat_percent: number | null;
   note: string | null;
+  source: string | null;
+  external_id: string | null;
 };
 
 const WEIGHT_LOG_COLUMNS = `
@@ -26,7 +33,9 @@ const WEIGHT_LOG_COLUMNS = `
   weighed_at,
   weight_lb,
   body_fat_percent,
-  note
+  note,
+  source,
+  external_id
 `;
 
 export async function fetchWeightLogsRange(
@@ -250,27 +259,64 @@ export async function insertWeightLogRow(input: {
   return data;
 }
 
+export { buildWeightLogUpdatePayload, computeWeightLogUserChanged, type WeightLogUserChanged };
+
 export async function updateWeightLogRow(input: {
+  userId: string;
   id: string;
   weighedAt: Date;
   weightLb: number;
   bodyFatPercent?: number | null;
   note?: string | null;
 }): Promise<WeightLogRow> {
-  const payload = {
-    weighed_at: input.weighedAt.toISOString(),
-    weight_lb: roundTo3(input.weightLb),
-    body_fat_percent:
-      input.bodyFatPercent !== undefined && input.bodyFatPercent !== null
-        ? roundTo2(input.bodyFatPercent)
-        : null,
+  if (!input.userId) {
+    throw new Error('User ID is required to update weight_log row');
+  }
+
+  // Fetch current row once so we can detect no-op saves and preserve Fitbit provenance.
+  const { data: oldRow, error: oldRowError } = await supabase
+    .from('weight_log')
+    .select(WEIGHT_LOG_COLUMNS)
+    .eq('id', input.id)
+    .eq('user_id', input.userId)
+    .maybeSingle();
+
+  if (oldRowError) {
+    console.error('Error fetching current weight_log row for update', oldRowError);
+    throw oldRowError;
+  }
+
+  if (!oldRow) {
+    throw new Error('Weight entry not found');
+  }
+
+  const weighedAtISO = input.weighedAt.toISOString();
+  const bodyFatPercent = input.bodyFatPercent ?? null;
+
+  const plan = buildWeightLogUpdatePayload({
+    oldRow: {
+      source: oldRow.source,
+      external_id: oldRow.external_id,
+      weighed_at: oldRow.weighed_at,
+      weight_lb: oldRow.weight_lb,
+      body_fat_percent: oldRow.body_fat_percent,
+    },
+    weighedAtISO,
+    weightLb: input.weightLb,
+    bodyFatPercent,
     note: input.note ?? null,
-  };
+  });
+
+  // Save with no changes: return success without modifying the row.
+  if (!plan.shouldUpdateRow) {
+    return oldRow;
+  }
 
   const { data, error } = await supabase
     .from('weight_log')
-    .update(payload)
+    .update(plan.payload)
     .eq('id', input.id)
+    .eq('user_id', input.userId)
     .select(WEIGHT_LOG_COLUMNS)
     .single();
 

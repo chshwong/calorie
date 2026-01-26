@@ -34,28 +34,28 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { InterFont } from '@/hooks/use-fonts';
 
-export type SegmentedOption = {
-  key: 'weight' | 'volume'; // Extend this type as needed for future use cases
+export type SegmentedOption<T extends string> = {
+  key: T;
   label: string;
 };
 
-export type SegmentedToggleProps = {
+export type SegmentedToggleProps<T extends string> = {
   /** Exactly two options for the segmented control */
-  options: SegmentedOption[];
+  options: Array<SegmentedOption<T>>;
   /** Currently selected option key */
-  value: SegmentedOption['key'];
+  value: T;
   /** Callback when selection changes */
-  onChange: (value: SegmentedOption['key']) => void;
+  onChange: (value: T) => void;
   /** Disable animation for reduced motion accessibility */
   reduceMotion?: boolean;
 };
 
-export function SegmentedToggle({
+export function SegmentedToggle<T extends string>({
   options,
   value,
   onChange,
   reduceMotion = false,
-}: SegmentedToggleProps) {
+}: SegmentedToggleProps<T>) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -114,13 +114,13 @@ export function SegmentedToggle({
     transform: [{ translateX }],
   };
 
-  const handlePress = (optionKey: SegmentedOption['key']) => {
+  const handlePress = (optionKey: T) => {
     if (optionKey !== value) {
       onChange(optionKey);
     }
   };
 
-  const isActive = (optionKey: SegmentedOption['key']) => optionKey === value;
+  const isActive = (optionKey: T) => optionKey === value;
 
   return (
     <View
