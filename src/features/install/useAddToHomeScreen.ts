@@ -1,85 +1,45 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Platform } from 'react-native';
+import {
+  getDeferredPrompt,
+  clearDeferredPrompt,
+  subscribe,
+  getIsStandalone,
+  getIsIosSafari,
+} from './installPromptStore';
 
-/** BeforeInstallPromptEvent is not in DOM libs; we extend Window locally. */
-declare global {
-  interface WindowEventMap {
-    beforeinstallprompt: BeforeInstallPromptEvent;
-  }
-}
-
-export interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-  prompt(): Promise<void>;
-}
-
-export type PromptInstallResult = 'accepted' | 'dismissed' | 'unavailable';
-
-function getIsStandalone(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const mq = window.matchMedia?.('(display-mode: standalone)');
-    if (mq?.matches) return true;
-    const nav = navigator as Navigator & { standalone?: boolean };
-    if (nav.standalone === true) return true;
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
-
-function getIsIosSafari(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  const isIos = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (!isIos) return false;
-  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
-  return isSafari;
-}
+export type PromptInstallResult =
+  | 'accepted'
+  | 'dismissed'
+  | 'unavailable'
+  | 'already_installed'
+  | 'ios_manual';
 
 export function useAddToHomeScreen() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isIosSafari] = useState(() => getIsIosSafari());
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    setIsStandalone(getIsStandalone());
-    const checkStandalone = () => setIsStandalone(getIsStandalone());
-    let mq: MediaQueryList | null = null;
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      mq = window.matchMedia('(display-mode: standalone)');
-      mq.addEventListener?.('change', checkStandalone);
-    }
-    return () => {
-      mq?.removeEventListener?.('change', checkStandalone);
-    };
+    return subscribe(() => setVersion((v) => v + 1));
   }, []);
 
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    const handleBeforeInstall = (e: BeforeInstallPromptEvent) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-  }, []);
+  const deferredPrompt = getDeferredPrompt();
+  const isStandalone = getIsStandalone();
+  const isIosSafari = getIsIosSafari();
+  const canPromptInstall = !!deferredPrompt && !isStandalone && !isIosSafari;
 
   const promptInstall = useCallback(async (): Promise<PromptInstallResult> => {
-    if (isStandalone) return 'unavailable';
-    if (isIosSafari) return 'unavailable';
-    if (!deferredPrompt) return 'unavailable';
+    if (isStandalone) return 'already_installed';
+    if (isIosSafari) return 'ios_manual';
+    const prompt = getDeferredPrompt();
+    if (!prompt) return 'unavailable';
     try {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      return outcome === 'accepted' ? 'accepted' : 'dismissed';
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      clearDeferredPrompt();
+      return choice.outcome === 'accepted' ? 'accepted' : 'dismissed';
     } catch {
       return 'unavailable';
     }
-  }, [isStandalone, isIosSafari, deferredPrompt]);
-
-  const canPromptInstall = !isStandalone && !isIosSafari && !!deferredPrompt;
+  }, [isStandalone, isIosSafari]);
 
   return {
     canPromptInstall,

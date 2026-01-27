@@ -961,16 +961,12 @@
       "email_settings": "Paramètres de courriel"
     },
     "add_to_home_screen": {
-      "title": "Ajouter AvoVibe à l'écran d'accueil",
+      "modal_title": "Ajouter AvoVibe sur votre téléphone",
+      "modal_body_1": "Ajoutez AvoVibe sur l'écran d'accueil de votre téléphone pour l'ouvrir comme une vraie application.",
+      "modal_body_2_fallback": "L'installation en un clic n'est pas disponible ici.",
+      "modal_instruction_ios": "Dans Safari : appuyez sur Partager → Ajouter à l'écran d'accueil",
+      "modal_instruction_android": "Dans Chrome : appuyez sur ⋮ → Ajouter à l'écran d'accueil ou Installer l'application",
       "modal_got_it": "Compris",
-      "modal_ios_step_1": "Appuyez sur le bouton Partager dans Safari",
-      "modal_ios_step_2": "Choisissez « Ajouter à l'écran d'accueil »",
-      "modal_ios_step_3": "Appuyez sur Ajouter",
-      "modal_fallback_title": "Ajouter AvoVibe sur votre téléphone",
-      "modal_fallback_primary": "Vous pouvez ajouter AvoVibe sur l'écran d'accueil de votre téléphone pour l'ouvrir comme une vraie application.",
-      "modal_fallback_secondary": "Votre navigateur ne prend pas en charge l'installation en un clic ici.",
-      "modal_fallback_ios": "Sur iPhone (Safari) : Appuyez sur Partager → Ajouter à l'écran d'accueil",
-      "modal_fallback_android": "Sur Android : Appuyez sur le menu (⋮) → Ajouter à l'écran d'accueil ou Installer l'application",
       "toast_already_added": "Déjà ajouté à votre écran d'accueil",
       "toast_added": "Ajouté à l'écran d'accueil"
     },

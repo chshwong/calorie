@@ -21,6 +21,7 @@ import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
 import { setupFocusWarmup } from '@/lib/utils/session-warmup';
+import { initInstallPromptCapture } from '@/src/features/install/installPromptStore';
 
 // Import QueryClient from separate module to avoid circular dependency with AuthContext
 import { queryClient } from '@/lib/query-client';
@@ -102,6 +103,13 @@ export default function RootLayout() {
   useEffect(() => {
     const cleanup = setupFocusWarmup();
     return cleanup;
+  }, []);
+
+  // Web: capture beforeinstallprompt at app startup so we never miss it (e.g. when user opens Settings)
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      initInstallPromptCapture();
+    }
   }, []);
 
   // Web: Add online/offline listener for automatic query invalidation on reconnect

@@ -1332,16 +1332,12 @@
       "change_password": "Change Password"
     },
     "add_to_home_screen": {
-      "title": "Add AvoVibe to Home Screen",
+      "modal_title": "Add AvoVibe to Your Phone",
+      "modal_body_1": "Add AvoVibe to your phone's home screen so it opens like a real app.",
+      "modal_body_2_fallback": "One-tap install isn't available here.",
+      "modal_instruction_ios": "In Safari: tap Share → Add to Home Screen",
+      "modal_instruction_android": "In Chrome: tap ⋮ → Add to Home Screen",
       "modal_got_it": "Got it",
-      "modal_ios_step_1": "Tap the Share button in Safari",
-      "modal_ios_step_2": "Choose \"Add to Home Screen\"",
-      "modal_ios_step_3": "Tap Add",
-      "modal_fallback_title": "Add AvoVibe to Your Phone",
-      "modal_fallback_primary": "You can add AvoVibe to your phone's home screen so it opens like a real app.",
-      "modal_fallback_secondary": "Your browser doesn't support one-tap install here.",
-      "modal_fallback_ios": "If you're on iPhone (Safari): Tap Share → Add to Home Screen",
-      "modal_fallback_android": "If you're on Android: Tap the menu (⋮) → Add to Home Screen or Install app",
       "toast_already_added": "Already added to your home screen",
       "toast_added": "Added to home screen"
     },

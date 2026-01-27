@@ -6,12 +6,12 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
-export type AddToHomeScreenModalMode = 'ios' | 'fallback';
+export type AddToHomeScreenModalPlatform = 'ios' | 'android' | 'fallback';
 
 export interface AddToHomeScreenModalProps {
   visible: boolean;
   onClose: () => void;
-  mode: AddToHomeScreenModalMode;
+  platform: AddToHomeScreenModalPlatform;
 }
 
 const modalMessageStyles = {
@@ -20,43 +20,35 @@ const modalMessageStyles = {
   textAlign: 'center' as const,
 };
 
-export function AddToHomeScreenModal({ visible, onClose, mode }: AddToHomeScreenModalProps) {
+export function AddToHomeScreenModal({ visible, onClose, platform }: AddToHomeScreenModalProps) {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const title =
-    mode === 'ios'
-      ? t('settings.add_to_home_screen.title')
-      : t('settings.add_to_home_screen.modal_fallback_title');
+  const title = t('settings.add_to_home_screen.modal_title');
   const gotIt = t('settings.add_to_home_screen.modal_got_it');
+  const body1 = t('settings.add_to_home_screen.modal_body_1');
 
   const message =
-    mode === 'ios' ? (
-      <View style={styles.iosSteps}>
-        <ThemedText style={modalMessageStyles}>
-          1) {t('settings.add_to_home_screen.modal_ios_step_1')}
+    platform === 'ios' ? (
+      <View style={styles.body}>
+        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>{body1}</ThemedText>
+        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>
+          {t('settings.add_to_home_screen.modal_instruction_ios')}
         </ThemedText>
-        <ThemedText style={modalMessageStyles}>
-          2) {t('settings.add_to_home_screen.modal_ios_step_2')}
-        </ThemedText>
-        <ThemedText style={modalMessageStyles}>
-          3) {t('settings.add_to_home_screen.modal_ios_step_3')}
+      </View>
+    ) : platform === 'android' ? (
+      <View style={styles.body}>
+        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>{body1}</ThemedText>
+        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>
+          {t('settings.add_to_home_screen.modal_instruction_android')}
         </ThemedText>
       </View>
     ) : (
-      <View style={styles.fallbackBody}>
-        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>
-          {t('settings.add_to_home_screen.modal_fallback_primary')}
-        </ThemedText>
+      <View style={styles.body}>
+        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>{body1}</ThemedText>
         <ThemedText style={[modalMessageStyles, { color: colors.textSecondary }]}>
-          {t('settings.add_to_home_screen.modal_fallback_secondary')}
-        </ThemedText>
-        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>
-          {t('settings.add_to_home_screen.modal_fallback_ios')}
-        </ThemedText>
-        <ThemedText style={[modalMessageStyles, { color: colors.text }]}>
-          {t('settings.add_to_home_screen.modal_fallback_android')}
+          {t('settings.add_to_home_screen.modal_body_2_fallback')}
         </ThemedText>
       </View>
     );
@@ -77,10 +69,7 @@ export function AddToHomeScreenModal({ visible, onClose, mode }: AddToHomeScreen
 }
 
 const styles = StyleSheet.create({
-  iosSteps: {
-    gap: 10,
-  },
-  fallbackBody: {
+  body: {
     gap: 10,
   },
 });

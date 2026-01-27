@@ -133,10 +133,12 @@ export default function SettingsScreen() {
   const [showRestartTourConfirm, setShowRestartTourConfirm] = useState(false);
   const [restartTourLoading, setRestartTourLoading] = useState(false);
   const [showAddToHomeScreenModal, setShowAddToHomeScreenModal] = useState(false);
-  const [addToHomeScreenModalMode, setAddToHomeScreenModalMode] = useState<'ios' | 'fallback'>('fallback');
+  const [addToHomeScreenModalPlatform, setAddToHomeScreenModalPlatform] = useState<
+    'ios' | 'android' | 'fallback'
+  >('android');
   const scrollRef = useRef<ScrollView>(null);
 
-  const { isStandalone, isIosSafari, promptInstall } = useAddToHomeScreen();
+  const { isStandalone, isIosSafari, canPromptInstall, promptInstall } = useAddToHomeScreen();
 
   // Always reset scroll position when returning to Settings
   useFocusEffect(
@@ -454,17 +456,22 @@ export default function SettingsScreen() {
                 return;
               }
               if (isIosSafari) {
-                setAddToHomeScreenModalMode('ios');
+                setAddToHomeScreenModalPlatform('ios');
                 setShowAddToHomeScreenModal(true);
                 return;
               }
-              const result = await promptInstall();
-              if (result === 'accepted') {
-                showAppToast(t('settings.add_to_home_screen.toast_added'));
-              } else if (result === 'unavailable') {
-                setAddToHomeScreenModalMode('fallback');
-                setShowAddToHomeScreenModal(true);
+              if (canPromptInstall) {
+                const result = await promptInstall();
+                if (result === 'accepted') {
+                  showAppToast(t('settings.add_to_home_screen.toast_added'));
+                } else if (result === 'unavailable') {
+                  setAddToHomeScreenModalPlatform('android');
+                  setShowAddToHomeScreenModal(true);
+                }
+                return;
               }
+              setAddToHomeScreenModalPlatform('android');
+              setShowAddToHomeScreenModal(true);
             }}
           />
         </SettingSection>
@@ -737,7 +744,7 @@ export default function SettingsScreen() {
       <AddToHomeScreenModal
         visible={showAddToHomeScreenModal}
         onClose={() => setShowAddToHomeScreenModal(false)}
-        mode={addToHomeScreenModalMode}
+        platform={addToHomeScreenModalPlatform}
       />
     </ThemedView>
   );
