@@ -1,6 +1,6 @@
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform, Image } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -25,6 +25,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/navigation/weight';
 import { getBigCircleMenuColors } from '@/theme/getBigCircleMenuColors';
 import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import AICustomButtonImg from '@/assets/images/AI_CUSTOM_BUTTON.png';
+import AIQuickLogButtonImg from '@/assets/images/AI_QUICKLOG_BUTTON.png';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
@@ -328,54 +330,32 @@ function TabLayoutContent() {
     water: '/(tabs)/water',
   } as const;
 
-  // Helper function to open mealtype-log for current time
-  // Reuses the same route and params structure as the old FAB behavior
-  // autoScan: if true, automatically opens the barcode scanner when the screen loads
-  const openMealTypeLogForNow = (autoScan: boolean = false) => {
+  /** Derive entryDate + mealType from "now" (same rules as Log Food). Shared by mealtype-log and AI tiles. */
+  const getMealTypeParamsForNow = (): { entryDate: string; mealType: string } => {
     const now = new Date();
-    
-    // Determine the mealType based on current time
     const minutes = now.getHours() * 60 + now.getMinutes();
+
     let mealType: string;
-    
-    // 22:00–04:00 -> Snack
-    // 04:00–11:30 -> Breakfast
-    // 11:30–14:00 -> Lunch
-    // 14:00–17:00 -> Snack
-    // 17:00–22:00 -> Dinner
-    if (minutes >= 22 * 60 || minutes < 4 * 60) {
-      mealType = 'afternoon_snack';
-    } else if (minutes >= 4 * 60 && minutes < (11 * 60 + 30)) {
-      mealType = 'breakfast';
-    } else if (minutes >= (11 * 60 + 30) && minutes < 14 * 60) {
-      mealType = 'lunch';
-    } else if (minutes >= 14 * 60 && minutes < 17 * 60) {
-      mealType = 'afternoon_snack';
-    } else {
-      mealType = 'dinner';
-    }
-    
-    // Use the same date format and param structure that mealtype-log already expects
-    // Reuse getLocalDateString() utility for consistency with FAB behavior
-    const todayString = getLocalDateString();
-    
-    // Build params object
+    if (minutes >= 22 * 60 || minutes < 4 * 60) mealType = 'afternoon_snack';
+    else if (minutes >= 4 * 60 && minutes < (11 * 60 + 30)) mealType = 'breakfast';
+    else if (minutes >= (11 * 60 + 30) && minutes < 14 * 60) mealType = 'lunch';
+    else if (minutes >= 14 * 60 && minutes < 17 * 60) mealType = 'afternoon_snack';
+    else mealType = 'dinner';
+
+    const entryDate = getLocalDateString();
+    return { entryDate, mealType };
+  };
+
+  /** Open mealtype-log for "now" (uses getMealTypeParamsForNow). autoScan: open barcode scanner on load. */
+  const openMealTypeLogForNow = (autoScan: boolean = false) => {
+    const { entryDate, mealType } = getMealTypeParamsForNow();
     const params: Record<string, string> = {
-      entryDate: todayString,
-      mealType: mealType,
-      preloadedEntries: JSON.stringify([])
+      entryDate,
+      mealType,
+      preloadedEntries: JSON.stringify([]),
     };
-    
-    // Add auto-scan param if requested
-    if (autoScan) {
-      params.openBarcodeScanner = 'true';
-    }
-    
-    // Navigate to mealtype-log with the same params structure as the FAB
-    router.push({
-      pathname: '/(tabs)/mealtype-log',
-      params
-    });
+    if (autoScan) params.openBarcodeScanner = 'true';
+    router.push({ pathname: '/(tabs)/mealtype-log', params });
   };
 
   // Helper function to open Exercise screen for today
@@ -621,6 +601,78 @@ function TabLayoutContent() {
             )}
           </View>
         )}
+        <Text
+          style={[
+            styles.quickAddCardLabel,
+            {
+              fontSize: BigCircleMenuTokens.tile.label.fontSize[themeKey],
+              fontWeight: BigCircleMenuTokens.tile.label.fontWeight[themeKey],
+              color: BigCircleMenuTokens.tile.label.color[themeKey],
+              marginTop: BigCircleMenuTokens.tile.label.marginTop[themeKey],
+            },
+          ]}
+        >
+          {params.label}
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const renderQuickAddImageCard = (params: {
+    key: 'ai_quick_log' | 'ai_custom_food';
+    label: string;
+    imageSource: typeof AIQuickLogButtonImg;
+    onPress: () => void;
+  }) => {
+    return (
+      <Pressable
+        key={params.key}
+        style={({ pressed }) => [
+          styles.quickAddCard,
+          {
+            width:
+              quickAddSheetWidth != null
+                ? (quickAddSheetWidth -
+                    BigCircleMenuTokens.container.paddingHorizontal[themeKey] * 2 -
+                    BigCircleMenuTokens.grid.gap[themeKey].column) /
+                  2
+                : '48%',
+            backgroundColor: BigCircleMenuTokens.tile.backgroundColor[themeKey],
+            borderWidth: BigCircleMenuTokens.tile.borderWidth[themeKey],
+            borderColor: BigCircleMenuTokens.tile.borderColor[themeKey],
+            shadowColor: BigCircleMenuTokens.tile.iosShadow[themeKey].color,
+            shadowOpacity: BigCircleMenuTokens.tile.iosShadow[themeKey].opacity,
+            shadowOffset: {
+              width: 0,
+              height: BigCircleMenuTokens.tile.iosShadow[themeKey].offsetY,
+            },
+            shadowRadius: BigCircleMenuTokens.tile.iosShadow[themeKey].radius,
+            elevation: BigCircleMenuTokens.tile.androidElevation[themeKey],
+          },
+          themeKey === 'dark' && Platform.OS === 'android' ? { overflow: 'hidden' as const } : null,
+          pressed && themeKey === 'light' ? styles.quickAddCardPressed : null,
+          pressed && themeKey === 'dark' && Platform.OS === 'ios' ? { opacity: 0.75 } : null,
+        ]}
+        android_ripple={
+          themeKey === 'dark'
+            ? { color: bigCircleColors.ripple }
+            : undefined
+        }
+        onPress={params.onPress}
+        accessibilityLabel={params.label}
+        accessibilityRole="button"
+      >
+        <Image
+          source={params.imageSource}
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 14,
+            marginBottom: Layout.cardInnerPaddingCompact,
+            alignSelf: 'center',
+          }}
+          resizeMode="cover"
+        />
         <Text
           style={[
             styles.quickAddCardLabel,
@@ -894,6 +946,34 @@ function TabLayoutContent() {
                   >
                     {renderQuickAddModuleCard(module1Config)}
                     {renderQuickAddModuleCard(module2Config)}
+
+                    {renderQuickAddImageCard({
+                      key: 'ai_quick_log',
+                      label: t('quick_add.ai_quick_log', { defaultValue: 'AI Log' }),
+                      imageSource: AIQuickLogButtonImg,
+                      onPress: () => {
+                        closeQuickAdd('tap');
+                        const { entryDate, mealType } = getMealTypeParamsForNow();
+                        router.push({
+                          pathname: '/quick-log',
+                          params: { date: entryDate, mealType, tab: 'ai' },
+                        });
+                      },
+                    })}
+                    {renderQuickAddImageCard({
+                      key: 'ai_custom_food',
+                      label: t('quick_add.ai_custom_food', { defaultValue: 'AI Custom' }),
+                      imageSource: AICustomButtonImg,
+                      onPress: () => {
+                        closeQuickAdd('tap');
+                        const { entryDate, mealType } = getMealTypeParamsForNow();
+                        router.push({
+                          pathname: '/create-custom-food',
+                          params: { mealType, entryDate, tab: 'ai' },
+                        });
+                      },
+                    })}
+
                     {renderQuickAddCard({
                       key: 'enter_weight',
                       label: t('quick_add.enter_weight'),

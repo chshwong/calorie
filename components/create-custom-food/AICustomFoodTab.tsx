@@ -4,11 +4,11 @@ import { Colors, SemanticColors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { parseAICustomFoodReply, type AICustomFoodParsed } from '@/lib/ai/aiCustomFoodParser';
 import {
-    getButtonAccessibilityProps,
-    getInputAccessibilityProps,
-    getLinkAccessibilityProps,
-    getMinTouchTargetStyle,
-    getWebAccessibilityProps,
+  getButtonAccessibilityProps,
+  getInputAccessibilityProps,
+  getLinkAccessibilityProps,
+  getMinTouchTargetStyle,
+  getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import { Asset } from 'expo-asset';
 import React, { useMemo, useRef, useState } from 'react';
@@ -159,9 +159,7 @@ export function AICustomFoodTab({ onApplyParsed, onClearAi }: Props) {
           <Text style={[styles.stepHeader, { color: colors.text }]}>
             {t('create_custom_food.ai.step1_header', { defaultValue: '① 📷 Nutrition label → Copy Prompt' })}
           </Text>
-          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-            {t('create_custom_food.ai.step1_helper', { defaultValue: 'Take a label photo, then copy the prompt.' })}
-          </Text>
+         
           <TouchableOpacity
             style={[styles.secondaryButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
             onPress={handleCopyPrompt}

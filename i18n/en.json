@@ -2044,9 +2044,9 @@
     },
     "ai": {
       "disclaimer": "Powered by your own AI assistant (keeps it free).",
-      "step1_header": "① 📷 Snap food image or nutrition label \n→ Copy Prompt",
+      "step1_header": "① Click 'Copy Prompt'",
       "step1_helper": "Take a food photo or nutrition label, then click this button.",
-      "step2_header": "② Paste prompt + image to AI",
+      "step2_header": "② Paste prompt + 📷image to AI",
       "step2_helper_prefix": "Paste the copied prompt into any AI assistant like",
       "step2_helper_suffix": "with your food or label image attached.",
       "step3_header": "③ Paste reply → Submit",
@@ -2769,7 +2769,9 @@
     "log_water": "Log Water",
     "enter_weight": "Log Weight",
     "scan_barcode": "Scan Barcode",
-    "log_now": "Log Now"
+    "log_now": "Log Now",
+    "ai_quick_log": "AI📸 Quick Log",
+    "ai_custom_food": "AI📸 Save Custom"
   },
   "water": {
     "dashboard": {
@@ -2876,9 +2878,9 @@
       "badge_accessibility_label": "AI quick log",
       "disclaimer": "Powered by your own AI assistant (keeps it free).",
       "instructions": "Copy the prompt, use it with your AI assistant (with your meal photo), then paste the AI reply here.",
-      "step1_header": "① 📷 Meal photo → Copy Prompt",
+      "step1_header": "① Click 'Copy Prompt'",
       "step1_helper": "Snap your meal, then click this button.",
-      "step2_header": "② Paste prompt + meal photo to AI",
+      "step2_header": "② Paste prompt + 📷meal photo to AI",
       "step2_helper_prefix": "Paste the copied prompt into any AI assistant like",
       "step2_helper_suffix": "with your meal picture attached.",
       "step3_header": "③ Paste reply → Submit",

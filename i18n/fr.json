@@ -2161,7 +2161,9 @@
     "log_med_supp": "Enregistrer méd./suppl.",
     "log_water": "Enregistrer l’eau",
     "enter_weight": "Enregistrer le poids",
-    "scan_barcode": "Scanner un code-barres"
+    "scan_barcode": "Scanner un code-barres",
+    "ai_quick_log": "AI Log",
+    "ai_custom_food": "AI Custom"
   },
   "quick_log": {
     "header_title": "🍴 Journal",
