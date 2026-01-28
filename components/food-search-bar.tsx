@@ -723,13 +723,15 @@ const styles = StyleSheet.create({
   searchRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'nowrap',
     gap: 8,
   },
   searchRowNarrow: {
     width: '100%',
   },
   searchInputWrapper: {
-    flexGrow: 1,
+    flex: 1,
+    flexShrink: 1,
     minWidth: 0,
   },
   searchOuterContainer: {

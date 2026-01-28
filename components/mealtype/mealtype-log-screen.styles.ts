@@ -481,11 +481,14 @@ export const styles = StyleSheet.create({
   },
   searchBarWrapper: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     marginRight: 8,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'nowrap',
     gap: 8,
     marginBottom: 2,
     position: 'relative',

@@ -1,33 +1,15 @@
-import Lottie from "lottie-react";
-import animationData from "../assets/lottie/Wobbling.json";
-import { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-  useWindowDimensions,
-  Image,
-  type ScrollView as ScrollViewType,
-  type LayoutChangeEvent,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, FontWeight, Layout, Nudge, Shadows, Spacing, type ThemeColors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useGeoCountry } from '@/hooks/use-geo-country';
+import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
+import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
 import {
   getButtonAccessibilityProps,
   getInputAccessibilityProps,
@@ -35,7 +17,25 @@ import {
   getMinTouchTargetStyle,
   getWebAccessibilityProps,
 } from '@/utils/accessibility';
-import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Lottie from "lottie-react";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+  type ScrollView as ScrollViewType,
+} from 'react-native';
+import animationData from "../assets/lottie/Wobbling.json";
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -88,12 +88,15 @@ function HeroVisualComposite({
   isTwoCol: boolean;
 }) {
   const { t } = useTranslation();
-  const height = isTwoCol ? 400 : 300;
-  const phoneWidth = isTwoCol ? 280 : 240;
-  const phoneHeight = isTwoCol ? 392 : 340;
+  const height = isTwoCol ? 440 : 400;
+  const phoneWidth = isTwoCol ? 357 : 334;
+  const phoneHeight = isTwoCol ? 499 : 469;
+  
   const phoneOffsetX = Math.round(phoneWidth / 2);
   const phoneOffsetY = Math.round(phoneHeight / 2);
-  const cardWidth = isTwoCol ? 188 : 170;
+ // Responsive: card width scales with phone width, with sane min/max.
+  const cardWidth = clamp(Math.round(phoneWidth * 0.62), 132, isTwoCol ? 188 : 168);
+  const isCompactCards = phoneWidth <= 250; // tweak threshold if needed
 
   return (
     <View
@@ -117,43 +120,27 @@ function HeroVisualComposite({
         ]}
       />
 
-      {/* Phone frame */}
+      
+      {/* Hero phone image (replaces placeholder phone container) */}
       <View
         style={[
-          styles.phoneFrame,
+          styles.heroPhoneWrap,
           {
-            borderColor: colors.cardBorder ?? colors.border,
-            backgroundColor: colorScheme === 'dark' ? '#0B0F14' : '#FFFFFF',
             width: phoneWidth,
             height: phoneHeight,
             transform: [{ translateX: -phoneOffsetX }, { translateY: -phoneOffsetY }],
           },
         ]}
       >
-        <View style={[styles.phoneNotch, { backgroundColor: colorScheme === 'dark' ? '#11181C' : '#EAECEF' }]} />
-        <View
-          style={[
-            styles.phoneScreen,
-            {
-              borderColor: colors.border,
-              backgroundColor: colors.backgroundSecondary,
-            },
-            isWeb
-              ? {
-                  backgroundImage:
-                    colorScheme === 'dark'
-                      ? 'radial-gradient(160px circle at 35% 30%, rgba(91, 194, 198, 0.35), transparent 62%), radial-gradient(220px circle at 70% 55%, rgba(233, 135, 111, 0.30), transparent 62%), linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))'
-                      : 'radial-gradient(170px circle at 32% 28%, rgba(47, 164, 169, 0.32), transparent 62%), radial-gradient(240px circle at 72% 58%, rgba(184, 85, 63, 0.24), transparent 62%), linear-gradient(135deg, rgba(15,23,42,0.02), rgba(15,23,42,0.00))',
-                }
-              : null,
-          ]}
-        >
-          {/* Placeholder "floating UI" bars */}
-          <View style={[styles.phoneBar, { backgroundColor: colors.border + '55' }]} />
-          <View style={[styles.phoneBar, { width: '74%', backgroundColor: colors.border + '45' }]} />
-          <View style={[styles.phoneBar, { width: '62%', backgroundColor: colors.border + '35' }]} />
-        </View>
+        <Image
+          source={require('@/assets/images/login/index_ca.png')} // <-- your hero phone image
+          style={styles.heroPhoneImage}
+          resizeMode="contain" // use "cover" only if you want cropping
+          fadeDuration={0}
+          accessibilityIgnoresInvertColors
+        />
       </View>
+
 
       {/* Floating stat cards */}
       <View
@@ -161,13 +148,22 @@ function HeroVisualComposite({
           styles.floatingCard,
           styles.floatingCardTL,
           {
-            width: cardWidth,
-            backgroundColor: colorScheme === 'dark' ? 'rgba(11, 15, 20, 0.72)' : 'rgba(255, 255, 255, 0.92)',
+  // shrink-to-fit (no forced width), but don’t let it get too wide
+  maxWidth: cardWidth,
+  minWidth: 0,
+  alignItems: 'flex-start',
+            paddingVertical: isCompactCards ? 9 : 12,
+            paddingHorizontal: isCompactCards ? 10 : 12,
+            backgroundColor:
+              colorScheme === 'dark'
+                ? `rgba(11, 15, 20, ${isCompactCards ? 0.62 : 0.72})`
+                : `rgba(255, 255, 255, ${isCompactCards ? 0.86 : 0.92})`,
             borderColor: colors.cardBorder ?? colors.border,
             ...(isWeb ? ({ backdropFilter: 'blur(10px)' } as any) : null),
           },
         ]}
       >
+
         <Text style={[styles.floatingCardTitle, { color: colors.textSecondary }]}>
           {t('auth.login.marketing.demo_today_label')}
         </Text>
@@ -184,13 +180,22 @@ function HeroVisualComposite({
           styles.floatingCard,
           styles.floatingCardBR,
           {
-            width: cardWidth,
-            backgroundColor: colorScheme === 'dark' ? 'rgba(11, 15, 20, 0.72)' : 'rgba(255, 255, 255, 0.92)',
+  // shrink-to-fit (no forced width), but don’t let it get too wide
+  maxWidth: cardWidth,
+  minWidth: 0,
+  alignItems: 'flex-start',
+            paddingVertical: isCompactCards ? 9 : 12,
+            paddingHorizontal: isCompactCards ? 10 : 12,
+            backgroundColor:
+              colorScheme === 'dark'
+                ? `rgba(11, 15, 20, ${isCompactCards ? 0.62 : 0.72})`
+                : `rgba(255, 255, 255, ${isCompactCards ? 0.86 : 0.92})`,
             borderColor: colors.cardBorder ?? colors.border,
             ...(isWeb ? ({ backdropFilter: 'blur(10px)' } as any) : null),
           },
         ]}
-      >
+>
+
         <Text style={[styles.floatingCardTitle, { color: colors.textSecondary }]}>
           {t('auth.login.marketing.demo_macros_label')}
         </Text>
@@ -209,186 +214,48 @@ type StepsMockVariant = 'logging' | 'progress' | 'plan';
 
 function PhoneMock({
   colors,
-  colorScheme,
   isWeb,
   variant,
 }: {
   colors: ThemeColors;
-  colorScheme: 'light' | 'dark';
   isWeb: boolean;
   variant: StepsMockVariant;
 }) {
-  // Use theme surfaces (no hardcoded colors).
-  const frameBg = colors.card;
-  const screenBg = colors.backgroundSecondary;
-
-  const renderVariant = () => {
-    switch (variant) {
-      case 'logging':
-        return (
-          <View style={styles.mockContent}>
-            <View style={styles.mockTopRow}>
-              <View style={[styles.mockPill, { backgroundColor: colors.appTeal + '18', borderColor: colors.appTeal + '35' }]}>
-                <View style={[styles.mockDot, { backgroundColor: colors.appTeal }]} />
-                <View style={[styles.mockPillText, { backgroundColor: colors.textSecondary + '55' }]} />
-              </View>
-              <View style={[styles.mockChip, { backgroundColor: colors.tintLight, borderColor: colors.tint + '35' }]}>
-                <View style={[styles.mockChipText, { backgroundColor: colors.textSecondary + '55' }]} />
-              </View>
-            </View>
-
-            <View style={styles.mockList}>
-              <View style={[styles.mockListRow, { borderColor: colors.border }]}>
-                <View style={[styles.mockAvatar, { backgroundColor: colors.tint + '18' }]} />
-                <View style={styles.mockListTextCol}>
-                  <View style={[styles.mockLine, { width: '78%', backgroundColor: colors.textSecondary + '55' }]} />
-                  <View style={[styles.mockLine, { width: '52%', backgroundColor: colors.textSecondary + '35' }]} />
-                </View>
-              </View>
-              <View style={[styles.mockListRow, { borderColor: colors.border }]}>
-                <View style={[styles.mockAvatar, { backgroundColor: colors.appTeal + '18' }]} />
-                <View style={styles.mockListTextCol}>
-                  <View style={[styles.mockLine, { width: '70%', backgroundColor: colors.textSecondary + '55' }]} />
-                  <View style={[styles.mockLine, { width: '46%', backgroundColor: colors.textSecondary + '35' }]} />
-                </View>
-              </View>
-              <View style={[styles.mockListRow, { borderColor: colors.border }]}>
-                <View style={[styles.mockAvatar, { backgroundColor: colors.chartGreen + '18' }]} />
-                <View style={styles.mockListTextCol}>
-                  <View style={[styles.mockLine, { width: '66%', backgroundColor: colors.textSecondary + '55' }]} />
-                  <View style={[styles.mockLine, { width: '40%', backgroundColor: colors.textSecondary + '35' }]} />
-                </View>
-              </View>
-            </View>
-
-            <View style={[styles.mockCtaBar, { backgroundColor: colors.tint, borderColor: (colors.cardBorder ?? colors.border) + '55' }]}>
-              <View style={[styles.mockCtaText, { backgroundColor: colors.textInverse + 'AA' }]} />
-              <View style={[styles.mockCtaIcon, { backgroundColor: colors.textInverse + 'CC' }]} />
-            </View>
-          </View>
-        );
-
-      case 'progress':
-        return (
-          <View style={styles.mockContent}>
-            <View style={styles.mockTopRow}>
-              <View style={[styles.mockChip, { backgroundColor: colors.tintLight, borderColor: colors.tint + '35' }]}>
-                <View style={[styles.mockChipText, { backgroundColor: colors.textSecondary + '55' }]} />
-              </View>
-              <View style={[styles.mockPill, { backgroundColor: colors.chartGreen + '14', borderColor: colors.chartGreen + '35' }]}>
-                <View style={[styles.mockDot, { backgroundColor: colors.chartGreen }]} />
-                <View style={[styles.mockPillText, { backgroundColor: colors.textSecondary + '55' }]} />
-              </View>
-            </View>
-
-            <View style={[styles.mockChartCard, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
-              <View style={styles.mockChartBars}>
-                <View style={[styles.mockBar, { height: '55%', backgroundColor: colors.tint + '55' }]} />
-                <View style={[styles.mockBar, { height: '72%', backgroundColor: colors.appTeal + '55' }]} />
-                <View style={[styles.mockBar, { height: '46%', backgroundColor: colors.chartGreen + '55' }]} />
-                <View style={[styles.mockBar, { height: '82%', backgroundColor: colors.tint + '55' }]} />
-                <View style={[styles.mockBar, { height: '64%', backgroundColor: colors.appTeal + '55' }]} />
-              </View>
-              <View style={styles.mockDividerRow}>
-                <View style={[styles.mockTinyLine, { backgroundColor: colors.textSecondary + '35' }]} />
-                <View style={[styles.mockTinyLine, { width: '38%', backgroundColor: colors.textSecondary + '35' }]} />
-              </View>
-            </View>
-
-            <View style={styles.mockRowChips}>
-              <View style={[styles.mockChip, { backgroundColor: colors.appTeal + '18', borderColor: colors.appTeal + '35' }]} />
-              <View style={[styles.mockChip, { backgroundColor: colors.tint + '18', borderColor: colors.tint + '35' }]} />
-              <View style={[styles.mockChip, { backgroundColor: colors.chartGreen + '14', borderColor: colors.chartGreen + '35' }]} />
-            </View>
-          </View>
-        );
-
-      case 'plan':
-        return (
-          <View style={styles.mockContent}>
-            <View style={styles.mockTopRow}>
-              <View style={[styles.mockPill, { backgroundColor: colors.tint + '12', borderColor: colors.tint + '35' }]}>
-                <View style={[styles.mockDot, { backgroundColor: colors.tint }]} />
-                <View style={[styles.mockPillText, { backgroundColor: colors.textSecondary + '55' }]} />
-              </View>
-              <View style={[styles.mockChip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                <View style={[styles.mockChipText, { backgroundColor: colors.textSecondary + '55' }]} />
-              </View>
-            </View>
-
-            <View style={[styles.mockCalendar, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
-              <View style={styles.mockCalendarRow}>
-                {(['m', 't', 'w', 'th', 'f', 'sa', 'su'] as const).map((dayKey, i) => (
-                  <View
-                    key={dayKey}
-                    style={[
-                      styles.mockCalendarDot,
-                      {
-                        backgroundColor:
-                          i === 2 ? colors.tint : i === 4 ? colors.appTeal : colors.textSecondary + '35',
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
-              <View style={[styles.mockLine, { width: '72%', backgroundColor: colors.textSecondary + '45' }]} />
-            </View>
-
-            <View style={styles.mockGrid}>
-              <View style={[styles.mockMealCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                <View style={[styles.mockMealThumb, { backgroundColor: colors.appTeal + '18' }]} />
-                <View style={[styles.mockLine, { width: '70%', backgroundColor: colors.textSecondary + '55' }]} />
-                <View style={[styles.mockLine, { width: '48%', backgroundColor: colors.textSecondary + '35' }]} />
-              </View>
-              <View style={[styles.mockMealCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                <View style={[styles.mockMealThumb, { backgroundColor: colors.tint + '18' }]} />
-                <View style={[styles.mockLine, { width: '62%', backgroundColor: colors.textSecondary + '55' }]} />
-                <View style={[styles.mockLine, { width: '42%', backgroundColor: colors.textSecondary + '35' }]} />
-              </View>
-            </View>
-          </View>
-        );
-    }
-  };
+  // Map variants to your final marketing images.
+  // Replace the require(...) paths with your real assets.
+  const src =
+    variant === 'logging'
+      ? require('@/assets/images/login/double.png')
+      : variant === 'progress'
+        ? require('@/assets/images/login/dashlight.png')
+        : require('@/assets/images/login/AICAMLight.png');
 
   return (
     <View
       style={[
         styles.phoneMockFrame,
         {
-          borderColor: colors.cardBorder ?? colors.border,
-          backgroundColor: frameBg,
+          backgroundColor: 'transparent',
+          borderColor: 'transparent',
+          borderWidth: 0,
         },
       ]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <View
-        style={[
-          styles.phoneMockNotch,
-          { backgroundColor: colorScheme === 'dark' ? colors.backgroundSecondary : colors.border },
-        ]}
+      <Image
+        source={src}
+        style={styles.phoneMockImage}
+        // "contain" = never crops, safest for marketing screenshots
+        // If you prefer edge-to-edge fill and accept cropping, switch to "cover"
+        resizeMode="contain"
+        fadeDuration={0}
+        accessibilityIgnoresInvertColors
       />
-
-      <View
-        style={[
-          styles.phoneMockScreen,
-          { borderColor: colors.border, backgroundColor: screenBg },
-          isWeb
-            ? ({
-                backgroundImage:
-                  colorScheme === 'dark'
-                    ? 'radial-gradient(160px circle at 30% 22%, rgba(91, 194, 198, 0.28), transparent 62%), radial-gradient(240px circle at 76% 60%, rgba(233, 135, 111, 0.22), transparent 62%), linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))'
-                    : 'radial-gradient(160px circle at 28% 20%, rgba(47, 164, 169, 0.26), transparent 62%), radial-gradient(240px circle at 76% 62%, rgba(184, 85, 63, 0.18), transparent 62%), linear-gradient(135deg, rgba(15,23,42,0.02), rgba(15,23,42,0.00))',
-              } as any)
-            : null,
-        ]}
-      >
-        {renderVariant()}
-      </View>
     </View>
   );
 }
+
 
 function StepsShowcaseMobileStack({
   colors,
@@ -1610,15 +1477,10 @@ const styles = StyleSheet.create({
   },
   floatingCard: {
     position: 'absolute',
-    width: 170,
     borderRadius: 18,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
     ...Platform.select({
-      web: {
-        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.14)',
-      },
+      web: { boxShadow: '0 10px 24px rgba(15, 23, 42, 0.14)' },
       default: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
@@ -1628,13 +1490,14 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  
   floatingCardTL: {
-    top: 18,
-    left: 14,
+    top: 70,
+    right: 100,
   },
   floatingCardBR: {
     bottom: 16,
-    right: 14,
+    left: 14,
   },
   floatingCardTitle: {
     fontSize: 12,
@@ -1954,6 +1817,11 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  phoneMockImage: {
+    width: '100%',
+    height: '100%',
+  },
+  
   phoneMockNotch: {
     position: 'absolute',
     top: Spacing.sm,
@@ -2148,4 +2016,23 @@ const styles = StyleSheet.create({
     aspectRatio: 4 / 3,
     borderRadius: BorderRadius.xl,
   },
+  heroPhoneWrap: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 0,
+    overflow: 'visible',
+    ...Platform.select({
+      web: { boxShadow: 'none' },
+      default: { shadowOpacity: 0, elevation: 0 },
+    }),
+  },
+  
+  heroPhoneImage: {
+    width: '100%',
+    height: '100%',
+  },
+  
 });
