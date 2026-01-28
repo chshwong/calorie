@@ -81,11 +81,13 @@ function HeroVisualComposite({
   colorScheme,
   isWeb,
   isTwoCol,
+  isCanada,
 }: {
   colors: ThemeColors;
   colorScheme: 'light' | 'dark';
   isWeb: boolean;
   isTwoCol: boolean;
+  isCanada: boolean;
 }) {
   const { t } = useTranslation();
   const height = isTwoCol ? 440 : 400;
@@ -133,7 +135,7 @@ function HeroVisualComposite({
         ]}
       >
         <Image
-          source={require('@/assets/images/login/index_ca.png')} // <-- your hero phone image
+          source={isCanada ? require('@/assets/images/login/index_ca.png') : require('@/assets/images/login/index.png')}
           style={styles.heroPhoneImage}
           resizeMode="contain" // use "cover" only if you want cropping
           fadeDuration={0}
@@ -958,6 +960,7 @@ export default function LoginScreen() {
                   colorScheme={colorScheme ?? 'light'}
                   isWeb={isWeb}
                   isTwoCol={isTwoCol}
+                  isCanada={country === 'CA'}
                 />
               ) : null}
             </View>
