@@ -163,7 +163,6 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
           return d.toLocaleDateString('en-US', { weekday: 'short' });
         }
 
-        const isStartOrEnd = idx === startIdx || idx === endIdx;
         if (card.id === '1m') {
           // Weekly ticks: show M/D, always include start/end.
           const mm = d.getMonth() + 1;
@@ -171,8 +170,8 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
           return `${mm}/${dd}`;
         }
 
-        // Month-based ticks: show month; for start/end include day for clarity.
-        if (isStartOrEnd) {
+        // Month-based ticks (3m, 6m, 1y): end label only gets month+day; start and middle get month only.
+        if (idx === endIdx) {
           return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
         return d.toLocaleDateString('en-US', { month: 'short' });
@@ -273,15 +272,14 @@ export const WeightChartCarousel = memo(function WeightChartCarousel({ dailyLate
                   labelIndices={ds.labelIndices} 
                   getLabel={ds.getLabel} 
                   height={200}
-                  // Pass new props for 7-day card only
-                  {...(item.id === '7d' ? {
-                    dayKeys: ds.dayKeys,
-                    todayDateString,
-                    yesterdayDateString,
-                    selectedDateString,
-                    dailyMap,
-                    unit,
-                  } : {})}
+                  dayKeys={ds.dayKeys}
+                  todayDateString={todayDateString}
+                  yesterdayDateString={yesterdayDateString}
+                  selectedDateString={ds.dayKeys[ds.dayKeys.length - 1]}
+                  dailyMap={dailyMap}
+                  unit={unit}
+                  useTodayYesterdayLabels={item.id === '7d'}
+                  {...(item.id === '3m' || item.id === '6m' || item.id === '1y' ? { dotRadius: 4 } : {})}
                 />
               </View>
             </View>

@@ -2323,6 +2323,7 @@
     }
   },
   "weight": {
+    "chart_add_one_more": "Ajoutez une pesée de plus pour voir une tendance.",
     "fab": {
       "log_weight": "+ Noter le poids",
       "log_weight_a11y": "Noter le poids"

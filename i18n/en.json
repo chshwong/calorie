@@ -2920,6 +2920,7 @@
     }
   },
   "weight": {
+    "chart_add_one_more": "Add one more weigh-in to see a trend.",
     "dashboard": {
       "title": "Weight",
       "card_label": "Weight: {{weight}}",

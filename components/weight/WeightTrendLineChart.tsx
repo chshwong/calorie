@@ -9,6 +9,10 @@ import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 type Props = {
   values: number[]; // NaN = missing
   labelIndices: number[]; // indices into values to label
@@ -20,9 +24,13 @@ type Props = {
   yesterdayDateString?: string; // Yesterday's date key for "Yesterday" label
   /** Dashboard-only: show "Yday" instead of "Yesterday" for yesterday label */
   useYdayLabel?: boolean;
+  /** When true, X-axis labels use Today/Yesterday/weekday; when false, use getLabel only (7d only). */
+  useTodayYesterdayLabels?: boolean;
   selectedDateString?: string; // Selected date key (last date in range) for Y-axis dotted line
   dailyMap?: Map<string, { weight_lb: number | null }>; // Map to look up weight values by date key
   unit?: 'kg' | 'lbs'; // Weight unit for formatting Y-axis labels
+  /** Optional dot radius (default 5); use 4 for long ranges 3m/6m/1y to reduce clutter. */
+  dotRadius?: number;
   onDayPress?: (dateKey: string) => void; // Optional: enable per-day navigation (dashboard)
 };
 
@@ -35,9 +43,11 @@ export function WeightTrendLineChart({
   todayDateString,
   yesterdayDateString,
   useYdayLabel = false,
+  useTodayYesterdayLabels = false,
   selectedDateString,
   dailyMap,
   unit = 'lbs',
+  dotRadius = 5,
   onDayPress,
 }: Props) {
   const { t } = useTranslation();
@@ -61,7 +71,7 @@ export function WeightTrendLineChart({
   };
 
   const chart = useMemo(() => {
-    const DOT_R = 5;
+    const DOT_R = Math.max(1, Math.min(10, dotRadius));
     const PAD_X = DOT_R + 2;
     const PAD_Y_TOP = DOT_R + 2;
     const PAD_Y_BOTTOM = DOT_R + 10;
@@ -72,7 +82,7 @@ export function WeightTrendLineChart({
     const denom = Math.max(1, n - 1);
 
     const finite = values.filter((v) => Number.isFinite(v));
-    // Fitbit-style: show dots for actual weigh-ins even if there's only 1 point.
+    // Need at least 1 point for path/dots; "trend" empty state when < 2.
     if (finite.length < 1) {
       return {
         hasSufficientPoints: false,
@@ -115,9 +125,10 @@ export function WeightTrendLineChart({
     });
 
     const pathD = buildFitbitPathD(pointsByIndex);
+    const hasSufficientPoints = finite.length >= 2;
 
     return {
-      hasSufficientPoints: true,
+      hasSufficientPoints,
       DOT_R,
       PAD_X,
       PAD_Y_TOP,
@@ -132,53 +143,80 @@ export function WeightTrendLineChart({
       pathD,
       pointsByIndex,
     };
-  }, [effectiveHeight, values, width, yAxisWidth, dailyMap, selectedDateString]);
+  }, [effectiveHeight, values, width, yAxisWidth, dailyMap, selectedDateString, dotRadius]);
   
-  // Calculate Y-axis points using chart's minY and maxY
+  // Nice Y-axis ticks: ~5 ticks (cap <= 7), same scale as dots; one list for both grid and labels.
   const yAxisPoints = useMemo(() => {
     if (!chart.hasSufficientPoints || !dailyMap || !selectedDateString) return [];
-    
-    const { rawMin, rawMax, minY, maxY, plotHeight } = chart;
+    const { rawMin, rawMax, minY, maxY, plotHeight, span } = chart;
+    const plotSpan = span ?? Math.max(1e-6, maxY - minY);
     if (!Number.isFinite(rawMin) || !Number.isFinite(rawMax)) return [];
-    
-    // Get selected date's weight
-    const selectedRow = dailyMap.get(selectedDateString);
-    let selectedWeight: number | null = null;
-    if (selectedRow && selectedRow.weight_lb !== null && selectedRow.weight_lb !== undefined) {
-      const wLb = selectedRow.weight_lb;
-      selectedWeight = unit === 'kg' ? roundTo1(lbToKg(wLb)) : roundTo1(wLb);
-    }
-    
-    const points: Array<{ value: number; position: number }> = [];
-    const span = Math.max(1e-6, maxY - minY);
-    
-    // Always include raw min/max as labels + dotted lines (scaled using padded min/max).
-    const pushPoint = (value: number) => {
-      const pos = ((value - minY) / span) * plotHeight; // 0..plotHeight (bottom-up within plot region)
-      points.push({ value, position: Math.max(0, Math.min(plotHeight, pos)) });
-    };
 
-    pushPoint(rawMin);
-    if (rawMax !== rawMin) pushPoint(rawMax);
-    
-    // Include selected date's weight if it's between min and max
-    if (
-      selectedWeight !== null &&
-      Number.isFinite(selectedWeight) &&
-      selectedWeight >= rawMin &&
-      selectedWeight <= rawMax
-    ) {
-      const already = points.some((p) => Math.abs(p.value - selectedWeight) < 1e-6);
-      if (!already) pushPoint(selectedWeight);
+    const stepsLbs = [0.2, 0.5, 1, 2, 5];
+    const stepsKg = [0.1, 0.2, 0.5, 1];
+    const candidates = unit === 'kg' ? stepsKg : stepsLbs;
+
+    // Flat-line guard: if all values identical, expand range for tick generation.
+    let workMin = rawMin;
+    let workMax = rawMax;
+    if (rawMin === rawMax) {
+      const flatStep = unit === 'kg' ? 0.5 : 1;
+      workMin = rawMin - flatStep;
+      workMax = rawMax + flatStep;
     }
-    
-    // Sort by position (bottom to top)
-    return points.sort((a, b) => a.position - b.position);
-  }, [chart, dailyMap, selectedDateString, unit]);
+    const range = Math.max(1e-6, workMax - workMin);
+
+    // Pick step: closest to range/4; if tick count > 7, use next larger candidate.
+    let step = candidates[0];
+    for (const s of candidates) {
+      step = s;
+      const nMin = Math.floor(workMin / step) * step;
+      const nMax = Math.ceil(workMax / step) * step;
+      const count = Math.round((nMax - nMin) / step) + 1;
+      if (count <= 7) break;
+    }
+
+    const niceMin = Math.floor(workMin / step) * step;
+    const niceMax = Math.ceil(workMax / step) * step;
+    const ticksSet = new Set<number>();
+    for (let v = niceMin; v <= niceMax + 1e-6; v += step) {
+      ticksSet.add(roundTo1(v));
+    }
+    let ticks = Array.from(ticksSet);
+    if (ticks.length === 0) ticks = [roundTo1(niceMin), roundTo1(niceMax)];
+
+    // Filter: only ticks within [minY, maxY] (same list for grid and labels).
+    const filtered = ticks.filter((v) => v >= minY - 1e-6 && v <= maxY + 1e-6);
+    const points: Array<{ value: number; position: number; isHighlight: boolean }> = filtered.map((value) => {
+      const position = ((value - minY) / plotSpan) * plotHeight;
+      return { value, position: Math.max(0, Math.min(plotHeight, position)), isHighlight: false };
+    });
+    points.sort((a, b) => a.position - b.position);
+
+    // Highlight nearest existing tick to selected (or last valid) weight; styling only.
+    const selectedRow = dailyMap.get(selectedDateString);
+    let refWeight: number | null = null;
+    if (selectedRow && selectedRow.weight_lb != null) {
+      refWeight = unit === 'kg' ? roundTo1(lbToKg(selectedRow.weight_lb)) : roundTo1(selectedRow.weight_lb);
+    }
+    if (refWeight == null) {
+      const revIdx = [...values].reverse().findIndex((v) => Number.isFinite(v));
+      const lastFiniteIdx = revIdx >= 0 ? values.length - 1 - revIdx : -1;
+      if (lastFiniteIdx >= 0 && Number.isFinite(values[lastFiniteIdx])) refWeight = values[lastFiniteIdx];
+    }
+    if (refWeight != null && points.length > 0) {
+      const nearest = points.reduce((prev, curr) =>
+        Math.abs(curr.value - refWeight!) < Math.abs(prev.value - refWeight!) ? curr : prev
+      );
+      nearest.isHighlight = true;
+    }
+
+    return points;
+  }, [chart, dailyMap, selectedDateString, unit, values]);
   
-  // Update getLabel to use Today/Yesterday/weekday logic if dayKeys are provided
+  // Only 7-day range uses Today/Yesterday/weekday; other ranges use getLabel only.
   const enhancedGetLabel = useMemo(() => {
-    if (!dayKeys || !todayDateString) return getLabel;
+    if (!useTodayYesterdayLabels || !dayKeys || !todayDateString) return getLabel;
     
     return (idx: number) => {
       const key = dayKeys[idx];
@@ -193,7 +231,7 @@ export function WeightTrendLineChart({
       const d = new Date(`${key}T00:00:00`);
       return d.toLocaleDateString('en-US', { weekday: 'short' });
     };
-  }, [dayKeys, todayDateString, yesterdayDateString, getLabel, t, useYdayLabel]);
+  }, [useTodayYesterdayLabels, dayKeys, todayDateString, yesterdayDateString, getLabel, t, useYdayLabel]);
 
   return (
     <View
@@ -237,15 +275,6 @@ export function WeightTrendLineChart({
               ]}
             >
               {yAxisPoints.map((point, idx) => {
-                const isSelected = selectedDateString && dailyMap?.get(selectedDateString) && 
-                  (() => {
-                    const selectedRow = dailyMap.get(selectedDateString);
-                    if (!selectedRow || selectedRow.weight_lb === null) return false;
-                    const wLb = selectedRow.weight_lb;
-                    const selectedWeight = unit === 'kg' ? roundTo1(lbToKg(wLb)) : roundTo1(wLb);
-                    return Math.abs(selectedWeight - point.value) < 0.1;
-                  })();
-                
                 // Y-axis label vertical alignment offset (nudge text down so it sits on the dotted line).
                 const BASE_LABEL_OFFSET = Math.round(FontSize.xs * 0.35);
                 const isMin = point.value === chart.rawMin;
@@ -258,7 +287,6 @@ export function WeightTrendLineChart({
                       styles.yAxisLabelContainer,
                       {
                         position: 'absolute',
-                        // Fix coordinate mismatch: account for PAD_Y_BOTTOM so labels align with dots.
                         bottom: chart.PAD_Y_BOTTOM + point.position,
                         transform: [{ translateY: labelOffset }],
                       },
@@ -308,105 +336,124 @@ export function WeightTrendLineChart({
             )}
 
             {/* Dotted horizontal lines at Y-axis points - rendered behind trend line */}
-            {yAxisPoints.length > 0 && yAxisPoints.map((point, idx) => {
-              const isSelected = selectedDateString && dailyMap?.get(selectedDateString) && 
-                (() => {
-                  const selectedRow = dailyMap.get(selectedDateString);
-                  if (!selectedRow || selectedRow.weight_lb === null) return false;
-                  const wLb = selectedRow.weight_lb;
-                  const selectedWeight = unit === 'kg' ? roundTo1(lbToKg(wLb)) : roundTo1(wLb);
-                  return Math.abs(selectedWeight - point.value) < 0.1;
-                })();
-              
+            {yAxisPoints.length > 0 && yAxisPoints.map((point, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.yAxisLine,
+                  {
+                    bottom: chart.PAD_Y_BOTTOM + point.position,
+                    borderColor: colors.textSecondary,
+                    opacity: point.isHighlight ? 1 : 0.8,
+                  },
+                ]}
+              />
+            ))}
+
+            {/* Trend line and dots - rendered on top; emphasize latest data point */}
+            {(() => {
+              let lastFiniteIndex = -1;
+              for (let i = values.length - 1; i >= 0; i--) {
+                if (Number.isFinite(values[i])) {
+                  lastFiniteIndex = i;
+                  break;
+                }
+              }
               return (
-                <View
-                  key={idx}
-                  style={[
-                    styles.yAxisLine,
-                    {
-                      // Fix coordinate mismatch: account for PAD_Y_BOTTOM so lines align with dots.
-                      bottom: chart.PAD_Y_BOTTOM + point.position,
-                      borderColor: colors.textSecondary,
-                      opacity: isSelected ? 1 : 0.8,
-                    },
-                  ]}
-                />
-              );
-            })}
-
-            {/* Trend line and dots - rendered on top */}
-            <View style={[styles.trendLineContainer, { zIndex: 2 }]}>
-              <Svg
-                width={width - effectiveYAxisWidth}
-                height={effectiveHeight - chart.xAxisHeight}
-                viewBox={`0 0 ${width - effectiveYAxisWidth} ${effectiveHeight - chart.xAxisHeight}`}
-                preserveAspectRatio="none"
-                pointerEvents="none"
-              >
-                <Path d={chart.pathD} fill="none" stroke={colors.tint} strokeWidth={2} />
-                {chart.pointsByIndex.map((p, idx) =>
-                  p ? (
-                    <Circle key={idx} cx={p.x} cy={p.y} r={chart.DOT_R} stroke={colors.tint} strokeWidth={2} fill={colors.tint} />
-                  ) : null
-                )}
-              </Svg>
-            </View>
-          </View>
-
-          {/* X-axis labels */}
-          <View
-            style={[
-              styles.labelsLayer,
-              {
-                position: 'absolute',
-                // Align labels layer with plot area (no extra padding shifts).
-                left: effectiveYAxisWidth,
-                right: 0,
-                bottom: 0,
-                height: chart.xAxisHeight,
-              },
-            ]}
-            pointerEvents="none"
-          >
-            {labelIndices.map((idx) => {
-              if (idx < 0 || idx >= values.length) return null;
-              const n = values.length;
-              const denom = Math.max(1, n - 1);
-              const plotWidth = width - effectiveYAxisWidth;
-              const usableWidth = Math.max(0, plotWidth - chart.PAD_X * 2);
-
-              // Use the exact same horizontal coordinate system as the plotted dots.
-              // Dots use: x = PAD_X + (i / denom) * usableWidth
-              const dotX = n <= 1 ? plotWidth / 2 : chart.PAD_X + (idx / denom) * usableWidth;
-
-              // Center label under the dot using a fixed container width per slot.
-              const slotW = plotWidth / Math.max(1, n);
-              const labelW = slotW;
-              const left = dotX - labelW / 2;
-              const text = enhancedGetLabel(idx);
-              if (!text) return null;
-              const dayKey = dayKeys?.[idx];
-              const isToday = todayDateString && dayKey === todayDateString;
-              return (
-                <View key={idx} style={[styles.labelItem, { left, width: labelW }]}>
-                  <ThemedText 
-                    style={[
-                      { color: colors.textSecondary, fontSize: FontSize.sm },
-                      isToday && styles.labelToday
-                    ]}
+                <View style={[styles.trendLineContainer, { zIndex: 2 }]}>
+                  <Svg
+                    width={width - effectiveYAxisWidth}
+                    height={effectiveHeight - chart.xAxisHeight}
+                    viewBox={`0 0 ${width - effectiveYAxisWidth} ${effectiveHeight - chart.xAxisHeight}`}
+                    preserveAspectRatio="none"
+                    pointerEvents="none"
                   >
-                    {text}
-                  </ThemedText>
+                    <Path d={chart.pathD} fill="none" stroke={colors.tint} strokeWidth={2} />
+                    {chart.pointsByIndex.map((p, idx) =>
+                      p ? (
+                        <Circle
+                          key={idx}
+                          cx={p.x}
+                          cy={p.y}
+                          r={idx === lastFiniteIndex ? chart.DOT_R + 1 : chart.DOT_R}
+                          stroke={colors.tint}
+                          strokeWidth={idx === lastFiniteIndex ? 3 : 2}
+                          fill={colors.tint}
+                        />
+                      ) : null
+                    )}
+                  </Svg>
                 </View>
               );
-            })}
+            })()}
           </View>
+
+          {/* X-axis labels: inject end index, filter by 42px spacing, fixed 60px width, clamp left */}
+          {(() => {
+            const n = values.length;
+            const endIndex = n - 1;
+            const plotWidth = width - effectiveYAxisWidth;
+            const usableWidth = Math.max(0, plotWidth - chart.PAD_X * 2);
+            const denom = Math.max(1, n - 1);
+            const MIN_LABEL_SPACING_PX = 42;
+            const LABEL_WIDTH = 60;
+
+            const candidates = Array.from(new Set([...labelIndices, endIndex])).sort((a, b) => a - b);
+            let lastX = -Infinity;
+            const filteredLabelIndices: number[] = [];
+            for (const idx of candidates) {
+              if (idx < 0 || idx >= n) continue;
+              const dotX = n <= 1 ? plotWidth / 2 : chart.PAD_X + (idx / denom) * usableWidth;
+              if (dotX - lastX >= MIN_LABEL_SPACING_PX || idx === endIndex) {
+                filteredLabelIndices.push(idx);
+                lastX = dotX;
+              }
+            }
+
+            return (
+              <View
+                style={[
+                  styles.labelsLayer,
+                  {
+                    position: 'absolute',
+                    left: effectiveYAxisWidth,
+                    right: 0,
+                    bottom: 0,
+                    height: chart.xAxisHeight,
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                {filteredLabelIndices.map((idx) => {
+                  const dotX = n <= 1 ? plotWidth / 2 : chart.PAD_X + (idx / denom) * usableWidth;
+                  const leftPos = clamp(dotX - LABEL_WIDTH / 2, 0, plotWidth - LABEL_WIDTH);
+                  const text = enhancedGetLabel(idx);
+                  if (!text) return null;
+                  const dayKey = dayKeys?.[idx];
+                  const isToday = todayDateString && dayKey === todayDateString;
+                  return (
+                    <View key={idx} style={[styles.labelItem, { left: leftPos, width: LABEL_WIDTH }]}>
+                      <ThemedText
+                        numberOfLines={1}
+                        style={[
+                          { color: colors.textSecondary, fontSize: FontSize.sm },
+                          isToday && styles.labelToday,
+                        ]}
+                      >
+                        {text}
+                      </ThemedText>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })()}
               </>
             );
           })()}
         </View>
       ) : (
-        <ThemedText style={{ color: colors.textSecondary }}>Add at least 2 weigh-ins to see a trend.</ThemedText>
+        <ThemedText style={{ color: colors.textSecondary }}>{t('weight.chart_add_one_more')}</ThemedText>
       )}
     </View>
   );

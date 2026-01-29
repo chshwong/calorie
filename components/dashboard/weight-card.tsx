@@ -295,6 +295,7 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
                       todayDateString={todayDateString}
                       yesterdayDateString={yesterdayDateString}
                       useYdayLabel
+                      useTodayYesterdayLabels
                       selectedDateString={selectedDateString}
                       dailyMap={dailyMap}
                       unit={unit}
