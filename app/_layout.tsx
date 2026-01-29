@@ -26,6 +26,10 @@ import { initInstallPromptCapture } from '@/src/features/install/installPromptSt
 // Import QueryClient from separate module to avoid circular dependency with AuthContext
 import { queryClient } from '@/lib/query-client';
 
+if (typeof window !== 'undefined' && Platform.OS === 'web') {
+  initInstallPromptCapture();
+}
+
 // TEMPORARY: Add global query logging via event system
 if (typeof window !== 'undefined') {
   queryClient.getQueryCache().subscribe((event) => {
@@ -103,13 +107,6 @@ export default function RootLayout() {
   useEffect(() => {
     const cleanup = setupFocusWarmup();
     return cleanup;
-  }, []);
-
-  // Web: capture beforeinstallprompt at app startup so we never miss it (e.g. when user opens Settings)
-  useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      initInstallPromptCapture();
-    }
   }, []);
 
   // Web: Add online/offline listener for automatic query invalidation on reconnect

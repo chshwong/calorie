@@ -3,6 +3,8 @@
  * (e.g. in root layout) so we never miss the event when user opens Settings.
  */
 
+const DEBUG_A2HS = (typeof __DEV__ !== 'undefined' && __DEV__) || (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_DEBUG_A2HS === '1');
+
 export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
@@ -27,18 +29,21 @@ export function initInstallPromptCapture(): void {
   if (typeof window === 'undefined') return;
 
   initialized = true;
+  if (DEBUG_A2HS) console.log('[A2HS] initInstallPromptCapture ran');
 
   window.addEventListener(
     'beforeinstallprompt',
     (e: Event) => {
       e.preventDefault();
       deferredPrompt = e as BeforeInstallPromptEvent;
+      if (DEBUG_A2HS) console.log('[A2HS] beforeinstallprompt captured', e);
       notify();
     },
     { passive: false }
   );
 
   window.addEventListener('appinstalled', () => {
+    if (DEBUG_A2HS) console.log('[A2HS] appinstalled fired');
     deferredPrompt = null;
     notify();
   });

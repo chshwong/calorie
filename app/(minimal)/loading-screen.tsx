@@ -28,6 +28,8 @@ export default function LoadingScreen() {
   
   // Animated loading dots state
   const [dotsCount, setDotsCount] = useState(0);
+  // Show hint after 5s if still on this screen (stuck state)
+  const [showSlowHint, setShowSlowHint] = useState(false);
 
   // Animate loading dots: 0 → 1 → 2 → 3 → 0 (loop)
   useEffect(() => {
@@ -36,6 +38,12 @@ export default function LoadingScreen() {
     }, 450); // 450ms per step
 
     return () => clearInterval(interval);
+  }, []);
+
+  // After 5s continuous display, show guidance for stuck states
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSlowHint(true), 5000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Pick random quote once per mount
@@ -97,6 +105,18 @@ export default function LoadingScreen() {
             {loadingText}
           </ThemedText>
         </View>
+
+        {/* Slow-loading hint: show after 5s if still stuck */}
+        {showSlowHint ? (
+          <View style={styles.slowHintContainer}>
+            <ThemedText style={[styles.slowHintText, { color: colors.textSecondary }]}>
+              This is taking too long—we dropped the avocado. 🥑
+            </ThemedText>
+            <ThemedText style={[styles.slowHintText, styles.slowHintTextSecond, { color: colors.textSecondary }]}>
+              Please close the browser completely and reopen AvoVibe.
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
     </ThemedView>
   );
@@ -175,6 +195,26 @@ const styles = StyleSheet.create({
       default: undefined, // Use system default on native
     }),
     letterSpacing: 0.5, // Slight spacing for better readability
+  },
+  slowHintContainer: {
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
+    maxWidth: 340,
+    paddingBottom: Spacing.lg,
+  },
+  slowHintText: {
+    textAlign: 'center',
+    fontSize: Platform.select({ web: 14, default: 13 }),
+    lineHeight: Platform.select({ web: 20, default: 18 }),
+    opacity: 0.9,
+    fontFamily: Platform.select({
+      web: 'Inter, system-ui, sans-serif',
+      default: undefined,
+    }),
+  },
+  slowHintTextSecond: {
+    marginTop: 6,
   },
 });
 
