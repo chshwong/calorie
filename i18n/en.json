@@ -197,10 +197,10 @@
       ]
     },
     "meal_types": {
-      "breakfast": "Breakfast",
-      "lunch": "Lunch",
-      "dinner": "Dinner",
-      "afternoon_snack": "Snack"
+      "breakfast": "☀️Breakfast",
+      "lunch": "🕛Lunch",
+      "dinner": "🌙Dinner",
+      "afternoon_snack": "🥑Snack"
     },
     "meal_menu": {
       "quick_log": "Quick Log",
@@ -213,7 +213,13 @@
     },
     "food_log": {
       "log_food_prompt": "← Log Food",
-      "kcal": "cal"
+      "kcal": "cal",
+      "master_view_collapse": "Collapse",
+      "master_view_compact": "Compact",
+      "master_view_expand": "Expand",
+      "master_view_toast": "All meals updated",
+      "master_view_a11y_hint": "Applies to all meals with entries",
+      "meals_label": "View"
     },
     "previous_day_copy": {
       "label_yesterday": "Yesterday",
@@ -267,7 +273,8 @@
       "expand_details": "Expand more details",
       "collapse_details": "Collapse more details",
       "details_hint": "Double tap to show or hide additional nutrition details",
-      "calendar_select_day": "Select {{day}}"
+      "calendar_select_day": "Select {{day}}",
+      "master_view_a11y": "Set all meals to {{mode}} view"
     },
     "profile_not_found": {
       "title": "Profile Not Found",
@@ -1581,7 +1588,8 @@
       "item_other": "items",
       "edit": "Edit",
       "done": "Done",
-      "no_entries": "No entries yet. Add one above!"
+      "no_entries": "No entries yet. Add one above!",
+      "insights_section": "Insights"
     },
     "form": {
       "food_item_placeholder": "e.g. Buffet, candies, curry soup, and more",

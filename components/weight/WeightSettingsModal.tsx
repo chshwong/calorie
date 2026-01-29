@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import {
   Modal,
   Platform,
@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  type LayoutChangeEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -46,25 +45,6 @@ export function WeightSettingsModal({
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
 
-  const [bodyHeight, setBodyHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-
-  const shouldScroll = useMemo(() => {
-    if (!bodyHeight) return false;
-    if (!contentHeight) return false;
-    return contentHeight > bodyHeight;
-  }, [bodyHeight, contentHeight]);
-
-  const handleBodyLayout = (e: LayoutChangeEvent) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0 && h !== bodyHeight) setBodyHeight(h);
-  };
-
-  const handleContentLayout = (e: LayoutChangeEvent) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0 && h !== contentHeight) setContentHeight(h);
-  };
-
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
@@ -91,20 +71,15 @@ export function WeightSettingsModal({
             </TouchableOpacity>
           </View>
 
-          <ThemedView style={styles.body} onLayout={handleBodyLayout}>
-            {shouldScroll ? (
-              <ScrollView
-                style={styles.bodyScroll}
-                contentContainerStyle={styles.bodyScrollContent}
-                showsVerticalScrollIndicator={false}
-              >
-                <View onLayout={handleContentLayout}>{children}</View>
-              </ScrollView>
-            ) : (
-              <View onLayout={handleContentLayout} style={styles.bodyScrollContent}>
-                {children}
-              </View>
-            )}
+          <ThemedView style={styles.body}>
+            <ScrollView
+              style={styles.bodyScroll}
+              contentContainerStyle={styles.bodyScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {children}
+            </ScrollView>
           </ThemedView>
 
           <View style={styles.footer}>
@@ -186,6 +161,7 @@ const styles = StyleSheet.create({
   },
   bodyScrollContent: {
     gap: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   footer: {
     flexDirection: 'row',

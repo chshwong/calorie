@@ -160,6 +160,32 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
     opacity: 0.5,
   },
+  foodLogEntriesInset: {
+    width: '100%',
+    alignSelf: 'stretch' as const,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    paddingVertical: 8,
+    marginTop: 8,
+    marginHorizontal: 0,
+    overflow: 'hidden' as const,
+  },
+  insightsDividerRow: {
+    width: '100%',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  insightsDividerLine: {
+    height: 1,
+    width: '100%',
+    opacity: 0.8,
+  },
+  insightsLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    textAlign: 'center' as const,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',

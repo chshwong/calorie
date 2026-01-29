@@ -75,6 +75,7 @@ export function useDailyFoodSummary(dateString: string) {
     fiberG: totals.fiber,
     fiberGoalG: fiberGoal,
     sugarG: totals.sugar,
+    entries,
   };
 }
 

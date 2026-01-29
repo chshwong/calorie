@@ -51,12 +51,48 @@ type DashboardFoodSectionProps = {
   isMobile: boolean;
   onPress: () => void;
   onDateSelect: (dateString: string) => void;
+  foodSummary: ReturnType<typeof useDailyFoodSummary>;
 };
 
-function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect }: DashboardFoodSectionProps) {
+function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, foodSummary }: DashboardFoodSectionProps) {
   const { t } = useTranslation();
-  const foodSummary = useDailyFoodSummary(dateString);
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
+
+  const mealCals = useMemo(() => {
+    const out = { breakfast: 0, lunch: 0, dinner: 0, afternoon_snack: 0 };
+    const entries = foodSummary.entries ?? [];
+    if (!Array.isArray(entries)) return out;
+    for (const e of entries) {
+      const mt = e.meal_type?.toLowerCase?.() ?? '';
+      const cals = Number(e.calories_kcal ?? 0);
+      if (mt === 'breakfast') out.breakfast += cals;
+      else if (mt === 'lunch') out.lunch += cals;
+      else if (mt === 'dinner') out.dinner += cals;
+      else if (mt === 'afternoon_snack' || mt === 'snack') out.afternoon_snack += cals;
+    }
+    return out;
+  }, [foodSummary.entries]);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const sum = mealCals.breakfast + mealCals.lunch + mealCals.dinner + mealCals.afternoon_snack;
+    const total = Number(foodSummary.caloriesTotal ?? 0);
+    if (Math.abs(Math.round(sum) - Math.round(total)) > 1) {
+      console.warn('[Dashboard] meal calories != total', { sum, total, mealCals });
+    }
+  }, [mealCals, foodSummary]);
+
+  const format4 = (n: number) => {
+    const s = String(Math.max(0, Math.round(n)));
+    return s.padStart(4, ' ');
+  };
+
+  const mealRows = [
+    { key: 'breakfast', emoji: '☀️', value: mealCals.breakfast },
+    { key: 'lunch', emoji: '🕛', value: mealCals.lunch },
+    { key: 'afternoon_snack', emoji: '🥑', value: mealCals.afternoon_snack },
+    { key: 'dinner', emoji: '🌙', value: mealCals.dinner },
+  ];
 
   // Calculate averages, excluding days with no value (0 or invalid) - memoized for performance
   const avgStats = useMemo(() => {
@@ -110,6 +146,8 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
     );
   }
 
+  const gaugeSize = isSmallScreen ? 190 : 220;
+
   return (
     <DashboardSectionContainer>
       <PremiumCard>
@@ -140,11 +178,42 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
             {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
           >
           <View style={styles.caloriesRow}>
+            <View style={styles.mealBreakdownOverlay} pointerEvents="none">
+              {/* Option B connector */}
+              <View style={[styles.mealBreakdownConnector, { backgroundColor: colors.border }]} />
+
+              <ThemedText style={[styles.mealBreakdownTitle, { color: colors.textMuted }]}>
+                Cal by meal
+              </ThemedText>
+
+              <View style={styles.mealBreakdownStack}>
+                {mealRows.map(r => {
+                  const v = Math.round(r.value ?? 0);
+                  const isZero = v === 0;
+                  return (
+                    <View key={r.key} style={[styles.mealRow, isZero && styles.mealRowZero]}>
+                      <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>
+                        {r.emoji}
+                      </ThemedText>
+
+                      <ThemedText
+                        style={[
+                          styles.mealValue,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {format4(v)}
+                      </ThemedText>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
             <AvocadoGauge
               consumed={Number(foodSummary.caloriesTotal)}
               target={Number(foodSummary.caloriesGoal)}
               goalType={goalType}
-              size={isSmallScreen ? 190 : 220}
+              size={gaugeSize}
               strokeWidth={8}
               surfaceBg={colors.card}
               showLabel
@@ -996,6 +1065,7 @@ export default function DashboardScreen() {
           isMobile={isMobile}
           onPress={() => router.push(`/?date=${selectedDateString}`)}
           onDateSelect={handleDateSelect}
+          foodSummary={foodSummary}
         />
 
         {/* Module Grid - 2 columns on desktop, single column on mobile */}
@@ -1120,6 +1190,51 @@ const styles = StyleSheet.create({
     marginTop: 0 - Spacing.sm,
     marginBottom: 0,
     minHeight: 220, // Reduced to minimize spacing after gauge
+  },
+  mealBreakdownOverlay: {
+    position: 'absolute',
+    left: Spacing.md,
+    top: Spacing.sm,
+    zIndex: 6,
+    alignItems: 'flex-start',
+  },
+  mealBreakdownConnector: {
+    position: 'absolute',
+    left: 0,
+    top: 28,
+    width: 18,
+    height: 1,
+    opacity: 0.25,
+  },
+  mealBreakdownTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+    letterSpacing: 0.2,
+    marginBottom: 4,
+    includeFontPadding: false,
+    opacity: 0.85,
+  },
+  mealBreakdownStack: {
+    alignItems: 'flex-start',
+    gap: 2,
+  },
+  mealRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mealRowZero: {
+    opacity: 0.45,
+  },
+  mealEmoji: {
+    fontSize: FontSize.sm,
+    marginRight: 1,
+    includeFontPadding: false,
+  },
+  mealValue: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    includeFontPadding: false,
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
   },
   foodChipsOverlay: {
     position: 'absolute',

@@ -30,6 +30,7 @@ type Props = {
   secondaryActionVariant?: 'secondary' | 'tertiary';
   children?: React.ReactNode;
   style?: ViewStyle;
+  layout?: 'row' | 'stacked';
 };
 
 /**
@@ -46,6 +47,7 @@ export function FitbitConnectionCard({
   secondaryActionVariant = 'secondary',
   children,
   style,
+  layout = 'row',
 }: Props) {
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
@@ -95,8 +97,8 @@ export function FitbitConnectionCard({
 
   return (
     <View style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }, style]}>
-      <View style={styles.row}>
-        <View style={styles.logoWrap} accessible accessibilityLabel="Fitbit">
+      <View style={[styles.rowBase, layout === 'stacked' ? styles.rowStacked : styles.rowRow]}>
+        <View style={[styles.logoWrap, layout === 'stacked' && styles.logoWrapStacked]} accessible accessibilityLabel="Fitbit">
           <View style={[styles.logoChip, { backgroundColor: logoChipBg }]} accessible={false}>
             <View style={styles.logoBox} accessible={false}>
               {logo}
@@ -104,7 +106,7 @@ export function FitbitConnectionCard({
           </View>
         </View>
 
-        <View style={styles.main}>
+        <View style={[styles.main, layout === 'stacked' && styles.mainStacked]}>
           <View style={styles.statusRow}>
             <View
               style={[
@@ -113,21 +115,23 @@ export function FitbitConnectionCard({
               ]}
               accessible={false}
             />
-            <ThemedText style={[styles.statusText, { color: colors.textSecondary }]} numberOfLines={2}>
+            <ThemedText style={[styles.statusText, { color: colors.textSecondary }]} numberOfLines={2} ellipsizeMode="tail">
               {statusLine}
             </ThemedText>
           </View>
 
           {(primaryAction || secondaryAction) ? (
             <View style={styles.actionRow}>
-              {connected && primaryAction && secondaryAction ? (
-                <View style={styles.btnRow}>
-                  {renderButton(primaryAction, 'primary')}
-                  {renderButton(secondaryAction, secondaryActionVariant)}
-                </View>
-              ) : primaryAction ? (
-                renderButton(primaryAction, 'primary')
-              ) : null}
+              <View style={styles.actionsRow}>
+                {connected && primaryAction && secondaryAction ? (
+                  <>
+                    {renderButton(primaryAction, 'primary')}
+                    {renderButton(secondaryAction, secondaryActionVariant)}
+                  </>
+                ) : primaryAction ? (
+                  renderButton(primaryAction, 'primary')
+                ) : null}
+              </View>
             </View>
           ) : null}
 
@@ -146,15 +150,26 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  row: {
+  rowBase: {
+    padding: 0,
+    gap: Spacing.md,
+  },
+  rowRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+  },
+  rowStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   logoWrap: {
     flexShrink: 0,
     alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  logoWrapStacked: {
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.sm,
   },
   logoChip: {
     borderRadius: 10,
@@ -175,9 +190,14 @@ const styles = StyleSheet.create({
     gap: 2,
     alignItems: 'flex-start',
   },
+  mainStacked: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'stretch',
     gap: Spacing.xs,
     marginTop: 2,
   },
@@ -194,11 +214,11 @@ const styles = StyleSheet.create({
   actionRow: {
     marginTop: Spacing.sm,
   },
-  btnRow: {
+  actionsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
   primaryBtn: {
     alignSelf: 'flex-start',

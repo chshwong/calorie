@@ -648,6 +648,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                     {t('burned.modal.wearable_integration')}
                   </ThemedText>
                   <FitbitConnectionCard
+                    layout="stacked"
                     statusLine={fitbitStatusLine ?? 'Not connected'}
                     connected={fitbitConn?.status === 'active'}
                     logo={<FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />}

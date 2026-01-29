@@ -225,7 +225,13 @@
     },
     "food_log": {
       "log_food_prompt": "← Ajouter aliment",
-      "kcal": "cal"
+      "kcal": "cal",
+      "master_view_collapse": "Réduire",
+      "master_view_compact": "Compact",
+      "master_view_expand": "Développer",
+      "master_view_toast": "Tous les repas mis à jour",
+      "master_view_a11y_hint": "S'applique à tous les repas avec des entrées",
+      "meals_label": "Repas"
     },
     "previous_day_copy": {
       "label_yesterday": "Hier",
@@ -249,7 +255,8 @@
       "expand_details": "Afficher plus de détails",
       "collapse_details": "Masquer les détails",
       "details_hint": "Appuyez deux fois pour afficher ou masquer les détails nutritionnels",
-      "calendar_select_day": "Sélectionner {{day}}"
+      "calendar_select_day": "Sélectionner {{day}}",
+      "master_view_a11y": "Définir tous les repas en vue {{mode}}"
     },
     "admin_button": "ADMIN"
   },
@@ -1309,7 +1316,8 @@
       "more_options": "Plus d’options",
       "more_options_hint": "Appuyez deux fois pour ouvrir le menu",
       "exit_selection_mode": "Quitter le mode de sélection",
-      "exit_selection_mode_hint": "Appuyez deux fois pour quitter le mode de sélection"
+      "exit_selection_mode_hint": "Appuyez deux fois pour quitter le mode de sélection",
+      "insights_section": "Aperçus"
     },
     
     "form": {

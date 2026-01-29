@@ -52,10 +52,9 @@ import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import { ensureContrast } from '@/theme/contrast';
 import {
-  AccessibilityHints,
   getButtonAccessibilityProps,
   getFocusStyle,
-  getMinTouchTargetStyle,
+  getMinTouchTargetStyle
 } from '@/utils/accessibility';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
@@ -64,6 +63,7 @@ import { getLocalDateKey } from '@/utils/dateTime';
 import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -519,6 +519,11 @@ export default function FoodLogHomeScreen() {
     dinner: DEFAULT_MEAL_VIEW_MODE,
   });
 
+  // Master view mode: when set, newly non-empty meals default to this; null = no master applied
+  const [masterMealViewMode, setMasterMealViewMode] = useState<MealViewMode | null>(null);
+  const [isMasterToggleInteracting, setIsMasterToggleInteracting] = useState(false);
+  const prevHadEntriesRef = useRef<Record<string, boolean>>({});
+
   // Load meal view modes from storage on mount
   useEffect(() => {
     const load = async () => {
@@ -872,6 +877,11 @@ export default function FoodLogHomeScreen() {
     return { dailyTotals: totals, groupedEntries: grouped };
   }, [dataByMealType, entries, selectedDateString]);
 
+  const nonEmptyMealTypes = useMemo(
+    () => MEAL_TYPE_ORDER.filter((type) => groupedEntries[type].entries.length > 0),
+    [groupedEntries]
+  );
+
   const proteinConsumed = Number(dailyTotals?.protein ?? 0);
   // AUTHORITATIVE: onboarding target column only (no legacy fallbacks)
   // NOTE: effectiveProfile typing is behind current DB schema; remove this cast once profile types are regenerated.
@@ -1077,43 +1087,101 @@ export default function FoodLogHomeScreen() {
     });
   }, []);
 
-  // Render meal view toggle
-  const renderMealViewToggle = useCallback((mealType: string, mode: MealViewMode) => {
-    const icon =
-      mode === 'collapsed' ? '▢' :
-      mode === 'semi' ? '≡' :
-      '☰';
+  const applyMasterMode = useCallback(
+    (mode: MealViewMode) => {
+      setMasterMealViewMode(mode);
+      setMealViewModes(prev => {
+        const next = { ...prev };
+        nonEmptyMealTypes.forEach(type => {
+          next[type] = mode;
+        });
+        return next;
+      });
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      showAppToast(t('home.food_log.master_view_toast'));
+    },
+    [nonEmptyMealTypes, t]
+  );
 
-    const a11y =
-      mode === 'collapsed' ? 'Show summary' :
-      mode === 'semi' ? 'Show details' :
-      'Collapse meal';
+  // When a meal becomes non-empty, default its view mode to current master
+  useEffect(() => {
+    const updates: Record<string, MealViewMode> = {};
+    MEAL_TYPE_ORDER.forEach(type => {
+      const hasEntries = groupedEntries[type].entries.length > 0;
+      const hadEntries = prevHadEntriesRef.current[type];
+      if (hasEntries && !hadEntries && masterMealViewMode != null) {
+        updates[type] = masterMealViewMode;
+        prevHadEntriesRef.current[type] = true;
+      }
+      if (!hasEntries) {
+        prevHadEntriesRef.current[type] = false;
+      }
+    });
+    if (Object.keys(updates).length > 0) {
+      setMealViewModes(prev => ({ ...prev, ...updates }));
+    }
+  }, [groupedEntries, masterMealViewMode]);
 
-    const toggleColor = colorScheme === 'dark' ? '#FFFFFF' : colors.textSecondary;
+  // Reusable meal view mode icons (master + per-meal stay identical)
+  const MEAL_VIEW_ICON_SIZE = 16;
+  const renderMealViewModeIcon = useCallback(
+    (mode: MealViewMode, color: string, size: number = MEAL_VIEW_ICON_SIZE) => {
+      if (mode === 'collapsed') {
+        return (
+          <>
+            <Text style={[styles.mealViewToggleIcon, { color, fontSize: size - 2, lineHeight: size }]}>—</Text>
+            <IconSymbol name="chevron.down" size={size} color={color} decorative />
+          </>
+        );
+      }
+      if (mode === 'semi') {
+        return (
+          <>
+            <Text style={[styles.mealViewToggleIcon, { color, fontSize: size - 2, lineHeight: size }]}>≡</Text>
+            <IconSymbol name="chevron.down" size={size} color={color} decorative />
+          </>
+        );
+      }
+      return (
+        <>
+          <Text style={[styles.mealViewToggleIcon, { color, fontSize: size - 2, lineHeight: size }]}>☰</Text>
+          <IconSymbol name="chevron.up" size={size} color={color} decorative />
+        </>
+      );
+    },
+    []
+  );
 
-    return (
-      <Pressable
-        onPress={() => cycleMealViewMode(mealType)}
-        hitSlop={10}
-        style={({ pressed }) => [
-          styles.mealViewToggle,
-          pressed && { opacity: 0.6 },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={a11y}
-      >
-        <View style={styles.mealViewToggleInner}>
-          <Text style={[styles.mealViewToggleIcon, { color: toggleColor }]}>{icon}</Text>
-          <IconSymbol
-            name={mode === 'expanded' ? 'chevron.up' : 'chevron.down'}
-            size={16}
-            color={toggleColor}
-            decorative
-          />
-        </View>
-      </Pressable>
-    );
-  }, [cycleMealViewMode, colorScheme, colors.textSecondary]);
+  // Render meal view toggle (per-meal: collapsed = chevron-down only; compact = ≡ + down; expanded = ☰ + up)
+  const renderMealViewToggle = useCallback(
+    (mealType: string, mode: MealViewMode) => {
+      const a11y =
+        mode === 'collapsed' ? 'Show summary' :
+        mode === 'semi' ? 'Show details' :
+        'Collapse meal';
+      const toggleColor = colorScheme === 'dark' ? '#FFFFFF' : colors.textSecondary;
+
+      return (
+        <Pressable
+          onPress={() => cycleMealViewMode(mealType)}
+          hitSlop={10}
+          style={({ pressed }) => [
+            styles.mealViewToggle,
+            pressed && { opacity: 0.6 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={a11y}
+        >
+          <View style={styles.mealViewToggleInner}>
+            {renderMealViewModeIcon(mode, toggleColor)}
+          </View>
+        </Pressable>
+      );
+    },
+    [cycleMealViewMode, colorScheme, colors.textSecondary, renderMealViewModeIcon]
+  );
 
   // Construct greeting text
   const hour = new Date().getHours();
@@ -1477,6 +1545,73 @@ export default function FoodLogHomeScreen() {
 
           {/* Today's Calorie Entries */}
           <View ref={tourMealLogRef as any} style={[styles.entriesSectionCard, { backgroundColor: colors.card }]}>
+            {nonEmptyMealTypes.length >= 1 && (() => {
+              const allMealsMatchMaster =
+                nonEmptyMealTypes.length > 0 &&
+                masterMealViewMode != null &&
+                nonEmptyMealTypes.every(
+                  (t) => (mealViewModes[t] ?? DEFAULT_MEAL_VIEW_MODE) === masterMealViewMode
+                );
+              const toggleOpacity =
+                allMealsMatchMaster && !isMasterToggleInteracting ? 0.78 : 1;
+              return (
+              <View style={styles.masterViewHeaderRow}>
+                <View
+                  style={[
+                    styles.masterViewPill,
+                    {
+                      backgroundColor:
+                        colorScheme === 'dark' ? colors.background + '50' : colors.background + 'E0',
+                      opacity: toggleOpacity,
+                    },
+                  ]}
+                  accessibilityRole="none"
+                >
+                  {(['collapsed', 'semi', 'expanded'] as const).map((mode) => {
+                    const isActive = masterMealViewMode === mode;
+                    const segmentColor = isActive ? colors.tint : colors.textSecondary;
+                    const a11yLabel =
+                      mode === 'collapsed'
+                        ? t('home.accessibility.master_view_a11y', { mode: 'collapsed' })
+                        : mode === 'semi'
+                          ? t('home.accessibility.master_view_a11y', { mode: 'compact' })
+                          : t('home.accessibility.master_view_a11y', { mode: 'expanded' });
+                    return (
+                      <Pressable
+                        key={mode}
+                        onPress={() => applyMasterMode(mode)}
+                        onPressIn={() => setIsMasterToggleInteracting(true)}
+                        onPressOut={() => setIsMasterToggleInteracting(false)}
+                        style={[
+                          styles.masterViewSegment,
+                          isActive && {
+                            backgroundColor: colorScheme === 'dark' ? colors.tint + '30' : colors.tint + '18',
+                          },
+                          Platform.OS === 'web' && getFocusStyle(colors.tint),
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={a11yLabel}
+                        accessibilityHint={t('home.food_log.master_view_a11y_hint')}
+                      >
+                        {mode === 'collapsed' && (
+                          <IconSymbol name="chevron.down" size={MEAL_VIEW_ICON_SIZE} color={segmentColor} decorative />
+                        )}
+                        {mode === 'semi' && (
+                          <Text style={[styles.masterViewSegmentIcon, { color: segmentColor }]}>≡</Text>
+                        )}
+                        {mode === 'expanded' && (
+                          <View style={styles.masterViewSegmentIconRow}>
+                            <Text style={[styles.masterViewSegmentIcon, { color: segmentColor }]}>☰</Text>
+                            <IconSymbol name="chevron.up" size={MEAL_VIEW_ICON_SIZE} color={segmentColor} decorative />
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+              );
+            })()}
             <View style={styles.entriesSection}>
               {showLoadingSpinner ? (
                 <View style={[styles.emptyState, { backgroundColor: 'transparent' }]}>
@@ -2656,6 +2791,43 @@ const styles = StyleSheet.create({
   },
   entriesSection: {
     marginBottom: 0,
+  },
+  masterViewHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    paddingBottom: 0,
+  },
+  masterViewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BorderRadius.full,
+    borderWidth: 0,
+    overflow: 'hidden',
+    marginRight: -4,
+  },
+  masterViewSegment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  masterViewSegmentIcon: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 16,
+    ...Platform.select({
+      web: { fontFamily: 'ui-sans-serif, system-ui' },
+      default: {},
+    }),
+  },
+  masterViewSegmentIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   sectionHeader: {
     flexDirection: 'row',

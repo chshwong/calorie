@@ -434,6 +434,7 @@ export default function WeightHomeScreen() {
         ) : (
           <>
             <FitbitConnectionCard
+              layout="stacked"
               statusLine={fitbitStatusLine ?? 'Not connected'}
               connected={fitbitConn?.status === 'active'}
               logo={<FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />}

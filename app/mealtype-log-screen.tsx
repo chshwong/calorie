@@ -2352,7 +2352,7 @@ export default function LogFoodScreen() {
                 <ThemedText style={[styles.foodLogTitle, { color: colors.text }]}>
                   {t('mealtype_log.food_log.title')}
                 </ThemedText>
-                <ThemedText style={[styles.foodLogItemCount, { color: colors.textMuted }]}>
+                <ThemedText style={[styles.foodLogItemCount, { color: colors.textMuted, fontWeight: entries.length === 1 ? '600' : '400' }]}>
                   {entries.length} {entries.length === 1 ? t('mealtype_log.food_log.item_one') : t('mealtype_log.food_log.item_other')}
                 </ThemedText>
               </View>
@@ -2540,65 +2540,80 @@ export default function LogFoodScreen() {
             );
           })()}
 
-          {showLoadingSpinner ? (
-            <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
-              <ActivityIndicator size="small" color={colors.tint} />
-              <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                {t('common.loading')}
-              </ThemedText>
-            </View>
-          ) : entries.length === 0 ? (
-            <EmptyEntriesState
-              onScanPress={handleBarcodeScanPress}
-              onCopyFromYesterday={handleCopyFromPreviousDay}
-              onQuickLog={handleQuickLog}
-              onAiCamera={handleAiCamera}
-              isCopying={isCopyingFromYesterday}
-              isToday={isSelectedDateToday}
-              mealTypeLabel={getMealTypeLabelLocal(selectedMealType)}
-              colors={colors}
-              t={t}
-              styles={styles}
-            />
-          ) : (
-            <>
-              {entries.map((entry) => (
-                <EntryCard
-                  key={entry.id}
-                  entry={entry}
-                  foodSourceMap={foodSourceMap}
-                  showEntryDetails={showEntryDetails}
-                  onEdit={handleEditEntry}
-                  onDelete={handleDelete}
-                  isSelected={isEntrySelected(entry.id)}
-                  onToggleSelection={() => toggleEntrySelection(entry.id)}
-                  isNewlyAdded={isNewlyAdded(entry.id)}
-                  hasAnySelection={hasAnySelection}
-                  entriesEditMode={entriesEditMode}
-                  colors={colors}
-                  t={t}
-                  styles={styles}
-                />
-              ))}
-            </>
-          )}
+          <View
+            style={[
+              styles.foodLogEntriesInset,
+              { backgroundColor: colors.background, borderColor: colors.icon + '15' },
+            ]}
+          >
+            {showLoadingSpinner ? (
+              <View style={[styles.emptyState, { backgroundColor: colors.background, borderColor: colors.icon + '20' }]}>
+                <ActivityIndicator size="small" color={colors.tint} />
+                <ThemedText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                  {t('common.loading')}
+                </ThemedText>
+              </View>
+            ) : entries.length === 0 ? (
+              <EmptyEntriesState
+                onScanPress={handleBarcodeScanPress}
+                onCopyFromYesterday={handleCopyFromPreviousDay}
+                onQuickLog={handleQuickLog}
+                onAiCamera={handleAiCamera}
+                isCopying={isCopyingFromYesterday}
+                isToday={isSelectedDateToday}
+                mealTypeLabel={getMealTypeLabelLocal(selectedMealType)}
+                colors={colors}
+                t={t}
+                styles={styles}
+              />
+            ) : (
+              <>
+                {entries.map((entry) => (
+                  <EntryCard
+                    key={entry.id}
+                    entry={entry}
+                    foodSourceMap={foodSourceMap}
+                    showEntryDetails={showEntryDetails}
+                    onEdit={handleEditEntry}
+                    onDelete={handleDelete}
+                    isSelected={isEntrySelected(entry.id)}
+                    onToggleSelection={() => toggleEntrySelection(entry.id)}
+                    isNewlyAdded={isNewlyAdded(entry.id)}
+                    hasAnySelection={hasAnySelection}
+                    entriesEditMode={entriesEditMode}
+                    colors={colors}
+                    t={t}
+                    styles={styles}
+                  />
+                ))}
+              </>
+            )}
+          </View>
           </View>
 
-          {/* AvoScore Donut Chart - Only shown when there are entries and meal totals */}
+          {/* Insights section: divider + AvoScore donut chart */}
           {entries.length > 0 && mealTotals && mealTotals.kcal > 0 && (
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.md, paddingBottom: Spacing.md + 20 }}>
-              <MacroCompositionDonutChart
-                gramsCarbTotal={mealTotals.carbs_g ?? 0}
-                gramsFiber={mealTotals.fiber_g ?? 0}
-                gramsProtein={mealTotals.protein_g ?? 0}
-                gramsFat={mealTotals.fat_g ?? 0}
-                size={220}
-                showGrams={true}
-                centerGrade={avo.grade}
-                centerLabel="avo_score.label"
-                centerReasons={avo.reasons}
-              />
-            </View>
+            <>
+              <View style={styles.insightsDividerRow}>
+                <View style={[styles.insightsDividerLine, { backgroundColor: colors.separator }]} />
+                <ThemedText style={[styles.insightsLabel, { color: colors.textMuted }]}>
+                  {t('mealtype_log.food_log.insights_section')}
+                </ThemedText>
+              </View>
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.sm, paddingBottom: Spacing.md + 20 }}>
+                <MacroCompositionDonutChart
+                  gramsCarbTotal={mealTotals.carbs_g ?? 0}
+                  gramsFiber={mealTotals.fiber_g ?? 0}
+                  gramsProtein={mealTotals.protein_g ?? 0}
+                  gramsFat={mealTotals.fat_g ?? 0}
+                  size={220}
+                  showGrams={true}
+                  centerGrade={avo.grade}
+                  centerLabel="avo_score.label"
+                  centerReasons={avo.reasons}
+                />
+              </View>
+            </>
           )}
         </View>
         </DesktopPageContainer>
