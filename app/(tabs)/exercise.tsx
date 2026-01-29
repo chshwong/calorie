@@ -29,6 +29,7 @@ import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
+import { useDailySumExercisesStepsForDate, useUpsertDailySteps } from '@/hooks/use-daily-sum-exercises';
 import {
   useCreateExerciseLog,
   useDeleteExerciseLog,
@@ -64,6 +65,7 @@ const NARROW_SCREEN_BREAKPOINT = 380; // Breakpoint for narrow mobile screens
 const LARGE_SCREEN_BREAKPOINT = 768; // Breakpoint for tablet/desktop screens
 const KM_TO_MILES_CONVERSION = 1.60934; // Conversion factor: 1 mile = 1.60934 kilometers
 const DAY_SUMMARY_CONTENT_INSET = Spacing.md; // Tighter inset for Day Summary card content than SurfaceCard default
+const STEPS_MAX = 150000; // Max steps per day (digits only, 0–150000 inclusive)
 
 // Distance precision helpers
 /**
@@ -551,6 +553,11 @@ export default function ExerciseHomeScreen() {
   const { data: exerciseLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useExerciseLogsForDate(selectedDateString);
   const { data: recentDaysSummary = [] } = useExerciseSummaryForRecentDays(7);
   const { data: recentAndFrequentExercises = [], isLoading: isLoadingRecentFrequent } = useRecentAndFrequentExercises(RecentFrequentDayRange);
+  const { data: stepsRow } = useDailySumExercisesStepsForDate(selectedDateString);
+  const stepsValue = stepsRow?.steps ?? 0;
+  const stepsSource = stepsRow?.steps_source ?? null;
+  const isUnsetSteps = !stepsRow || (stepsValue === 0 && !stepsSource);
+  const formatInt = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
   // Celebration toast hook
   const { show, props: confettiToastProps } = useConfettiToastMessage();
@@ -804,6 +811,11 @@ export default function ExerciseHomeScreen() {
   // Mass delete confirmation modal state
   const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
   
+  // Steps edit modal state
+  const [showStepsModal, setShowStepsModal] = useState(false);
+  const [stepsDraft, setStepsDraft] = useState('');
+  const upsertStepsMutation = useUpsertDailySteps();
+
   // Exercise settings modal state
   const [showExerciseSettings, setShowExerciseSettings] = useState(false);
   const [settingsDistanceUnit, setSettingsDistanceUnit] = useState<'km' | 'mi'>('km');
@@ -827,6 +839,12 @@ export default function ExerciseHomeScreen() {
       setSettingsTrackStrengthEffort(userConfig?.exercise_track_strength_effort ?? false);
     }
   }, [showExerciseSettings, userConfig?.distance_unit, userConfig?.exercise_track_cardio_duration, userConfig?.exercise_track_cardio_distance, userConfig?.exercise_track_cardio_effort, userConfig?.exercise_track_strength_sets, userConfig?.exercise_track_strength_reps, userConfig?.exercise_track_strength_effort]);
+
+  // Initialize steps draft when Steps modal opens
+  useEffect(() => {
+    if (!showStepsModal) return;
+    setStepsDraft(isUnsetSteps ? '' : String(stepsValue));
+  }, [showStepsModal, isUnsetSteps, stepsValue]);
   
   // Shared edit mode state (for both clone and delete)
   const [editMode, setEditMode] = useState(false);
@@ -1699,6 +1717,36 @@ export default function ExerciseHomeScreen() {
                 }
               />
 
+          <Pressable
+            onPress={() => setShowStepsModal(true)}
+            disabled={editMode}
+            style={[
+              styles.stepsRow,
+              { backgroundColor: colors.backgroundSecondary, borderColor: colors.separator },
+              editMode && { opacity: 0.6 },
+              Platform.OS === 'web' && getFocusStyle(colors.tint),
+            ]}
+            {...getButtonAccessibilityProps('Edit steps')}
+          >
+            <View style={styles.stepsLeft}>
+              <ThemedText style={[styles.stepsIcon, { color: colors.textSecondary }]}>👣</ThemedText>
+              <ThemedText style={[styles.stepsLabel, { color: colors.textSecondary }]}>Steps</ThemedText>
+              <ThemedText style={[styles.stepsValue, { color: colors.text }]}>
+                {isUnsetSteps ? '—' : formatInt(stepsValue)}
+              </ThemedText>
+              {!!stepsSource && (
+                <View style={[styles.stepsSourceChip, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
+                  <ThemedText style={[styles.stepsSourceText, { color: colors.tint }]}>
+                    {stepsSource === 'manual' ? 'Manual' : stepsSource === 'fitbit' ? 'Fitbit' : stepsSource}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+            <View style={styles.stepsRight}>
+              <IconSymbol name="chevron.right" size={16} color={colors.textSecondary} />
+            </View>
+          </Pressable>
+
           <View style={styles.daySummaryBody}>
             {logsLoading ? (
               <View style={styles.loadingContainer}>
@@ -2117,6 +2165,80 @@ export default function ExerciseHomeScreen() {
                   <ActivityIndicator size="small" color={colors.textInverse} />
                 ) : (
                   <ThemedText style={{ color: colors.textInverse }}>{t('exercise.delete.confirm')}</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Steps Edit Modal */}
+      <Modal
+        visible={showStepsModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStepsModal(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.confirmModalContent, { backgroundColor: colors.background }]}>
+            <ThemedText type="title" style={[styles.confirmModalTitle, { color: colors.text }]}>
+              Steps
+            </ThemedText>
+            <TextInput
+              value={stepsDraft}
+              onChangeText={(text) => {
+                const digitsOnly = text.replace(/[^0-9]/g, '');
+                if (digitsOnly === '') {
+                  setStepsDraft('');
+                  return;
+                }
+                const num = parseInt(digitsOnly, 10);
+                setStepsDraft(String(Math.min(num, STEPS_MAX)));
+              }}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor={colors.textSecondary}
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
+              style={[
+                styles.stepsModalInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+              ]}
+              maxLength={6}
+            />
+            <ThemedText style={[styles.stepsModalHint, { color: colors.textSecondary }]}>
+              Whole numbers only. Max 150,000 per day.
+            </ThemedText>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={[styles.confirmModalButton, styles.cancelButton, { borderColor: colors.border }]}
+                onPress={() => setShowStepsModal(false)}
+                {...getButtonAccessibilityProps('Cancel')}
+              >
+                <ThemedText style={{ color: colors.text }}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalButton, { backgroundColor: colors.tint }]}
+                onPress={() => {
+                  const digitsOnly = stepsDraft.replace(/[^0-9]/g, '');
+                  const steps = digitsOnly === '' ? 0 : Math.min(parseInt(digitsOnly, 10), STEPS_MAX);
+                  upsertStepsMutation.mutate(
+                    { date: selectedDateString, steps, steps_source: steps > 0 ? 'manual' : null },
+                    {
+                      onSuccess: () => showAppToast('Steps saved'),
+                      onError: () => showAppToast('Could not save steps'),
+                    }
+                  );
+                  setShowStepsModal(false);
+                }}
+                disabled={upsertStepsMutation.isPending}
+                {...getButtonAccessibilityProps('Save')}
+              >
+                {upsertStepsMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.textInverse} />
+                ) : (
+                  <ThemedText style={{ color: colors.textInverse }}>Save</ThemedText>
                 )}
               </TouchableOpacity>
             </View>
@@ -2762,6 +2884,49 @@ const styles = StyleSheet.create({
   daySummaryBody: {
     marginHorizontal: -Spacing.xl, // Cancel SurfaceCard horizontal padding (SurfaceCard uses lg)
     paddingHorizontal: DAY_SUMMARY_CONTENT_INSET,
+  },
+  // Steps row (between header and day summary body): left = icon + label + value, right = source + chevron
+  stepsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: DAY_SUMMARY_CONTENT_INSET,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    marginHorizontal: -Spacing.xl,
+  },
+  stepsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepsIcon: { fontSize: FontSize.sm, marginRight: 8 },
+  stepsLabel: { fontSize: FontSize.sm, fontWeight: '600', marginRight: 10 },
+  stepsValue: { fontSize: FontSize.base, fontWeight: '700', marginRight: 8 },
+  stepsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    paddingLeft: 14, // 12–16px gap between value and source
+    gap: 8, // 6–8px between source and chevron
+  },
+  stepsSourceChip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  stepsSourceText: { fontSize: FontSize.xs, fontWeight: '700' },
+  stepsModalInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: FontSize.base,
+    marginBottom: Spacing.xs,
+  },
+  stepsModalHint: {
+    fontSize: FontSize.xs,
+    marginBottom: Spacing.lg,
   },
   // Category separator between cardio_mind_body and strength sections
   categorySeparator: {
