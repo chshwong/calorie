@@ -15,12 +15,21 @@ type Props = {
   onSync: () => Promise<void>;
   /** 'full' = default slot; 'compact' = smaller for inline (e.g. Steps row). */
   variant?: 'full' | 'compact';
+  /** When set, used for phase rotation (same logic as orchestrator). Fallback: userConfig. */
+  willSyncWeight?: boolean;
+  willSyncSteps?: boolean;
 };
 
 const SUCCESS_RESET_MS = 1200;
 const PHASE_INTERVAL_MS = 2000;
 
-export function DailyBurnWearableSyncSlot({ isConnected, onSync, variant = 'full' }: Props) {
+export function DailyBurnWearableSyncSlot({
+  isConnected,
+  onSync,
+  variant = 'full',
+  willSyncWeight,
+  willSyncSteps,
+}: Props) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
@@ -32,8 +41,8 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync, variant = 'full
   const phaseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseIndexRef = useRef(0);
 
-  const syncWeight = userConfig?.weight_sync_provider === 'fitbit';
-  const syncSteps = userConfig?.exercise_sync_steps === true;
+  const syncWeight = willSyncWeight ?? (userConfig?.weight_sync_provider === 'fitbit');
+  const syncSteps = willSyncSteps ?? (userConfig?.exercise_sync_steps === true);
   const phases = useMemo(() => {
     const list: { key: string; label: string }[] = [
       { key: 'burn', label: t('wearable_sync_phase_burn') },
@@ -87,10 +96,11 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync, variant = 'full
 
   const handleSync = async () => {
     if (status === 'syncing') return;
+    stopPhaseRotation();
     setStatus('syncing');
     phaseIndexRef.current = 0;
     setSyncPhaseLabel(phases[0]?.label ?? t('wearable_syncing_label'));
-    if (phases.length > 0) {
+    if (phases.length > 1) {
       phaseIntervalRef.current = setInterval(() => {
         if (!isMountedRef.current) return;
         const next = (phaseIndexRef.current + 1) % phases.length;

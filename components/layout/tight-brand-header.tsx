@@ -8,6 +8,7 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
 import BrandLogoFull from '@/components/brand/BrandLogoFull';
+import MascotAvatarFallback from '@/components/brand/MascotAvatarFallback';
 import { HOME_ROUTE } from '@/lib/navigation/routes';
 import { useUnreadNotificationCount } from '@/hooks/use-notifications';
 import {
@@ -145,35 +146,22 @@ export function TightBrandHeader({
                   source={{ uri: avatarUrl }}
                   style={[
                     styles.avatarImage,
-                    { 
-                      width: avatarSize, 
-                      height: avatarSize, 
+                    {
+                      width: avatarSize,
+                      height: avatarSize,
                       borderRadius: avatarSize / 2,
-                      borderColor: colors.separator, 
-                      marginTop: 5 
+                      borderColor: colors.separator,
+                      marginTop: 5,
                     },
                   ]}
                   resizeMode="cover"
                 />
               ) : (
-                <View
-                  style={[
-                    styles.avatarFallback,
-                    {
-                      width: avatarSize,
-                      height: avatarSize,
-                      borderRadius: avatarSize / 2,
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.separator,
-                      marginTop: 5,
-                    },
-                  ]}
-                >
-                  <IconSymbol
-                    name="person.fill"
-                    size={avatarSize * 0.6}
-                    color={colors.textSecondary}
-                    decorative={true}
+                <View style={{ marginTop: 5 }}>
+                  <MascotAvatarFallback
+                    size={avatarSize}
+                    backgroundColor={colors.backgroundSecondary}
+                    borderColor={colors.separator}
                   />
                 </View>
               )}
@@ -251,11 +239,6 @@ const styles = StyleSheet.create({
   },
   avatarImage: {
     borderWidth: 1,
-  },
-  avatarFallback: {
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
 

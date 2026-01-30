@@ -1778,6 +1778,8 @@ export default function ExerciseHomeScreen() {
                   onSync={async () => {
                     await fitbitOrchestrator.syncFitbitAllNow({ includeBurnApply: false });
                   }}
+                  willSyncWeight={userConfig?.weight_sync_provider === 'fitbit'}
+                  willSyncSteps={userConfig?.exercise_sync_steps === true}
                 />
               )}
             </View>

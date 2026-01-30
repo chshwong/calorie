@@ -259,6 +259,8 @@ export default function WeightHomeScreen() {
                       showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
                     }
                   }}
+                  willSyncWeight={userConfig?.weight_sync_provider === 'fitbit'}
+                  willSyncSteps={userConfig?.exercise_sync_steps === true}
                 />
               ) : null
             }

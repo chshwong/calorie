@@ -62,7 +62,7 @@ export function EnergyEquation({
   const normalizedDateKey = toDateKey(dateKey);
   const { data: dailyBurned } = useDailySumBurned(normalizedDateKey, { enabled: !!normalizedDateKey });
   const foodSummary = useDailyFoodSummary(normalizedDateKey);
-  const userConfig = useUserConfig();
+  const { data: userConfig } = useUserConfig();
   const goalType = (userConfig?.goal_type ?? 'maintain') as 'lose' | 'maintain' | 'recomp' | 'gain';
 
   const fitbitEnabled = showSync && Platform.OS === 'web';
@@ -114,6 +114,8 @@ export function EnergyEquation({
             showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
           }
         }}
+        willSyncWeight={userConfig?.weight_sync_provider === 'fitbit'}
+        willSyncSteps={userConfig?.exercise_sync_steps === true}
       />
     ) : null;
 

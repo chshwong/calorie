@@ -5,6 +5,7 @@ import { Colors, ModuleThemes, Spacing, FontSize, BorderRadius, type ModuleType 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTranslation } from 'react-i18next';
 import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
+import MascotAvatarFallback from '@/components/brand/MascotAvatarFallback';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useUnreadNotificationCount } from '@/hooks/use-notifications';
@@ -198,12 +199,13 @@ export function CollapsibleModuleHeader({
                   {rightAvatarUri ? (
                     <Image source={{ uri: rightAvatarUri }} style={styles.avatar} />
                   ) : (
-                    <View
-                      style={[
-                        styles.avatarPlaceholder,
-                        { backgroundColor: colors.backgroundSecondary },
-                      ]}
-                    />
+                    <View style={{ marginTop: 5 }}>
+                      <MascotAvatarFallback
+                        size={34}
+                        backgroundColor={colors.backgroundSecondary}
+                        borderColor={colors.separator}
+                      />
+                    </View>
                   )}
                 </Pressable>
               </View>
@@ -366,12 +368,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   avatar: {
-    width: 34, // Standard header avatar size (larger than TightBrandHeader's 32px for better visibility)
-    height: 34,
-    borderRadius: 17, // Half of width/height for perfect circle (34/2 = 17)
-    marginTop: 5, // Lower avatar slightly to avoid touching top edge
-  },
-  avatarPlaceholder: {
     width: 34, // Standard header avatar size (larger than TightBrandHeader's 32px for better visibility)
     height: 34,
     borderRadius: 17, // Half of width/height for perfect circle (34/2 = 17)

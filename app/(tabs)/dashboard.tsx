@@ -58,9 +58,11 @@ type DashboardFoodSectionProps = {
   onPress: () => void;
   onDateSelect: (dateString: string) => void;
   foodSummary: ReturnType<typeof useDailyFoodSummary>;
+  willSyncWeight?: boolean;
+  willSyncSteps?: boolean;
 };
 
-function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, foodSummary }: DashboardFoodSectionProps) {
+function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, foodSummary, willSyncWeight, willSyncSteps }: DashboardFoodSectionProps) {
   const { t } = useTranslation();
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
   const { data: stepsRow } = useDailySumExercisesStepsForDate(dateString);
@@ -193,6 +195,8 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                     }
                   }}
                   variant="compact"
+                  willSyncWeight={willSyncWeight}
+                  willSyncSteps={willSyncSteps}
                 />
               )}
             </View>
@@ -1119,6 +1123,8 @@ export default function DashboardScreen() {
           onPress={() => router.push(`/?date=${selectedDateString}`)}
           onDateSelect={handleDateSelect}
           foodSummary={foodSummary}
+          willSyncWeight={userConfig?.weight_sync_provider === 'fitbit'}
+          willSyncSteps={userConfig?.exercise_sync_steps === true}
         />
 
         {/* Module Grid - 2 columns on desktop, single column on mobile */}
