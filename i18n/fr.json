@@ -304,6 +304,13 @@
         "title": "Déconnecter Fitbit?",
         "message": "Vous pourrez vous reconnecter à tout moment."
       },
+      "what_to_sync": "Quoi synchroniser",
+      "activity_burn": "Dépense d’activité",
+      "weight": "Poids",
+      "steps": "Pas",
+      "off": "Désactivé",
+      "fitbit": "Fitbit",
+      "sync_uses_fitbit_helper": "La synchro utilise vos données Fitbit lorsqu’elle est activée.",
       "toast": {
         "connected": "Fitbit connecté.",
         "connect_failed": "Échec de connexion Fitbit.",
@@ -311,7 +318,8 @@
         "synced_applied": "Synchronisé et appliqué.",
         "sync_failed": "Échec de synchronisation Fitbit.",
         "disconnected": "Fitbit déconnecté.",
-        "disconnect_failed": "Échec de déconnexion."
+        "disconnect_failed": "Échec de déconnexion.",
+        "saved": "Enregistré"
       },
       "errors": {
         "popup_blocked": "Fenêtre bloquée. Autorisez les popups puis réessayez.",

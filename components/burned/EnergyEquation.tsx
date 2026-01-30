@@ -117,42 +117,46 @@ export function EnergyEquation({
       />
     ) : null;
 
-  // Minimal vertical: Sync at top, then 🔥 burned, −, 🍴 eaten, divider, result (one line). Same data/sync.
+  // Minimal vertical: equation container (Sync → Burn − Eaten = Result). Same data/sync.
   if (layout === 'vertical' && variant === 'minimalVertical') {
     return (
       <View
         ref={tourContainerRef as React.RefObject<View>}
         style={[styles.minimalVerticalWrap, compact && styles.minimalVerticalWrapCompact]}
       >
-        {wearableSyncSlot ? (
-          <View style={styles.minimalSyncRow}>{wearableSyncSlot}</View>
-        ) : null}
-        <View style={styles.minimalRow}>
-          <Text style={styles.minimalEmoji} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            🔥
-          </Text>
-          <ThemedText style={[styles.minimalNumber, { color: colors.text }]} numberOfLines={1}>
-            {burnedCal == null ? t('burned.week.placeholder') : formatWholeNumber(burnedCal)}
-          </ThemedText>
-        </View>
-        <ThemedText style={[styles.minimalOp, { color: colors.textSecondary }]}>−</ThemedText>
-        <View style={styles.minimalRow}>
-          <Text style={styles.minimalEmoji} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            🍴
-          </Text>
-          <ThemedText style={[styles.minimalNumber, { color: colors.text }]} numberOfLines={1}>
-            {formatWholeNumber(eatenCal)}
-          </ThemedText>
-        </View>
-        <View style={[styles.minimalDivider, { backgroundColor: colors.separator }]} />
-        <View style={styles.minimalResultRow}>
-          <ThemedText style={[styles.minimalNumber, { color: netColor }]} numberOfLines={1}>
-            {netAbs == null ? t('burned.week.placeholder') : formatWholeNumber(netAbs)}
-          </ThemedText>
-          <ThemedText style={[styles.minimalResultLabel, { color: netColor }]} numberOfLines={1}>
-            {' '}
-            {netLabel}
-          </ThemedText>
+        <View style={styles.eqContainer}>
+          {wearableSyncSlot ? (
+            <View style={styles.minimalSyncRow}>{wearableSyncSlot}</View>
+          ) : null}
+          <View style={styles.minimalRow}>
+            <Text style={styles.eqEmoji} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              🔥
+            </Text>
+            <ThemedText style={[styles.eqValue, { color: colors.textSecondary }]} numberOfLines={1}>
+              {burnedCal == null ? t('burned.week.placeholder') : formatWholeNumber(burnedCal)}
+            </ThemedText>
+          </View>
+          <View style={styles.eqRowTight}>
+            <ThemedText style={[styles.eqMinusInline, { color: colors.textSecondary }]}>−</ThemedText>
+            <Text style={styles.eqEmoji} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              🍴
+            </Text>
+            <ThemedText style={[styles.eqValue, { color: colors.textSecondary }]} numberOfLines={1}>
+              {formatWholeNumber(eatenCal)}
+            </ThemedText>
+          </View>
+          <View style={[styles.eqLine, { backgroundColor: colors.separator }]} />
+          <View style={styles.eqResultBlock}>
+            <View style={styles.eqResultTopRow}>
+              <ThemedText style={[styles.eqEquals, { color: colors.textSecondary }]}>=</ThemedText>
+              <ThemedText style={[styles.eqResultValue, { color: netColor }]} numberOfLines={1}>
+                {netAbs == null ? t('burned.week.placeholder') : formatWholeNumber(netAbs)}
+              </ThemedText>
+            </View>
+            <ThemedText style={[styles.eqResultLabelBelow, { color: netColor }]} numberOfLines={1}>
+              {netLabel}
+            </ThemedText>
+          </View>
         </View>
       </View>
     );
@@ -457,12 +461,12 @@ const styles = StyleSheet.create({
   minimalVerticalWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 64,
-    maxWidth: 88,
+    minWidth: 56,
+    maxWidth: 96,
   },
   minimalVerticalWrapCompact: {
-    minWidth: 56,
-    maxWidth: 76,
+    minWidth: 52,
+    maxWidth: 88,
   },
   minimalSyncRow: {
     alignSelf: 'stretch',
@@ -472,8 +476,9 @@ const styles = StyleSheet.create({
   minimalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    justifyContent: 'flex-end',
+    gap: 2,
+    marginBottom: 2,
   },
   minimalEmoji: {
     fontSize: 14,
@@ -482,31 +487,77 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
-  minimalNumber: {
-    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
-    fontWeight: '600',
+  eqEmoji: {
+    width: 14,
+    textAlign: 'center',
+    fontSize: 14,
+    ...Platform.select({
+      web: { fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji' },
+      default: {},
+    }),
+  },
+  eqValue: {
+    width: 48,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: FontWeight.semibold,
     letterSpacing: -0.2,
   },
-  minimalOp: {
-    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
-    fontWeight: '600',
-    marginVertical: 2,
+  eqRowTight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 2,
+    marginBottom: 2,
+  },
+  eqMinusInline: {
+    width: 12,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: FontWeight.bold,
   },
   minimalDivider: {
     height: 1,
     alignSelf: 'stretch',
-    marginVertical: 4,
+    marginVertical: 2,
     marginHorizontal: 4,
   },
-  minimalResultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'nowrap',
+  eqLine: {
+    height: 2,
+    width: 66,
+    borderRadius: 2,
+    marginTop: 2,
+    marginBottom: 6,
+    alignSelf: 'flex-end',
   },
-  minimalResultLabel: {
-    fontSize: Platform.select({ web: FontSize.xs, default: FontSize.xs }),
-    fontWeight: '600',
-    marginLeft: 4,
+  eqContainer: {
+    alignItems: 'flex-end',
+    paddingVertical: 2,
+  },
+  eqResultBlock: {
+    alignItems: 'flex-end',
+  },
+  eqResultTopRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'flex-end',
+    gap: 4,
+  },
+  eqEquals: {
+    fontSize: 12,
+    fontWeight: FontWeight.bold,
+    marginRight: 0,
+    opacity: 0.7,
+  },
+  eqResultValue: {
+    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
+    fontWeight: FontWeight.bold,
+    letterSpacing: -0.2,
+  },
+  eqResultLabelBelow: {
+    marginTop: 0,
+    lineHeight: 12,
+    fontSize: 11,
+    fontWeight: FontWeight.semibold,
   },
 });

@@ -14,9 +14,9 @@ type GoalType = 'lose' | 'maintain' | 'recomp' | 'gain';
 // ============================================================================
 // These are SVG viewBox coordinates used to draw/position the avocado. They are
 // not "UI spacing" tokens; they define the canonical shape geometry.
-const VB_X = -45;
+const VB_X = -55; // Extra left/right so tip label (e.g. 835 / 66.8%) is not clipped
 const VB_Y = -25; // Increased top padding to accommodate tip labels at the top
-const VB_W = 180;
+const VB_W = 200;
 const VB_H = 235; // Increased height to match the extra top padding
 
 // The avocado outline's approximate x-bounds within the viewBox (for label centering).
@@ -264,12 +264,12 @@ export function AvocadoGauge({
   const pitTransformY = pitCenterY - 208.81 * pitScale;
 
   return (
-    <View style={[styles.wrap, { width: size, height, zIndex: 10 }]}>
+    <View style={[styles.wrap, { width: size, height, zIndex: 10, overflow: 'visible' as const }]}>
       <Svg
         width={size}
         height={height}
         viewBox={`${VB_X} ${VB_Y} ${VB_W} ${VB_H}`}
-        style={Platform.OS === 'web' ? { pointerEvents: 'none' } : undefined}
+        style={Platform.OS === 'web' ? { pointerEvents: 'none', overflow: 'visible' } : undefined}
       >
         {/* Track */}
         <Path

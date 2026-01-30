@@ -41,6 +41,9 @@
   "wearable_syncing_label": "⏳ Syncing…",
   "wearable_updated_label": "✓ Updated",
   "wearable_none_short": "No device",
+  "wearable_sync_phase_burn": "Syncing burn…",
+  "wearable_sync_phase_weight": "Syncing weight…",
+  "wearable_sync_phase_steps": "Syncing steps…",
   "date": {
     "yday": "Yday"
   },
@@ -349,8 +352,16 @@
         "synced_applied": "Synced and applied.",
         "sync_failed": "Fitbit sync failed.",
         "disconnected": "Fitbit disconnected.",
-        "disconnect_failed": "Disconnect failed."
+        "disconnect_failed": "Disconnect failed.",
+        "saved": "Saved"
       },
+      "what_to_sync": "What to sync",
+      "activity_burn": "Activity Burn",
+      "weight": "Weight",
+      "steps": "Steps",
+      "off": "Off",
+      "fitbit": "Fitbit",
+      "sync_uses_fitbit_helper": "Sync uses your Fitbit data when enabled.",
       "errors": {
         "popup_blocked": "Popup blocked. Please allow popups and try again.",
         "popup_timeout": "Timed out waiting for Fitbit. Please try again.",

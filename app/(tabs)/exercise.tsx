@@ -17,9 +17,9 @@ import { showAppToast } from '@/components/ui/app-toast';
 import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
 import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
+import { FitbitSyncToggles } from '@/components/fitbit/FitbitSyncToggles';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { SegmentedToggle } from '@/components/ui';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { RANGES, TEXT_LIMITS } from '@/constants/constraints';
 import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessages';
@@ -834,6 +834,8 @@ export default function ExerciseHomeScreen() {
   const [settingsTrackStrengthReps, setSettingsTrackStrengthReps] = useState<boolean>(false);
   const [settingsTrackStrengthEffort, setSettingsTrackStrengthEffort] = useState<boolean>(false);
   const [settingsSyncStepsWithFitbit, setSettingsSyncStepsWithFitbit] = useState<boolean>(false);
+  const [settingsSyncActivityBurn, setSettingsSyncActivityBurn] = useState<boolean>(true);
+  const [settingsWeightSyncProvider, setSettingsWeightSyncProvider] = useState<'none' | 'fitbit'>('none');
   const [showFitbitModal, setShowFitbitModal] = useState(false);
   const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
   const [isFitbitSyncing, setIsFitbitSyncing] = useState(false);
@@ -859,8 +861,10 @@ export default function ExerciseHomeScreen() {
       setSettingsTrackStrengthReps(userConfig?.exercise_track_strength_reps ?? false);
       setSettingsTrackStrengthEffort(userConfig?.exercise_track_strength_effort ?? false);
       setSettingsSyncStepsWithFitbit(userConfig?.exercise_sync_steps ?? false);
+      setSettingsSyncActivityBurn(userConfig?.sync_activity_burn ?? true);
+      setSettingsWeightSyncProvider(userConfig?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none');
     }
-  }, [showExerciseSettings, userConfig?.distance_unit, userConfig?.exercise_track_cardio_duration, userConfig?.exercise_track_cardio_distance, userConfig?.exercise_track_cardio_effort, userConfig?.exercise_track_strength_sets, userConfig?.exercise_track_strength_reps, userConfig?.exercise_track_strength_effort, userConfig?.exercise_sync_steps]);
+  }, [showExerciseSettings, userConfig?.distance_unit, userConfig?.exercise_track_cardio_duration, userConfig?.exercise_track_cardio_distance, userConfig?.exercise_track_cardio_effort, userConfig?.exercise_track_strength_sets, userConfig?.exercise_track_strength_reps, userConfig?.exercise_track_strength_effort, userConfig?.exercise_sync_steps, userConfig?.sync_activity_burn, userConfig?.weight_sync_provider]);
 
   // Initialize steps draft when Steps modal opens
   useEffect(() => {
@@ -2813,24 +2817,19 @@ export default function ExerciseHomeScreen() {
                       }
                       secondaryActionVariant="tertiary"
                     >
-                      <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700' }}>
-                        {t('exercise.settings.wearable.steps_sync_label')}
-                      </ThemedText>
-                      <View
-                        style={fitbitConn?.status !== 'active' ? { opacity: 0.6, pointerEvents: 'none' as const } : undefined}
-                      >
-                        <SegmentedToggle<'none' | 'fitbit'>
-                          options={[
-                            { key: 'none', label: t('exercise.settings.wearable.off') },
-                            { key: 'fitbit', label: t('exercise.settings.wearable.fitbit') },
-                          ]}
-                          value={settingsSyncStepsWithFitbit ? 'fitbit' : 'none'}
-                          onChange={(next) => setSettingsSyncStepsWithFitbit(next === 'fitbit')}
-                        />
-                      </View>
-                      <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
-                        {t('exercise.settings.wearable.steps_sync_helper')}
-                      </ThemedText>
+                      <FitbitSyncToggles
+                        value={{
+                          activityBurn: settingsSyncActivityBurn,
+                          weight: settingsWeightSyncProvider === 'fitbit',
+                          steps: settingsSyncStepsWithFitbit,
+                        }}
+                        onChange={(patch) => {
+                          if (patch.activityBurn !== undefined) setSettingsSyncActivityBurn(patch.activityBurn);
+                          if (patch.weight !== undefined) setSettingsWeightSyncProvider(patch.weight ? 'fitbit' : 'none');
+                          if (patch.steps !== undefined) setSettingsSyncStepsWithFitbit(patch.steps);
+                        }}
+                        disabled={fitbitConn?.status !== 'active'}
+                      />
                     </FitbitConnectionCard>
                     {fitbitEnabled && (fitbitConnLoading || fitbitConnFetching) ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
@@ -2865,6 +2864,8 @@ export default function ExerciseHomeScreen() {
                     exercise_track_strength_reps: settingsTrackStrengthReps,
                     exercise_track_strength_effort: settingsTrackStrengthEffort,
                     exercise_sync_steps: settingsSyncStepsWithFitbit,
+                    sync_activity_burn: settingsSyncActivityBurn,
+                    weight_sync_provider: settingsWeightSyncProvider,
                   }, {
                     onSuccess: () => {
                       showAppToast(t('exercise.settings.save'));

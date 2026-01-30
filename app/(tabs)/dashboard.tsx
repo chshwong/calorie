@@ -1,3 +1,4 @@
+import { DailyBurnWearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 import { EnergyEquation } from '@/components/burned/EnergyEquation';
 import { CalInVsOutChart } from '@/components/charts/cal-in-vs-out-chart';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
@@ -11,6 +12,7 @@ import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +22,8 @@ import {
   useDailyFoodSummary,
   useWeeklyCalInVsOut,
 } from '@/hooks/use-dashboard-data';
+import { useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useMedLogsForDate, useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
 import { useSelectedDate } from '@/hooks/use-selected-date';
@@ -61,6 +65,8 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
   const { data: stepsRow } = useDailySumExercisesStepsForDate(dateString);
   const stepsForDay = stepsRow?.steps ?? 0;
+  const fitbit = useFitbitConnectionQuery({ enabled: Platform.OS === 'web' });
+  const fitbitOrchestrator = useFitbitSyncOrchestrator();
 
   const mealCals = useMemo(() => {
     const out = { breakfast: 0, lunch: 0, dinner: 0, afternoon_snack: 0 };
@@ -156,24 +162,44 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
     <DashboardSectionContainer>
       <PremiumCard>
         {/* Header-only button to avoid nested <button> hydration errors on web (chart bars are interactive). */}
-        <TouchableOpacity
-          onPress={onPress}
-          activeOpacity={0.7}
-          style={getMinTouchTargetStyle()}
-          {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
-          {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
-        >
-          <View style={styles.cardHeader}>
+        <View style={styles.cardHeader}>
+          <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={getMinTouchTargetStyle()}
+            {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+            {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
+          >
             <View style={styles.cardTitleRow}>
               <IconSymbol name="fork.knife" size={20} color={colors.accentFood} decorative />
               <ThemedText type="subtitle" style={[styles.cardTitle, { color: colors.text }]}>
                 {t('dashboard.food.title')}
               </ThemedText>
             </View>
+          </TouchableOpacity>
+          <View style={styles.foodHeaderRight}>
+            <View style={[styles.syncPill, { backgroundColor: colors.backgroundSecondary }]}>
+              {Platform.OS === 'web' && (
+                <DailyBurnWearableSyncSlot
+                  isConnected={fitbit.isConnected}
+                  lastSyncAt={fitbit.lastSyncAt}
+                  onSync={async () => {
+                    const res = await fitbitOrchestrator.syncFitbitAllNow({
+                      dateKey: toDateKey(dateString),
+                      includeBurnApply: true,
+                    });
+                    if (res.weightOk === false && res.weightErrorCode === 'INSUFFICIENT_SCOPE') {
+                      showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
+                    }
+                  }}
+                  variant="compact"
+                />
+              )}
+            </View>
           </View>
-        </TouchableOpacity>
+        </View>
 
-          {/* Gauge area: Cal by meal (left), Burn−Eaten=Deficit+Sync (center-right), AvocadoGauge (center), chips (bottom). Burn equation is NOT inside a touchable so Sync button is not nested. */}
+          {/* Gauge area: Cal by meal (left), Burn−Eaten=Deficit (center-right), AvocadoGauge (center), chips (bottom). Sync is in card header. */}
           <View style={styles.caloriesRow}>
             <TouchableOpacity
               onPress={onPress}
@@ -203,24 +229,24 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                     </View>
                   );
                 })}
+                <View style={[styles.leftOverlayDivider, { backgroundColor: colors.border }]} />
+                <ThemedText style={[styles.leftOverlaySubheader, { color: colors.textSecondary }]}>
+                  Steps
+                </ThemedText>
+                <View style={[styles.mealRow, styles.stepsRowTight]}>
+                  <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>👣</ThemedText>
+                  <ThemedText style={[styles.mealValue, { color: colors.textSecondary }]}>{format4(stepsForDay)}</ThemedText>
+                </View>
               </View>
             </TouchableOpacity>
             <View style={styles.burnEquationOverlay} pointerEvents="box-none">
-              <View style={[styles.burnEquationConnector, { backgroundColor: colors.border }]} />
               <EnergyEquation
                 dateKey={dateString}
                 layout="vertical"
                 variant="minimalVertical"
-                showSync={true}
+                showSync={false}
                 compact={isSmallScreen || isMobile}
               />
-              {/* Steps (separate from equation) */}
-              <View style={styles.stepsRowRight}>
-                <ThemedText style={[styles.stepsEmojiRight, { color: colors.textSecondary }]}>👣</ThemedText>
-                <ThemedText style={[styles.stepsValueRight, { color: colors.textSecondary }]}>
-                  {format4(stepsForDay)}
-                </ThemedText>
-              </View>
             </View>
             <View style={styles.gaugeArea}>
               <View style={styles.gaugeOnTop}>
@@ -1156,6 +1182,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
   },
+  foodHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  syncPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
   cardTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',
@@ -1217,56 +1253,34 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 0,
     minHeight: 220, // Reduced to minimize spacing after gauge
+    overflow: 'visible',
   },
   mealBreakdownOverlay: {
     position: 'absolute',
     left: Spacing.md,
-    top: Spacing.sm,
+    top: 0,
     zIndex: 6,
     alignItems: 'flex-start',
   },
   mealBreakdownConnector: {
     position: 'absolute',
     left: 0,
-    top: 28,
+    top: 26,
     width: 18,
     height: 1,
     opacity: 0.25,
   },
-  // Right overlay: Burn − Eaten = Deficit (same pattern as mealBreakdownOverlay)
+  // Right overlay: Burn − Eaten = Deficit (behind gauge so status numbers stay on top)
   burnEquationOverlay: {
     position: 'absolute',
-    right: Spacing.md,
-    top: Spacing.sm,
-    zIndex: 6,
+    right: 10,
+    top: 0,
+    zIndex: 1,
+    elevation: 0,
     alignItems: 'flex-end',
-    width: 110,
-  },
-  burnEquationConnector: {
-    height: 2,
-    width: 18,
-    borderRadius: 2,
-    marginBottom: 6,
-    alignSelf: 'flex-end',
-    opacity: 0.25,
-  },
-  stepsRowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    gap: 4,
-  },
-  stepsEmojiRight: {
-    width: 16,
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  stepsValueRight: {
-    width: 40,
-    textAlign: 'right',
-    fontSize: 14,
-    fontWeight: FontWeight.semibold,
+    width: 96,
+    opacity: 0.85,
+    overflow: 'visible',
   },
   mealBreakdownTitle: {
     fontSize: FontSize.xs,
@@ -1288,20 +1302,41 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   mealEmoji: {
+    width: 18,
     fontSize: FontSize.sm,
     marginRight: 1,
+    textAlign: 'center',
     includeFontPadding: false,
   },
   mealValue: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
+    textAlign: 'right',
     includeFontPadding: false,
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+  },
+  leftOverlayDivider: {
+    height: 1,
+    width: 72,
+    borderRadius: 1,
+    marginTop: 6,
+    marginBottom: 4,
+    opacity: 0.6,
+  },
+  leftOverlaySubheader: {
+    fontSize: 11,
+    fontWeight: FontWeight.semibold,
+    marginBottom: 2,
+    lineHeight: 14,
+    opacity: 0.85,
+  },
+  stepsRowTight: {
+    marginTop: 0,
   },
   foodChipsOverlay: {
     position: 'absolute',
     left: Spacing.md, // shift into the left white space
-    top: Spacing.sm, // align with top of avocado area
+    top: 0, // align with top of avocado area
     zIndex: 5,
   },
   foodChipsColumn: {
@@ -1310,17 +1345,18 @@ const styles = StyleSheet.create({
   },
   gaugeArea: {
     position: 'relative',
+    overflow: 'visible',
   },
   gaugeOnTop: {
     position: 'relative',
-    zIndex: 2,
-    elevation: 2,
+    zIndex: 3,
+    elevation: 3,
   },
   avocadoChipsOverlay: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 6,
+    bottom: -12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

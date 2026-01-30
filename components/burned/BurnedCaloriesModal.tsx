@@ -15,6 +15,8 @@ import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
 import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import { useDisconnectFitbit, useFitbitConnectionPublic } from '@/hooks/use-fitbit-connection';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { getTodayKey, getYesterdayKey, toDateKey } from '@/utils/dateKey';
 
@@ -22,6 +24,7 @@ import FitbitLogo from '@/assets/images/fitbit_logo.svg';
 import { BurnReductionModal } from '@/components/burned/BurnReductionModal';
 import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
 import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
+import { FitbitSyncToggles } from '@/components/fitbit/FitbitSyncToggles';
 
 type Props = {
   visible: boolean;
@@ -69,6 +72,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const fitbitOrchestrator = useFitbitSyncOrchestrator();
   const [fitbitSyncing, setFitbitSyncing] = useState(false);
   const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
+  const { data: userConfig } = useUserConfig();
+  const updateProfile = useUpdateProfile();
 
   const fitbitStatusLine = useMemo(() => {
     if (!fitbitEnabled) return null;
@@ -99,9 +104,14 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const [didResetToSystem, setDidResetToSystem] = useState(false);
   const [fitbitModalVisible, setFitbitModalVisible] = useState(false);
   const [burnCorrectionModalVisible, setBurnCorrectionModalVisible] = useState(false);
+  const [draftSyncActivityBurn, setDraftSyncActivityBurn] = useState(true);
+  const [draftWeightProvider, setDraftWeightProvider] = useState<'none' | 'fitbit'>('none');
+  const [draftSyncSteps, setDraftSyncSteps] = useState(false);
+  const prevVisibleRef = useRef(false);
 
   useEffect(() => {
     if (!visible) {
+      prevVisibleRef.current = false;
       setTouched({ bmr: false, active: false, tdee: false });
       setValidationError(null);
       setDidResetToSystem(false);
@@ -114,6 +124,12 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       setCenterToastText(null);
       if (centerToastTimerRef.current) clearTimeout(centerToastTimerRef.current);
       return;
+    }
+    if (!prevVisibleRef.current) {
+      prevVisibleRef.current = true;
+      setDraftSyncActivityBurn(userConfig?.sync_activity_burn ?? true);
+      setDraftWeightProvider(userConfig?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none');
+      setDraftSyncSteps(userConfig?.exercise_sync_steps ?? false);
     }
     if (burnedRow) {
       // Capture system defaults once per row (stable for reset behavior).
@@ -151,6 +167,9 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     }
   }, [
     visible,
+    userConfig?.sync_activity_burn,
+    userConfig?.weight_sync_provider,
+    userConfig?.exercise_sync_steps,
     burnedRow?.id,
     burnedRow?.updated_at,
     burnedRow?.bmr_cal,
@@ -179,7 +198,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     saveMutation.isPending ||
     resetMutation.isPending ||
     fitbitSyncing ||
-    disconnectFitbit.isPending;
+    disconnectFitbit.isPending ||
+    updateProfile.isPending;
 
   const parsed = useMemo(() => {
     const bmr = parseInt(bmrText, 10);
@@ -358,13 +378,30 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     }
   };
 
+  const fitbitDraftChanged =
+    draftSyncActivityBurn !== (userConfig?.sync_activity_burn ?? true) ||
+    draftWeightProvider !== (userConfig?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none') ||
+    draftSyncSteps !== (userConfig?.exercise_sync_steps ?? false);
+
   const handleSave = async () => {
     if (!burnedRow) return;
 
     // UI guard: do not allow saving at/above the hard threshold (>= 15000); user must correct first.
     if (isTooHighBurn) return;
 
-    // Save immediately for any TDEE < 15000 (warning banner for 6000-14999 is informational only)
+    if (fitbitDraftChanged) {
+      try {
+        await updateProfile.mutateAsync({
+          sync_activity_burn: draftSyncActivityBurn,
+          weight_sync_provider: draftWeightProvider,
+          exercise_sync_steps: draftSyncSteps,
+        });
+        showAppToast(t('burned.fitbit.toast.saved'));
+      } catch {
+        showAppToast(t('common.unexpected_error'));
+        return;
+      }
+    }
     await persistSave();
   };
 
@@ -675,7 +712,21 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                         : null
                     }
                     secondaryActionVariant="tertiary"
-                  />
+                  >
+                    <FitbitSyncToggles
+                      value={{
+                        activityBurn: draftSyncActivityBurn,
+                        weight: draftWeightProvider === 'fitbit',
+                        steps: draftSyncSteps,
+                      }}
+                      onChange={(patch) => {
+                        if (patch.activityBurn !== undefined) setDraftSyncActivityBurn(patch.activityBurn);
+                        if (patch.weight !== undefined) setDraftWeightProvider(patch.weight ? 'fitbit' : 'none');
+                        if (patch.steps !== undefined) setDraftSyncSteps(patch.steps);
+                      }}
+                      disabled={!fitbitEnabled || fitbitConn?.status !== 'active'}
+                    />
+                  </FitbitConnectionCard>
                 </>
               )}
 

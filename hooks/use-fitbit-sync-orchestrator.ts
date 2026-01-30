@@ -49,6 +49,7 @@ export function useFitbitSyncOrchestrator() {
   const { data: userConfig } = useUserConfig();
   const applyRawMutation = useApplyRawToFinals();
 
+  const activitySyncOn = userConfig?.sync_activity_burn !== false;
   const weightProvider = userConfig?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none';
   const stepsSyncOn = userConfig?.exercise_sync_steps === true;
 
@@ -61,11 +62,13 @@ export function useFitbitSyncOrchestrator() {
       const includeBurnApply = Boolean(params.includeBurnApply);
       if (includeBurnApply && !dateKey) throw new Error('MISSING_DATEKEY');
 
-      // 1) Always sync activity first.
-      await syncFitbitNow();
+      // 1) Sync activity only when opted-in (default on).
+      if (activitySyncOn) {
+        await syncFitbitNow();
+      }
 
-      // 2) Optional burned apply.
-      if (includeBurnApply && dateKey) {
+      // 2) Optional burned apply (only when we synced activity).
+      if (activitySyncOn && includeBurnApply && dateKey) {
         await applyRawMutation.mutateAsync({ entryDate: dateKey });
       }
 
@@ -99,7 +102,7 @@ export function useFitbitSyncOrchestrator() {
 
       // Cache invalidation (best-effort, non-blocking).
       queryClient.invalidateQueries({ queryKey: ['fitbitConnectionPublic', userId] });
-      if (includeBurnApply && dateKey) {
+      if (activitySyncOn && includeBurnApply && dateKey) {
         const key = dailySumBurnedQueryKey(userId, dateKey);
         queryClient.invalidateQueries({ queryKey: key });
         queryClient.refetchQueries({ queryKey: key, type: 'active' });

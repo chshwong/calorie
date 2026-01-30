@@ -22,7 +22,6 @@ import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } 
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useFitbitConnectionQuery, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
 import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
-import { useSyncFitbitWeightNow } from '@/hooks/use-fitbit-weight-sync';
 import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { getLocalDateKey } from '@/utils/dateTime';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +33,8 @@ import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
 import { showAppToast } from '@/components/ui/app-toast';
 import { WeightSettingsModal } from '@/components/weight/WeightSettingsModal';
 import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
-import { ConfirmModal, SegmentedToggle } from '@/components/ui';
+import { FitbitSyncToggles } from '@/components/fitbit/FitbitSyncToggles';
+import { ConfirmModal } from '@/components/ui';
 import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 
 import FitbitLogo from '@/assets/images/fitbit_logo.svg';
@@ -71,6 +71,7 @@ export default function WeightHomeScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [fitbitModalVisible, setFitbitModalVisible] = useState(false);
   const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
+  const [isFitbitSyncing, setIsFitbitSyncing] = useState(false);
   const fitbitEnabled = Platform.OS === 'web';
   const fitbit = useFitbitConnectionQuery({ enabled: fitbitEnabled });
   const fitbitConn = fitbit.data ?? null;
@@ -78,7 +79,6 @@ export default function WeightHomeScreen() {
   const fitbitConnFetching = fitbit.isFetching;
   const disconnectFitbit = useDisconnectFitbit();
   const connectFitbit = useFitbitConnectPopup();
-  const syncWeightNow = useSyncFitbitWeightNow();
   const fitbitOrchestrator = useFitbitSyncOrchestrator();
   const weight366Query = useWeightLogs366d();
   const rawLogs = weight366Query.data ?? [];
@@ -108,14 +108,22 @@ export default function WeightHomeScreen() {
 
   const [draftUnit, setDraftUnit] = useState<'lbs' | 'kg'>(unit);
   const [draftWeightProvider, setDraftWeightProvider] = useState<'none' | 'fitbit'>(weightSyncProvider);
+  const [draftSyncActivityBurn, setDraftSyncActivityBurn] = useState<boolean>(userConfig?.sync_activity_burn ?? true);
+  const [draftSyncSteps, setDraftSyncSteps] = useState<boolean>(userConfig?.exercise_sync_steps ?? false);
 
   useEffect(() => {
     if (!showMenu) return;
     setDraftUnit(unit);
     setDraftWeightProvider(weightSyncProvider);
-  }, [showMenu, unit, weightSyncProvider]);
+    setDraftSyncActivityBurn(userConfig?.sync_activity_burn ?? true);
+    setDraftSyncSteps(userConfig?.exercise_sync_steps ?? false);
+  }, [showMenu, unit, weightSyncProvider, userConfig?.sync_activity_burn, userConfig?.exercise_sync_steps]);
 
-  const hasDraftChanges = draftUnit !== unit || draftWeightProvider !== weightSyncProvider;
+  const hasDraftChanges =
+    draftUnit !== unit ||
+    draftWeightProvider !== weightSyncProvider ||
+    draftSyncActivityBurn !== (userConfig?.sync_activity_burn ?? true) ||
+    draftSyncSteps !== (userConfig?.exercise_sync_steps ?? false);
 
   const fitbitStatusLine = useMemo(() => {
     if (!fitbitEnabled) return null;
@@ -382,9 +390,11 @@ export default function WeightHomeScreen() {
         }}
         onSave={async () => {
           if (updateProfileForSettings.isPending) return;
-          const updates: { weight_unit?: 'lbs' | 'kg'; weight_sync_provider?: 'none' | 'fitbit' } = {};
+          const updates: Record<string, unknown> = {};
           if (draftUnit !== unit) updates.weight_unit = draftUnit;
           if (draftWeightProvider !== weightSyncProvider) updates.weight_sync_provider = draftWeightProvider;
+          if (draftSyncActivityBurn !== (userConfig?.sync_activity_burn ?? true)) updates.sync_activity_burn = draftSyncActivityBurn;
+          if (draftSyncSteps !== (userConfig?.exercise_sync_steps ?? false)) updates.exercise_sync_steps = draftSyncSteps;
           if (Object.keys(updates).length === 0) {
             setShowMenu(false);
             return;
@@ -447,9 +457,15 @@ export default function WeightHomeScreen() {
                           setFitbitModalVisible(true);
                           return;
                         }
+                        setIsFitbitSyncing(true);
                         try {
-                          await syncWeightNow.mutateAsync();
-                          showAppToast(t('weight.settings.wearable.toast.weight_updated'));
+                          const res = await fitbitOrchestrator.syncFitbitAllNow({ includeBurnApply: false });
+                          if (res.weightOk === false) {
+                            showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
+                            setFitbitModalVisible(true);
+                          } else {
+                            showAppToast(t('weight.settings.wearable.toast.weight_updated'));
+                          }
                         } catch (e: any) {
                           const msg = String(e?.message ?? '');
                           if (msg === 'INSUFFICIENT_SCOPE') {
@@ -463,10 +479,12 @@ export default function WeightHomeScreen() {
                           } else {
                             showAppToast(t('burned.fitbit.toast.sync_failed'));
                           }
+                        } finally {
+                          setIsFitbitSyncing(false);
                         }
                       },
-                      disabled: draftWeightProvider !== 'fitbit' || syncWeightNow.isPending,
-                      loading: syncWeightNow.isPending,
+                      disabled: isFitbitSyncing,
+                      loading: isFitbitSyncing,
                     }
                   : {
                       label: t('weight.settings.wearable.actions.connect'),
@@ -485,22 +503,19 @@ export default function WeightHomeScreen() {
               }
               secondaryActionVariant="tertiary"
             >
-              <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700' }}>
-                {t('weight.settings.wearable.weight_sync_label')}
-              </ThemedText>
-              <SegmentedToggle<'none' | 'fitbit'>
-                options={[
-                  { key: 'none', label: t('weight.settings.wearable.off') },
-                  { key: 'fitbit', label: t('weight.settings.wearable.fitbit') },
-                ]}
-                value={draftWeightProvider}
-                onChange={(next) => setDraftWeightProvider(next)}
+              <FitbitSyncToggles
+                value={{
+                  activityBurn: draftSyncActivityBurn,
+                  weight: draftWeightProvider === 'fitbit',
+                  steps: draftSyncSteps,
+                }}
+                onChange={(patch) => {
+                  if (patch.activityBurn !== undefined) setDraftSyncActivityBurn(patch.activityBurn);
+                  if (patch.weight !== undefined) setDraftWeightProvider(patch.weight ? 'fitbit' : 'none');
+                  if (patch.steps !== undefined) setDraftSyncSteps(patch.steps);
+                }}
+                disabled={fitbitConn?.status !== 'active'}
               />
-              {draftWeightProvider === 'fitbit' ? (
-                <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
-                  {t('weight.settings.wearable.weight_sync_helper')}
-                </ThemedText>
-              ) : null}
             </FitbitConnectionCard>
 
             {fitbitEnabled && (fitbitConnLoading || fitbitConnFetching) ? (

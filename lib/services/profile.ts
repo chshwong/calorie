@@ -23,6 +23,8 @@ export type ProfileRow = {
   height_unit?: string | null;
   weight_unit?: string | null;
   weight_sync_provider?: 'none' | 'fitbit' | null;
+  /** When true, Sync Now will fetch and apply activity calories from Fitbit (default true). */
+  sync_activity_burn?: boolean | null;
   exercise_sync_steps?: boolean | null;
   onboarding_complete?: boolean | null;
 

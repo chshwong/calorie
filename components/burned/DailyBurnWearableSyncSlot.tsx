@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
-import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { Colors, FontSize, FontWeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { getButtonAccessibilityProps } from '@/utils/accessibility';
 
 type Props = {
@@ -17,29 +18,51 @@ type Props = {
 };
 
 const SUCCESS_RESET_MS = 1200;
+const PHASE_INTERVAL_MS = 2000;
 
 export function DailyBurnWearableSyncSlot({ isConnected, onSync, variant = 'full' }: Props) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
+  const { data: userConfig } = useUserConfig();
   const [status, setStatus] = useState<'idle' | 'syncing' | 'success'>('idle');
+  const [syncPhaseLabel, setSyncPhaseLabel] = useState<string | null>(null);
   const isMountedRef = useRef(true);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phaseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const phaseIndexRef = useRef(0);
+
+  const syncWeight = userConfig?.weight_sync_provider === 'fitbit';
+  const syncSteps = userConfig?.exercise_sync_steps === true;
+  const phases = useMemo(() => {
+    const list: { key: string; label: string }[] = [
+      { key: 'burn', label: t('wearable_sync_phase_burn') },
+      ...(syncWeight ? [{ key: 'weight', label: t('wearable_sync_phase_weight') }] : []),
+      ...(syncSteps ? [{ key: 'steps', label: t('wearable_sync_phase_steps') }] : []),
+    ];
+    return list;
+  }, [t, syncWeight, syncSteps]);
 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      if (phaseIntervalRef.current) clearInterval(phaseIntervalRef.current);
     };
   }, []);
 
-  const linkColor = useMemo(() => `${colors.chartOrange}B3`, [colors.chartOrange]);
+  // Light mode: solid darker salmon for contrast on white; dark mode: tint with slight transparency.
+  const linkColor = useMemo(
+    () => (scheme === 'light' ? colors.tint : `${colors.tint}B3`),
+    [scheme, colors.tint],
+  );
 
-  const label = status === 'syncing'
-    ? '↻ Syncing…'
-    : status === 'success'
-      ? t('wearable_updated_label')
-      : t('wearable_sync_label');
+  const label =
+    status === 'syncing'
+      ? (syncPhaseLabel ?? t('wearable_syncing_label'))
+      : status === 'success'
+        ? t('wearable_updated_label')
+        : t('wearable_sync_label');
 
   const handleErrorToast = (error: unknown) => {
     const msg = String((error as { message?: string })?.message ?? '');
@@ -54,19 +77,41 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync, variant = 'full
     }
   };
 
+  const stopPhaseRotation = () => {
+    if (phaseIntervalRef.current) {
+      clearInterval(phaseIntervalRef.current);
+      phaseIntervalRef.current = null;
+    }
+    setSyncPhaseLabel(null);
+  };
+
   const handleSync = async () => {
     if (status === 'syncing') return;
     setStatus('syncing');
+    phaseIndexRef.current = 0;
+    setSyncPhaseLabel(phases[0]?.label ?? t('wearable_syncing_label'));
+    if (phases.length > 0) {
+      phaseIntervalRef.current = setInterval(() => {
+        if (!isMountedRef.current) return;
+        const next = (phaseIndexRef.current + 1) % phases.length;
+        phaseIndexRef.current = next;
+        setSyncPhaseLabel(phases[next].label);
+      }, PHASE_INTERVAL_MS);
+    }
     try {
       await onSync();
       if (!isMountedRef.current) return;
+      stopPhaseRotation();
       setStatus('success');
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
       successTimerRef.current = setTimeout(() => {
         if (isMountedRef.current) setStatus('idle');
       }, SUCCESS_RESET_MS);
     } catch (error) {
-      if (isMountedRef.current) setStatus('idle');
+      if (isMountedRef.current) {
+        stopPhaseRotation();
+        setStatus('idle');
+      }
       handleErrorToast(error);
     }
   };
