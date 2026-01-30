@@ -2416,7 +2416,25 @@
         "reps_range": "Reps Range"
       },
       "distance_unit": "Distance Unit",
-      "distance_unit_description": "Choose how distance is displayed for cardio exercises"
+      "distance_unit_description": "Choose how distance is displayed for cardio exercises",
+      "wearable": {
+        "title": "Wearable Integration",
+        "web_only": "Wearables are web-only for now.",
+        "connected": "Fitbit connected",
+        "not_connected": "Not connected",
+        "steps_sync_label": "Steps sync",
+        "steps_sync_helper": "Activity sync will also update steps.",
+        "off": "Off",
+        "fitbit": "Fitbit",
+        "actions": {
+          "connect": "Connect Fitbit",
+          "sync": "Sync"
+        },
+        "toast": {
+          "updated": "Updated",
+          "reconnect_to_enable_steps_sync": "Reconnect Fitbit to enable steps sync"
+        }
+      }
     },
     "clone": {
       "title": "Clone today's exercises",

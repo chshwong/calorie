@@ -1966,7 +1966,25 @@
       "kilometers": "Kilomètres (km)",
       "miles": "Miles (mi)",
       "cancel": "Annuler",
-      "save": "Enregistrer"
+      "save": "Enregistrer",
+      "wearable": {
+        "title": "Intégration wearable",
+        "web_only": "Les wearables sont pris en charge uniquement sur le web pour l'instant.",
+        "connected": "Fitbit connecté",
+        "not_connected": "Non connecté",
+        "steps_sync_label": "Sync des pas",
+        "steps_sync_helper": "La sync d'activité mettra aussi à jour les pas.",
+        "off": "Désactivé",
+        "fitbit": "Fitbit",
+        "actions": {
+          "connect": "Connecter Fitbit",
+          "sync": "Synchroniser"
+        },
+        "toast": {
+          "updated": "Mis à jour",
+          "reconnect_to_enable_steps_sync": "Reconnectez Fitbit pour activer la sync des pas"
+        }
+      }
     },
     "loading": "Chargement des exercices...",
     "error": "Échec du chargement des exercices"

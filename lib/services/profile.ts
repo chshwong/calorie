@@ -23,6 +23,7 @@ export type ProfileRow = {
   height_unit?: string | null;
   weight_unit?: string | null;
   weight_sync_provider?: 'none' | 'fitbit' | null;
+  exercise_sync_steps?: boolean | null;
   onboarding_complete?: boolean | null;
 
   // Onboarding target columns (authoritative)

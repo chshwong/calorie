@@ -2,8 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { dailySumBurnedQueryKey } from '@/hooks/use-daily-sum-burned';
+import { dailySumExercisesStepsKey } from '@/hooks/use-daily-sum-exercises';
 import { useApplyRawToFinals } from '@/hooks/use-burned-mutations';
-import { syncFitbitNow, syncFitbitWeightNow } from '@/lib/services/fitbit/fitbitConnection';
+import { syncFitbitNow, syncFitbitStepsNow, syncFitbitWeightNow } from '@/lib/services/fitbit/fitbitConnection';
 
 type Params = {
   /** YYYY-MM-DD */
@@ -18,7 +19,24 @@ export type FitbitOrchestratorResult = {
   weightOk: boolean | null;
   /** If weight sync failed (non-fatal), normalized error code. */
   weightErrorCode: string | null;
+  /** Steps sync ran and succeeded (only when exercise_sync_steps is on). */
+  stepsOk: boolean | null;
+  /** If steps sync failed (non-fatal), normalized error code. */
+  stepsErrorCode: string | null;
 };
+
+function getLast7LocalDateKeys(): string[] {
+  const keys: string[] = [];
+  const d = new Date();
+  for (let i = 0; i < 7; i++) {
+    const x = new Date(d.getTime());
+    x.setDate(x.getDate() - i);
+    keys.push(
+      `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`,
+    );
+  }
+  return keys;
+}
 
 function errCode(e: unknown): string {
   return String((e as any)?.message ?? 'UNKNOWN');
@@ -32,6 +50,7 @@ export function useFitbitSyncOrchestrator() {
   const applyRawMutation = useApplyRawToFinals();
 
   const weightProvider = userConfig?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none';
+  const stepsSyncOn = userConfig?.exercise_sync_steps === true;
 
   return {
     weightProvider,
@@ -63,6 +82,21 @@ export function useFitbitSyncOrchestrator() {
         }
       }
 
+      // 4) Optional steps sync (non-fatal failures).
+      let stepsOk: boolean | null = null;
+      let stepsErrorCode: string | null = null;
+      let syncedStepsDates: string[] | null = null;
+      if (stepsSyncOn) {
+        try {
+          const result = await syncFitbitStepsNow();
+          stepsOk = true;
+          syncedStepsDates = result.synced_dates ?? null;
+        } catch (e) {
+          stepsOk = false;
+          stepsErrorCode = errCode(e);
+        }
+      }
+
       // Cache invalidation (best-effort, non-blocking).
       queryClient.invalidateQueries({ queryKey: ['fitbitConnectionPublic', userId] });
       if (includeBurnApply && dateKey) {
@@ -75,8 +109,16 @@ export function useFitbitSyncOrchestrator() {
         queryClient.invalidateQueries({ queryKey: ['weightLogs', userId] });
         queryClient.invalidateQueries({ queryKey: ['weightLogs', userId, 'earliest'] });
       }
+      if (stepsOk === true && userId) {
+        const datesToInvalidate = syncedStepsDates?.length
+          ? syncedStepsDates
+          : getLast7LocalDateKeys();
+        for (const date of datesToInvalidate) {
+          queryClient.invalidateQueries({ queryKey: dailySumExercisesStepsKey(userId, date) });
+        }
+      }
 
-      return { activityOk: true, weightOk, weightErrorCode };
+      return { activityOk: true, weightOk, weightErrorCode, stepsOk, stepsErrorCode };
     },
   };
 }

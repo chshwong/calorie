@@ -12,11 +12,13 @@ type Props = {
   isConnected: boolean;
   lastSyncAt?: string | null;
   onSync: () => Promise<void>;
+  /** 'full' = default slot; 'compact' = smaller for inline (e.g. Steps row). */
+  variant?: 'full' | 'compact';
 };
 
 const SUCCESS_RESET_MS = 1200;
 
-export function DailyBurnWearableSyncSlot({ isConnected, onSync }: Props) {
+export function DailyBurnWearableSyncSlot({ isConnected, onSync, variant = 'full' }: Props) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
@@ -69,12 +71,15 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync }: Props) {
     }
   };
 
+  const isCompact = variant === 'compact';
+
   return (
-    <View style={styles.slotContainer}>
+    <View style={[styles.slotContainer, isCompact && styles.slotContainerCompact]}>
       {isConnected ? (
         <Pressable
           style={[
             styles.link,
+            isCompact && styles.linkCompact,
             status === 'syncing' ? styles.linkDisabled : null,
             Platform.OS === 'web' ? ({ cursor: status === 'syncing' ? 'default' : 'pointer' } as any) : null,
           ]}
@@ -83,12 +88,22 @@ export function DailyBurnWearableSyncSlot({ isConnected, onSync }: Props) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           {...getButtonAccessibilityProps(t('wearable_sync_label'), undefined, status === 'syncing')}
         >
-          <ThemedText style={[styles.linkText, { color: linkColor }]} numberOfLines={1}>
+          <ThemedText
+            style={[styles.linkText, isCompact && styles.linkTextCompact, { color: linkColor }]}
+            numberOfLines={1}
+          >
             {label}
           </ThemedText>
         </Pressable>
       ) : (
-        <ThemedText style={[styles.placeholderText, { color: colors.textMuted }]} numberOfLines={1}>
+        <ThemedText
+          style={[
+            styles.placeholderText,
+            isCompact && styles.placeholderTextCompact,
+            { color: colors.textMuted },
+          ]}
+          numberOfLines={1}
+        >
           {t('wearable_none_short')}
         </ThemedText>
       )}
@@ -106,11 +121,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 0,
   },
+  slotContainerCompact: {
+    paddingVertical: 0,
+  },
   link: {
     alignSelf: 'flex-start',
     paddingHorizontal: 0,
     paddingVertical: 0,
     backgroundColor: 'transparent',
+  },
+  linkCompact: {
+    paddingVertical: 0,
   },
   linkDisabled: {
     opacity: 0.6,
@@ -120,8 +141,14 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     letterSpacing: 0.1,
   },
+  linkTextCompact: {
+    fontSize: Platform.select({ web: FontSize.xs, default: FontSize.xs }),
+  },
   placeholderText: {
     fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
     fontWeight: FontWeight.medium,
+  },
+  placeholderTextCompact: {
+    fontSize: Platform.select({ web: FontSize.xs, default: FontSize.xs }),
   },
 });

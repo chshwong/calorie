@@ -41,8 +41,9 @@ serve(async (req) => {
 
     const clientId = requireEnv('FITBIT_CLIENT_ID')
     const redirectUri = requireEnv('FITBIT_REDIRECT_URI')
-    // Scopes are controlled via FITBIT_SCOPES env var.
-    // Default includes activity + body measurements (weight scope covers weight + body fat per Fitbit Web API).
+    // Scopes are controlled via FITBIT_SCOPES env var (space-delimited).
+    // Default: activity (active calories + steps time series) and weight (weight + body fat).
+    // Do not remove "activity" or steps sync will fail with INSUFFICIENT_SCOPE.
     const scopes = (Deno.env.get('FITBIT_SCOPES') ?? 'activity weight').trim()
 
     // PKCE + CSRF state

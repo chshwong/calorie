@@ -200,6 +200,8 @@ export interface FitbitConnectionPublic {
   last_sync_at: string | null;
   /** Independent from activity sync; used only for weight/body sync. */
   last_weight_sync_at?: string | null;
+  /** Last time steps were synced from Fitbit. */
+  last_steps_sync_at?: string | null;
   last_error_code: string | null;
   last_error_message: string | null;
   last_error_at: string | null;

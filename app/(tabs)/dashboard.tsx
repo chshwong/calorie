@@ -1,3 +1,4 @@
+import { EnergyEquation } from '@/components/burned/EnergyEquation';
 import { CalInVsOutChart } from '@/components/charts/cal-in-vs-out-chart';
 import { DashboardSectionContainer } from '@/components/dashboard-section-container';
 import { ExerciseActivitiesChart } from '@/components/dashboard/exercise-activities-chart';
@@ -14,6 +15,7 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDailySumExercisesStepsForDate } from '@/hooks/use-daily-sum-exercises';
 import {
   useDailyFoodSummary,
   useWeeklyCalInVsOut,
@@ -57,6 +59,8 @@ type DashboardFoodSectionProps = {
 function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, foodSummary }: DashboardFoodSectionProps) {
   const { t } = useTranslation();
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
+  const { data: stepsRow } = useDailySumExercisesStepsForDate(dateString);
+  const stepsForDay = stepsRow?.steps ?? 0;
 
   const mealCals = useMemo(() => {
     const out = { breakfast: 0, lunch: 0, dinner: 0, afternoon_snack: 0 };
@@ -169,23 +173,19 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
           </View>
         </TouchableOpacity>
 
-          {/* Make the gauge area tappable so it behaves like "open Food Log for this date". */}
-          <TouchableOpacity
-            onPress={onPress}
-            activeOpacity={0.7}
-            style={getMinTouchTargetStyle()}
-            {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
-            {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
-          >
+          {/* Gauge area: Cal by meal (left), Burn−Eaten=Deficit+Sync (center-right), AvocadoGauge (center), chips (bottom). Burn equation is NOT inside a touchable so Sync button is not nested. */}
           <View style={styles.caloriesRow}>
-            <View style={styles.mealBreakdownOverlay} pointerEvents="none">
-              {/* Option B connector */}
+            <TouchableOpacity
+              onPress={onPress}
+              activeOpacity={0.7}
+              style={[styles.mealBreakdownOverlay, getMinTouchTargetStyle()]}
+              {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+              {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
+            >
               <View style={[styles.mealBreakdownConnector, { backgroundColor: colors.border }]} />
-
               <ThemedText style={[styles.mealBreakdownTitle, { color: colors.textMuted }]}>
                 Cal by meal
               </ThemedText>
-
               <View style={styles.mealBreakdownStack}>
                 {mealRows.map(r => {
                   const v = Math.round(r.value ?? 0);
@@ -195,12 +195,8 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                       <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>
                         {r.emoji}
                       </ThemedText>
-
                       <ThemedText
-                        style={[
-                          styles.mealValue,
-                          { color: colors.textSecondary },
-                        ]}
+                        style={[styles.mealValue, { color: colors.textSecondary }]}
                       >
                         {format4(v)}
                       </ThemedText>
@@ -208,41 +204,72 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                   );
                 })}
               </View>
+            </TouchableOpacity>
+            <View style={styles.burnEquationOverlay} pointerEvents="box-none">
+              <View style={[styles.burnEquationConnector, { backgroundColor: colors.border }]} />
+              <EnergyEquation
+                dateKey={dateString}
+                layout="vertical"
+                variant="minimalVertical"
+                showSync={true}
+                compact={isSmallScreen || isMobile}
+              />
+              {/* Steps (separate from equation) */}
+              <View style={styles.stepsRowRight}>
+                <ThemedText style={[styles.stepsEmojiRight, { color: colors.textSecondary }]}>👣</ThemedText>
+                <ThemedText style={[styles.stepsValueRight, { color: colors.textSecondary }]}>
+                  {format4(stepsForDay)}
+                </ThemedText>
+              </View>
             </View>
-            <AvocadoGauge
-              consumed={Number(foodSummary.caloriesTotal)}
-              target={Number(foodSummary.caloriesGoal)}
-              goalType={goalType}
-              size={gaugeSize}
-              strokeWidth={8}
-              surfaceBg={colors.card}
-              showLabel
-            />
-            
-            {/* Chips overlay at bottom of avocado gauge */}
-            <View style={styles.avocadoChipsOverlay} pointerEvents="box-none">
-              <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
-                <ThemedText 
-                  style={[styles.foodChipText, { color: colors.textSecondary }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
+            <View style={styles.gaugeArea}>
+              <View style={styles.gaugeOnTop}>
+                <TouchableOpacity
+                  onPress={onPress}
+                  activeOpacity={0.7}
+                  style={getMinTouchTargetStyle()}
+                  {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+                  {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
                 >
-                  Goal: {getGoalLabel}
-                </ThemedText>
+                  <AvocadoGauge
+                    consumed={Number(foodSummary.caloriesTotal)}
+                    target={Number(foodSummary.caloriesGoal)}
+                    goalType={goalType}
+                    size={gaugeSize}
+                    strokeWidth={8}
+                    surfaceBg={colors.card}
+                    showLabel
+                  />
+                </TouchableOpacity>
               </View>
-
-              <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
-                <ThemedText 
-                  style={[styles.foodChipText, { color: colors.textSecondary }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  Aim: {Number(foodSummary.caloriesGoal).toLocaleString('en-US')} {t('units.kcal')}/day
-                </ThemedText>
-              </View>
+              <TouchableOpacity
+                onPress={onPress}
+                activeOpacity={0.7}
+                style={[styles.avocadoChipsOverlay, getMinTouchTargetStyle()]}
+                {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+                {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
+              >
+                <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
+                  <ThemedText
+                    style={[styles.foodChipText, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    Goal: {getGoalLabel}
+                  </ThemedText>
+                </View>
+                <View style={[styles.foodChip, { backgroundColor: colors.backgroundSecondary }]}>
+                  <ThemedText
+                    style={[styles.foodChipText, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    Aim: {Number(foodSummary.caloriesGoal).toLocaleString('en-US')} {t('units.kcal')}/day
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
-          </TouchableOpacity>
 
           {/* Cals in vs out Chart */}
           <View style={styles.chartSection}>
@@ -1182,12 +1209,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
   },
-  // Calories row
+  // Calories row: gauge centered; left/right stacks are absolute overlays (don't affect layout)
   caloriesRow: {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative', // IMPORTANT: anchor for absolute overlay
-    marginTop: 0 - Spacing.sm,
+    marginTop: 0,
     marginBottom: 0,
     minHeight: 220, // Reduced to minimize spacing after gauge
   },
@@ -1205,6 +1232,41 @@ const styles = StyleSheet.create({
     width: 18,
     height: 1,
     opacity: 0.25,
+  },
+  // Right overlay: Burn − Eaten = Deficit (same pattern as mealBreakdownOverlay)
+  burnEquationOverlay: {
+    position: 'absolute',
+    right: Spacing.md,
+    top: Spacing.sm,
+    zIndex: 6,
+    alignItems: 'flex-end',
+    width: 110,
+  },
+  burnEquationConnector: {
+    height: 2,
+    width: 18,
+    borderRadius: 2,
+    marginBottom: 6,
+    alignSelf: 'flex-end',
+    opacity: 0.25,
+  },
+  stepsRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    gap: 4,
+  },
+  stepsEmojiRight: {
+    width: 16,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  stepsValueRight: {
+    width: 40,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: FontWeight.semibold,
   },
   mealBreakdownTitle: {
     fontSize: FontSize.xs,
@@ -1246,16 +1308,25 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.xs,
   },
+  gaugeArea: {
+    position: 'relative',
+  },
+  gaugeOnTop: {
+    position: 'relative',
+    zIndex: 2,
+    elevation: 2,
+  },
   avocadoChipsOverlay: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 6, // Position in blank space below avocado
+    bottom: 6,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: Spacing.xs,
-    zIndex: 5,
+    zIndex: 1,
+    elevation: 0,
     pointerEvents: 'box-none',
   },
   foodChip: {

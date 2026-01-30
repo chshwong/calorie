@@ -14,8 +14,12 @@ import { MultiSelectItem } from '@/components/multi-select-item';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
+import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
+import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
+import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { SegmentedToggle } from '@/components/ui';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { RANGES, TEXT_LIMITS } from '@/constants/constraints';
 import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessages';
@@ -40,6 +44,9 @@ import {
 } from '@/hooks/use-exercise-logs';
 import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useMultiSelect } from '@/hooks/use-multi-select';
+import { useFitbitConnectionQuery, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
+import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useUserConfig } from '@/hooks/use-user-config';
@@ -50,6 +57,7 @@ import {
   getFocusStyle,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import FitbitLogo from '@/assets/images/fitbit_logo.svg';
 import { getLocalDateKey } from '@/utils/dateTime';
 import type { DailyLogStatus } from '@/utils/types';
 import { useFocusEffect } from '@react-navigation/native';
@@ -825,6 +833,19 @@ export default function ExerciseHomeScreen() {
   const [settingsTrackStrengthSets, setSettingsTrackStrengthSets] = useState<boolean>(true);
   const [settingsTrackStrengthReps, setSettingsTrackStrengthReps] = useState<boolean>(false);
   const [settingsTrackStrengthEffort, setSettingsTrackStrengthEffort] = useState<boolean>(false);
+  const [settingsSyncStepsWithFitbit, setSettingsSyncStepsWithFitbit] = useState<boolean>(false);
+  const [showFitbitModal, setShowFitbitModal] = useState(false);
+  const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
+  const [isFitbitSyncing, setIsFitbitSyncing] = useState(false);
+
+  const fitbitEnabled = Platform.OS === 'web';
+  const fitbit = useFitbitConnectionQuery({ enabled: fitbitEnabled });
+  const fitbitConn = fitbit.data ?? null;
+  const fitbitConnLoading = fitbit.isLoading;
+  const fitbitConnFetching = fitbit.isFetching;
+  const disconnectFitbit = useDisconnectFitbit();
+  const connectFitbit = useFitbitConnectPopup();
+  const fitbitOrchestrator = useFitbitSyncOrchestrator();
 
   // Initialize settings when modal opens
   useEffect(() => {
@@ -837,8 +858,9 @@ export default function ExerciseHomeScreen() {
       setSettingsTrackStrengthSets(userConfig?.exercise_track_strength_sets ?? true);
       setSettingsTrackStrengthReps(userConfig?.exercise_track_strength_reps ?? false);
       setSettingsTrackStrengthEffort(userConfig?.exercise_track_strength_effort ?? false);
+      setSettingsSyncStepsWithFitbit(userConfig?.exercise_sync_steps ?? false);
     }
-  }, [showExerciseSettings, userConfig?.distance_unit, userConfig?.exercise_track_cardio_duration, userConfig?.exercise_track_cardio_distance, userConfig?.exercise_track_cardio_effort, userConfig?.exercise_track_strength_sets, userConfig?.exercise_track_strength_reps, userConfig?.exercise_track_strength_effort]);
+  }, [showExerciseSettings, userConfig?.distance_unit, userConfig?.exercise_track_cardio_duration, userConfig?.exercise_track_cardio_distance, userConfig?.exercise_track_cardio_effort, userConfig?.exercise_track_strength_sets, userConfig?.exercise_track_strength_reps, userConfig?.exercise_track_strength_effort, userConfig?.exercise_sync_steps]);
 
   // Initialize steps draft when Steps modal opens
   useEffect(() => {
@@ -1717,35 +1739,48 @@ export default function ExerciseHomeScreen() {
                 }
               />
 
-          <Pressable
-            onPress={() => setShowStepsModal(true)}
-            disabled={editMode}
+          <View
             style={[
               styles.stepsRow,
               { backgroundColor: colors.backgroundSecondary, borderColor: colors.separator },
               editMode && { opacity: 0.6 },
-              Platform.OS === 'web' && getFocusStyle(colors.tint),
             ]}
-            {...getButtonAccessibilityProps('Edit steps')}
           >
             <View style={styles.stepsLeft}>
-              <ThemedText style={[styles.stepsIcon, { color: colors.textSecondary }]}>👣</ThemedText>
-              <ThemedText style={[styles.stepsLabel, { color: colors.textSecondary }]}>Steps</ThemedText>
-              <ThemedText style={[styles.stepsValue, { color: colors.text }]}>
-                {isUnsetSteps ? '—' : formatInt(stepsValue)}
-              </ThemedText>
-              {!!stepsSource && (
-                <View style={[styles.stepsSourceChip, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
-                  <ThemedText style={[styles.stepsSourceText, { color: colors.tint }]}>
-                    {stepsSource === 'manual' ? 'Manual' : stepsSource === 'fitbit' ? 'Fitbit' : stepsSource}
-                  </ThemedText>
-                </View>
+              <Pressable
+                onPress={() => setShowStepsModal(true)}
+                disabled={editMode}
+                style={styles.stepsEditPressable}
+                {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
+                {...getButtonAccessibilityProps('Edit steps')}
+              >
+                <ThemedText style={[styles.stepsIcon, { color: colors.textSecondary }]}>👣</ThemedText>
+                <ThemedText style={[styles.stepsLabel, { color: colors.textSecondary }]}>Steps</ThemedText>
+                <ThemedText style={[styles.stepsValue, { color: colors.text }]}>
+                  {isUnsetSteps ? '—' : formatInt(stepsValue)}
+                </ThemedText>
+                {!!stepsSource && (
+                  <View style={[styles.stepsSourceChip, { backgroundColor: colors.tint + '20', borderColor: colors.tint + '40' }]}>
+                    <ThemedText style={[styles.stepsSourceText, { color: colors.tint }]}>
+                      {stepsSource === 'manual' ? 'Manual' : stepsSource === 'fitbit' ? 'Fitbit' : stepsSource}
+                    </ThemedText>
+                  </View>
+                )}
+              </Pressable>
+              {fitbitEnabled && (
+                <WearableSyncSlot
+                  variant="compact"
+                  isConnected={fitbitConn?.status === 'active'}
+                  onSync={async () => {
+                    await fitbitOrchestrator.syncFitbitAllNow({ includeBurnApply: false });
+                  }}
+                />
               )}
             </View>
             <View style={styles.stepsRight}>
               <IconSymbol name="chevron.right" size={16} color={colors.textSecondary} />
             </View>
-          </Pressable>
+          </View>
 
           <View style={styles.daySummaryBody}>
             {logsLoading ? (
@@ -2709,6 +2744,105 @@ export default function ExerciseHomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Wearable Integration Section */}
+              <View style={styles.trackingPreferencesSection}>
+                <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('exercise.settings.wearable.title')}
+                </ThemedText>
+                {!fitbitEnabled ? (
+                  <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                    {t('exercise.settings.wearable.web_only')}
+                  </ThemedText>
+                ) : (
+                  <>
+                    <FitbitConnectionCard
+                      layout="stacked"
+                      statusLine={
+                        fitbitConn?.status === 'active'
+                          ? t('exercise.settings.wearable.connected')
+                          : t('exercise.settings.wearable.not_connected')
+                      }
+                      connected={fitbitConn?.status === 'active'}
+                      logo={<FitbitLogo width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />}
+                      primaryAction={
+                        fitbitConn?.status === 'active'
+                          ? {
+                              label: t('exercise.settings.wearable.actions.sync'),
+                              onPress: async () => {
+                                if (isFitbitSyncing) return;
+                                setIsFitbitSyncing(true);
+                                try {
+                                  const res = await fitbitOrchestrator.syncFitbitAllNow({ includeBurnApply: false });
+                                  if (res.stepsOk === false && res.stepsErrorCode === 'INSUFFICIENT_SCOPE') {
+                                    showAppToast(t('exercise.settings.wearable.toast.reconnect_to_enable_steps_sync'));
+                                  } else {
+                                    showAppToast(t('exercise.settings.wearable.toast.updated'));
+                                  }
+                                } catch (e: any) {
+                                  const msg = String(e?.message ?? '');
+                                  if (msg === 'RATE_LIMIT') {
+                                    showAppToast(t('burned.fitbit.errors.rate_limit_15m'));
+                                  } else if (msg === 'UNAUTHORIZED' || msg === 'MISSING_TOKENS') {
+                                    showAppToast(t('burned.fitbit.errors.reconnect_required'));
+                                    setShowFitbitModal(true);
+                                  } else {
+                                    showAppToast(t('burned.fitbit.toast.sync_failed'));
+                                  }
+                                } finally {
+                                  setIsFitbitSyncing(false);
+                                }
+                              },
+                              disabled: isFitbitSyncing,
+                              loading: isFitbitSyncing,
+                            }
+                          : {
+                              label: t('exercise.settings.wearable.actions.connect'),
+                              onPress: () => setShowFitbitModal(true),
+                              disabled: connectFitbit.isPending,
+                            }
+                      }
+                      secondaryAction={
+                        fitbitConn?.status === 'active'
+                          ? {
+                              label: t('burned.fitbit.actions.disconnect'),
+                              onPress: () => setDisconnectConfirmVisible(true),
+                              disabled: disconnectFitbit.isPending || disconnectConfirmVisible,
+                            }
+                          : null
+                      }
+                      secondaryActionVariant="tertiary"
+                    >
+                      <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700' }}>
+                        {t('exercise.settings.wearable.steps_sync_label')}
+                      </ThemedText>
+                      <View
+                        style={fitbitConn?.status !== 'active' ? { opacity: 0.6, pointerEvents: 'none' as const } : undefined}
+                      >
+                        <SegmentedToggle<'none' | 'fitbit'>
+                          options={[
+                            { key: 'none', label: t('exercise.settings.wearable.off') },
+                            { key: 'fitbit', label: t('exercise.settings.wearable.fitbit') },
+                          ]}
+                          value={settingsSyncStepsWithFitbit ? 'fitbit' : 'none'}
+                          onChange={(next) => setSettingsSyncStepsWithFitbit(next === 'fitbit')}
+                        />
+                      </View>
+                      <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+                        {t('exercise.settings.wearable.steps_sync_helper')}
+                      </ThemedText>
+                    </FitbitConnectionCard>
+                    {fitbitEnabled && (fitbitConnLoading || fitbitConnFetching) ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
+                        <ActivityIndicator size="small" color={colors.tint} />
+                        <ThemedText style={{ color: colors.textSecondary, fontSize: FontSize.xs }}>
+                          {t('common.loading')}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </View>
             </ScrollView>
 
             <View style={styles.modalButtons}>
@@ -2730,6 +2864,7 @@ export default function ExerciseHomeScreen() {
                     exercise_track_strength_sets: settingsTrackStrengthSets,
                     exercise_track_strength_reps: settingsTrackStrengthReps,
                     exercise_track_strength_effort: settingsTrackStrengthEffort,
+                    exercise_sync_steps: settingsSyncStepsWithFitbit,
                   }, {
                     onSuccess: () => {
                       showAppToast(t('exercise.settings.save'));
@@ -2750,6 +2885,62 @@ export default function ExerciseHomeScreen() {
           </View>
         </View>
       </Modal>
+
+      <FitbitConnectModal
+        visible={showFitbitModal}
+        onClose={() => setShowFitbitModal(false)}
+        mode="connectOnly"
+        fitbitEnabled={fitbitEnabled}
+        connection={fitbitConn ?? null}
+        isFetching={fitbitConnLoading || fitbitConnFetching}
+        isBusy={connectFitbit.isPending}
+        onConnect={async () => {
+          try {
+            const res = await connectFitbit.mutateAsync();
+            if (res.ok) {
+              showAppToast(t('burned.fitbit.toast.connected'));
+              setShowFitbitModal(false);
+              return;
+            }
+            const msg =
+              res.errorCode === 'popup_blocked'
+                ? t('burned.fitbit.errors.popup_blocked')
+                : res.errorCode === 'timeout'
+                  ? t('burned.fitbit.errors.popup_timeout')
+                  : res.errorCode === 'closed'
+                    ? t('burned.fitbit.errors.popup_closed')
+                    : null;
+            showAppToast(msg ?? res.message ?? t('burned.fitbit.toast.connect_failed'));
+          } catch {
+            showAppToast(t('burned.fitbit.toast.connect_failed'));
+          }
+        }}
+      />
+
+      <ConfirmModal
+        visible={disconnectConfirmVisible}
+        title={t('burned.fitbit.confirm_disconnect.title')}
+        message={t('burned.fitbit.confirm_disconnect.message')}
+        confirmText={t('burned.fitbit.actions.disconnect')}
+        cancelText={t('common.cancel')}
+        confirmButtonStyle={{ backgroundColor: colors.error }}
+        confirmDisabled={disconnectFitbit.isPending}
+        onConfirm={async () => {
+          if (disconnectFitbit.isPending) return;
+          try {
+            await disconnectFitbit.mutateAsync();
+            showAppToast(t('burned.fitbit.toast.disconnected'));
+            setDisconnectConfirmVisible(false);
+            setShowFitbitModal(false);
+          } catch {
+            showAppToast(t('burned.fitbit.toast.disconnect_failed'));
+          }
+        }}
+        onCancel={() => {
+          if (disconnectFitbit.isPending) return;
+          setDisconnectConfirmVisible(false);
+        }}
+      />
 
       {/* Celebration Toast */}
       <ConfettiCelebrationModal {...confettiToastProps} />
@@ -2896,6 +3087,10 @@ const styles = StyleSheet.create({
     marginHorizontal: -Spacing.xl,
   },
   stepsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepsEditPressable: {
     flexDirection: 'row',
     alignItems: 'center',
   },

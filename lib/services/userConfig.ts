@@ -32,6 +32,8 @@ export type UserConfig = {
   weight_unit: 'kg' | 'lb' | null;
   // Explicit opt-in provider (future-proof enum-like string)
   weight_sync_provider: 'none' | 'fitbit' | null;
+  /** When true, Sync Now will also sync steps from Fitbit (last 7 local dates). */
+  exercise_sync_steps: boolean | null;
   water_unit_preference: 'metric' | 'imperial' | null;
   water_unit: string | null;
   distance_unit: 'km' | 'mi' | null;

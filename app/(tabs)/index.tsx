@@ -1,5 +1,5 @@
 import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
-import { DailyBurnWearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
+import { EnergyEquation } from '@/components/burned/EnergyEquation';
 import { CalorieCurvyGauge } from '@/components/CalorieCurvyGauge';
 import { ConfettiBurst } from '@/components/ConfettiBurst';
 import type { TransferMode } from '@/components/copy-mealtype-modal';
@@ -33,8 +33,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCopyMealtypeEntries } from '@/hooks/use-copy-mealtype-entries';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
-import { useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
-import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useMealtypeMeta } from '@/hooks/use-mealtype-meta';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useTransferMealtypeEntries } from '@/hooks/use-transfer-mealtype-entries';
@@ -50,7 +48,6 @@ import { getMealtypeMetaByDate } from '@/lib/services/calories-entries-mealtype-
 import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
-import { ensureContrast } from '@/theme/contrast';
 import {
   getButtonAccessibilityProps,
   getFocusStyle,
@@ -272,181 +269,6 @@ function formatMealEntryLabel(entry: CalorieEntry): string {
     ? entry.quantity.toString() 
     : entry.quantity.toFixed(1);
   return `${quantity} x ${entry.unit} ${entry.item_name}`;
-}
-
-function formatWholeNumber(n: number): string {
-  // Match existing Day Summary style: whole numbers, commas, no decimals.
-  return Math.round(n).toLocaleString('en-US');
-}
-
-function EnergyBalanceBlock(props: {
-  burnedCal: number | null;
-  eatenCal: number;
-  goalType: 'lose' | 'maintain' | 'recomp' | 'gain';
-  colors: typeof Colors.light | typeof Colors.dark;
-  t: (key: string, options?: any) => string;
-  onEditBurned?: () => void;
-  tourContainerRef?: React.RefObject<any>;
-  tourBurnedPencilRef?: React.RefObject<any>;
-  wearableSyncSlot?: React.ReactNode;
-}) {
-  const { burnedCal, eatenCal, goalType, colors, t, onEditBurned, tourContainerRef, tourBurnedPencilRef, wearableSyncSlot } = props;
-  const [isBurnedHover, setIsBurnedHover] = useState(false);
-  const scheme = useColorScheme();
-  const modeKey = (scheme ?? 'light') as 'light' | 'dark';
-
-  const net = burnedCal == null ? null : burnedCal - eatenCal;
-  const netAbs = net == null ? null : Math.abs(net);
-  const isDeficit = net == null ? true : net >= 0;
-
-  const netColorRaw = (() => {
-    if (net == null) return colors.text;
-    if (goalType !== 'lose') return colors.text;
-
-    if (net >= 200) return colors.chartGreen;
-    if (net >= 0) return colors.chartOrange;
-    if (net > -500) return colors.chartPink;
-    return colors.chartRed;
-  })();
-
-  // Match charts: ensure text color meets WCAG contrast.
-  // Light mode => darken; Dark mode => lighten.
-  const netColor = ensureContrast(netColorRaw, colors.card, modeKey, 4.5);
-
-  // Show checkmark only when the net label is in the "green" state.
-  const showCheckmark = goalType === 'lose' && net != null && net >= 200;
-
-  const netLabel = isDeficit ? t('burned.energy_balance.labels.deficit') : t('burned.energy_balance.labels.surplus');
-
-  const burnedPressableProps = onEditBurned
-    ? {
-        onPress: onEditBurned,
-        activeOpacity: 0.8,
-        hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
-        ...getButtonAccessibilityProps(t('burned.energy_balance.accessibility.edit_burned')),
-        onHoverIn: () => setIsBurnedHover(true),
-        onHoverOut: () => setIsBurnedHover(false),
-      }
-    : {};
-
-  return (
-    <View
-      ref={tourContainerRef as any}
-      style={[styles.energyBalanceWrap, { borderTopColor: colors.separator, borderBottomColor: colors.separator }]}
-    >
-      {/* Row 1: Equation */}
-      <View style={styles.energyBalanceRowNumbers}>
-        <View style={styles.energyBalanceCol}>
-          <TouchableOpacity
-            ref={tourBurnedPencilRef as any}
-            style={[
-              styles.energyBalanceBurnedTapTarget,
-              Platform.OS === 'web' && onEditBurned ? ({ cursor: 'pointer' } as any) : null,
-              Platform.OS === 'web' && onEditBurned ? getFocusStyle(colors.tint) : null,
-            ]}
-            {...burnedPressableProps}
-          >
-            <View style={styles.energyBalanceBurnedNumberRow}>
-              <ThemedText
-                style={[
-                  styles.energyBalanceNumber,
-                  { color: colors.text },
-                  Platform.OS === 'web' && isBurnedHover ? styles.energyBalanceUnderline : null,
-                ]}
-                numberOfLines={1}
-              >
-                {burnedCal == null ? t('burned.week.placeholder') : formatWholeNumber(burnedCal)}
-              </ThemedText>
-              <Text style={styles.energyBalanceEmoji} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">
-                ✏️
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
-          –
-        </ThemedText>
-
-        <View style={styles.energyBalanceCol}>
-          <ThemedText style={[styles.energyBalanceNumber, { color: colors.text }]} numberOfLines={1}>
-            {formatWholeNumber(eatenCal)}
-          </ThemedText>
-        </View>
-
-        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
-          =
-        </ThemedText>
-
-        <View style={styles.energyBalanceCol}>
-          <ThemedText style={[styles.energyBalanceNumber, { color: netColor }]} numberOfLines={1}>
-            {netAbs == null ? t('burned.week.placeholder') : formatWholeNumber(netAbs)}
-          </ThemedText>
-        </View>
-      </View>
-
-      {/* Row 2: Labels */}
-      <View style={styles.energyBalanceRowLabels}>
-        <View style={styles.energyBalanceCol}>
-          <TouchableOpacity
-            style={[
-              styles.energyBalanceBurnedTapTarget,
-              Platform.OS === 'web' && onEditBurned ? ({ cursor: 'pointer' } as any) : null,
-              Platform.OS === 'web' && onEditBurned ? getFocusStyle(colors.tint) : null,
-            ]}
-            {...burnedPressableProps}
-          >
-            <ThemedText style={[styles.energyBalanceLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-              {t('burned.energy_balance.labels.burned')}
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
-          {' '}
-        </ThemedText>
-
-        <View style={styles.energyBalanceCol}>
-          <ThemedText style={[styles.energyBalanceLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-            <Text style={styles.energyBalanceEmojiInline} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">
-              🍴
-            </Text>{' '}
-            {t('burned.energy_balance.words.eaten')}
-          </ThemedText>
-        </View>
-
-        <ThemedText style={[styles.energyBalanceOp, { color: colors.textSecondary }]} numberOfLines={1}>
-          {' '}
-        </ThemedText>
-
-        <View style={styles.energyBalanceCol}>
-          <ThemedText style={[styles.energyBalanceLabel, { color: netColor }]} numberOfLines={1}>
-            {showCheckmark ? (
-              <>
-                <Text
-                  style={styles.energyBalanceEmojiInline}
-                  accessibilityElementsHidden={true}
-                  importantForAccessibility="no-hide-descendants"
-                >
-                  ✅
-                </Text>{' '}
-              </>
-            ) : null}
-            {netLabel}
-          </ThemedText>
-        </View>
-      </View>
-      {wearableSyncSlot ? (
-        <View style={styles.energyBalanceRowAccessory}>
-          <View style={styles.energyBalanceCol}>{wearableSyncSlot}</View>
-          <View style={styles.energyBalanceOpSpacer} />
-          <View style={styles.energyBalanceCol} />
-          <View style={styles.energyBalanceOpSpacer} />
-          <View style={styles.energyBalanceCol} />
-        </View>
-      ) : null}
-    </View>
-  );
 }
 
 type MealViewMode = 'collapsed' | 'semi' | 'expanded';
@@ -683,9 +505,6 @@ export default function FoodLogHomeScreen() {
 
   // Burned daily cache (lazy create on day view open per spec).
   const { data: dailyBurned } = useDailySumBurned(selectedDateString, { enabled: !!user?.id });
-  const fitbitEnabled = Platform.OS === 'web';
-  const fitbit = useFitbitConnectionQuery({ enabled: fitbitEnabled });
-  const fitbitOrchestrator = useFitbitSyncOrchestrator();
 
   // Prefetch adjacent dates for instant navigation
   useEffect(() => {
@@ -1397,30 +1216,13 @@ export default function FoodLogHomeScreen() {
             
             {(entries.length > 0 || !showLoadingSpinner) && (
               <View style={styles.dailyTotalsContent}>
-                <EnergyBalanceBlock
-                  burnedCal={dailyBurned?.tdee_cal ?? null}
-                  eatenCal={calorieConsumed}
-                  goalType={goalType}
-                  colors={colors}
-                  t={t}
+                <EnergyEquation
+                  dateKey={selectedDateString}
+                  layout="horizontal"
+                  showSync={true}
                   onEditBurned={() => setBurnedModalVisible(true)}
                   tourContainerRef={tourBurnedEatenNetRef}
                   tourBurnedPencilRef={tourBurnedPencilRef}
-                  wearableSyncSlot={
-                    fitbitEnabled ? (
-                      <DailyBurnWearableSyncSlot
-                        isConnected={fitbit.isConnected}
-                        lastSyncAt={fitbit.lastSyncAt}
-            onSync={async () => {
-              const res = await fitbitOrchestrator.syncFitbitAllNow({ dateKey: selectedDateString, includeBurnApply: true });
-              if (res.weightOk === false && res.weightErrorCode === 'INSUFFICIENT_SCOPE') {
-                // Activity sync succeeded; weight sync failed non-fatally.
-                showAppToast(t('weight.settings.wearable.toast.reconnect_to_enable_weight_sync'));
-              }
-            }}
-                      />
-                    ) : null
-                  }
                 />
 
                 {/* Macro Gauges block (tour: home.macrosAndOtherLimits) */}
@@ -2535,84 +2337,6 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
     }),
-  },
-  energyBalanceWrap: {
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    // Keep layout tight without pulling the next section into the separator line
-    marginBottom: Spacing.xs,
-  },
-  energyBalanceRowNumbers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  energyBalanceRowLabels: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  energyBalanceRowAccessory: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: -4,
-  },
-  energyBalanceCol: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 0,
-  },
-  energyBalanceOp: {
-    width: 16,
-    textAlign: 'center',
-    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
-    fontWeight: '600',
-  },
-  energyBalanceOpSpacer: {
-    width: 16,
-  },
-  energyBalanceNumber: {
-    fontSize: Platform.select({ web: FontSize.md, default: FontSize.md }),
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-  energyBalanceUnderline: {
-    textDecorationLine: 'underline',
-  },
-  energyBalanceBurnedTapTarget: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  energyBalanceBurnedNumberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  energyBalanceEmoji: {
-    marginLeft: 5,
-    fontSize: 13,
-    ...Platform.select({
-      // Ensure colored emoji rendering on web/Windows (app default font is Inter).
-      web: {
-        fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji',
-      },
-      default: {},
-    }),
-  },
-  energyBalanceEmojiInline: {
-    fontSize: 12,
-    ...Platform.select({
-      web: {
-        fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji',
-      },
-      default: {},
-    }),
-  },
-  energyBalanceLabel: {
-    fontSize: Platform.select({ web: FontSize.sm, default: FontSize.xs }),
-    fontWeight: '500',
   },
   miniGaugeSection: {
     paddingTop: 0,

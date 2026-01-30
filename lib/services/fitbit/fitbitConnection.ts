@@ -8,6 +8,22 @@ export const FITBIT_CONNECTION_PUBLIC_COLUMNS = `
   status,
   last_sync_at,
   last_weight_sync_at,
+  last_steps_sync_at,
+  last_error_code,
+  last_error_message,
+  last_error_at,
+  created_at,
+  updated_at
+`;
+
+/** Columns without last_steps_sync_at (DB not yet migrated). */
+export const FITBIT_CONNECTION_PUBLIC_COLUMNS_NO_STEPS = `
+  user_id,
+  fitbit_user_id,
+  scopes,
+  status,
+  last_sync_at,
+  last_weight_sync_at,
   last_error_code,
   last_error_message,
   last_error_at,
@@ -38,6 +54,9 @@ export async function getFitbitConnectionPublic(userId: string): Promise<FitbitC
   let { data, error } = await trySelect(FITBIT_CONNECTION_PUBLIC_COLUMNS);
   if (error && typeof (error as any)?.message === 'string' && (error as any).message.toLowerCase().includes('last_weight_sync_at')) {
     ({ data, error } = await trySelect(FITBIT_CONNECTION_PUBLIC_COLUMNS_LEGACY));
+  }
+  if (error && typeof (error as any)?.message === 'string' && (error as any).message.toLowerCase().includes('last_steps_sync_at')) {
+    ({ data, error } = await trySelect(FITBIT_CONNECTION_PUBLIC_COLUMNS_NO_STEPS));
   }
 
   if (error) {
@@ -126,6 +145,29 @@ export async function syncFitbitWeightNow(): Promise<{ ok: true; processed?: num
   }
 
   return json as any;
+}
+
+export type SyncFitbitStepsResult = { ok: true; synced_dates?: string[] };
+
+export async function syncFitbitStepsNow(): Promise<SyncFitbitStepsResult> {
+  const supabaseUrl = requireSupabaseUrl();
+  const token = await requireSessionAccessToken();
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/fitbit-sync-steps`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const code = typeof json?.error === 'string' ? json.error : 'FITBIT_STEPS_SYNC_FAILED';
+    throw new Error(code);
+  }
+
+  return json as SyncFitbitStepsResult;
 }
 
 export async function disconnectFitbit(): Promise<void> {
