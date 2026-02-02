@@ -115,9 +115,9 @@ export const SUPPORT_CASES = {
 export const ANNOUNCEMENTS = {
   IMAGES: {
     MAX_COUNT: 3,
-    MAX_DIMENSION_PX: 1280,
-    TARGET_BYTES: 350 * 1024,
-    HARD_CAP_BYTES: 500 * 1024,
+    MAX_DIMENSION_PX: 1920,
+    TARGET_BYTES: 900 * 1024,
+    HARD_CAP_BYTES: 1200 * 1024,
   },
 } as const;
 

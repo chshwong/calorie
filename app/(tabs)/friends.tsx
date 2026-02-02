@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 
 import StatusGreen from '@/assets/images/StatusGreen.png';
+import StatusYellowGreen from '@/assets/images/StatusYellowGreen.png';
 import StatusYellow from '@/assets/images/StatusYellow.png';
+import StatusGreyYellow from '@/assets/images/StatusGreyYellow.png';
 import { AddFriendSheet } from '@/components/friends/AddFriendSheet';
 import { FriendsSettingsModal } from '@/components/friends/FriendsSettingsModal';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -109,9 +111,11 @@ function getFriendPrimaryLabel(friend: { first_name: string | null; avoid: strin
 }
 
 function getStatusIcon(state: FriendTargetState | null | undefined): any | null {
-  if (state === 'win') return StatusGreen;
-  if (state === 'almost') return StatusYellow;
-  return null;
+  if (state === 'win') return StatusGreen;          // 100%
+  if (state === 'almost') return StatusYellowGreen; // 85%+
+  if (state === 'halfway') return StatusYellow;     // 50%+
+  if (state === 'started') return StatusGreyYellow; // >0%
+  return null;                                       // 0% (none)
 }
 
 export default function FriendsScreen() {

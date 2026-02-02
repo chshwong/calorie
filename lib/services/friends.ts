@@ -35,7 +35,7 @@ export type Friend = {
   created_at: string;
 };
 
-export type FriendTargetState = 'none' | 'almost' | 'win';
+export type FriendTargetState = 'none' | 'started' | 'halfway' | 'almost' | 'win';
 
 export type FriendCard = {
   friend_user_id: string;

@@ -194,7 +194,7 @@ export async function compressImageForUpload(input: File): Promise<CompressedIma
   const maxDim = ANNOUNCEMENTS.IMAGES.MAX_DIMENSION_PX;
   const targetBytes = ANNOUNCEMENTS.IMAGES.TARGET_BYTES;
   const hardCapBytes = ANNOUNCEMENTS.IMAGES.HARD_CAP_BYTES;
-  const qualities = [0.82, 0.72, 0.62, 0.52];
+  const qualities = [0.95, 0.90, 0.85, 0.80, 0.75];
 
   try {
     if (Platform.OS !== 'web') {
@@ -203,7 +203,8 @@ export async function compressImageForUpload(input: File): Promise<CompressedIma
 
     let r = await webCompressToTarget({ file: input, maxDim, targetBytes, qualities });
     if (r.bytes > hardCapBytes) {
-      r = await webCompressToTarget({ file: input, maxDim: 1024, targetBytes, qualities });
+      // Retry at 80% of max dimension if still over hard cap
+      r = await webCompressToTarget({ file: input, maxDim: Math.round(maxDim * 0.8), targetBytes, qualities });
     }
 
     if (r.bytes > hardCapBytes) {
