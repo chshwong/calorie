@@ -13,6 +13,16 @@ import {
 
 const REFRESH_SAFETY_MS = 5 * 60 * 1000
 
+function parseDateKeyToUtcDate(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00.000Z`)
+}
+
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const d = parseDateKeyToUtcDate(dateKey)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 async function setPublicStatus(params: {
   admin: any
   userId: string
@@ -67,94 +77,131 @@ async function syncOneUser(params: { admin: any; userId: string; fitbitUserId: s
   }
 
   const tz = await getUserTimeZoneOrUtc({ admin, userId })
-  const dateKey = dateKeyInTimeZone(new Date(), tz)
-  const { res, json } = await fetchFitbitDailyActivity({ accessToken, dateKey })
+  const todayKey = dateKeyInTimeZone(new Date(), tz)
+  const dateKeys: string[] = []
+  for (let i = 0; i < 7; i++) dateKeys.push(addDaysToDateKey(todayKey, -i))
 
-  if (res.status === 401) {
-    // Token is invalid/revoked. Force re-connect by removing stored tokens.
-    await admin.from('fitbit_connections_tokens').delete().eq('user_id', userId)
-    await setPublicStatus({
-      admin,
-      userId,
-      patch: {
-        status: 'error',
-        last_error_code: 'UNAUTHORIZED',
-        last_error_message: 'Reconnect Fitbit',
-        last_error_at: nowIso(),
-      },
-    })
-    return { ok: false as const, code: 'UNAUTHORIZED' }
-  }
+  // Skip users who have no daily_sum_burned rows in the last 7 days.
+  // This job must not create rows; only update existing rows.
+  const { data: burnedRows, error: burnedErr } = await admin
+    .from('daily_sum_burned')
+    .select('entry_date')
+    .eq('user_id', userId)
+    .in('entry_date', dateKeys)
+  if (burnedErr) throw new Error(`DAILY_SUM_BURNED_SELECT_FAILED:${burnedErr.message}`)
 
-  if (!res.ok) {
-    await setPublicStatus({
-      admin,
-      userId,
-      patch: {
-        status: 'error',
-        last_error_code: `FITBIT_HTTP_${res.status}`,
-        last_error_message: 'Fitbit sync failed',
-        last_error_at: nowIso(),
-      },
-    })
-    return { ok: false as const, code: `FITBIT_HTTP_${res.status}` }
-  }
+  const existingDateKeys = new Set<string>(
+    (Array.isArray(burnedRows) ? burnedRows : [])
+      .map((r: any) => (typeof r?.entry_date === 'string' ? r.entry_date : null))
+      .filter((x: string | null): x is string => typeof x === 'string'),
+  )
 
-  let activityCalories: number
-  try {
-    activityCalories = extractActivityCaloriesOrThrow(json)
-  } catch {
-    await setPublicStatus({
-      admin,
-      userId,
-      patch: {
-        status: 'error',
-        last_error_code: 'MISSING_ACTIVITY_CALORIES',
-        last_error_message: 'Fitbit payload missing activityCalories',
-        last_error_at: nowIso(),
-      },
-    })
-    return { ok: false as const, code: 'MISSING_ACTIVITY_CALORIES' }
+  if (existingDateKeys.size === 0) {
+    return { ok: true as const }
   }
 
   const rawLastSyncedAt = nowIso()
-  const { data: updated, error: updErr } = await admin
-    .from('daily_sum_burned')
-    .update({
-      raw_burn: activityCalories,
-      raw_burn_source: 'fitbit',
-      raw_last_synced_at: rawLastSyncedAt,
-    })
-    .eq('user_id', userId)
-    .eq('entry_date', dateKey)
-    .select('id')
-    .maybeSingle()
+  let updatedAny = false
 
-  if (updErr || !updated) {
+  for (const dateKey of dateKeys) {
+    if (!existingDateKeys.has(dateKey)) continue
+
+    const { res, json } = await fetchFitbitDailyActivity({ accessToken, dateKey })
+
+    if (res.status === 401) {
+      // Token is invalid/revoked. Force re-connect by removing stored tokens.
+      await admin.from('fitbit_connections_tokens').delete().eq('user_id', userId)
+      await setPublicStatus({
+        admin,
+        userId,
+        patch: {
+          status: 'error',
+          last_error_code: 'UNAUTHORIZED',
+          last_error_message: 'Reconnect Fitbit',
+          last_error_at: nowIso(),
+        },
+      })
+      return { ok: false as const, code: 'UNAUTHORIZED' }
+    }
+
+    if (!res.ok) {
+      await setPublicStatus({
+        admin,
+        userId,
+        patch: {
+          status: 'error',
+          last_error_code: `FITBIT_HTTP_${res.status}`,
+          last_error_message: 'Fitbit sync failed',
+          last_error_at: nowIso(),
+        },
+      })
+      return { ok: false as const, code: `FITBIT_HTTP_${res.status}` }
+    }
+
+    let activityCalories: number
+    try {
+      activityCalories = extractActivityCaloriesOrThrow(json)
+    } catch {
+      await setPublicStatus({
+        admin,
+        userId,
+        patch: {
+          status: 'error',
+          last_error_code: 'MISSING_ACTIVITY_CALORIES',
+          last_error_message: 'Fitbit payload missing activityCalories',
+          last_error_at: nowIso(),
+        },
+      })
+      return { ok: false as const, code: 'MISSING_ACTIVITY_CALORIES' }
+    }
+
+    const { data: updated, error: updErr } = await admin
+      .from('daily_sum_burned')
+      .update({
+        raw_burn: activityCalories,
+        raw_burn_source: 'fitbit',
+        raw_last_synced_at: rawLastSyncedAt,
+      })
+      .eq('user_id', userId)
+      .eq('entry_date', dateKey)
+      .select('id')
+      .maybeSingle()
+
+    if (updErr) {
+      await setPublicStatus({
+        admin,
+        userId,
+        patch: {
+          status: 'error',
+          last_error_code: 'DAILY_SUM_BURNED_UPDATE_FAILED',
+          last_error_message: updErr.message,
+          last_error_at: nowIso(),
+        },
+      })
+      return { ok: false as const, code: 'DAILY_SUM_BURNED_UPDATE_FAILED' }
+    }
+
+    if (!updated) {
+      // Row disappeared; treat as skip.
+      continue
+    }
+    updatedAny = true
+  }
+
+  // Only mark successful sync when we actually updated at least one date.
+  if (updatedAny) {
     await setPublicStatus({
       admin,
       userId,
       patch: {
-        status: 'error',
-        last_error_code: 'MISSING_DAILY_ROW',
-        last_error_message: 'Open the app once to initialize today before syncing',
-        last_error_at: nowIso(),
+        status: 'active',
+        last_sync_at: rawLastSyncedAt,
+        last_error_code: null,
+        last_error_message: null,
+        last_error_at: null,
       },
     })
-    return { ok: false as const, code: 'MISSING_DAILY_ROW' }
   }
-
-  await setPublicStatus({
-    admin,
-    userId,
-    patch: {
-      status: 'active',
-      last_sync_at: rawLastSyncedAt,
-      last_error_code: null,
-      last_error_message: null,
-      last_error_at: null,
-    },
-  })
 
   return { ok: true as const }
 }

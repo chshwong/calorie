@@ -2309,10 +2309,12 @@ export default function ExerciseHomeScreen() {
               </ThemedText>
               <TouchableOpacity
                 onPress={closeCustomForm}
-                style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
+                style={styles.closeButton}
+                activeOpacity={0.7}
+                {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
                 {...getButtonAccessibilityProps(t('common.close'))}
               >
-                <IconSymbol name="xmark" size={20} color={colors.text} />
+                <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -2588,10 +2590,12 @@ export default function ExerciseHomeScreen() {
               </ThemedText>
               <TouchableOpacity
                 onPress={() => setShowExerciseSettings(false)}
-                style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
+                style={styles.closeButton}
+                activeOpacity={0.7}
+                {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
                 {...getButtonAccessibilityProps(t('common.close'))}
               >
-                <IconSymbol name="xmark" size={20} color={colors.text} />
+                <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 

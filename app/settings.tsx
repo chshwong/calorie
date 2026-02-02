@@ -71,6 +71,36 @@ export default function SettingsScreen() {
 
   const HANDLE_CLOSE_FALLBACK = '/'; // change if your home route differs
 
+  const handleCopyAvoId = async () => {
+    const text = profile?.avoid ?? '';
+    if (!text) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        showAppToast(t('settings.avoid_copied_toast'));
+        return;
+      }
+      if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showAppToast(t('settings.avoid_copied_toast'));
+        return;
+      }
+      showAppToast(t('common.unexpected_error', { defaultValue: 'Something went wrong.' }));
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Failed to copy AvoID', err);
+      }
+      showAppToast(t('common.unexpected_error', { defaultValue: 'Something went wrong.' }));
+    }
+  };
+
   const handleClose = () => {
     // 1) Prefer router's canGoBack if available
     const canGoBack =
@@ -389,6 +419,31 @@ export default function SettingsScreen() {
                   <ThemedText style={[styles.emailText, { color: colors.textSecondary }]}>
                     {email}
                   </ThemedText>
+                )}
+                {profile?.avoid != null && profile.avoid !== '' && (
+                  <View style={styles.avoidRow}>
+                    <ThemedText
+                      style={[styles.avoidValue, { color: colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {profile.avoid}
+                    </ThemedText>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.avoidCopyButton,
+                        getMinTouchTargetStyle(),
+                        { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) },
+                      ]}
+                      onPress={handleCopyAvoId}
+                      {...getButtonAccessibilityProps(
+                        t('settings.copy_avoid_a11y'),
+                        AccessibilityHints.BUTTON
+                      )}
+                    >
+                      <IconSymbol name="doc.on.doc" size={16} color={colors.textSecondary} decorative={true} />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </>
             )}
@@ -833,6 +888,24 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     textAlign: 'center',
     marginTop: -8,
+  },
+  avoidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: -4,
+  },
+  avoidValue: {
+    fontSize: 14,
+    opacity: 0.8,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  avoidCopyButton: {
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
     marginBottom: 24,

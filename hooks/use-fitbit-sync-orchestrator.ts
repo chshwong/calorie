@@ -63,13 +63,26 @@ export function useFitbitSyncOrchestrator() {
       if (includeBurnApply && !dateKey) throw new Error('MISSING_DATEKEY');
 
       // 1) Sync activity only when opted-in (default on).
+      let syncedBurnDates: string[] | null = null;
       if (activitySyncOn) {
-        await syncFitbitNow();
+        const result = await syncFitbitNow();
+        const synced = result.synced_dates;
+        syncedBurnDates = Array.isArray(synced) ? synced.filter((d): d is string => typeof d === 'string') : null;
       }
 
       // 2) Optional burned apply (only when we synced activity).
-      if (activitySyncOn && includeBurnApply && dateKey) {
-        await applyRawMutation.mutateAsync({ entryDate: dateKey });
+      const burnDatesToApply =
+        activitySyncOn && includeBurnApply
+          ? syncedBurnDates?.length
+            ? syncedBurnDates
+            : dateKey
+              ? [dateKey]
+              : []
+          : [];
+      if (burnDatesToApply.length) {
+        for (const d of burnDatesToApply) {
+          await applyRawMutation.mutateAsync({ entryDate: d });
+        }
       }
 
       // 3) Optional weight sync (non-fatal failures).
@@ -102,10 +115,15 @@ export function useFitbitSyncOrchestrator() {
 
       // Cache invalidation (best-effort, non-blocking).
       queryClient.invalidateQueries({ queryKey: ['fitbitConnectionPublic', userId] });
-      if (activitySyncOn && includeBurnApply && dateKey) {
-        const key = dailySumBurnedQueryKey(userId, dateKey);
-        queryClient.invalidateQueries({ queryKey: key });
-        queryClient.refetchQueries({ queryKey: key, type: 'active' });
+      if (burnDatesToApply.length) {
+        for (const d of burnDatesToApply) {
+          const key = dailySumBurnedQueryKey(userId, d);
+          queryClient.invalidateQueries({ queryKey: key });
+          // Ensure the currently viewed day updates immediately.
+          if (d === dateKey) {
+            queryClient.refetchQueries({ queryKey: key, type: 'active' });
+          }
+        }
       }
       if (weightProvider === 'fitbit') {
         queryClient.invalidateQueries({ queryKey: ['weightLogs366d', userId] });

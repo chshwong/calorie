@@ -4,6 +4,7 @@ import type { Notification } from '@/utils/types';
 import {
   getInboxNotifications,
   getUnreadNotificationCount,
+  markAllInboxNotificationsRead,
   markNotificationRead,
   type NotificationCursor,
 } from '@/lib/services/notifications';
@@ -84,13 +85,63 @@ export function useMarkNotificationRead() {
         { queryKey: inboxNotificationsQueryKeyBase(userId) },
         (current) => {
           if (!current) return current;
+          const item = current.items.find((i) => i.id === notificationId);
+          const isDeleteOnRead = item?.type === 'friend_request_accepted';
           return {
             ...current,
-            items: current.items.map((item) =>
-              item.id === notificationId && !item.read_at
-                ? { ...item, read_at: new Date().toISOString() }
-                : item
-            ),
+            items: isDeleteOnRead
+              ? current.items.filter((i) => i.id !== notificationId)
+              : current.items.map((i) =>
+                  i.id === notificationId && !i.read_at
+                    ? { ...i, read_at: new Date().toISOString() }
+                    : i
+                ),
+          };
+        }
+      );
+
+      return { previousUnread };
+    },
+    onError: (_error, _variables, context) => {
+      if (!userId) return;
+      const unreadKey = unreadNotificationCountQueryKey(userId);
+      if (context?.previousUnread !== undefined) {
+        queryClient.setQueryData(unreadKey, context.previousUnread);
+      }
+      queryClient.invalidateQueries({ queryKey: inboxNotificationsQueryKeyBase(userId) });
+    },
+    onSuccess: () => {
+      if (!userId) return;
+      queryClient.invalidateQueries({ queryKey: unreadNotificationCountQueryKey(userId) });
+    },
+  });
+}
+
+export function useMarkAllInboxNotificationsRead() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: markAllInboxNotificationsRead,
+    onMutate: async () => {
+      if (!userId) return undefined;
+
+      const unreadKey = unreadNotificationCountQueryKey(userId);
+      const previousUnread = queryClient.getQueryData<number>(unreadKey);
+
+      queryClient.setQueryData<number>(unreadKey, 0);
+
+      queryClient.setQueriesData<NotificationPage>(
+        { queryKey: inboxNotificationsQueryKeyBase(userId) },
+        (current) => {
+          if (!current) return current;
+          const now = new Date().toISOString();
+          return {
+            ...current,
+            items: current.items
+              .filter((item) => item.type !== 'friend_request_accepted')
+              .map((item) => (!item.read_at ? { ...item, read_at: now } : item)),
           };
         }
       );

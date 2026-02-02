@@ -30,6 +30,7 @@ import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useStreakState } from '@/hooks/use-streak-state';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { getFoodLoggingStreakLabel } from '@/src/lib/streaks/foodStreakLabel';
 import {
   getButtonAccessibilityProps,
   getFocusStyle,
@@ -822,6 +823,9 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
             const motivationText = getMotivationText(currentDays, bestDays);
             const todayLogged = isTodayLogged(lastDayKey);
             const isAtRisk = status === 'active' && !todayLogged;
+            // Use the same emoji-tier logic for both Login + Food streaks.
+            // Dashboard always shows an emoji; for 0–1 days we fall back to a neutral 📅.
+            const streakEmoji = getFoodLoggingStreakLabel(currentDays)?.emoji ?? '📅';
 
             const handlePress = () => {
               if (type === 'login') {
@@ -880,7 +884,7 @@ function DashboardStreaksSection({ dateString, colors, isLoading }: DashboardStr
                             isAtRisk && { opacity: 0.5 }
                           ]}
                         >
-                          🔥
+                          {streakEmoji}
                         </ThemedText>
                       )}
                     </View>

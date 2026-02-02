@@ -105,7 +105,20 @@ export async function startFitbitOAuth(): Promise<{ authorizeUrl: string }> {
   return { authorizeUrl: json.authorizeUrl as string };
 }
 
-export async function syncFitbitNow(): Promise<{ raw_last_synced_at?: string; raw_burn?: number; entry_date?: string }> {
+export type SyncFitbitNowResult = {
+  ok?: true;
+  raw_last_synced_at?: string;
+  /** Legacy: best-effort for today's sync only. */
+  raw_burn?: number;
+  /** Legacy: best-effort for today's sync only. */
+  entry_date?: string;
+  /** Burned sync can return multiple dates (today..today-6). */
+  synced_dates?: string[];
+  /** Dates skipped because daily_sum_burned row didn't exist. */
+  skipped_missing_daily_row_dates?: string[];
+};
+
+export async function syncFitbitNow(): Promise<SyncFitbitNowResult> {
   const supabaseUrl = requireSupabaseUrl();
   const token = await requireSessionAccessToken();
 
@@ -123,7 +136,7 @@ export async function syncFitbitNow(): Promise<{ raw_last_synced_at?: string; ra
     throw new Error(code);
   }
 
-  return json as any;
+  return json as SyncFitbitNowResult;
 }
 
 export async function syncFitbitWeightNow(): Promise<{ ok: true; processed?: number; inserted?: number; updated_existing?: number; updated_capped?: number }> {

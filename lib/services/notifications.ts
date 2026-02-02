@@ -17,7 +17,8 @@ const NOTIFICATION_COLUMNS = `
   announcement_id,
   link_path,
   read_at,
-  meta
+  meta,
+  dedupe_key
 `;
 
 export type NotificationCursor = {
@@ -32,6 +33,7 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
+    .eq('is_deleted', false)
     .is('read_at', null);
 
   if (error) {
@@ -54,6 +56,7 @@ export async function getInboxNotifications(params: {
     .from('notifications')
     .select(NOTIFICATION_COLUMNS)
     .eq('user_id', userId)
+    .eq('is_deleted', false)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(pageSize);
@@ -84,5 +87,13 @@ export async function markNotificationRead(notificationId: string): Promise<void
 
   if (error) {
     throw new Error(error.message || 'Failed to mark notification as read');
+  }
+}
+
+export async function markAllInboxNotificationsRead(): Promise<void> {
+  const { error } = await supabase.rpc('mark_all_inbox_notifications_read');
+
+  if (error) {
+    throw new Error(error.message || 'Failed to mark all notifications as read');
   }
 }

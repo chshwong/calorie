@@ -4,13 +4,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 
-import { MoreSheetTokens } from '@/constants/theme';
+import { MoreSheetTokens, Spacing } from '@/constants/theme';
 
 export type MoreSheetItem = {
   key: string;
   label: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   onPress: () => void;
+  /** Optional right-side badge (e.g. NewChip) shown before the chevron */
+  rightAccessory?: React.ReactNode;
 };
 
 type MoreSheetContentProps = {
@@ -133,6 +135,10 @@ export function MoreSheetContent({
                 {item.label}
               </Text>
 
+              {item.rightAccessory ? (
+                <View style={styles.rightAccessory}>{item.rightAccessory}</View>
+              ) : null}
+
               <Ionicons
                 name="chevron-forward"
                 size={t.row.chevron.size}
@@ -177,6 +183,11 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
+  },
+  rightAccessory: {
+    marginRight: Spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

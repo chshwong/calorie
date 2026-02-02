@@ -16,6 +16,8 @@ import { supabase } from '@/lib/supabase';
 export type ProfileRow = {
   user_id: string;
   first_name?: string | null;
+  /** User's AvoID for friend discovery. */
+  avoid?: string | null;
   date_of_birth?: string | null;
   gender?: string | null;
   height_cm?: number | null;

@@ -137,10 +137,6 @@ export default function AnnouncementDetailScreen() {
             </View>
           )}
         </View>
-
-        <View style={styles.footerSpacer}>
-          <IconSymbol name="sparkles" size={18} color={colors.textTertiary} decorative={true} />
-        </View>
       </ScrollView>
     </ThemedView>
   );
@@ -221,9 +217,5 @@ const styles = StyleSheet.create({
   thumb: {
     width: '100%',
     height: 90,
-  },
-  footerSpacer: {
-    marginTop: Spacing.lg,
-    alignItems: 'center',
   },
 });

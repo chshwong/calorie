@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   FlatList,
@@ -19,7 +20,12 @@ import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useAnnouncementsByIds } from '@/hooks/use-announcements';
-import { useInboxNotifications, useMarkNotificationRead } from '@/hooks/use-notifications';
+import {
+  inboxNotificationsQueryKeyBase,
+  useInboxNotifications,
+  useMarkAllInboxNotificationsRead,
+  useMarkNotificationRead,
+} from '@/hooks/use-notifications';
 import type { Notification } from '@/utils/types';
 import { pickI18n } from '@/utils/i18n';
 import { formatUTCDate } from '@/utils/calculations';
@@ -53,8 +59,16 @@ export default function InboxScreen() {
   const [nextCursor, setNextCursor] = useState<{ createdAt: string; id: string } | null>(null);
   const appendedCursors = useRef(new Set<string>());
 
+  const queryClient = useQueryClient();
   const { data, isLoading, isFetching, refetch } = useInboxNotifications({ pageSize: PAGE_SIZE, cursor });
   const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllInboxNotificationsRead();
+
+  const unreadCount = useMemo(
+    () => items.filter((n) => !n.read_at).length,
+    [items]
+  );
+  const canMarkAll = unreadCount > 0 && !markAllRead.isPending;
 
   // Track last non-inbox location for safe back navigation
   useEffect(() => {
@@ -133,7 +147,7 @@ export default function InboxScreen() {
           // If stored path is valid and not an inbox route, navigate to it
           if (!lastNonInboxPath.startsWith('/inbox')) {
             sessionStorage.removeItem('last_non_inbox_path');
-            router.replace(lastNonInboxPath);
+            router.replace(lastNonInboxPath as any);
             return;
           }
         }
@@ -174,10 +188,39 @@ export default function InboxScreen() {
     setCursor(nextCursor);
   };
 
+  const handleMarkAllRead = async () => {
+    if (!canMarkAll) return;
+    const nowIso = new Date().toISOString();
+    setItems((prev) =>
+      prev
+        .filter((n) => n.type !== 'friend_request_accepted')
+        .map((n) => (n.read_at ? n : { ...n, read_at: nowIso }))
+    );
+    try {
+      await markAllRead.mutateAsync();
+      await refetch();
+    } catch {
+      appendedCursors.current.clear();
+      setCursor(null);
+      setItems([]);
+      setNextCursor(null);
+      await queryClient.invalidateQueries({
+        queryKey: inboxNotificationsQueryKeyBase(user?.id),
+      });
+    }
+  };
+
   const renderItem = ({ item }: { item: Notification }) => {
     const announcement = item.announcement_id ? announcementMap.get(item.announcement_id) : null;
     const isAnnouncement = item.type === 'announcement';
     const isCaseReply = item.type === 'case_reply';
+    const isFriendRequest = item.type === 'friend_request';
+    const isFriendRequestAccepted = item.type === 'friend_request_accepted';
+
+    const isAggregateFriendRequest =
+      isFriendRequest && (item.dedupe_key as string) === 'friend_request_incoming_aggregate';
+    const pendingCount = (item.meta as any)?.pending_count as number | undefined;
+    const friendRequestCount = isAggregateFriendRequest && typeof pendingCount === 'number' ? pendingCount : 1;
 
     const title = isAnnouncement
       ? announcement
@@ -185,10 +228,33 @@ export default function InboxScreen() {
         : t('inbox.announcement_default_title')
       : isCaseReply
         ? t('inbox.case_reply_title')
+        : isFriendRequestAccepted
+          ? t('inbox.friend_request_accepted_title', { defaultValue: 'Friend request accepted' })
+        : isAggregateFriendRequest
+          ? t('inbox.friend_requests_title', { defaultValue: 'Friend requests' })
+        : isFriendRequest
+          ? t('inbox.friend_request_title', { defaultValue: 'Friend request' })
         : t('inbox.announcement_default_title');
 
     const body = isAnnouncement && announcement ? pickI18n(announcement.body_i18n, locale) : '';
-    const preview = isCaseReply ? t('inbox.case_reply_body') : buildPreview(body);
+    const preview = isCaseReply
+      ? t('inbox.case_reply_body')
+      : isFriendRequestAccepted
+        ? t('inbox.friend_request_accepted_body', {
+            defaultValue: '{{name}} accepted your friend request.',
+            name:
+              ((item.meta as any)?.accepter_first_name as string | undefined) ||
+              ((item.meta as any)?.accepter_avoid as string | undefined) ||
+              t('common.someone', { defaultValue: 'Someone' }),
+          })
+      : isAggregateFriendRequest
+        ? t('inbox.friend_requests_body', {
+            count: friendRequestCount,
+            defaultValue: 'You have {{count}} pending friend request(s).',
+          })
+        : isFriendRequest
+          ? t('inbox.friend_request_body', { defaultValue: 'You have a new friend request.' })
+          : buildPreview(body);
     const dateLabel = formatDate(formatUTCDate(item.created_at), t);
     const isUnread = !item.read_at;
 
@@ -198,18 +264,31 @@ export default function InboxScreen() {
         padding="md"
         style={styles.card}
         onPress={() => {
-          if (isUnread) {
+          if (isFriendRequestAccepted) {
+            setItems((prev) => prev.filter((n) => n.id !== item.id));
+            if (isUnread) markRead.mutate(item.id);
+          } else if (isUnread) {
             markRead.mutate(item.id);
           }
           if (isAnnouncement && item.announcement_id) {
             router.push(`/inbox/announcements/${item.announcement_id}`);
             return;
           }
+          if (isFriendRequestAccepted) {
+            const path = item.link_path || '/friends';
+            router.push(path as any);
+            return;
+          }
+          if (isFriendRequest) {
+            const path = item.link_path || '/friends';
+            router.push(path as any);
+            return;
+          }
           if (isCaseReply) {
             const metaCaseId = (item.meta as any)?.case_id ? String((item.meta as any).case_id) : null;
             const path = item.link_path || (metaCaseId ? `/support/cases/${metaCaseId}` : null);
             if (path) {
-              router.push(path);
+              router.push(path as any);
             }
           }
         }}
@@ -276,9 +355,36 @@ export default function InboxScreen() {
           </ThemedText>
         </TouchableOpacity>
 
-        <ThemedText style={[styles.pageTitle, { color: colors.text }]} accessibilityRole="header">
-          {t('inbox.title')}
-        </ThemedText>
+        <View style={styles.headerRow}>
+          <ThemedText style={[styles.pageTitle, { color: colors.text }]} accessibilityRole="header">
+            {t('inbox.title')}
+          </ThemedText>
+          <TouchableOpacity
+            style={[
+              styles.markAllReadButton,
+              getMinTouchTargetStyle(),
+              Platform.OS === 'web' ? getFocusStyle(colors.tint) : {},
+            ]}
+            onPress={handleMarkAllRead}
+            disabled={!canMarkAll}
+            hitSlop={10}
+            {...getButtonAccessibilityProps(
+              t('inbox.mark_all_as_read'),
+              AccessibilityHints.BUTTON,
+              !canMarkAll
+            )}
+          >
+            <ThemedText
+              style={[
+                styles.markAllReadText,
+                { color: canMarkAll ? colors.tint : colors.textSecondary },
+                !canMarkAll && styles.markAllReadTextDisabled,
+              ]}
+            >
+              {t('inbox.mark_all_as_read')}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
 
         {isLoading ? (
           <View style={styles.loadingState}>
@@ -359,11 +465,27 @@ const styles = StyleSheet.create({
   backLinkText: {
     fontSize: FontSize.sm,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: Layout.screenPadding,
+    marginTop: 0,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
   pageTitle: {
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.md,
-    paddingHorizontal: Layout.screenPadding,
+  },
+  markAllReadButton: {
+    flexShrink: 0,
+  },
+  markAllReadText: {
+    fontSize: FontSize.sm,
+  },
+  markAllReadTextDisabled: {
+    opacity: 0.45,
   },
   loadingState: {
     flex: 1,
@@ -414,7 +536,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.semiBold,
+    fontWeight: FontWeight.semibold,
   },
   cardPreview: {
     fontSize: FontSize.sm,
@@ -437,7 +559,7 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.semiBold,
+    fontWeight: FontWeight.semibold,
   },
   footerSpacer: {
     height: Spacing.lg,

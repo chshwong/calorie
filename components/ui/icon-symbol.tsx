@@ -6,7 +6,9 @@ import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name'] | { type: 'community', name: ComponentProps<typeof MaterialCommunityIcons>['name'] }>;
+type IconMappingValue = ComponentProps<typeof MaterialIcons>['name'] | { type: 'community'; name: ComponentProps<typeof MaterialCommunityIcons>['name'] };
+/** Keys are SF Symbol names where possible; custom keys (e.g. 'block') allowed for Material-only icons. */
+type IconMapping = Record<string, IconMappingValue>;
 export type IconSymbolName = keyof typeof MAPPING;
 
 /**
@@ -44,7 +46,10 @@ const MAPPING = {
   'flag.checkered': 'flag',
   'chart.bar.fill': 'bar-chart',
   'checkmark': 'check',
+  'checkmark.circle': 'check-circle',
   'checkmark.circle.fill': 'check-circle',
+  'xmark.circle': 'cancel',
+  'block': 'block',
   'exclamationmark.triangle.fill': 'warning',
   'barcode.viewfinder': { type: 'community', name: 'barcode' },
   'magnifyingglass': 'search',
@@ -88,7 +93,7 @@ const MAPPING = {
   'note.text': { type: 'community', name: 'note-text' },
   'target': 'center-focus-strong',
   'slider.horizontal.3': 'tune',
-} as IconMapping;
+} satisfies Record<string, IconMappingValue>;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.

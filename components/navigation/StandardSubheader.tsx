@@ -19,6 +19,8 @@ type StandardSubheaderProps = {
   onBack?: () => void;
   right?: React.ReactNode;
   showBack?: boolean;
+  /** Optional width for both left/right side containers (keeps title centered). */
+  sideWidth?: number;
   testID?: string;
 };
 
@@ -27,6 +29,7 @@ export function StandardSubheader({
   onBack,
   right,
   showBack = true,
+  sideWidth: sideWidthProp,
   testID,
 }: StandardSubheaderProps) {
   const router = useRouter();
@@ -57,6 +60,8 @@ export function StandardSubheader({
     router.replace('/(tabs)');
   };
 
+  const sideWidth = sideWidthProp ?? SIDE_WIDTH;
+
   return (
     <View
       testID={testID}
@@ -66,7 +71,7 @@ export function StandardSubheader({
       ]}
     >
       <View style={styles.row}>
-        <View style={styles.side}>
+        <View style={[styles.side, { width: sideWidth }]}>
           {showBack ? (
             <TouchableOpacity
               style={[
@@ -81,7 +86,7 @@ export function StandardSubheader({
               <Ionicons name="arrow-back" size={24} color={colors.tint} />
             </TouchableOpacity>
           ) : (
-            <View style={styles.sidePlaceholder} />
+            <View style={[styles.sidePlaceholder, { width: sideWidth }]} />
           )}
         </View>
 
@@ -89,8 +94,8 @@ export function StandardSubheader({
           {title}
         </ThemedText>
 
-        <View style={styles.side}>
-          {right ?? <View style={styles.sidePlaceholder} />}
+        <View style={[styles.side, { width: sideWidth }]}>
+          {right ?? <View style={[styles.sidePlaceholder, { width: sideWidth }]} />}
         </View>
       </View>
     </View>

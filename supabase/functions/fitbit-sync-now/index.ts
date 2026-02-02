@@ -15,6 +15,16 @@ import {
 const MIN_INTERVAL_MS = 15 * 60 * 1000
 const REFRESH_SAFETY_MS = 5 * 60 * 1000
 
+function parseDateKeyToUtcDate(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00.000Z`)
+}
+
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const d = parseDateKeyToUtcDate(dateKey)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 async function markPublicError(params: {
   admin: any
   userId: string
@@ -54,6 +64,37 @@ serve(async (req) => {
       return jsonResponse({ error: 'NOT_CONNECTED' }, { status: 404 })
     }
 
+    const tz = await getUserTimeZoneOrUtc({ admin, userId })
+    const todayKey = dateKeyInTimeZone(new Date(), tz)
+    const dateKeys: string[] = []
+    for (let i = 0; i < 7; i++) dateKeys.push(addDaysToDateKey(todayKey, -i))
+
+    // If there are no burned rows for the last 7 days, skip without rate limiting or Fitbit calls.
+    const { data: burnedRows, error: burnedErr } = await admin
+      .from('daily_sum_burned')
+      .select('entry_date')
+      .eq('user_id', userId)
+      .in('entry_date', dateKeys)
+    if (burnedErr) throw new Error(`DAILY_SUM_BURNED_SELECT_FAILED:${burnedErr.message}`)
+
+    const existingDateKeys = new Set<string>(
+      (Array.isArray(burnedRows) ? burnedRows : [])
+        .map((r: any) => (typeof r?.entry_date === 'string' ? r.entry_date : null))
+        .filter((x: string | null): x is string => typeof x === 'string'),
+    )
+
+    if (existingDateKeys.size === 0) {
+      return jsonResponse(
+        {
+          ok: true,
+          synced_dates: [],
+          skipped_missing_daily_row_dates: dateKeys,
+        },
+        { status: 200 },
+      )
+    }
+
+    // Throttle only when there is at least one row that could be updated.
     const lastSyncAt = (pubRow as any)?.last_sync_at ? new Date((pubRow as any).last_sync_at).getTime() : null
     if (typeof lastSyncAt === 'number' && Number.isFinite(lastSyncAt)) {
       const delta = Date.now() - lastSyncAt
@@ -99,91 +140,117 @@ serve(async (req) => {
       if (upsertErr) throw new Error(`TOKENS_REFRESH_UPSERT_FAILED:${upsertErr.message}`)
     }
 
-    const tz = await getUserTimeZoneOrUtc({ admin, userId })
-    const dateKey = dateKeyInTimeZone(new Date(), tz)
-
-    const { res, json } = await fetchFitbitDailyActivity({ accessToken, dateKey })
-
     // Optional: log response shape for a test user (sanitized; never log tokens)
     const debugUserId = Deno.env.get('FITBIT_DEBUG_USER_ID')
-    if (debugUserId && debugUserId === userId) {
-      const keys = Object.keys((json as any)?.summary ?? {})
-      console.log('fitbit daily summary keys:', keys)
-    }
+    const shouldDebug = Boolean(debugUserId && debugUserId === userId)
 
-    if (res.status === 401) {
-      // Token is invalid/revoked. Force re-connect by removing stored tokens.
-      await admin.from('fitbit_connections_tokens').delete().eq('user_id', userId)
-      await admin.from('fitbit_connections_public').update({
-        status: 'error',
-        last_error_code: 'UNAUTHORIZED',
-        last_error_message: 'Reconnect Fitbit',
-        last_error_at: nowIso(),
-      }).eq('user_id', userId)
-      return jsonResponse({ error: 'UNAUTHORIZED' }, { status: 401 })
-    }
-
-    if (!res.ok) {
-      await admin.from('fitbit_connections_public').update({
-        status: 'error',
-        last_error_code: `FITBIT_HTTP_${res.status}`,
-        last_error_message: 'Fitbit sync failed',
-        last_error_at: nowIso(),
-      }).eq('user_id', userId)
-      return jsonResponse({ error: 'FITBIT_FETCH_FAILED', status: res.status }, { status: 502 })
-    }
-
-    let activityCalories: number
-    try {
-      activityCalories = extractActivityCaloriesOrThrow(json)
-    } catch {
-      await admin.from('fitbit_connections_public').update({
-        status: 'error',
-        last_error_code: 'MISSING_ACTIVITY_CALORIES',
-        last_error_message: 'Fitbit payload missing activityCalories',
-        last_error_at: nowIso(),
-      }).eq('user_id', userId)
-      return jsonResponse({ error: 'MISSING_ACTIVITY_CALORIES' }, { status: 502 })
-    }
-
-    // Write RAW ONLY + provenance. Never touch final fields or reduction pct.
     const rawLastSyncedAt = nowIso()
-    const { data: updated, error: updErr } = await admin
-      .from('daily_sum_burned')
-      .update({
-        raw_burn: activityCalories,
-        raw_burn_source: 'fitbit',
-        raw_last_synced_at: rawLastSyncedAt,
-      })
-      .eq('user_id', userId)
-      .eq('entry_date', dateKey)
-      .select('id')
-      .maybeSingle()
+    const syncedDates: string[] = []
+    const skippedMissingDailyRowDates: string[] = []
+    let todayActivityCalories: number | null = null
 
-    if (updErr || !updated) {
-      await admin.from('fitbit_connections_public').update({
-        status: 'error',
-        last_error_code: 'MISSING_DAILY_ROW',
-        last_error_message: 'Open the app once to initialize today before syncing',
-        last_error_at: nowIso(),
-      }).eq('user_id', userId)
-      return jsonResponse({ error: 'MISSING_DAILY_ROW' }, { status: 409 })
+    for (const dateKey of dateKeys) {
+      if (!existingDateKeys.has(dateKey)) {
+        skippedMissingDailyRowDates.push(dateKey)
+        continue
+      }
+
+      const { res, json } = await fetchFitbitDailyActivity({ accessToken, dateKey })
+
+      if (shouldDebug && dateKey === todayKey) {
+        const keys = Object.keys((json as any)?.summary ?? {})
+        console.log('fitbit daily summary keys:', keys)
+      }
+
+      if (res.status === 401) {
+        // Token is invalid/revoked. Force re-connect by removing stored tokens.
+        await admin.from('fitbit_connections_tokens').delete().eq('user_id', userId)
+        await admin.from('fitbit_connections_public').update({
+          status: 'error',
+          last_error_code: 'UNAUTHORIZED',
+          last_error_message: 'Reconnect Fitbit',
+          last_error_at: nowIso(),
+        }).eq('user_id', userId)
+        return jsonResponse({ error: 'UNAUTHORIZED' }, { status: 401 })
+      }
+
+      if (!res.ok) {
+        await admin.from('fitbit_connections_public').update({
+          status: 'error',
+          last_error_code: `FITBIT_HTTP_${res.status}`,
+          last_error_message: 'Fitbit sync failed',
+          last_error_at: nowIso(),
+        }).eq('user_id', userId)
+        return jsonResponse({ error: 'FITBIT_FETCH_FAILED', status: res.status }, { status: 502 })
+      }
+
+      let activityCalories: number
+      try {
+        activityCalories = extractActivityCaloriesOrThrow(json)
+      } catch {
+        await admin.from('fitbit_connections_public').update({
+          status: 'error',
+          last_error_code: 'MISSING_ACTIVITY_CALORIES',
+          last_error_message: 'Fitbit payload missing activityCalories',
+          last_error_at: nowIso(),
+        }).eq('user_id', userId)
+        return jsonResponse({ error: 'MISSING_ACTIVITY_CALORIES' }, { status: 502 })
+      }
+
+      // Write RAW ONLY + provenance. Never touch final fields or reduction pct.
+      const { data: updated, error: updErr } = await admin
+        .from('daily_sum_burned')
+        .update({
+          raw_burn: activityCalories,
+          raw_burn_source: 'fitbit',
+          raw_last_synced_at: rawLastSyncedAt,
+        })
+        .eq('user_id', userId)
+        .eq('entry_date', dateKey)
+        .select('id')
+        .maybeSingle()
+
+      if (updErr) {
+        await admin.from('fitbit_connections_public').update({
+          status: 'error',
+          last_error_code: 'DAILY_SUM_BURNED_UPDATE_FAILED',
+          last_error_message: updErr.message,
+          last_error_at: nowIso(),
+        }).eq('user_id', userId)
+        return jsonResponse({ error: 'DAILY_SUM_BURNED_UPDATE_FAILED' }, { status: 500 })
+      }
+
+      if (!updated) {
+        skippedMissingDailyRowDates.push(dateKey)
+        continue
+      }
+
+      if (dateKey === todayKey) {
+        todayActivityCalories = activityCalories
+      }
+      syncedDates.push(dateKey)
     }
 
-    await admin.from('fitbit_connections_public').update({
-      status: 'active',
-      last_sync_at: rawLastSyncedAt,
-      last_error_code: null,
-      last_error_message: null,
-      last_error_at: null,
-    }).eq('user_id', userId)
+    // Only mark successful sync when we actually updated at least one date.
+    if (syncedDates.length > 0) {
+      await admin.from('fitbit_connections_public').update({
+        status: 'active',
+        last_sync_at: rawLastSyncedAt,
+        last_error_code: null,
+        last_error_message: null,
+        last_error_at: null,
+      }).eq('user_id', userId)
+    }
 
     return jsonResponse(
       {
         ok: true,
-        entry_date: dateKey,
-        raw_burn: activityCalories,
+        // Backward-compatible fields (best-effort; may be missing if today's row doesn't exist).
+        entry_date: todayActivityCalories !== null ? todayKey : undefined,
+        raw_burn: todayActivityCalories !== null ? todayActivityCalories : undefined,
         raw_last_synced_at: rawLastSyncedAt,
+        synced_dates: syncedDates,
+        skipped_missing_daily_row_dates: skippedMissingDailyRowDates,
       },
       { status: 200 },
     )

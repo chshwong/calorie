@@ -405,6 +405,9 @@ export interface Notification {
   link_path: string | null;
   read_at: string | null;
   meta: Record<string, any> | null;
+  /** When set, indicates an aggregate notification (e.g. friend_request_incoming_aggregate) */
+  dedupe_key?: string | null;
+  is_deleted?: boolean;
 }
 
 // ============================================================================

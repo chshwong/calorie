@@ -11,6 +11,7 @@ import { PlusButtonTab } from '@/components/plus-button-tab';
 import { MoreButtonTab } from '@/components/more-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
+import { NewChip } from '@/components/ui/NewChip';
 import { BigCircleMenuTokens, Colors, FontSize, FontWeight, Layout, MoreSheetTokens } from '@/constants/theme';
 import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import { ShareChip } from '@/src/components/share/ShareChip';
@@ -264,6 +265,11 @@ function TabLayoutContent() {
     router.push('/settings');
   };
 
+  const handleMoreFriends = () => {
+    setMoreMenuVisible(false);
+    router.push('/(tabs)/friends');
+  };
+
   const handleMoreExercise = () => {
     setMoreMenuVisible(false);
     router.push('/(tabs)/exercise');
@@ -284,12 +290,22 @@ function TabLayoutContent() {
     router.push('/(tabs)/water');
   };
 
+  /** Set to false to remove the "New" chip from the Friends row in the More sheet. */
+  const SHOW_FRIENDS_NEW_BADGE = true;
+
   const moreSheetItems = [
     {
       key: 'settings',
       label: t('settings.title'),
       icon: 'settings-outline' as const,
       onPress: handleMoreSettings,
+    },
+    {
+      key: 'friends',
+      label: t('friends.title'),
+      icon: 'people-outline' as const,
+      onPress: handleMoreFriends,
+      ...(SHOW_FRIENDS_NEW_BADGE && { rightAccessory: <NewChip /> }),
     },
     {
       key: 'exercise',
@@ -810,6 +826,12 @@ function TabLayoutContent() {
           name="exercise/settings"
           options={{
             href: null, // Hide from tab bar
+          }}
+        />
+        <Tabs.Screen
+          name="friends"
+          options={{
+            href: null, // Hide from tab bar (accessed via More sheet)
           }}
         />
         <Tabs.Screen

@@ -87,6 +87,31 @@ export function validatePreferredName(rawValue: string): ValidationResult {
   return { valid: true };
 }
 
+/** AvoID format: [color]-[personality]-[animal]-[1-99] (e.g. blue-happy-avocado-42) */
+const AVOID_REGEX = /^[a-z]+-[a-z]+-[a-z]+-([1-9][0-9]?)$/;
+
+/**
+ * Validates AvoID format.
+ * Rules: trim, lowercase, match [color]-[personality]-[animal]-[1-99]
+ */
+export function validateAvoId(rawValue: string): ValidationResult {
+  const value = rawValue.trim().toLowerCase();
+  if (!value) return { valid: false, error: 'friends.invalid_avoid' };
+  if (!AVOID_REGEX.test(value)) return { valid: false, error: 'friends.invalid_avoid' };
+  return { valid: true };
+}
+
+/**
+ * Validates email format (basic).
+ */
+export function validateEmailFormat(rawValue: string): ValidationResult {
+  const value = rawValue.trim().toLowerCase();
+  if (!value) return { valid: false, error: 'validation.invalid_email' };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(value)) return { valid: false, error: 'validation.invalid_email' };
+  return { valid: true };
+}
+
 /**
  * Validates announcement draft inputs.
  * Rules:

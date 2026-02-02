@@ -26,6 +26,8 @@ export type UserConfig = {
   email: string | null;
   first_name: string | null;
   avatar_url: string | null;
+  /** User's AvoID (e.g. blue-happy-avocado-42) for friend discovery. */
+  avoid: string | null;
   
   // Preferences
   language_preference: string | null;
