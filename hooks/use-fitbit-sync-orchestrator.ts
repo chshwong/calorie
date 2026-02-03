@@ -1,10 +1,13 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { showAppToast } from '@/components/ui/app-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserConfig } from '@/hooks/use-user-config';
 import { dailySumBurnedQueryKey } from '@/hooks/use-daily-sum-burned';
 import { dailySumExercisesStepsKey } from '@/hooks/use-daily-sum-exercises';
-import { useApplyRawToFinals } from '@/hooks/use-burned-mutations';
+import { useUserConfig } from '@/hooks/use-user-config';
+import { isWearableCaloriesEnabled } from '@/lib/domain/fitbit/isWearableCaloriesEnabled';
 import { syncFitbitNow, syncFitbitStepsNow, syncFitbitWeightNow } from '@/lib/services/fitbit/fitbitConnection';
+import { getTodayKey } from '@/utils/dateKey';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 type Params = {
   /** YYYY-MM-DD */
@@ -43,13 +46,13 @@ function errCode(e: unknown): string {
 }
 
 export function useFitbitSyncOrchestrator() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { data: userConfig } = useUserConfig();
-  const applyRawMutation = useApplyRawToFinals();
 
-  const activitySyncOn = userConfig?.sync_activity_burn !== false;
+  const activitySyncOn = isWearableCaloriesEnabled(userConfig);
   const weightProvider = userConfig?.weight_sync_provider === 'fitbit' ? 'fitbit' : 'none';
   const stepsSyncOn = userConfig?.exercise_sync_steps === true;
 
@@ -62,28 +65,37 @@ export function useFitbitSyncOrchestrator() {
       const includeBurnApply = Boolean(params.includeBurnApply);
       if (includeBurnApply && !dateKey) throw new Error('MISSING_DATEKEY');
 
-      // 1) Sync activity only when opted-in (default on).
+      // 1) Sync burned calories only when opted-in (default on).
       let syncedBurnDates: string[] | null = null;
+      let skippedMissingRowDates: string[] | null = null;
       if (activitySyncOn) {
         const result = await syncFitbitNow();
         const synced = result.synced_dates;
         syncedBurnDates = Array.isArray(synced) ? synced.filter((d): d is string => typeof d === 'string') : null;
+
+        const skipped = (result as any)?.skipped_missing_row;
+        const skippedLegacy = (result as any)?.skipped_missing_daily_row_dates;
+        const list = Array.isArray(skipped)
+          ? skipped
+          : Array.isArray(skippedLegacy)
+            ? skippedLegacy
+            : [];
+        skippedMissingRowDates = list.filter((d: unknown): d is string => typeof d === 'string');
+        const todayKey = getTodayKey();
+        if (skippedMissingRowDates.includes(todayKey)) {
+          showAppToast(t('burned.fitbit.toast.burned_row_needed'));
+        }
       }
 
-      // 2) Optional burned apply (only when we synced activity).
-      const burnDatesToApply =
-        activitySyncOn && includeBurnApply
+      // Edge functions write authoritative burned values directly; no client-side apply step needed.
+      const burnDatesToInvalidate =
+        activitySyncOn && (syncedBurnDates?.length || dateKey)
           ? syncedBurnDates?.length
             ? syncedBurnDates
             : dateKey
               ? [dateKey]
               : []
           : [];
-      if (burnDatesToApply.length) {
-        for (const d of burnDatesToApply) {
-          await applyRawMutation.mutateAsync({ entryDate: d });
-        }
-      }
 
       // 3) Optional weight sync (non-fatal failures).
       let weightOk: boolean | null = null;
@@ -115,8 +127,8 @@ export function useFitbitSyncOrchestrator() {
 
       // Cache invalidation (best-effort, non-blocking).
       queryClient.invalidateQueries({ queryKey: ['fitbitConnectionPublic', userId] });
-      if (burnDatesToApply.length) {
-        for (const d of burnDatesToApply) {
+      if (burnDatesToInvalidate.length) {
+        for (const d of burnDatesToInvalidate) {
           const key = dailySumBurnedQueryKey(userId, d);
           queryClient.invalidateQueries({ queryKey: key });
           // Ensure the currently viewed day updates immediately.

@@ -9,7 +9,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
 import { BURNED, RANGES } from '@/constants/constraints';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
-import { useResetDailySumBurned, useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
+import { useResetDailySumBurned, useSaveDailySumBurned, useSaveWearableTotalBurned } from '@/hooks/use-burned-mutations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
 import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
@@ -17,6 +17,7 @@ import { useDisconnectFitbit, useFitbitConnectionPublic } from '@/hooks/use-fitb
 import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useUserConfig } from '@/hooks/use-user-config';
+import { isWearableCaloriesEnabled } from '@/lib/domain/fitbit/isWearableCaloriesEnabled';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 import { getTodayKey, getYesterdayKey, toDateKey } from '@/utils/dateKey';
 
@@ -58,6 +59,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   // MUST call getOrCreate before rendering (spec) — enable only when visible.
   const { data: burnedRow, isLoading, isFetching, error, refetch: refetchBurned } = useDailySumBurned(entryDate, { enabled: visible });
   const saveMutation = useSaveDailySumBurned();
+  const saveWearableMutation = useSaveWearableTotalBurned();
   const resetMutation = useResetDailySumBurned();
 
   const fitbitEnabled = Platform.OS === 'web';
@@ -74,6 +76,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
   const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
   const { data: userConfig } = useUserConfig();
   const updateProfile = useUpdateProfile();
+  const wearableCaloriesEnabled = isWearableCaloriesEnabled(userConfig);
+  const wearableCaloriesMode = Boolean(fitbitEnabled && fitbitConn?.status === 'active' && wearableCaloriesEnabled);
 
   const fitbitStatusLine = useMemo(() => {
     if (!fitbitEnabled) return null;
@@ -196,6 +200,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     isLoading ||
     isFetching ||
     saveMutation.isPending ||
+    saveWearableMutation.isPending ||
     resetMutation.isPending ||
     fitbitSyncing ||
     disconnectFitbit.isPending ||
@@ -333,6 +338,34 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       return;
     }
 
+    if (wearableCaloriesMode) {
+      try {
+        const tdeeToSave = derivedFinalTdee;
+        const result = await saveWearableMutation.mutateAsync({
+          entryDate,
+          tdee_cal: tdeeToSave,
+        });
+        if (result) {
+          showAppToast(t('burned.toast.saved'));
+          onClose();
+        } else {
+          setValidationError(t('burned.errors.save_failed'));
+        }
+      } catch (e: any) {
+        const msg = String(e?.message ?? '');
+        if (msg === 'BURNED_MAX_EXCEEDED') {
+          setValidationError(t('burned.errors.max_kcal'));
+        } else if (msg === 'BURNED_NEGATIVE_NOT_ALLOWED' || msg === 'BURNED_INVALID_NUMBER') {
+          setValidationError(t('burned.errors.invalid_number'));
+        } else if (msg === 'BURNED_REDUCTION_PCT_INVALID') {
+          setValidationError(t('burned.errors.save_failed'));
+        } else {
+          setValidationError(t('burned.errors.save_failed'));
+        }
+      }
+      return;
+    }
+
     const bmrCal = Number.isFinite(parsed.bmr) ? Math.round(parsed.bmr) : burnedRow.bmr_cal;
     const rawToSave = baseActivity;
 
@@ -390,6 +423,8 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
     if (isTooHighBurn) return;
 
     if (fitbitDraftChanged) {
+      const wasCaloriesOn = wearableCaloriesEnabled;
+      const turningCaloriesOff = wasCaloriesOn && draftSyncActivityBurn === false;
       try {
         await updateProfile.mutateAsync({
           sync_activity_burn: draftSyncActivityBurn,
@@ -397,6 +432,19 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
           exercise_sync_steps: draftSyncSteps,
         });
         showAppToast(t('burned.fitbit.toast.saved'));
+        if (turningCaloriesOff) {
+          // UX: when Calories is turned OFF, reset today back to system authoritative so estimate mode is consistent.
+          const todayKey = getTodayKey();
+          try {
+            await resetMutation.mutateAsync({ entryDate: todayKey });
+          } catch {
+            // non-blocking: settings save succeeded; reset failure will self-heal next time user opens modal.
+          }
+          if (toDateKey(entryDate) === todayKey) {
+            onClose();
+            return;
+          }
+        }
       } catch {
         showAppToast(t('common.unexpected_error'));
         return;
@@ -443,7 +491,7 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
       const msg = String(e?.message ?? '');
       if (msg === 'RATE_LIMIT') {
         showCenterToast(t('burned.fitbit.errors.rate_limit_15m'));
-      } else if (msg === 'MISSING_ACTIVITY_CALORIES') {
+      } else if (msg === 'MISSING_TOTAL_CALORIES' || msg === 'MISSING_ACTIVITY_CALORIES') {
         showCenterToast(t('burned.fitbit.errors.missing_activity_calories'));
       } else if (msg === 'UNAUTHORIZED' || msg === 'MISSING_TOKENS') {
         showCenterToast(t('burned.fitbit.errors.reconnect_required'));
@@ -552,6 +600,18 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                 contentContainerStyle={styles.bodyScrollContent}
                 showsVerticalScrollIndicator={false}
               >
+                {wearableCaloriesMode ? (
+                  <View style={[styles.wearableSourceRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                    <ThemedText style={[styles.wearableSourceText, { color: colors.textSecondary }]}>
+                      {t('burned.fitbit.source_total_badge')}
+                    </ThemedText>
+                    {reductionEnabled ? (
+                      <ThemedText style={[styles.wearableSourceSubtext, { color: colors.textSecondary }]}>
+                        {t('burned.fitbit.correction_may_differ')}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                ) : null}
                 <View style={styles.row}>
                 <View style={styles.labelWrap}>
                   <ThemedText style={[styles.label, { color: colors.text }]}>{t('burned.fields.bmr')}</ThemedText>
@@ -591,9 +651,10 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                     </View>
                     <InlineEditableNumberChip
                       value={derivedFinalActive}
-                      disabled={false}
-                      showEditIcon
+                      disabled={wearableCaloriesMode}
+                      showEditIcon={!wearableCaloriesMode}
                       onCommit={(next) => {
+                        if (wearableCaloriesMode) return;
                         const base = next ?? 0;
                         markTouched('active');
                         setHasUserEditedThisSession(true);
@@ -1140,6 +1201,21 @@ const styles = StyleSheet.create({
   warnText: {
     fontSize: FontSize.xs,
     fontWeight: '700',
+  },
+  wearableSourceRow: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: 2,
+  },
+  wearableSourceText: {
+    fontSize: FontSize.xs,
+    fontWeight: '800',
+  },
+  wearableSourceSubtext: {
+    fontSize: FontSize.xs - 1,
+    fontWeight: '600',
   },
   advancedCard: {
     borderWidth: 1,

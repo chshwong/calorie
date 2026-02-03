@@ -77,7 +77,7 @@ export function DailyBurnWearableSyncSlot({
     const msg = String((error as { message?: string })?.message ?? '');
     if (msg === 'RATE_LIMIT') {
       showAppToast(t('burned.fitbit.errors.rate_limit_15m'));
-    } else if (msg === 'MISSING_ACTIVITY_CALORIES') {
+    } else if (msg === 'MISSING_TOTAL_CALORIES' || msg === 'MISSING_ACTIVITY_CALORIES') {
       showAppToast(t('burned.fitbit.errors.missing_activity_calories'));
     } else if (msg === 'UNAUTHORIZED' || msg === 'MISSING_TOKENS') {
       showAppToast(t('burned.fitbit.errors.reconnect_required'));

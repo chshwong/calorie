@@ -309,12 +309,14 @@
         "message": "Vous pourrez vous reconnecter à tout moment."
       },
       "what_to_sync": "Quoi synchroniser",
-      "activity_burn": "Dépense d’activité",
+      "activity_burn": "Calories",
       "weight": "Poids",
       "steps": "Pas",
       "off": "Désactivé",
       "fitbit": "Fitbit",
-      "sync_uses_fitbit_helper": "La synchro utilise vos données Fitbit lorsqu’elle est activée.",
+      "sync_uses_fitbit_helper": "La synchro utilise le total de calories brûlées Fitbit lorsqu’elle est activée.",
+      "source_total_badge": "Source : Fitbit (Total Calories)",
+      "correction_may_differ": "La correction peut faire différer le total de Fitbit.",
       "toast": {
         "connected": "Fitbit connecté.",
         "connect_failed": "Échec de connexion Fitbit.",
@@ -323,7 +325,8 @@
         "sync_failed": "Échec de synchronisation Fitbit.",
         "disconnected": "Fitbit déconnecté.",
         "disconnect_failed": "Échec de déconnexion.",
-        "saved": "Enregistré"
+        "saved": "Enregistré",
+        "burned_row_needed": "La synchro des calories s’appliquera une fois que la ligne Brûlées d’aujourd’hui existe."
       },
       "errors": {
         "popup_blocked": "Fenêtre bloquée. Autorisez les popups puis réessayez.",
@@ -331,7 +334,7 @@
         "popup_closed": "Fenêtre fermée avant la fin de la connexion.",
         "rate_limit": "Veuillez attendre avant de resynchroniser.",
         "rate_limit_15m": "Synchronisation Fitbit disponible dans 15 min.",
-        "missing_activity_calories": "Les données Fitbit n’incluent pas les calories d’activité pour ce jour.",
+        "missing_activity_calories": "Les données Fitbit n’incluent pas le total de calories brûlées pour ce jour.",
         "reconnect_required": "Reconnectez Fitbit pour synchroniser."
       }
     },

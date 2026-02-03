@@ -1,19 +1,37 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
-  corsHeaders,
-  extractActivityCaloriesOrThrow,
-  fetchFitbitDailyActivity,
-  getUserTimeZoneOrUtc,
-  jsonResponse,
-  nowIso,
-  refreshTokens,
-  requireUserIdFromAuthHeader,
-  supabaseAdminClient,
-  dateKeyInTimeZone,
+    corsHeaders,
+    dateKeyInTimeZone,
+    extractCaloriesOutOrThrow,
+    fetchFitbitDailyActivity,
+    getUserTimeZoneOrUtc,
+    jsonResponse,
+    nowIso,
+    refreshTokens,
+    requireUserIdFromAuthHeader,
+    supabaseAdminClient,
 } from '../_shared/fitbit.ts'
 
 const MIN_INTERVAL_MS = 15 * 60 * 1000
 const REFRESH_SAFETY_MS = 5 * 60 * 1000
+const MINUTES_PER_DAY = 24 * 60
+
+function minutesSinceLocalMidnightInTimeZone(date: Date, timeZone: string): number {
+  // Use Intl parts to compute local clock time in the provided IANA timezone.
+  // This avoids doing timezone math manually.
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  const parts = fmt.formatToParts(date)
+  const hh = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10)
+  const mm = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10)
+  const minutes = hh * 60 + mm
+  if (!Number.isFinite(minutes)) return 0
+  return Math.max(0, Math.min(MINUTES_PER_DAY, minutes))
+}
 
 function parseDateKeyToUtcDate(dateKey: string): Date {
   return new Date(`${dateKey}T00:00:00.000Z`)
@@ -69,26 +87,40 @@ serve(async (req) => {
     const dateKeys: string[] = []
     for (let i = 0; i < 7; i++) dateKeys.push(addDaysToDateKey(todayKey, -i))
 
+    // Gate: Calories sync is enabled unless explicitly set to false.
+    const { data: prefRow, error: prefErr } = await admin
+      .from('profiles')
+      .select('sync_activity_burn')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (prefErr) throw new Error(`PROFILE_PREF_SELECT_FAILED:${prefErr.message}`)
+    const syncOn = (prefRow as any)?.sync_activity_burn !== false
+    if (!syncOn) {
+      console.log(JSON.stringify({ event: 'fitbit_burn_total_sync_skipped', user_id: userId, reason: 'toggle_off' }))
+      return jsonResponse({ ok: true, synced_dates: [], skipped_missing_row: [] }, { status: 200 })
+    }
+
     // If there are no burned rows for the last 7 days, skip without rate limiting or Fitbit calls.
     const { data: burnedRows, error: burnedErr } = await admin
       .from('daily_sum_burned')
-      .select('entry_date')
+      .select('id,entry_date,system_bmr_cal,burn_reduction_pct_int')
       .eq('user_id', userId)
       .in('entry_date', dateKeys)
     if (burnedErr) throw new Error(`DAILY_SUM_BURNED_SELECT_FAILED:${burnedErr.message}`)
 
-    const existingDateKeys = new Set<string>(
-      (Array.isArray(burnedRows) ? burnedRows : [])
-        .map((r: any) => (typeof r?.entry_date === 'string' ? r.entry_date : null))
-        .filter((x: string | null): x is string => typeof x === 'string'),
-    )
+    const byDate = new Map<string, any>()
+    for (const r of Array.isArray(burnedRows) ? burnedRows : []) {
+      const k = typeof (r as any)?.entry_date === 'string' ? (r as any).entry_date : null
+      if (!k) continue
+      byDate.set(k, r)
+    }
 
-    if (existingDateKeys.size === 0) {
+    if (byDate.size === 0) {
       return jsonResponse(
         {
           ok: true,
           synced_dates: [],
-          skipped_missing_daily_row_dates: dateKeys,
+          skipped_missing_row: dateKeys,
         },
         { status: 200 },
       )
@@ -146,12 +178,23 @@ serve(async (req) => {
 
     const rawLastSyncedAt = nowIso()
     const syncedDates: string[] = []
-    const skippedMissingDailyRowDates: string[] = []
-    let todayActivityCalories: number | null = null
+    const skippedMissingRow: string[] = []
+    let todayCaloriesOut: number | null = null
 
     for (const dateKey of dateKeys) {
-      if (!existingDateKeys.has(dateKey)) {
-        skippedMissingDailyRowDates.push(dateKey)
+      const burnedRow = byDate.get(dateKey) ?? null
+      if (!burnedRow) {
+        skippedMissingRow.push(dateKey)
+        console.log(
+          JSON.stringify({
+            event: 'fitbit_burn_total_sync',
+            user_id: userId,
+            dateKey,
+            caloriesOut: null,
+            wrote_row: false,
+            reason: 'missing_daily_sum_burned',
+          }),
+        )
         continue
       }
 
@@ -184,26 +227,51 @@ serve(async (req) => {
         return jsonResponse({ error: 'FITBIT_FETCH_FAILED', status: res.status }, { status: 502 })
       }
 
-      let activityCalories: number
+      let caloriesOut: number
       try {
-        activityCalories = extractActivityCaloriesOrThrow(json)
+        caloriesOut = extractCaloriesOutOrThrow(json)
       } catch {
         await admin.from('fitbit_connections_public').update({
           status: 'error',
-          last_error_code: 'MISSING_ACTIVITY_CALORIES',
-          last_error_message: 'Fitbit payload missing activityCalories',
+          last_error_code: 'MISSING_TOTAL_CALORIES',
+          last_error_message: 'Fitbit payload missing caloriesOut',
           last_error_at: nowIso(),
         }).eq('user_id', userId)
-        return jsonResponse({ error: 'MISSING_ACTIVITY_CALORIES' }, { status: 502 })
+        return jsonResponse({ error: 'MISSING_TOTAL_CALORIES' }, { status: 502 })
       }
 
-      // Write RAW ONLY + provenance. Never touch final fields or reduction pct.
+      const systemBmrFullDay = typeof (burnedRow as any)?.system_bmr_cal === 'number' ? (burnedRow as any).system_bmr_cal : 0
+      const pct = typeof (burnedRow as any)?.burn_reduction_pct_int === 'number' ? Math.trunc((burnedRow as any).burn_reduction_pct_int) : 0
+      const clampedPct = Math.max(0, Math.min(50, pct))
+      const factor = 1 - clampedPct / 100
+      const progress = dateKey === todayKey ? minutesSinceLocalMidnightInTimeZone(new Date(), tz) / MINUTES_PER_DAY : 1
+      const bmrSoFar = Math.round(systemBmrFullDay * Math.max(0, Math.min(1, progress)))
+      const bmr = Math.min(bmrSoFar, caloriesOut)
+      const rawBurnBaseline = Math.max(0, caloriesOut - bmr)
+      const finalActive = Math.round(rawBurnBaseline * factor)
+      const finalTdee = Math.round(bmr + finalActive)
+
+      // Write authoritative finals + raw provenance (existing rows only).
       const { data: updated, error: updErr } = await admin
         .from('daily_sum_burned')
         .update({
-          raw_burn: activityCalories,
+          bmr_cal: bmr,
+          active_cal: finalActive,
+          tdee_cal: finalTdee,
+
+          // raw_tdee stores Fitbit TOTAL calories burned (caloriesOut).
+          raw_tdee: caloriesOut,
+          // raw_burn stores activity remainder baseline (raw_tdee - derived_bmr) BEFORE correction %.
+          raw_burn: rawBurnBaseline,
           raw_burn_source: 'fitbit',
           raw_last_synced_at: rawLastSyncedAt,
+
+          bmr_overridden: true,
+          active_overridden: true,
+          tdee_overridden: true,
+          is_overridden: true,
+
+          source: 'fitbit',
         })
         .eq('user_id', userId)
         .eq('entry_date', dateKey)
@@ -221,14 +289,25 @@ serve(async (req) => {
       }
 
       if (!updated) {
-        skippedMissingDailyRowDates.push(dateKey)
+        skippedMissingRow.push(dateKey)
+        console.log(
+          JSON.stringify({
+            event: 'fitbit_burn_total_sync',
+            user_id: userId,
+            dateKey,
+            caloriesOut,
+            wrote_row: false,
+            reason: 'missing_daily_sum_burned',
+          }),
+        )
         continue
       }
 
       if (dateKey === todayKey) {
-        todayActivityCalories = activityCalories
+        todayCaloriesOut = caloriesOut
       }
       syncedDates.push(dateKey)
+      console.log(JSON.stringify({ event: 'fitbit_burn_total_sync', user_id: userId, dateKey, caloriesOut, wrote_row: true }))
     }
 
     // Only mark successful sync when we actually updated at least one date.
@@ -246,11 +325,11 @@ serve(async (req) => {
       {
         ok: true,
         // Backward-compatible fields (best-effort; may be missing if today's row doesn't exist).
-        entry_date: todayActivityCalories !== null ? todayKey : undefined,
-        raw_burn: todayActivityCalories !== null ? todayActivityCalories : undefined,
+        entry_date: todayCaloriesOut !== null ? todayKey : undefined,
+        raw_tdee: todayCaloriesOut !== null ? todayCaloriesOut : undefined,
         raw_last_synced_at: rawLastSyncedAt,
         synced_dates: syncedDates,
-        skipped_missing_daily_row_dates: skippedMissingDailyRowDates,
+        skipped_missing_row: skippedMissingRow,
       },
       { status: 200 },
     )

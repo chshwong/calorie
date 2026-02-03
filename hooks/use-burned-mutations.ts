@@ -1,11 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import type { DailySumBurned } from '@/utils/types';
-import type { BurnReductionEdits, BurnedEditedValues, BurnedTouchedFields } from '@/lib/services/burned/saveDailySumBurned';
-import { saveDailySumBurned } from '@/lib/services/burned/saveDailySumBurned';
 import { applyRawToFinals } from '@/lib/services/burned/applyRawToFinals';
 import { resetDailySumBurned } from '@/lib/services/burned/resetDailySumBurned';
+import type { BurnReductionEdits, BurnedEditedValues, BurnedTouchedFields } from '@/lib/services/burned/saveDailySumBurned';
+import { saveDailySumBurned } from '@/lib/services/burned/saveDailySumBurned';
+import { saveWearableTotalBurned } from '@/lib/services/burned/saveWearableTotalBurned';
 import { toDateKey } from '@/utils/dateKey';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 export function useSaveDailySumBurned() {
   const { user } = useAuth();
@@ -46,6 +46,25 @@ export function useResetDailySumBurned() {
     mutationFn: async (input: { entryDate: string | Date }) => {
       if (!userId) throw new Error('User not authenticated');
       return resetDailySumBurned(userId, input.entryDate);
+    },
+    onSuccess: (row, variables) => {
+      const dateKey = toDateKey(variables.entryDate);
+      queryClient.setQueryData(['dailySumBurned', userId, dateKey], row);
+      queryClient.invalidateQueries({ queryKey: ['dailySumBurned', userId, dateKey] });
+      queryClient.invalidateQueries({ queryKey: ['dailySumBurnedRange', userId] });
+    },
+  });
+}
+
+export function useSaveWearableTotalBurned() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { entryDate: string | Date; tdee_cal: number }) => {
+      if (!userId) throw new Error('User not authenticated');
+      return saveWearableTotalBurned({ userId, dateInput: input.entryDate, tdee_cal: input.tdee_cal });
     },
     onSuccess: (row, variables) => {
       const dateKey = toDateKey(variables.entryDate);

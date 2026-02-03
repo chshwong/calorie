@@ -1,43 +1,44 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
-import { DatePickerButton } from '@/components/header/DatePickerButton';
-import {
-  useWeightLogs366d,
-  getLatestWeightEntry,
-  getLatestBodyFatEntry,
-} from '@/hooks/use-weight-logs';
-import { deriveDailyLatestWeight } from '@/lib/derive/daily-latest-weight';
-import { WeightChartCarousel } from '@/components/weight/WeightChartCarousel';
-import { useUserConfig } from '@/hooks/use-user-config';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/contexts/AuthContext';
-import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
-import { Colors, Spacing, BorderRadius, Layout, FontSize, FontWeight, Shadows } from '@/constants/theme';
-import { useUpdateProfile } from '@/hooks/use-profile-mutations';
-import { useFitbitConnectionQuery, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
-import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
-import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
-import { getLocalDateKey } from '@/utils/dateTime';
-import { useTranslation } from 'react-i18next';
-import { clampDateKey, compareDateKeys, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
-import { toDateKey } from '@/utils/dateKey';
-import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
-import { getButtonAccessibilityProps } from '@/utils/accessibility';
+import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
-import { showAppToast } from '@/components/ui/app-toast';
-import { WeightSettingsModal } from '@/components/weight/WeightSettingsModal';
 import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
 import { FitbitSyncToggles } from '@/components/fitbit/FitbitSyncToggles';
+import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
+import { DatePickerButton } from '@/components/header/DatePickerButton';
+import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { ConfirmModal } from '@/components/ui';
-import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
+import { showAppToast } from '@/components/ui/app-toast';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { WeightChartCarousel } from '@/components/weight/WeightChartCarousel';
+import { WeightSettingsModal } from '@/components/weight/WeightSettingsModal';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Shadows, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useClampedDateParam } from '@/hooks/use-clamped-date-param';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
+import { useDisconnectFitbit, useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { useUserConfig } from '@/hooks/use-user-config';
+import {
+    getLatestBodyFatEntry,
+    getLatestWeightEntry,
+    useWeightLogs366d,
+} from '@/hooks/use-weight-logs';
+import { clampDateKey, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { deriveDailyLatestWeight } from '@/lib/derive/daily-latest-weight';
+import { getButtonAccessibilityProps } from '@/utils/accessibility';
+import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
+import { getTodayKey, toDateKey } from '@/utils/dateKey';
+import { getLocalDateKey } from '@/utils/dateTime';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import FitbitLogo from '@/assets/images/fitbit_logo.svg';
+import { useResetDailySumBurned } from '@/hooks/use-burned-mutations';
 
 export default function WeightHomeScreen() {
   const { t } = useTranslation();
@@ -68,6 +69,7 @@ export default function WeightHomeScreen() {
   const effectiveProfile = userConfig || authProfile; // For avatar
   // Settings modal must own its own mutation instance (avoid cross-screen pending-state mismatch).
   const updateProfileForSettings = useUpdateProfile();
+  const resetBurnedToday = useResetDailySumBurned();
   const [showMenu, setShowMenu] = useState(false);
   const [fitbitModalVisible, setFitbitModalVisible] = useState(false);
   const [disconnectConfirmVisible, setDisconnectConfirmVisible] = useState(false);
@@ -392,6 +394,8 @@ export default function WeightHomeScreen() {
         }}
         onSave={async () => {
           if (updateProfileForSettings.isPending) return;
+          const wasCaloriesOn = (userConfig?.sync_activity_burn ?? true) !== false;
+          const turningCaloriesOff = wasCaloriesOn && draftSyncActivityBurn === false;
           const updates: Record<string, unknown> = {};
           if (draftUnit !== unit) updates.weight_unit = draftUnit;
           if (draftWeightProvider !== weightSyncProvider) updates.weight_sync_provider = draftWeightProvider;
@@ -403,6 +407,13 @@ export default function WeightHomeScreen() {
           }
           try {
             await updateProfileForSettings.mutateAsync(updates);
+            if (turningCaloriesOff) {
+              try {
+                await resetBurnedToday.mutateAsync({ entryDate: getTodayKey() });
+              } catch {
+                // non-blocking; settings save should still succeed
+              }
+            }
             setShowMenu(false);
           } catch {
             showAppToast(t('common.unexpected_error'));

@@ -213,6 +213,8 @@ export type FitbitDailyActivityResponse = {
 }
 
 export function extractActivityCaloriesOrThrow(data: FitbitDailyActivityResponse): number {
+  // Legacy (pre-wearable-total mode): extract Fitbit "activity calories".
+  // Kept for backward compatibility, but NOT used by the wearable TOTAL caloriesOut path.
   // We explicitly define raw_burn as *activity* burn, since the app model is:
   //   final_tdee = bmr + final_burn
   // Therefore we do NOT use caloriesOut (total) and we do NOT guess by subtracting caloriesBMR in Phase 1.
@@ -220,6 +222,16 @@ export function extractActivityCaloriesOrThrow(data: FitbitDailyActivityResponse
   const v = summary?.activityCalories
   if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
     throw new Error('FITBIT_PAYLOAD_MISSING_ACTIVITY_CALORIES')
+  }
+  return v
+}
+
+export function extractCaloriesOutOrThrow(data: FitbitDailyActivityResponse): number {
+  // Wearable TOTAL calories burned (Fitbit headline total; TDEE-equivalent): summary.caloriesOut
+  const summary = data?.summary
+  const v = summary?.caloriesOut
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
+    throw new Error('FITBIT_PAYLOAD_MISSING_CALORIES_OUT')
   }
   return v
 }

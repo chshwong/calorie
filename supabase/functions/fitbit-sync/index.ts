@@ -1,17 +1,33 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
-  corsHeaders,
-  dateKeyInTimeZone,
-  extractActivityCaloriesOrThrow,
-  fetchFitbitDailyActivity,
-  getUserTimeZoneOrUtc,
-  jsonResponse,
-  nowIso,
-  refreshTokens,
-  supabaseAdminClient,
+    corsHeaders,
+    dateKeyInTimeZone,
+    extractCaloriesOutOrThrow,
+    fetchFitbitDailyActivity,
+    getUserTimeZoneOrUtc,
+    jsonResponse,
+    nowIso,
+    refreshTokens,
+    supabaseAdminClient,
 } from '../_shared/fitbit.ts'
 
 const REFRESH_SAFETY_MS = 5 * 60 * 1000
+const MINUTES_PER_DAY = 24 * 60
+
+function minutesSinceLocalMidnightInTimeZone(date: Date, timeZone: string): number {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  const parts = fmt.formatToParts(date)
+  const hh = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10)
+  const mm = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10)
+  const minutes = hh * 60 + mm
+  if (!Number.isFinite(minutes)) return 0
+  return Math.max(0, Math.min(MINUTES_PER_DAY, minutes))
+}
 
 function parseDateKeyToUtcDate(dateKey: string): Date {
   return new Date(`${dateKey}T00:00:00.000Z`)
@@ -34,6 +50,27 @@ async function setPublicStatus(params: {
 
 async function syncOneUser(params: { admin: any; userId: string; fitbitUserId: string }) {
   const { admin, userId } = params
+
+  // Gate: Calories sync is enabled unless explicitly set to false.
+  const { data: prefRow, error: prefErr } = await admin
+    .from('profiles')
+    .select('sync_activity_burn')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (prefErr) throw new Error(`PROFILE_PREF_SELECT_FAILED:${prefErr.message}`)
+  const syncOn = (prefRow as any)?.sync_activity_burn !== false
+  if (!syncOn) {
+    console.log(
+      JSON.stringify({
+        event: 'fitbit_burn_total_sync_cron',
+        user_id: userId,
+        wrote_count: 0,
+        skipped_missing_row_count: 0,
+        toggle_off: true,
+      }),
+    )
+    return { ok: true as const }
+  }
 
   const { data: tokenRow } = await admin
     .from('fitbit_connections_tokens')
@@ -85,26 +122,39 @@ async function syncOneUser(params: { admin: any; userId: string; fitbitUserId: s
   // This job must not create rows; only update existing rows.
   const { data: burnedRows, error: burnedErr } = await admin
     .from('daily_sum_burned')
-    .select('entry_date')
+    .select('id,entry_date,system_bmr_cal,burn_reduction_pct_int')
     .eq('user_id', userId)
     .in('entry_date', dateKeys)
   if (burnedErr) throw new Error(`DAILY_SUM_BURNED_SELECT_FAILED:${burnedErr.message}`)
 
-  const existingDateKeys = new Set<string>(
-    (Array.isArray(burnedRows) ? burnedRows : [])
-      .map((r: any) => (typeof r?.entry_date === 'string' ? r.entry_date : null))
-      .filter((x: string | null): x is string => typeof x === 'string'),
-  )
+  const byDate = new Map<string, any>()
+  for (const r of Array.isArray(burnedRows) ? burnedRows : []) {
+    const k = typeof (r as any)?.entry_date === 'string' ? (r as any).entry_date : null
+    if (!k) continue
+    byDate.set(k, r)
+  }
 
-  if (existingDateKeys.size === 0) {
+  const skippedMissingRowCount = dateKeys.length - byDate.size
+
+  if (byDate.size === 0) {
+    console.log(
+      JSON.stringify({
+        event: 'fitbit_burn_total_sync_cron',
+        user_id: userId,
+        wrote_count: 0,
+        skipped_missing_row_count: skippedMissingRowCount,
+        toggle_off: false,
+      }),
+    )
     return { ok: true as const }
   }
 
   const rawLastSyncedAt = nowIso()
-  let updatedAny = false
+  let wroteCount = 0
 
   for (const dateKey of dateKeys) {
-    if (!existingDateKeys.has(dateKey)) continue
+    const burnedRow = byDate.get(dateKey) ?? null
+    if (!burnedRow) continue
 
     const { res, json } = await fetchFitbitDailyActivity({ accessToken, dateKey })
 
@@ -138,29 +188,52 @@ async function syncOneUser(params: { admin: any; userId: string; fitbitUserId: s
       return { ok: false as const, code: `FITBIT_HTTP_${res.status}` }
     }
 
-    let activityCalories: number
+    let caloriesOut: number
     try {
-      activityCalories = extractActivityCaloriesOrThrow(json)
+      caloriesOut = extractCaloriesOutOrThrow(json)
     } catch {
       await setPublicStatus({
         admin,
         userId,
         patch: {
           status: 'error',
-          last_error_code: 'MISSING_ACTIVITY_CALORIES',
-          last_error_message: 'Fitbit payload missing activityCalories',
+          last_error_code: 'MISSING_TOTAL_CALORIES',
+          last_error_message: 'Fitbit payload missing caloriesOut',
           last_error_at: nowIso(),
         },
       })
-      return { ok: false as const, code: 'MISSING_ACTIVITY_CALORIES' }
+      return { ok: false as const, code: 'MISSING_TOTAL_CALORIES' }
     }
+
+    const systemBmrFullDay = typeof (burnedRow as any)?.system_bmr_cal === 'number' ? (burnedRow as any).system_bmr_cal : 0
+    const pct = typeof (burnedRow as any)?.burn_reduction_pct_int === 'number' ? Math.trunc((burnedRow as any).burn_reduction_pct_int) : 0
+    const clampedPct = Math.max(0, Math.min(50, pct))
+    const factor = 1 - clampedPct / 100
+    const progress = dateKey === todayKey ? minutesSinceLocalMidnightInTimeZone(new Date(), tz) / MINUTES_PER_DAY : 1
+    const bmrSoFar = Math.round(systemBmrFullDay * Math.max(0, Math.min(1, progress)))
+    const bmr = Math.min(bmrSoFar, caloriesOut)
+    const rawBurnBaseline = Math.max(0, caloriesOut - bmr)
+    const finalActive = Math.round(rawBurnBaseline * factor)
+    const finalTdee = Math.round(bmr + finalActive)
 
     const { data: updated, error: updErr } = await admin
       .from('daily_sum_burned')
       .update({
-        raw_burn: activityCalories,
+        bmr_cal: bmr,
+        active_cal: finalActive,
+        tdee_cal: finalTdee,
+
+        raw_tdee: caloriesOut,
+        raw_burn: rawBurnBaseline,
         raw_burn_source: 'fitbit',
         raw_last_synced_at: rawLastSyncedAt,
+
+        bmr_overridden: true,
+        active_overridden: true,
+        tdee_overridden: true,
+        is_overridden: true,
+
+        source: 'fitbit',
       })
       .eq('user_id', userId)
       .eq('entry_date', dateKey)
@@ -185,11 +258,11 @@ async function syncOneUser(params: { admin: any; userId: string; fitbitUserId: s
       // Row disappeared; treat as skip.
       continue
     }
-    updatedAny = true
+    wroteCount += 1
   }
 
   // Only mark successful sync when we actually updated at least one date.
-  if (updatedAny) {
+  if (wroteCount > 0) {
     await setPublicStatus({
       admin,
       userId,
@@ -202,6 +275,16 @@ async function syncOneUser(params: { admin: any; userId: string; fitbitUserId: s
       },
     })
   }
+
+  console.log(
+    JSON.stringify({
+      event: 'fitbit_burn_total_sync_cron',
+      user_id: userId,
+      wrote_count: wroteCount,
+      skipped_missing_row_count: skippedMissingRowCount,
+      toggle_off: false,
+    }),
+  )
 
   return { ok: true as const }
 }

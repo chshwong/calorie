@@ -1,3 +1,6 @@
+import FitbitLogo from '@/assets/images/fitbit_logo.svg';
+import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
+import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
 import { CloneDayModal } from '@/components/clone-day-modal';
 import { HighlightableRow } from '@/components/common/highlightable-row';
 import { QuickAddChip } from '@/components/common/quick-add-chip';
@@ -6,6 +9,8 @@ import { SurfaceCard } from '@/components/common/surface-card';
 import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
 import { IntensityBottomSheet } from '@/components/exercise/IntensityBottomSheet';
 import { RepsRangeBottomSheet } from '@/components/exercise/RepsRangeBottomSheet';
+import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
+import { FitbitSyncToggles } from '@/components/fitbit/FitbitSyncToggles';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -14,10 +19,6 @@ import { MultiSelectItem } from '@/components/multi-select-item';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
-import { FitbitConnectModal } from '@/components/burned/FitbitConnectModal';
-import { WearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
-import { FitbitConnectionCard } from '@/components/fitbit/FitbitConnectionCard';
-import { FitbitSyncToggles } from '@/components/fitbit/FitbitSyncToggles';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { InlineEditableNumberChip } from '@/components/ui/InlineEditableNumberChip';
@@ -29,35 +30,36 @@ import { isTourCompleted } from '@/features/tour/storage';
 import { useTour } from '@/features/tour/TourProvider';
 import { V1_EXERCISES_TOUR_STEPS } from '@/features/tour/tourSteps';
 import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import { useResetDailySumBurned } from '@/hooks/use-burned-mutations';
 import { useCloneDayEntriesMutation } from '@/hooks/use-clone-day-entries';
 import { useCloneFromPreviousDay } from '@/hooks/use-clone-from-previous-day';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
 import { useDailySumExercisesStepsForDate, useUpsertDailySteps } from '@/hooks/use-daily-sum-exercises';
 import {
-  useCreateExerciseLog,
-  useDeleteExerciseLog,
-  useExerciseLogsForDate,
-  useExerciseSummaryForRecentDays,
-  useRecentAndFrequentExercises,
-  useUpdateExerciseLog,
+    useCreateExerciseLog,
+    useDeleteExerciseLog,
+    useExerciseLogsForDate,
+    useExerciseSummaryForRecentDays,
+    useRecentAndFrequentExercises,
+    useUpdateExerciseLog,
 } from '@/hooks/use-exercise-logs';
+import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
+import { useDisconnectFitbit, useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
+import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useMassDeleteEntriesMutation } from '@/hooks/use-mass-delete-entries';
 import { useMultiSelect } from '@/hooks/use-multi-select';
-import { useFitbitConnectionQuery, useDisconnectFitbit } from '@/hooks/use-fitbit-connection';
-import { useFitbitConnectPopup } from '@/hooks/use-fitbit-connect-popup';
-import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
 import { RecentFrequentDayRange } from '@/lib/services/exerciseLogs';
 import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle,
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle,
 } from '@/utils/accessibility';
-import FitbitLogo from '@/assets/images/fitbit_logo.svg';
+import { getTodayKey } from '@/utils/dateKey';
 import { getLocalDateKey } from '@/utils/dateTime';
 import type { DailyLogStatus } from '@/utils/types';
 import { useFocusEffect } from '@react-navigation/native';
@@ -505,6 +507,7 @@ export default function ExerciseHomeScreen() {
   const { data: userConfig } = useUserConfig();
   const effectiveProfile = userConfig || authProfile;
   const updateProfileMutation = useUpdateProfile();
+  const resetBurnedToday = useResetDailySumBurned();
 
   // Derive tracking preferences from userConfig with defaults
   const trackingPrefs = useMemo(() => ({
@@ -2861,6 +2864,8 @@ export default function ExerciseHomeScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
                 onPress={() => {
+                  const wasCaloriesOn = (userConfig?.sync_activity_burn ?? true) !== false;
+                  const turningCaloriesOff = wasCaloriesOn && settingsSyncActivityBurn === false;
                   updateProfileMutation.mutate({
                     distance_unit: settingsDistanceUnit,
                     exercise_track_cardio_duration: settingsTrackCardioDuration,
@@ -2873,7 +2878,14 @@ export default function ExerciseHomeScreen() {
                     sync_activity_burn: settingsSyncActivityBurn,
                     weight_sync_provider: settingsWeightSyncProvider,
                   }, {
-                    onSuccess: () => {
+                    onSuccess: async () => {
+                      if (turningCaloriesOff) {
+                        try {
+                          await resetBurnedToday.mutateAsync({ entryDate: getTodayKey() });
+                        } catch {
+                          // non-blocking; settings save should still succeed
+                        }
+                      }
                       showAppToast(t('exercise.settings.save'));
                       setShowExerciseSettings(false);
                     },

@@ -108,13 +108,17 @@ export async function startFitbitOAuth(): Promise<{ authorizeUrl: string }> {
 export type SyncFitbitNowResult = {
   ok?: true;
   raw_last_synced_at?: string;
-  /** Legacy: best-effort for today's sync only. */
+  /** Best-effort for today's sync only (wearable total calories burned). */
+  raw_tdee?: number;
+  /** Legacy: best-effort for today's sync only (deprecated). */
   raw_burn?: number;
-  /** Legacy: best-effort for today's sync only. */
+  /** Best-effort for today's sync only. */
   entry_date?: string;
   /** Burned sync can return multiple dates (today..today-6). */
   synced_dates?: string[];
-  /** Dates skipped because daily_sum_burned row didn't exist. */
+  /** Dates skipped because daily_sum_burned row didn't exist (canonical). */
+  skipped_missing_row?: string[];
+  /** Legacy field name (server may still return this). */
   skipped_missing_daily_row_dates?: string[];
 };
 

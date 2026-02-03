@@ -224,7 +224,7 @@
       "master_view_collapse": "Collapse",
       "master_view_compact": "Compact",
       "master_view_expand": "Expand",
-      "master_view_toast": "All meals updated",
+     
       "master_view_a11y_hint": "Applies to all meals with entries",
       "meals_label": "View"
     },
@@ -357,22 +357,25 @@
         "sync_failed": "Fitbit sync failed.",
         "disconnected": "Fitbit disconnected.",
         "disconnect_failed": "Disconnect failed.",
-        "saved": "Saved"
+        "saved": "Saved",
+        "burned_row_needed": "Calories sync will apply once today’s Burned row exists."
       },
       "what_to_sync": "What to sync",
-      "activity_burn": "Activity Burn",
+      "activity_burn": "Calories",
       "weight": "Weight",
       "steps": "Steps",
       "off": "Off",
       "fitbit": "Fitbit",
-      "sync_uses_fitbit_helper": "Sync uses your Fitbit data when enabled.",
+      "sync_uses_fitbit_helper": "Sync uses your Fitbit total calories burned when enabled.",
+      "source_total_badge": "Source: Fitbit (Total Calories)",
+      "correction_may_differ": "Burn correction may make Total differ from Fitbit.",
       "errors": {
         "popup_blocked": "Popup blocked. Please allow popups and try again.",
         "popup_timeout": "Timed out waiting for Fitbit. Please try again.",
         "popup_closed": "Popup closed before completing Fitbit connection.",
         "rate_limit": "Please wait before syncing again.",
         "rate_limit_15m": "Fitbit sync available every 15 min only.",
-        "missing_activity_calories": "Fitbit data is missing activity calories for that day.",
+        "missing_activity_calories": "Fitbit data is missing total calories burned for that day.",
         "reconnect_required": "Reconnect Fitbit to sync."
       }
     },
