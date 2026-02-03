@@ -48,9 +48,9 @@ import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle
 } from '@/utils/accessibility';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
@@ -64,18 +64,35 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Modal,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const mq = (typeof window !== 'undefined' && (window as any).matchMedia?.('(prefers-reduced-motion: reduce)')) ?? null;
+    if (!mq) return;
+    const update = () => setReduced(!!mq.matches);
+    update();
+    const add = (mq as any).addEventListener ? 'addEventListener' : 'addListener';
+    const remove = (mq as any).removeEventListener ? 'removeEventListener' : 'removeListener';
+    (mq as any)[add]('change', update);
+    return () => (mq as any)[remove]('change', update);
+  }, []);
+  return reduced;
+}
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -411,7 +428,10 @@ export default function FoodLogHomeScreen() {
   const gaugesPagerRef = useRef<ScrollView>(null);
   const [gaugesPagerWidth, setGaugesPagerWidth] = useState(0);
   const [gaugesPageIndex, setGaugesPageIndex] = useState<0 | 1>(0);
-  
+
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const gaugesEntrance = useRef(new Animated.Value(0)).current;
+
   // Use shared date hook
   const {
     selectedDate,
@@ -1152,6 +1172,19 @@ export default function FoodLogHomeScreen() {
     [gaugesPagerWidth, computePage]
   );
 
+  // Gauge entrance rubber-band: run once on mount (web only, reduced-motion safe); bouncier spring
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (prefersReducedMotion) return;
+    gaugesEntrance.setValue(0);
+    Animated.spring(gaugesEntrance, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 4,
+      tension: 140,
+    }).start();
+  }, [gaugesEntrance, prefersReducedMotion]);
+
   // Drive UI on step start: show mini gauges on step 4/9 (home-macros)
   useEffect(() => {
     const unsubscribe = registerOnStepChange((tourId, step) => {
@@ -1281,6 +1314,26 @@ export default function FoodLogHomeScreen() {
 
                 {/* Macro Gauges block (tour: home.macrosAndOtherLimits) */}
                 <View ref={tourMacrosAndOtherLimitsRef as any}>
+                  <Animated.View
+                    style={[
+                      Platform.OS === 'web' && !prefersReducedMotion
+                        ? {
+                            transform: [
+                              {
+                                scale: gaugesEntrance.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0.88, 1],
+                                }),
+                              },
+                            ],
+                            opacity: gaugesEntrance.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0, 1],
+                            }),
+                          }
+                        : null,
+                    ]}
+                  >
                   {/* Gauges Pager: outer = full-width (gear on card edge), inner = padded for chevrons */}
                   <View style={styles.macroGaugesOuter}>
                     <TouchableOpacity
@@ -1420,6 +1473,7 @@ export default function FoodLogHomeScreen() {
                     )}
                     </View>
                   </View>
+                  </Animated.View>
                 </View>
               </View>
             )}
@@ -2168,6 +2222,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 0,
     paddingTop: 0,
   },
@@ -2176,7 +2231,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     minWidth: 0,
     marginTop: -18,
-    paddingTop: 0,    
+    paddingTop: 0,
   },
   macroTargetsGearButtonAbsolute: {
     position: 'absolute',

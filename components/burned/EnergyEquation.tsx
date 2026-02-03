@@ -5,16 +5,16 @@
  */
 
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { DailyBurnWearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useDailyFoodSummary } from '@/hooks/use-dashboard-data';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
+import { useDailyFoodSummary } from '@/hooks/use-dashboard-data';
 import { useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
 import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
 import { useUserConfig } from '@/hooks/use-user-config';

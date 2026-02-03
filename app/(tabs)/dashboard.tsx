@@ -19,12 +19,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumExercisesStepsForDate } from '@/hooks/use-daily-sum-exercises';
 import {
-  useDailyFoodSummary,
-  useWeeklyCalInVsOut,
+    useDailyFoodSummary,
+    useWeeklyCalInVsOut,
 } from '@/hooks/use-dashboard-data';
+import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
 import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator';
-import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useMedLogsForDate, useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
 import { useSelectedDate } from '@/hooks/use-selected-date';
 import { useStreakState } from '@/hooks/use-streak-state';
@@ -32,9 +32,9 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { getFoodLoggingStreakLabel } from '@/src/lib/streaks/foodStreakLabel';
 import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle,
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 import { getLocalDateString, getMealTypeFromCurrentTime } from '@/utils/calculations';
 import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';

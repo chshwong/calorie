@@ -1,15 +1,15 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, ViewStyle, Platform } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, FontSize, Typography, ModuleThemes, type ModuleType } from '@/constants/theme';
+import { Colors, FontSize, ModuleThemes, Spacing, Typography, type ModuleType } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
+    getButtonAccessibilityProps,
+    getFocusStyle,
 } from '@/utils/accessibility';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 type SummaryCardHeaderProps = {
   /** i18n key for the title (e.g., 'home.summary.title_other') */
