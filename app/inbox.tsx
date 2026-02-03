@@ -216,11 +216,14 @@ export default function InboxScreen() {
     const isCaseReply = item.type === 'case_reply';
     const isFriendRequest = item.type === 'friend_request';
     const isFriendRequestAccepted = item.type === 'friend_request_accepted';
+    const isNudges = item.type === 'nudges';
 
     const isAggregateFriendRequest =
       isFriendRequest && (item.dedupe_key as string) === 'friend_request_incoming_aggregate';
     const pendingCount = (item.meta as any)?.pending_count as number | undefined;
     const friendRequestCount = isAggregateFriendRequest && typeof pendingCount === 'number' ? pendingCount : 1;
+
+    const nudgeCount = isNudges ? ((item.meta as any)?.unack_count as number | undefined) ?? 1 : 0;
 
     const title = isAnnouncement
       ? announcement
@@ -232,6 +235,8 @@ export default function InboxScreen() {
           ? t('inbox.friend_request_accepted_title', { defaultValue: 'Friend request accepted' })
         : isAggregateFriendRequest
           ? t('inbox.friend_requests_title', { defaultValue: 'Friend requests' })
+        : isNudges
+          ? t('inbox.nudges_title', { defaultValue: 'Nudges' })
         : isFriendRequest
           ? t('inbox.friend_request_title', { defaultValue: 'Friend request' })
         : t('inbox.announcement_default_title');
@@ -239,6 +244,8 @@ export default function InboxScreen() {
     const body = isAnnouncement && announcement ? pickI18n(announcement.body_i18n, locale) : '';
     const preview = isCaseReply
       ? t('inbox.case_reply_body')
+      : isNudges
+        ? t('inbox.nudges_body', { count: nudgeCount, defaultValue: 'You have {{count}} new nudge(s)' })
       : isFriendRequestAccepted
         ? t('inbox.friend_request_accepted_body', {
             defaultValue: '{{name}} accepted your friend request.',
@@ -280,6 +287,11 @@ export default function InboxScreen() {
             return;
           }
           if (isFriendRequest) {
+            const path = item.link_path || '/friends';
+            router.push(path as any);
+            return;
+          }
+          if (isNudges) {
             const path = item.link_path || '/friends';
             router.push(path as any);
             return;

@@ -288,3 +288,68 @@ export function maskEmail(email: string | null): string {
 export function maskEmailForDisplay(email: string | null): string {
   return maskEmail(email);
 }
+
+// ---------------------------------------------------------------------------
+// Friend nudges
+// ---------------------------------------------------------------------------
+
+export const NUDGE_EMOJIS = ['👋', '💧', '💪', '🔥'] as const;
+export type NudgeEmoji = (typeof NUDGE_EMOJIS)[number];
+
+export type RecentNudge = {
+  id: string;
+  sender_user_id: string;
+  sender_name: string | null;
+  sender_avatar_url: string | null;
+  emoji: string;
+  created_at: string;
+};
+
+export async function sendFriendNudge(receiverUserId: string, emoji: NudgeEmoji): Promise<void> {
+  if (!receiverUserId || !NUDGE_EMOJIS.includes(emoji)) {
+    throw new Error('Invalid nudge params');
+  }
+
+  const { error } = await supabase.rpc('rpc_send_friend_nudge', {
+    p_receiver_user_id: receiverUserId,
+    p_emoji: emoji,
+  });
+
+  if (error) {
+    if (error.code === 'P0020') throw new Error('NUDGE_THROTTLED');
+    if (error.code === 'P0010') throw new Error('FRIENDS_NOT_FRIENDS');
+    if (error.code === 'P0011') throw new Error('FRIENDS_BLOCKED');
+    throw error;
+  }
+}
+
+export async function fetchRecentNudges(): Promise<RecentNudge[]> {
+  const { data, error } = await supabase.rpc('rpc_get_recent_nudges');
+
+  if (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[fetchRecentNudges] RPC failed:', error);
+    }
+    return [];
+  }
+
+  const rows = Array.isArray(data) ? data : data != null ? [data] : [];
+  return rows.map((row: any) => ({
+    id: String(row.id ?? ''),
+    sender_user_id: String(row.sender_user_id ?? ''),
+    sender_name: row.sender_name ?? null,
+    sender_avatar_url: row.sender_avatar_url ?? null,
+    emoji: row.emoji ?? '👋',
+    created_at: row.created_at != null ? String(row.created_at) : '',
+  }));
+}
+
+export async function ackRecentNudges(ids: string[]): Promise<void> {
+  if (!ids || ids.length === 0) return;
+
+  const { error } = await supabase.rpc('rpc_ack_recent_nudges', {
+    p_ids: ids,
+  });
+
+  if (error) throw error;
+}

@@ -1,4 +1,5 @@
--- Block user RPC: decline any pending request from that user, then insert into friend_blocks.
+-- Block user RPC: remove as friend (if present), decline any pending request from that user,
+-- then insert into friend_blocks.
 -- Callable by authenticated users; blocker is always auth.uid().
 
 create or replace function public.rpc_block_user(p_blocked_user_id uuid)
@@ -14,6 +15,12 @@ begin
   if p_blocked_user_id = auth.uid() then
     return; -- no self-block
   end if;
+
+  -- If we are currently friends, remove friendship (both directions).
+  -- Safe to run even if not friends (0 rows affected).
+  delete from public.friends
+  where (user_id = auth.uid() and friend_user_id = p_blocked_user_id)
+     or (user_id = p_blocked_user_id and friend_user_id = auth.uid());
 
   -- Decline any pending friend request from this user (so it disappears from incoming).
   update public.friend_requests

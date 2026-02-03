@@ -38,6 +38,7 @@ const MAPPING = {
   'bell.fill': 'notifications',
   'arrow.down.doc.fill': 'file-download',
   'hand.raised.fill': 'privacy-tip',
+  'hand.wave': { type: 'community', name: 'hand-wave' },
   'info.circle.fill': 'info',
   'doc.text.fill': 'description',
   'questionmark.circle.fill': 'help',

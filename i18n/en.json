@@ -3213,7 +3213,12 @@
     "blocked_users_title": "Blocked users",
     "blocked_users_subtext": "Blocked users can't send you requests or interact with you. They won't be notified.",
     "blocked_users_empty": "No blocked users",
-    "unblock": "Unblock"
+    "unblock": "Unblock",
+    "nudge_sent_toast": "Nudge sent",
+    "nudge_throttled": "You can nudge again later.",
+    "nudge_a11y": "Nudge {{name}}",
+    "nudges_overlay_title": "Nudges",
+    "nudges_got_it": "Got it"
   },
   "inbox": {
     "title": "Inbox",
@@ -3226,6 +3231,8 @@
     "friend_request_body": "You have a new friend request.",
     "friend_requests_title": "Friend requests",
     "friend_requests_body": "You have {{count}} pending friend request(s).",
+    "nudges_title": "Nudges",
+    "nudges_body": "You have {{count}} new nudge(s).",
     "friend_request_accepted_title": "Friend request accepted",
     "friend_request_accepted_body": "{{name}} accepted your friend request.",
     "load_more": "Load more",

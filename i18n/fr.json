@@ -2385,7 +2385,12 @@
     "blocked_users_title": "Utilisateurs bloqués",
     "blocked_users_subtext": "Les utilisateurs bloqués ne peuvent pas vous envoyer de demandes ni interagir avec vous. Ils ne seront pas notifiés.",
     "blocked_users_empty": "Aucun utilisateur bloqué",
-    "unblock": "Débloquer"
+    "unblock": "Débloquer",
+    "nudge_sent_toast": "Coup de coude envoyé",
+    "nudge_throttled": "Vous pourrez renvoyer un coup de coude plus tard.",
+    "nudge_a11y": "Coup de coude {{name}}",
+    "nudges_overlay_title": "Coups de coude",
+    "nudges_got_it": "Compris"
   },
   "inbox": {
     "title": "Boîte de réception",
@@ -2398,6 +2403,8 @@
     "friend_request_body": "Vous avez une nouvelle demande d'ami.",
     "friend_requests_title": "Demandes d'amis",
     "friend_requests_body": "Vous avez {{count}} demande(s) d'ami en attente.",
+    "nudges_title": "Coups de coude",
+    "nudges_body": "Vous avez {{count}} nouveau(x) coup(s) de coude.",
     "friend_request_accepted_title": "Demande d'ami acceptée",
     "friend_request_accepted_body": "{{name}} a accepté votre demande d'ami.",
     "load_more": "Charger plus",

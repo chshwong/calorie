@@ -16,13 +16,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AICameraFunnelModal } from '@/components/ui/AICameraFunnelModal';
 import { showAppToast } from '@/components/ui/app-toast';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MiniRingGauge } from '@/components/ui/mini-ring-gauge';
 import { FOOD_LOG } from '@/constants/constraints';
 import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
-import { BorderRadius, Colors, FontSize, FontWeight, Layout, Nudge, Spacing } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { isTourCompleted, isTourWelcomeShown, setTourWelcomeShown } from '@/features/tour/storage';
 import { useTour } from '@/features/tour/TourProvider';
@@ -64,8 +63,19 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ScrollView } from 'react-native';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 // Component for copy from yesterday button on meal type chip
 type MealTypeCopyButtonProps = {
@@ -387,9 +397,6 @@ export default function FoodLogHomeScreen() {
   }>({ visible: false, mealType: null, mode: 'copy' });
 
   const [burnedModalVisible, setBurnedModalVisible] = useState(false);
-  
-  // Mini gauges section collapse state
-  const [isMiniGaugesCollapsed, setIsMiniGaugesCollapsed] = useState(false);
 
   // Password recovery UI is not supported (passwordless-only).
   // If Supabase ever enters PASSWORD_RECOVERY mode, we intentionally do nothing here.
@@ -399,6 +406,11 @@ export default function FoodLogHomeScreen() {
   const [isPulling, setIsPulling] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const pullDistance = useRef<number>(0);
+
+  // Gauges pager (macros + other limits)
+  const gaugesPagerRef = useRef<ScrollView>(null);
+  const [gaugesPagerWidth, setGaugesPagerWidth] = useState(0);
+  const [gaugesPageIndex, setGaugesPageIndex] = useState<0 | 1>(0);
   
   // Use shared date hook
   const {
@@ -919,7 +931,7 @@ export default function FoodLogHomeScreen() {
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-      showAppToast(t('home.food_log.master_view_toast'));
+      
     },
     [nonEmptyMealTypes, t]
   );
@@ -1090,27 +1102,69 @@ export default function FoodLogHomeScreen() {
     void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
   }, [startTour]);
 
-  // Drive UI on step start: expand "Other limits" section on step 4/9 (home-macros)
+  const scrollToGaugesPage = useCallback(
+    (next: number) => {
+      if (!gaugesPagerRef.current || gaugesPagerWidth <= 0) return;
+      const clamped = Math.max(0, Math.min(1, next));
+      gaugesPagerRef.current.scrollTo({ x: clamped * gaugesPagerWidth, animated: true });
+      setGaugesPageIndex(clamped as 0 | 1);
+    },
+    [gaugesPagerWidth]
+  );
+
+  const clamp01 = (n: number) => (n <= 0 ? 0 : n >= 1 ? 1 : n);
+
+  const computePage = useCallback(
+    (x: number, w: number) => {
+      if (!w) return 0;
+      return clamp01(x / w >= 0.5 ? 1 : 0) as 0 | 1;
+    },
+    []
+  );
+
+  const onGaugesPagerScroll = useCallback(
+    (e: any) => {
+      if (gaugesPagerWidth <= 0) return;
+      const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+      const next = computePage(x, gaugesPagerWidth);
+      setGaugesPageIndex((prev) => (prev === next ? prev : next));
+    },
+    [gaugesPagerWidth, computePage]
+  );
+
+  const onGaugesPagerMomentumEnd = useCallback(
+    (e: any) => {
+      if (gaugesPagerWidth <= 0) return;
+      const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+      const next = computePage(x, gaugesPagerWidth);
+      setGaugesPageIndex(next);
+    },
+    [gaugesPagerWidth, computePage]
+  );
+
+  const onGaugesPagerScrollEndDrag = useCallback(
+    (e: any) => {
+      if (gaugesPagerWidth <= 0) return;
+      const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+      const next = computePage(x, gaugesPagerWidth);
+      setGaugesPageIndex(next);
+    },
+    [gaugesPagerWidth, computePage]
+  );
+
+  // Drive UI on step start: show mini gauges on step 4/9 (home-macros)
   useEffect(() => {
     const unsubscribe = registerOnStepChange((tourId, step) => {
       if (tourId !== 'V1_HomePageTour') return;
-      
+
       if (step.id === 'home-macros') {
-        // Expand "Other limits" section if it's collapsed, then re-measure to include mini gauges
-        if (isMiniGaugesCollapsed) {
-          setIsMiniGaugesCollapsed(false);
-          // Wait for expansion animation to complete before re-measuring
-          setTimeout(() => {
-            requestRemeasure();
-          }, 250);
-        } else {
-          // Already expanded, just re-measure to ensure spotlight includes mini gauges
-          requestRemeasure();
-        }
+        // Ensure mini gauges are visible for the spotlight measurement
+        scrollToGaugesPage(1);
+        requestRemeasure();
       }
     });
     return unsubscribe;
-  }, [isMiniGaugesCollapsed, registerOnStepChange, requestRemeasure]);
+  }, [registerOnStepChange, requestRemeasure, scrollToGaugesPage]);
 
 
   return (
@@ -1227,35 +1281,8 @@ export default function FoodLogHomeScreen() {
 
                 {/* Macro Gauges block (tour: home.macrosAndOtherLimits) */}
                 <View ref={tourMacrosAndOtherLimitsRef as any}>
-                  {/* Macro Gauges Row */}
-                  <View style={styles.macroGaugeRowWrap}>
-                    <View style={styles.macroGaugeRow}>
-                      <View style={styles.macroGaugeRowGauges}>
-                        <View
-                          style={[
-                            { flexDirection: 'row' },
-                            // RN style types don't include web-only `columnGap`, so we cast for web-only usage.
-                            Platform.OS === 'web' ? ({ columnGap: 4 } as any) : null,
-                          ]}
-                        >
-                          {/* Protein */}
-                          <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                            <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
-                          </View>
-
-                          {/* Fiber */}
-                          <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                            <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
-                          </View>
-
-                          {/* Carbs */}
-                          <View style={{ flex: 1 }}>
-                            <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-
+                  {/* Gauges Pager: outer = full-width (gear on card edge), inner = padded for chevrons */}
+                  <View style={styles.macroGaugesOuter}>
                     <TouchableOpacity
                       style={[
                         styles.macroTargetsGearButtonAbsolute,
@@ -1270,76 +1297,129 @@ export default function FoodLogHomeScreen() {
                         t('settings.my_goal.a11y.navigate_to_edit')
                       )}
                     >
-                      <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative={true} />
+                      <IconSymbol name="gearshape" size={18} color={colors.textSecondary} decorative />
                     </TouchableOpacity>
+
+                    <View style={styles.macroGaugesInner}>
+                    <View
+                      style={styles.gaugesPagerInner}
+                      onLayout={(e) => {
+                        const w = e.nativeEvent.layout.width;
+                        if (w && w !== gaugesPagerWidth) setGaugesPagerWidth(w);
+                      }}
+                    >
+                      <ScrollView
+                        ref={gaugesPagerRef}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onScroll={onGaugesPagerScroll}
+                        onMomentumScrollEnd={onGaugesPagerMomentumEnd}
+                        onScrollEndDrag={onGaugesPagerScrollEndDrag}
+                        scrollEventThrottle={16}
+                        contentContainerStyle={styles.gaugesPagerContent}
+                      >
+                      {/* Page 0 — Macro Gauges */}
+                      <View style={[styles.gaugesPagerPage, { width: gaugesPagerWidth || undefined }]}>
+                        <View style={styles.gaugesPageInner}>
+                          <View style={styles.macroGaugeRow}>
+                            <View style={styles.macroGaugeRowGauges}>
+                              <View
+                                style={[
+                                  { flexDirection: 'row' },
+                                  Platform.OS === 'web' ? ({ columnGap: 4 } as any) : null,
+                                ]}
+                              >
+                                <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
+                                  <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
+                                </View>
+                                <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
+                                  <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                                </View>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Page 1 — Mini Gauges */}
+                      <View style={[styles.gaugesPagerPage, { width: gaugesPagerWidth || undefined }]}>
+                        <View style={[styles.gaugesPageInner, styles.miniGaugesPageInner]}>
+                          <View style={styles.miniGaugeRow}>
+                            <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                              <MiniRingGauge label={t('home.summary.sugar')} value={sugarConsumedG} target={sugarMaxG} unit={t('units.g')} size="xs" />
+                            </View>
+                            <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                              <MiniRingGauge label={t('home.summary.sodium')} value={sodiumConsumedMg} target={sodiumMaxMg} unit={t('units.mg')} size="xs" />
+                            </View>
+                            <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
+                              <MiniRingGauge label={t('home.summary.saturated_fat')} value={satFatConsumedG} target={satFatLimitG} unit={t('units.g')} size="xs" />
+                            </View>
+                            <View style={styles.miniGaugeItem}>
+                              <MiniRingGauge label={t('home.summary.trans_fat')} value={transFatConsumedG} target={transFatLimitG} unit={t('units.g')} size="xs" valueFormat="ceilToTenth" />
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                      </ScrollView>
+                    </View>
+
+                    {/* Gauges pager dots */}
+                    <View style={styles.gaugesPagerDotsRow}>
+                      {[0, 1].map((i) => {
+                        const active = gaugesPageIndex === i;
+                        return (
+                          <TouchableOpacity
+                            key={i}
+                            onPress={() => scrollToGaugesPage(i)}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={i === 0 ? 'Show macros' : 'Show other limits'}
+                            style={[
+                              styles.gaugesPagerDot,
+                              active && styles.gaugesPagerDotActive,
+                              active && { backgroundColor: colors.tint },
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+
+                    {/* Desktop-only chevrons (side gutters, do not block gauges) */}
+                    {Platform.OS === 'web' && gaugesPagerWidth > 0 && (
+                      <View style={styles.gaugesDesktopNav}>
+                        <TouchableOpacity
+                          style={[
+                            styles.gaugesNavButton,
+                            { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, opacity: gaugesPageIndex === 0 ? 0.35 : 1 },
+                          ]}
+                          onPress={() => scrollToGaugesPage(0)}
+                          disabled={gaugesPageIndex === 0}
+                          activeOpacity={0.8}
+                          aria-label="Previous"
+                        >
+                          <IconSymbol name="chevron.left" size={18} color={colors.textSecondary} decorative />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.gaugesNavButton,
+                            { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, opacity: gaugesPageIndex === 1 ? 0.35 : 1 },
+                          ]}
+                          onPress={() => scrollToGaugesPage(1)}
+                          disabled={gaugesPageIndex === 1}
+                          activeOpacity={0.8}
+                          aria-label="Next"
+                        >
+                          <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} decorative />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    </View>
                   </View>
-
-                  {/* Mini Gauges Section - Collapsible */}
-                  <CollapsibleSection
-                  title={t('home.summary.other_limits')}
-                  isCollapsed={isMiniGaugesCollapsed}
-                  onToggle={() => setIsMiniGaugesCollapsed(!isMiniGaugesCollapsed)}
-                  accessibilityLabel={t('home.summary.toggle_other_limits')}
-                  titlePosition="right"
-                  headerStyle={{
-                    borderBottomWidth: 0,
-                    paddingVertical: Spacing.xxs,
-                    paddingTop: Spacing.xxs,
-                    paddingBottom: Spacing.xxs,
-                    minHeight: 32,
-                  }}
-                  titleStyle={{
-                    fontSize: FontSize.sm,
-                    fontWeight: FontWeight.regular,
-                  }}
-                  contentStyle={{
-                    paddingTop: Spacing.none,
-                    paddingBottom: Spacing.none,
-                  }}
-                >
-                  <View style={styles.miniGaugeRow}>
-                    <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                      <MiniRingGauge
-                        label={t('home.summary.sugar')}
-                        value={sugarConsumedG}
-                        target={sugarMaxG}
-                        unit={t('units.g')}
-                        size="xs"
-                      />
-                    </View>
-
-                    <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                      <MiniRingGauge
-                        label={t('home.summary.sodium')}
-                        value={sodiumConsumedMg}
-                        target={sodiumMaxMg}
-                        unit={t('units.mg')}
-                        size="xs"
-                      />
-                    </View>
-
-                    <View style={[styles.miniGaugeItem, styles.miniGaugeItemSpaced]}>
-                      <MiniRingGauge
-                        label={t('home.summary.saturated_fat')}
-                        value={satFatConsumedG}
-                        target={satFatLimitG}
-                        unit={t('units.g')}
-                        size="xs"
-                      />
-                    </View>
-
-                    <View style={styles.miniGaugeItem}>
-                      <MiniRingGauge
-                        label={t('home.summary.trans_fat')}
-                        value={transFatConsumedG}
-                        target={transFatLimitG}
-                        unit={t('units.g')}
-                        size="xs"
-                        valueFormat="ceilToTenth"
-                      />
-                    </View>
-                  </View>
-                </CollapsibleSection>
                 </View>
               </View>
             )}
@@ -1396,15 +1476,14 @@ export default function FoodLogHomeScreen() {
                         accessibilityHint={t('home.food_log.master_view_a11y_hint')}
                       >
                         {mode === 'collapsed' && (
-                          <IconSymbol name="chevron.down" size={MEAL_VIEW_ICON_SIZE} color={segmentColor} decorative />
+                          <Text style={[styles.masterViewSegmentIcon, { color: segmentColor }]}>—</Text>  
                         )}
                         {mode === 'semi' && (
                           <Text style={[styles.masterViewSegmentIcon, { color: segmentColor }]}>≡</Text>
                         )}
                         {mode === 'expanded' && (
                           <View style={styles.masterViewSegmentIconRow}>
-                            <Text style={[styles.masterViewSegmentIcon, { color: segmentColor }]}>☰</Text>
-                            <IconSymbol name="chevron.up" size={MEAL_VIEW_ICON_SIZE} color={segmentColor} decorative />
+                            <Text style={[styles.masterViewSegmentIcon, { color: segmentColor }]}>☰</Text>                            
                           </View>
                         )}
                       </Pressable>
@@ -2087,23 +2166,96 @@ const styles = StyleSheet.create({
   },
   macroGaugeRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 0,
+    paddingTop: 0,
   },
   macroGaugeRowGauges: {
-    flex: 1,
+    width: '100%',
+    maxWidth: 420,
     minWidth: 0,
-    // Reserve space for the gear button while keeping gauges centered
-    paddingLeft: 0,
-    paddingRight: 0,
+    marginTop: -18,
+    paddingTop: 0,    
   },
   macroTargetsGearButtonAbsolute: {
     position: 'absolute',
-    // Anchor just below the nearest separator line
-    top: Nudge.none,
     right: 0,
+    top: Spacing.xxs,
+    zIndex: 3,
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  macroGaugesOuter: {
+    position: 'relative',
+    marginTop: 0,
+    marginBottom: 0,
+    paddingTop: 0,
+  },
+  macroGaugesInner: {
+    position: 'relative',
+    paddingTop: 0,
+    ...(Platform.OS === 'web' ? { paddingHorizontal: 22 } : {}),
+  },
+  gaugesPagerWrap: {
+    position: 'relative',
+    marginTop: 0,
+    paddingTop: 0,
+  },
+  gaugesPagerInner: {
+    width: '100%',
+  },
+  gaugesPagerContent: {},
+  gaugesPagerPage: {
+    width: '100%',
+  },
+  gaugesPageInner: {
+    alignItems: 'center',
+    paddingTop: 0,
+    marginTop: 0,
+    paddingRight: 0,
+    paddingLeft: 0,
+  },
+  miniGaugesPageInner: {
+    alignItems: 'center',
+    paddingTop: Spacing.md,
+  },
+  gaugesDesktopNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    pointerEvents: 'box-none',
+  },
+  gaugesNavButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gaugesPagerDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  gaugesPagerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 6,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  gaugesPagerDotActive: {
+    width: 18,
+    height: 8,
+    borderRadius: 6,
   },
   scrollContentContainer: {
     flexGrow: 1,
@@ -2344,6 +2496,8 @@ const styles = StyleSheet.create({
   },
   miniGaugeRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 0,
     paddingTop: Spacing.none,
     paddingBottom: Spacing.none,
   },

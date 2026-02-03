@@ -24,4 +24,5 @@ export { SegmentedToggle, type SegmentedOption, type SegmentedToggleProps } from
 export { ToastProvider, useAppToast, showAppToast } from './app-toast';
 export { CollapsibleSection, type CollapsibleSectionProps } from './collapsible-section';
 export { NewChip, type NewChipProps, type NewChipVariant, type NewChipSize } from './NewChip';
+export { Popover, type PopoverProps, type PopoverPlacement } from './Popover';
 

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -15,11 +15,13 @@ import {
 } from 'react-native';
 
 import StatusGreen from '@/assets/images/StatusGreen.png';
-import StatusYellowGreen from '@/assets/images/StatusYellowGreen.png';
-import StatusYellow from '@/assets/images/StatusYellow.png';
 import StatusGreyYellow from '@/assets/images/StatusGreyYellow.png';
+import StatusYellow from '@/assets/images/StatusYellow.png';
+import StatusYellowGreen from '@/assets/images/StatusYellowGreen.png';
 import { AddFriendSheet } from '@/components/friends/AddFriendSheet';
 import { FriendsSettingsModal } from '@/components/friends/FriendsSettingsModal';
+import { NudgeEmojiPicker } from '@/components/friends/NudgeEmojiPicker';
+import { RecentNudgesOverlay } from '@/components/friends/RecentNudgesOverlay';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { ThemedText } from '@/components/themed-text';
@@ -28,7 +30,7 @@ import { showAppToast } from '@/components/ui/app-toast';
 import { Button } from '@/components/ui/button';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { BorderRadius, Colors, FontSize, Layout, SemanticColors, Spacing } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, Layout, Nudge, SemanticColors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -38,6 +40,7 @@ import {
   useDeclineFriendRequest,
   useFriendCards,
   useFriendRequests,
+  useRecentNudges,
   useRemoveFriend,
 } from '@/hooks/use-friends';
 import { useUserConfig } from '@/hooks/use-user-config';
@@ -131,12 +134,14 @@ export default function FriendsScreen() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFriendsSettings, setShowFriendsSettings] = useState(false);
+  const [showNudgesOverlay, setShowNudgesOverlay] = useState(true);
   const [selectedFriend, setSelectedFriend] = useState<FriendCard | null>(null);
   const [showFriendActions, setShowFriendActions] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [selectedIncomingForBlock, setSelectedIncomingForBlock] = useState<IncomingFriendRequest | null>(null);
+  const [blockTarget, setBlockTarget] = useState<{ userId: string; name: string } | null>(null);
 
   const { incoming, outgoing, isLoading: requestsLoading } = useFriendRequests();
+  const { data: recentNudges = [] } = useRecentNudges(true);
   const { data: friends = [], isLoading: friendsLoading } = useFriendCards();
   const acceptMut = useAcceptFriendRequest();
   const declineMut = useDeclineFriendRequest();
@@ -151,6 +156,13 @@ export default function FriendsScreen() {
   const handleSendSuccess = () => {
     setShowAddModal(false);
   };
+
+  // Reset overlay visibility when nudges become empty (e.g. after ack) so future nudges show again
+  useEffect(() => {
+    if (recentNudges.length === 0) setShowNudgesOverlay(true);
+  }, [recentNudges.length]);
+
+  const showNudgesOverlayVisible = recentNudges.length > 0 && showNudgesOverlay;
 
   const AddButton = () => (
     <TouchableOpacity
@@ -348,7 +360,12 @@ export default function FriendsScreen() {
                               Platform.OS === 'web' ? getFocusStyle(colors.error) : {},
                               { opacity: pressed ? 1 : 0.88 },
                             ]}
-                            onPress={() => setSelectedIncomingForBlock(req)}
+                            onPress={() =>
+                              setBlockTarget({
+                                userId: req.requester_user_id,
+                                name: getRequesterPrimaryLabel(req),
+                              })
+                            }
                             disabled={blockMut.isPending}
                             {...getButtonAccessibilityProps(t('friends.block_a11y'), AccessibilityHints.BUTTON)}
                           >
@@ -408,58 +425,88 @@ export default function FriendsScreen() {
             >
               {hasFriends ? (
                 friends.map((friend) => (
-                  <TouchableOpacity
+                  <View
                     key={friend.friend_user_id}
                     style={[
                       styles.friendRow,
-                      getMinTouchTargetStyle(),
                       { backgroundColor: colors.card, borderColor: colors.border },
-                      Platform.OS === 'web' ? getFocusStyle(colors.tint) : {},
                     ]}
-                    onPress={() => {
-                      setSelectedFriend(friend);
-                      setShowFriendActions(true);
-                    }}
-                    activeOpacity={0.7}
-                    {...getButtonAccessibilityProps(`${getFriendPrimaryLabel(friend)}`, AccessibilityHints.BUTTON)}
                   >
-                    {friend.avatar_url ? (
-                      <Image
-                        source={{ uri: friend.avatar_url }}
-                        style={[styles.friendAvatar, { borderColor: colors.border }]}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          styles.friendAvatarInitials,
-                          { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                        ]}
-                      >
-                        <ThemedText style={[styles.friendAvatarText, { color: colors.textSecondary }]}>
-                          {getFriendInitials(friend)}
-                        </ThemedText>
-                      </View>
-                    )}
-
-                    <View style={styles.friendContent}>
-                      <ThemedText style={[styles.friendPrimary, { color: colors.text }]} numberOfLines={1}>
-                        {getFriendPrimaryLabel(friend)}
-                      </ThemedText>
-                      {(() => {
-                        const streak = getFoodLoggingStreakLabel(friend.food_streak_days);
-                        if (!streak) return null;
-                        return (
-                          <ThemedText style={[styles.friendTertiary, { color: colors.textSecondary }]} numberOfLines={1}>
-                            {t('friends.food_streak_line', { count: streak.days, emoji: streak.emoji })}
+                    <TouchableOpacity
+                      style={[
+                        styles.friendRowTouchable,
+                        styles.friendRowTouchableLeft,
+                        styles.friendRowLeftContent,
+                        getMinTouchTargetStyle(),
+                        Platform.OS === 'web' ? getFocusStyle(colors.tint) : {},
+                      ]}
+                      onPress={() => {
+                        setSelectedFriend(friend);
+                        setShowFriendActions(true);
+                      }}
+                      activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(`${getFriendPrimaryLabel(friend)}`, AccessibilityHints.BUTTON)}
+                    >
+                      {friend.avatar_url ? (
+                        <Image
+                          source={{ uri: friend.avatar_url }}
+                          style={[styles.friendAvatar, { borderColor: colors.border }]}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.friendAvatarInitials,
+                            { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                          ]}
+                        >
+                          <ThemedText style={[styles.friendAvatarText, { color: colors.textSecondary }]}>
+                            {getFriendInitials(friend)}
                           </ThemedText>
-                        );
-                      })()}
+                        </View>
+                      )}
+
+                      <View style={styles.friendContent}>
+                        <ThemedText style={[styles.friendPrimary, { color: colors.text }]} numberOfLines={1}>
+                          {getFriendPrimaryLabel(friend)}
+                        </ThemedText>
+                        {(() => {
+                          const streak = getFoodLoggingStreakLabel(friend.food_streak_days);
+                          if (!streak) return null;
+                          return (
+                            <ThemedText style={[styles.friendTertiary, { color: colors.textSecondary }]} numberOfLines={1}>
+                              {t('friends.food_streak_line', { count: streak.days, emoji: streak.emoji })}
+                            </ThemedText>
+                          );
+                        })()}
+                      </View>
+                    </TouchableOpacity>
+
+                    <View style={styles.friendNudgeWrapper}>
+                      <NudgeEmojiPicker
+                        friendUserId={friend.friend_user_id}
+                        friendName={getFriendPrimaryLabel(friend)}
+                      />
                     </View>
 
-                    <View style={[styles.friendGoalsSeparator, { backgroundColor: colors.border }]} />
+                    <TouchableOpacity
+                      style={[
+                        styles.friendRowTouchable,
+                        styles.friendRowTouchableRight,
+                        styles.friendGoalsColumn,
+                        getMinTouchTargetStyle(),
+                        Platform.OS === 'web' ? getFocusStyle(colors.tint) : {},
+                      ]}
+                      onPress={() => {
+                        setSelectedFriend(friend);
+                        setShowFriendActions(true);
+                      }}
+                      activeOpacity={0.7}
+                      {...getButtonAccessibilityProps(`${getFriendPrimaryLabel(friend)}`, AccessibilityHints.BUTTON)}
+                    >
+                      <View style={[styles.friendGoalsSeparator, { backgroundColor: colors.border }]} />
 
-                    {(() => {
+                      {(() => {
                       // Privacy: if a friend has hidden a metric via sharing prefs, the server returns NULL.
                       // Per UX: still render the titles, but show blank value/icon.
                       return (
@@ -496,7 +543,15 @@ export default function FriendsScreen() {
                               <ThemedText style={[styles.nutrientTitle, { color: colors.textSecondary }]}>👣</ThemedText>
                               <View style={[styles.nutrientIconRow, styles.nutrientIconRowSteps]}>
                                 {friend.steps != null && friend.steps > 0 ? (
-                                  <ThemedText style={[styles.nutrientValue, styles.nutrientValueRight, { color: colors.textSecondary }]}>
+                                  <ThemedText
+                                    style={[
+                                      styles.nutrientValue,
+                                      styles.nutrientValueRight,
+                                      { color: colors.textSecondary, width: '100%' },
+                                    ]}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                  >
                                     {Number(friend.steps).toLocaleString()}
                                   </ThemedText>
                                 ) : null /* 0 OR NULL => blank value cell */}
@@ -506,7 +561,8 @@ export default function FriendsScreen() {
                         </View>
                       );
                     })()}
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
                 ))
               ) : (
                 <View style={styles.emptyState}>
@@ -536,6 +592,10 @@ export default function FriendsScreen() {
 
       <FriendsSettingsModal open={showFriendsSettings} onClose={() => setShowFriendsSettings(false)} />
 
+      {showNudgesOverlayVisible && (
+        <RecentNudgesOverlay nudges={recentNudges} onClose={() => setShowNudgesOverlay(false)} />
+      )}
+
       <Modal
         visible={showFriendActions}
         transparent={true}
@@ -559,6 +619,32 @@ export default function FriendsScreen() {
             >
               <ThemedText style={[styles.actionSheetDestructiveText, { color: colors.error }]}>
                 {t('friends.remove_friend_action', { defaultValue: 'Remove Friend' })}
+              </ThemedText>
+            </TouchableOpacity>
+
+            <View style={[styles.actionSheetDivider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity
+              style={[styles.actionSheetRow, getMinTouchTargetStyle()]}
+              onPress={() => {
+                const userId = selectedFriend?.friend_user_id;
+                if (!userId || blockMut.isPending) return;
+                setShowFriendActions(false);
+                setBlockTarget({
+                  userId,
+                  name: selectedFriend ? getFriendPrimaryLabel(selectedFriend) : '',
+                });
+              }}
+              activeOpacity={0.7}
+              disabled={blockMut.isPending}
+              {...getButtonAccessibilityProps(
+                t('friends.block_button', { defaultValue: 'Block' }),
+                AccessibilityHints.BUTTON,
+                blockMut.isPending
+              )}
+            >
+              <ThemedText style={[styles.actionSheetDestructiveText, { color: colors.error }]}>
+                {t('friends.block_button', { defaultValue: 'Block' })}
               </ThemedText>
             </TouchableOpacity>
 
@@ -604,21 +690,22 @@ export default function FriendsScreen() {
       />
 
       <ConfirmModal
-        visible={!!selectedIncomingForBlock}
-        title={t('friends.block_confirm_title', { name: selectedIncomingForBlock ? getRequesterPrimaryLabel(selectedIncomingForBlock) : '' })}
+        visible={!!blockTarget}
+        title={t('friends.block_confirm_title', { name: blockTarget?.name ?? '' })}
         message={t('friends.block_confirm_message')}
         confirmText={t('friends.block_button')}
         cancelText={t('common.cancel')}
         onConfirm={() => {
-          const userId = selectedIncomingForBlock?.requester_user_id;
+          const userId = blockTarget?.userId;
           if (!userId || blockMut.isPending) return;
           blockMut.mutate(userId, {
             onSuccess: () => {
-              setSelectedIncomingForBlock(null);
+              setBlockTarget(null);
+              setSelectedFriend(null);
             },
           });
         }}
-        onCancel={() => setSelectedIncomingForBlock(null)}
+        onCancel={() => setBlockTarget(null)}
         confirmButtonStyle={{ backgroundColor: colors.error }}
         cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
         cancelTextStyle={{ color: colors.text }}
@@ -800,10 +887,50 @@ const styles = StyleSheet.create({
   friendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingLeft: 0,
+    paddingRight: Spacing.xs,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  friendRowLeftContent: {
+    paddingLeft: Spacing.md,
+    paddingVertical: 0,
+  },
+  friendRowTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  friendRowTouchableLeft: {
+    flex: 1,
+    // Allow left content to shrink on narrow widths so goals never get pushed off-screen.
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  friendRowTouchableRight: {
+    /**
+     * Daily Goals panel:
+     * - Must never overflow off-screen
+     * - Must not steal horizontal space from the name/streak column
+     *
+     * Cap its width (percentage) and allow shrinking/wrapping within.
+     */
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    maxWidth: '42%',
+    minWidth: 0,
+  },
+  friendGoalsColumn: {
+    paddingRight: 0,
+    marginRight: 0,
+    alignItems: 'flex-end',
+  },
+  friendNudgeWrapper: {
+    width: 36,
+    marginLeft: Spacing.xxs,
   },
   friendAvatar: {
     width: 44,
@@ -833,19 +960,29 @@ const styles = StyleSheet.create({
     width: 1,
     alignSelf: 'stretch',
     opacity: 0.5,
-    marginLeft: Spacing.sm,
+    // Keep divider close to the goals to maximize left-column space.
+    marginLeft: 0,
   },
   friendSignals: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     justifyContent: 'flex-end',
-    marginLeft: Spacing.xxs,
+    // Remove extra inset between divider and first goal label (Pro).
+    marginLeft: 0,
+    paddingRight: 0,
+    flexGrow: 0,
+    flexShrink: 1,
+    minWidth: 0,
   },
   goalsCluster: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'flex-end',
-    gap: Spacing.xxs, // 2px (tight)
+    gap: Nudge.px1,
+    flexShrink: 1,
+    minWidth: 0,
+    flexWrap: 'wrap',
+    alignContent: 'flex-end',
   },
   friendPrimary: {
     fontSize: FontSize.md,
@@ -864,10 +1001,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nutrientBlockIcon: {
-    width: 22,
+    width: 18,
   },
   nutrientBlockSteps: {
-    alignItems: 'flex-end',
+    minWidth: 28,
+    maxWidth: 52,
+    // Keep the 👣 closer to 💧 (less perceived gap), while the number stays right-aligned via width: 100% + textAlign.
+    alignItems: 'flex-start',
   },
   nutrientTitle: {
     fontSize: FontSize.xs,
@@ -880,7 +1020,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   nutrientIconRowSteps: {
-    alignItems: 'flex-end',
+    alignItems: 'stretch',
+    minWidth: 0,
   },
   nutrientValue: {
     fontSize: FontSize.xs,
@@ -891,8 +1032,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   statusIcon: {
-    width: 14,
-    height: 14,
+    width: 13,
+    height: 13,
     resizeMode: 'contain',
   },
   emptyState: {

@@ -7,6 +7,7 @@ import {
 } from '@/hooks/use-notifications';
 import {
   acceptFriendRequest,
+  ackRecentNudges,
   blockUser,
   cancelFriendRequest,
   declineFriendRequest,
@@ -14,8 +15,10 @@ import {
   fetchFriends,
   fetchIncomingFriendRequests,
   fetchOutgoingFriendRequests,
+  fetchRecentNudges,
   getBlockedUsers,
   removeFriend,
+  sendFriendNudge,
   sendFriendRequest,
   unblockUser,
 } from '@/lib/services/friends';
@@ -35,6 +38,7 @@ export const friendsFriendCardsQueryKey = (userId: string | undefined, dateKey: 
   dateKey,
 ];
 export const blockedUsersQueryKey = (userId: string | undefined) => ['friends', 'blockedUsers', userId];
+export const recentNudgesQueryKey = (userId: string | undefined) => ['friends', 'recentNudges', userId];
 
 /** Invalidate all friends-related queries so UI never shows stale friends/requests/blocks. */
 export function invalidateFriendsQueries(queryClient: QueryClient, userId: string | undefined): void {
@@ -44,6 +48,7 @@ export function invalidateFriendsQueries(queryClient: QueryClient, userId: strin
   queryClient.invalidateQueries({ queryKey: friendsQueryKey(userId) });
   queryClient.invalidateQueries({ queryKey: ['friends', 'friendCards', userId] });
   queryClient.invalidateQueries({ queryKey: blockedUsersQueryKey(userId) });
+  queryClient.invalidateQueries({ queryKey: recentNudgesQueryKey(userId) });
   queryClient.invalidateQueries({ queryKey: unreadNotificationCountQueryKey(userId) });
   queryClient.invalidateQueries({ queryKey: inboxNotificationsQueryKeyBase(userId) });
 }
@@ -206,6 +211,45 @@ export function useUnblockUser() {
 
   return useMutation({
     mutationFn: unblockUser,
+    onSuccess: () => invalidateFriendsQueries(queryClient, userId),
+  });
+}
+
+export function useRecentNudges(open: boolean) {
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  return useQuery({
+    queryKey: recentNudgesQueryKey(userId),
+    enabled: !!userId && open,
+    queryFn: async () => {
+      if (!userId) throw new Error('User not authenticated');
+      return fetchRecentNudges();
+    },
+    staleTime: 90 * 1000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useSendNudge() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ receiverUserId, emoji }: { receiverUserId: string; emoji: import('@/lib/services/friends').NudgeEmoji }) =>
+      sendFriendNudge(receiverUserId, emoji),
+    onSuccess: () => invalidateFriendsQueries(queryClient, userId),
+  });
+}
+
+export function useAckNudges() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => ackRecentNudges(ids),
     onSuccess: () => invalidateFriendsQueries(queryClient, userId),
   });
 }
