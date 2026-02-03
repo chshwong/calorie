@@ -3179,6 +3179,8 @@
     "settings_steps": "Steps",
     "settings_food_streak": "Food logging streak",
     "settings_save_error": "Could not save settings. Try again.",
+    "outgoing_to_prefix": "To:",
+    "food_streak_line": "{{emoji}} {{count}}-day food log streak",
     "food_streak_line_one": "{{emoji}} {{count}}-day food log streak",
     "food_streak_line_other": "{{emoji}} {{count}}-day food log streak",
     "empty_title": "No friends yet",

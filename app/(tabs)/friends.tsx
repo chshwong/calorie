@@ -2,16 +2,16 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    ActivityIndicator,
+    Image,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
 import StatusGreen from '@/assets/images/StatusGreen.png';
@@ -34,28 +34,27 @@ import { BorderRadius, Colors, FontSize, Layout, Nudge, SemanticColors, Spacing 
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-  useAcceptFriendRequest,
-  useBlockUser,
-  useCancelFriendRequest,
-  useDeclineFriendRequest,
-  useFriendCards,
-  useFriendRequests,
-  useRecentNudges,
-  useRemoveFriend,
+    useAcceptFriendRequest,
+    useBlockUser,
+    useCancelFriendRequest,
+    useDeclineFriendRequest,
+    useFriendCards,
+    useFriendRequests,
+    useRecentNudges,
+    useRemoveFriend,
 } from '@/hooks/use-friends';
 import { useUserConfig } from '@/hooks/use-user-config';
 import {
-  maskEmailForDisplay,
-  type FriendCard,
-  type FriendTargetState,
-  type IncomingFriendRequest,
+    maskEmailForDisplay,
+    type FriendCard,
+    type FriendTargetState
 } from '@/lib/services/friends';
 import { getFoodLoggingStreakLabel } from '@/src/lib/streaks/foodStreakLabel';
 import {
-  AccessibilityHints,
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle,
+    AccessibilityHints,
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 
 /**
@@ -78,6 +77,14 @@ function getOutgoingDisplayLabel(
   if (req.target_email) return maskEmailForDisplay(req.target_email);
   if (req.target_avoid) return req.target_avoid;
   return t('friends.email_request_fallback', { defaultValue: 'Email request' });
+}
+
+function trimOutgoingIdentifier(input: string, maxChars = 24): string {
+  const s = input.trim();
+  if (!s) return '•••';
+  if (s.length <= maxChars) return s;
+  // Pre-trim so long identifiers never dominate (RN will still ellipsize if needed).
+  return `${s.slice(0, Math.max(1, maxChars - 1))}…`;
 }
 
 function getRequesterInitials(req: { requester_first_name: string | null; requester_avoid: string | null }): string {
@@ -389,11 +396,12 @@ export default function FriendsScreen() {
                       >
                         <View style={styles.outgoingLeft}>
                           <ThemedText
-                            style={[styles.requestLabel, { color: colors.text }]}
+                            style={[styles.outgoingIdentifier, { color: colors.textTertiary }]}
                             numberOfLines={1}
                             ellipsizeMode="tail"
                           >
-                            {getOutgoingDisplayLabel(req, t)}
+                            {t('friends.outgoing_to_prefix', { defaultValue: 'To:' })}{' '}
+                            {trimOutgoingIdentifier(getOutgoingDisplayLabel(req, t))}
                           </ThemedText>
                         </View>
 
@@ -847,6 +855,11 @@ const styles = StyleSheet.create({
   outgoingPending: {
     fontSize: FontSize.xs,
     opacity: 0.75,
+  },
+  outgoingIdentifier: {
+    // Outgoing identifier (AvoID or masked email) should be subtle/secondary.
+    fontSize: FontSize.sm,
+    fontWeight: '400',
   },
   incomingRequestRow: {
     flexDirection: 'row',

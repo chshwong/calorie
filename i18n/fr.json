@@ -2351,6 +2351,8 @@
     "settings_steps": "Pas",
     "settings_food_streak": "Série de journal alimentaire",
     "settings_save_error": "Impossible d'enregistrer les paramètres. Réessayez.",
+    "outgoing_to_prefix": "À :",
+    "food_streak_line": "{{emoji}} Série de journal alimentaire : {{count}} jours",
     "food_streak_line_one": "{{emoji}} Série de journal alimentaire : {{count}} jour",
     "food_streak_line_other": "{{emoji}} Série de journal alimentaire : {{count}} jours",
     "empty_title": "Pas encore d'amis",
