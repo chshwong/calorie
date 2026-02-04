@@ -1,45 +1,52 @@
-import React, { useRef, useEffect } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ColoredBrandName } from '@/components/brand/ColoredBrandName';
+import { OnboardingErrorBox } from '@/components/onboarding/OnboardingErrorBox';
+import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
+import { StepIndicator } from '@/components/onboarding/StepIndicator';
+import {
+    ActivityStep,
+    CurrentWeightStep,
+    DailyCalorieTargetStep,
+    DailyFocusTargetsStep,
+    GoalStep,
+    GoalWeightStep,
+    HeightStep,
+    LegalAgreementStep,
+    ModulePreferencesStep,
+    NameStep,
+    PlanStep,
+    SexStep,
+} from '@/components/onboarding/steps';
+import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { onboardingColors } from '@/theme/onboardingTheme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOnboardingForm } from '@/hooks/useOnboardingForm';
-import { onboardingStyles } from '@/theme/onboardingStyles';
-import { filterNumericInput } from '@/utils/inputFilters';
-import {
-  NameStep,
-  SexStep,
-  HeightStep,
-  ActivityStep,
-  CurrentWeightStep,
-  GoalStep,
-  GoalWeightStep,
-  DailyCalorieTargetStep,
-  DailyFocusTargetsStep,
-  ModulePreferencesStep,
-  PlanStep,
-  LegalAgreementStep,
-} from '@/components/onboarding/steps';
-import { StepIndicator } from '@/components/onboarding/StepIndicator';
-import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
-import { OnboardingErrorBox } from '@/components/onboarding/OnboardingErrorBox';
-import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
-} from '@/utils/accessibility';
 import { kgToLb } from '@/lib/domain/weight-constants';
+import { onboardingStyles } from '@/theme/onboardingStyles';
+import { onboardingColors } from '@/theme/onboardingTheme';
+import {
+    getButtonAccessibilityProps,
+    getFocusStyle,
+} from '@/utils/accessibility';
+import { filterNumericInput } from '@/utils/inputFilters';
+import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    Platform,
+    ScrollView,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 export default function OnboardingScreen() {
+  // Wrapped-native mode: never show web onboarding inside the native WebView.
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).__AVOVIBE_CONTAINER__?.type === 'native') {
+    (window as any).ReactNativeWebView?.postMessage?.('NEED_POST_LOGIN_GATE');
+    return <BlockingBrandedLoader enabled timeoutMs={6000} overlay={false} />;
+  }
+
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   // Many onboarding step components currently type `colors` as `typeof Colors.light`.

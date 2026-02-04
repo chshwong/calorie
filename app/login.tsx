@@ -569,6 +569,23 @@ export default function LoginScreen() {
 
   const overlapMode = isWeb && isTwoCol && screenWidth >= 1200 && isDesktopLikePointer && !hasTouchPoints;
 
+  // Wrapped-native mode: never show the web login UI inside a native WebView.
+  // Instead, request the native session and render a branded blocking loader.
+  const isNativeWrapper =
+    isWeb && typeof window !== 'undefined' && (window as any).__AVOVIBE_CONTAINER__?.type === 'native';
+
+  useEffect(() => {
+    if (!isNativeWrapper) return;
+    // If we somehow arrived here without an authenticated session, ask native for it.
+    if (!authLoading && !user) {
+      (window as any).ReactNativeWebView?.postMessage?.('REQUEST_NATIVE_SESSION');
+    }
+  }, [isNativeWrapper, authLoading, user]);
+
+  if (isNativeWrapper) {
+    return <BlockingBrandedLoader enabled timeoutMs={6000} overlay={false} />;
+  }
+
   // In overlap/collage mode, the step mockups are lifted via transforms (visual-only),
   // which leaves extra layout space below the collage. Pull the social proof strip up
   // by approximately the same amount as step 3's lift, minus a small buffer.

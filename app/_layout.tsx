@@ -20,6 +20,7 @@ import { TourProvider } from '@/features/tour/TourProvider';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppFonts } from '@/hooks/use-fonts';
+import { setupNativeWrapperAuthBridgeOnce } from '@/lib/nativeWrapperAuth';
 import { setupFocusWarmup } from '@/lib/utils/session-warmup';
 import { initInstallPromptCapture } from '@/src/features/install/installPromptStore';
 
@@ -193,6 +194,7 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
 
   return (
     <AuthProvider>
+      <NativeWrapperBridgeInstaller />
       <BlockingGateWithRetry
         fontsLoaded={fontsLoaded}
         fontError={fontError}
@@ -237,6 +239,13 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
       </BlockingGateWithRetry>
     </AuthProvider>
   );
+}
+
+function NativeWrapperBridgeInstaller() {
+  useEffect(() => {
+    setupNativeWrapperAuthBridgeOnce();
+  }, []);
+  return null;
 }
 
 /**
