@@ -40,6 +40,28 @@ export default function WebWrapperScreen() {
   const isDark = colorScheme === "dark";
   const backgroundColor = isDark ? "#000000" : "#ffffff";
   const safeAreaEdges = Platform.OS === "android" ? ([] as const) : (["top"] as const);
+  const androidStatusBarHeight = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0;
+
+  const StatusBarChrome = useMemo(() => {
+    // iOS: leave as-is. Android: edge-to-edge can make the StatusBar background effectively transparent.
+    if (Platform.OS !== "android") {
+      return <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />;
+    }
+
+    // Android: Render a background "shim" under the status icons and reserve space,
+    // so wrapped web content never overlaps the status bar.
+    return (
+      <>
+        <StatusBar
+          hidden={false}
+          translucent={true}
+          barStyle={isDark ? "light-content" : "dark-content"}
+          backgroundColor="transparent"
+        />
+        <View style={{ height: androidStatusBarHeight, backgroundColor }} />
+      </>
+    );
+  }, [androidStatusBarHeight, backgroundColor, isDark]);
 
   const requestedPath = useMemo(() => coercePathParam(params.path), [params.path]);
 
@@ -197,10 +219,7 @@ export default function WebWrapperScreen() {
   if (!authLoading && (!session || !user)) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
-        <StatusBar
-          barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={backgroundColor}
-        />
+        {StatusBarChrome}
         <View style={styles.centered}>
           <ActivityIndicator />
         </View>
@@ -211,10 +230,7 @@ export default function WebWrapperScreen() {
   if (isBlockedPath(requestedPath)) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
-        <StatusBar
-          barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={backgroundColor}
-        />
+        {StatusBarChrome}
         <View style={styles.centered}>
           <ActivityIndicator />
         </View>
@@ -231,10 +247,7 @@ export default function WebWrapperScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
-      <StatusBar
-        barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={backgroundColor}
-      />
+      {StatusBarChrome}
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
         <WebView
           ref={webViewRef}
