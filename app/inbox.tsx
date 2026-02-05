@@ -1,43 +1,43 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { router as appRouter, usePathname, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useQueryClient } from '@tanstack/react-query';
+import { router as appRouter, usePathname, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    FlatList,
+    Platform,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-import { ThemedView } from '@/components/themed-view';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { PressableCard } from '@/components/ui/card';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { TightBrandHeader } from '@/components/layout/tight-brand-header';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserConfig } from '@/hooks/use-user-config';
 import { useAnnouncementsByIds } from '@/hooks/use-announcements';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-  inboxNotificationsQueryKeyBase,
-  useInboxNotifications,
-  useMarkAllInboxNotificationsRead,
-  useMarkNotificationRead,
+    inboxNotificationsQueryKeyBase,
+    useInboxNotifications,
+    useMarkAllInboxNotificationsRead,
+    useMarkNotificationRead,
 } from '@/hooks/use-notifications';
-import type { Notification } from '@/utils/types';
-import { pickI18n } from '@/utils/i18n';
+import { useUserConfig } from '@/hooks/use-user-config';
+import {
+    AccessibilityHints,
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle,
+} from '@/utils/accessibility';
 import { formatUTCDate } from '@/utils/calculations';
 import { formatDate } from '@/utils/formatters';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
-import {
-  AccessibilityHints,
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle,
-} from '@/utils/accessibility';
+import { pickI18n } from '@/utils/i18n';
+import type { Notification } from '@/utils/types';
 
 const PAGE_SIZE = 20;
 
@@ -53,6 +53,10 @@ export default function InboxScreen() {
   const profile = userConfig;
   const avatarUrl = profile?.avatar_url ?? null;
   const preferredName = profile?.first_name ?? null;
+  const isNativeWebWrapper =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    (window as any).__AVOVIBE_CONTAINER__?.type === 'native';
 
   const [cursor, setCursor] = useState<{ createdAt: string; id: string } | null>(null);
   const [items, setItems] = useState<Notification[]>([]);
@@ -355,6 +359,7 @@ export default function InboxScreen() {
         <TouchableOpacity
           style={[
             styles.backLink,
+            { paddingTop: isNativeWebWrapper ? 0 : Spacing.md },
             getMinTouchTargetStyle(),
             Platform.OS === 'web' ? getFocusStyle(colors.tint) : {},
           ]}

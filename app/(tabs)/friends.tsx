@@ -2,16 +2,16 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Image,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 
 import StatusGreen from '@/assets/images/StatusGreen.png';
@@ -34,27 +34,27 @@ import { BorderRadius, Colors, FontSize, Layout, Nudge, SemanticColors, Spacing 
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-    useAcceptFriendRequest,
-    useBlockUser,
-    useCancelFriendRequest,
-    useDeclineFriendRequest,
-    useFriendCards,
-    useFriendRequests,
-    useRecentNudges,
-    useRemoveFriend,
+  useAcceptFriendRequest,
+  useBlockUser,
+  useCancelFriendRequest,
+  useDeclineFriendRequest,
+  useFriendCards,
+  useFriendRequests,
+  useRecentNudges,
+  useRemoveFriend,
 } from '@/hooks/use-friends';
 import { useUserConfig } from '@/hooks/use-user-config';
 import {
-    maskEmailForDisplay,
-    type FriendCard,
-    type FriendTargetState
+  maskEmailForDisplay,
+  type FriendCard,
+  type FriendTargetState
 } from '@/lib/services/friends';
 import { getFoodLoggingStreakLabel } from '@/src/lib/streaks/foodStreakLabel';
 import {
-    AccessibilityHints,
-    getButtonAccessibilityProps,
-    getFocusStyle,
-    getMinTouchTargetStyle,
+  AccessibilityHints,
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 
 /**
@@ -134,6 +134,10 @@ export default function FriendsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { width } = useWindowDimensions();
+  const isNativeWebWrapper =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    (window as any).__AVOVIBE_CONTAINER__?.type === 'native';
 
   const { profile: authProfile } = useAuth();
   const { data: userConfig } = useUserConfig();
@@ -273,7 +277,9 @@ export default function FriendsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <DesktopPageContainer style={styles.pageContent}>
+          <DesktopPageContainer
+            style={[styles.pageContent, { paddingTop: isNativeWebWrapper ? 0 : Spacing.md }]}
+          >
             {hasRequests && (
               <Section title={t('friends.requests')}>
                 {incoming.length > 0 && (

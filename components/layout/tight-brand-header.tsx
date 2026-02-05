@@ -1,22 +1,22 @@
-import React from 'react';
-import { View, StyleSheet, Pressable, Image, Platform, Text, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
 import BrandLogoFull from '@/components/brand/BrandLogoFull';
+import BrandLogoNameOnly from '@/components/brand/BrandLogoNameOnly';
 import MascotAvatarFallback from '@/components/brand/MascotAvatarFallback';
-import { HOME_ROUTE } from '@/lib/navigation/routes';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUnreadNotificationCount } from '@/hooks/use-notifications';
+import { HOME_ROUTE } from '@/lib/navigation/routes';
 import {
-  getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
-  getFocusStyle,
   AccessibilityHints,
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { Image, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type TightBrandHeaderProps = {
   /** User avatar URL (optional) */
@@ -62,7 +62,7 @@ export function TightBrandHeader({
   return (
     <SafeAreaView 
       style={[styles.safeArea, { backgroundColor: colors.background }]}
-      edges={['top']}
+      edges={Platform.OS === 'web' ? [] : ['top']}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Left: Logo */}
