@@ -310,8 +310,13 @@ export function WrappedWebView({ initialPath, allowOnboardingPaths = false, cont
           onNavigationStateChange={(navState) => {
             const nextUrl = String(navState?.url ?? "");
             setLastNavUrl(nextUrl || null);
+            // Android WebView can occasionally miss `onLoadEnd` for same-origin navigations.
+            // Use navigation state's `loading` as an additional signal to clear the overlay spinner.
+            if (navState && navState.loading === false) {
+              setIsLoading(false);
+            }
             if (__DEV__ && nextUrl) {
-              console.log("[WrappedWebView]", containerType, "nav:", nextUrl);
+              console.log("[WrappedWebView]", containerType, "nav:", nextUrl, "loading:", !!navState?.loading);
             }
           }}
           onLoadStart={() => {
