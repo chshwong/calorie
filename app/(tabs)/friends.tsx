@@ -18,6 +18,7 @@ import StatusGreen from '@/assets/images/StatusGreen.png';
 import StatusGreyYellow from '@/assets/images/StatusGreyYellow.png';
 import StatusYellow from '@/assets/images/StatusYellow.png';
 import StatusYellowGreen from '@/assets/images/StatusYellowGreen.png';
+import MascotAvatarFallback from '@/components/brand/MascotAvatarFallback';
 import { AddFriendSheet } from '@/components/friends/AddFriendSheet';
 import { FriendsSettingsModal } from '@/components/friends/FriendsSettingsModal';
 import { NudgeEmojiPicker } from '@/components/friends/NudgeEmojiPicker';
@@ -87,30 +88,10 @@ function trimOutgoingIdentifier(input: string, maxChars = 24): string {
   return `${s.slice(0, Math.max(1, maxChars - 1))}…`;
 }
 
-function getRequesterInitials(req: { requester_first_name: string | null; requester_avoid: string | null }): string {
-  const first = req.requester_first_name?.trim();
-  if (first && first.length >= 2) return first.slice(0, 2).toUpperCase();
-  if (first && first.length === 1) return first.toUpperCase();
-  const avoid = req.requester_avoid?.trim();
-  if (avoid && avoid.length >= 2) return avoid.slice(0, 2).toUpperCase();
-  if (avoid && avoid.length === 1) return avoid.toUpperCase();
-  return '••';
-}
-
 function getRequesterPrimaryLabel(req: { requester_first_name: string | null; requester_avoid: string | null }): string {
   const first = req.requester_first_name?.trim();
   if (first) return first;
   return req.requester_avoid ?? '•••';
-}
-
-function getFriendInitials(friend: { first_name: string | null; avoid: string | null }): string {
-  const first = friend.first_name?.trim();
-  if (first && first.length >= 2) return first.slice(0, 2).toUpperCase();
-  if (first && first.length === 1) return first.toUpperCase();
-  const avoid = friend.avoid?.trim();
-  if (avoid && avoid.length >= 2) return avoid.slice(0, 2).toUpperCase();
-  if (avoid && avoid.length === 1) return avoid.toUpperCase();
-  return '••';
 }
 
 function getFriendPrimaryLabel(friend: { first_name: string | null; avoid: string | null }): string {
@@ -307,15 +288,12 @@ export default function FriendsScreen() {
                             resizeMode="cover"
                           />
                         ) : (
-                          <View
-                            style={[
-                              styles.friendAvatarInitials,
-                              { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                            ]}
-                          >
-                            <ThemedText style={[styles.friendAvatarText, { color: colors.textSecondary }]}>
-                              {getRequesterInitials(req)}
-                            </ThemedText>
+                          <View style={{ marginRight: Spacing.sm }}>
+                            <MascotAvatarFallback
+                              size={styles.friendAvatar.width}
+                              backgroundColor={colors.backgroundSecondary}
+                              borderColor={colors.border}
+                            />
                           </View>
                         )}
 
@@ -468,15 +446,12 @@ export default function FriendsScreen() {
                           resizeMode="cover"
                         />
                       ) : (
-                        <View
-                          style={[
-                            styles.friendAvatarInitials,
-                            { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                          ]}
-                        >
-                          <ThemedText style={[styles.friendAvatarText, { color: colors.textSecondary }]}>
-                            {getFriendInitials(friend)}
-                          </ThemedText>
+                        <View style={{ marginRight: Spacing.sm }}>
+                          <MascotAvatarFallback
+                            size={styles.friendAvatar.width}
+                            backgroundColor={colors.backgroundSecondary}
+                            borderColor={colors.border}
+                          />
                         </View>
                       )}
 

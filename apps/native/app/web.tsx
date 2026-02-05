@@ -39,6 +39,7 @@ export default function WebWrapperScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const backgroundColor = isDark ? "#000000" : "#ffffff";
+  const safeAreaEdges = Platform.OS === "android" ? ([] as const) : (["top"] as const);
 
   const requestedPath = useMemo(() => coercePathParam(params.path), [params.path]);
 
@@ -195,7 +196,7 @@ export default function WebWrapperScreen() {
   // If guards are about to redirect, keep UI minimal.
   if (!authLoading && (!session || !user)) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={["top"]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
           backgroundColor={backgroundColor}
@@ -209,7 +210,7 @@ export default function WebWrapperScreen() {
 
   if (isBlockedPath(requestedPath)) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={["top"]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
           backgroundColor={backgroundColor}
@@ -229,7 +230,7 @@ export default function WebWrapperScreen() {
       : ({} as const);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={["top"]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={backgroundColor}
