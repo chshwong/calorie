@@ -1,16 +1,17 @@
 import { router, useLocalSearchParams } from "expo-router";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
-    DEFAULT_WEB_PATH,
-    WEB_BASE_URL,
-    isBlockedPath,
-    isSameOrigin,
+  DEFAULT_WEB_PATH,
+  isBlockedPath,
+  isSameOrigin,
+  WEB_BASE_URL,
 } from "@/lib/webWrapper/webConfig";
 
 function coercePathParam(input: unknown): string {
@@ -34,6 +35,10 @@ export default function WebWrapperScreen() {
   const params = useLocalSearchParams();
   const { user, session, loading: authLoading } = useAuth();
   const webViewRef = useRef<WebView>(null);
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const backgroundColor = isDark ? "#000000" : "#ffffff";
 
   const requestedPath = useMemo(() => coercePathParam(params.path), [params.path]);
 
@@ -190,17 +195,29 @@ export default function WebWrapperScreen() {
   // If guards are about to redirect, keep UI minimal.
   if (!authLoading && (!session || !user)) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator />
-      </View>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={["top"]}>
+        <StatusBar
+          barStyle={isDark ? "light-content" : "dark-content"}
+          backgroundColor={backgroundColor}
+        />
+        <View style={styles.centered}>
+          <ActivityIndicator />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (isBlockedPath(requestedPath)) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator />
-      </View>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={["top"]}>
+        <StatusBar
+          barStyle={isDark ? "light-content" : "dark-content"}
+          backgroundColor={backgroundColor}
+        />
+        <View style={styles.centered}>
+          <ActivityIndicator />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -212,63 +229,72 @@ export default function WebWrapperScreen() {
       : ({} as const);
 
   return (
-    <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{ uri: initialUrl }}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-        injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
-        onMessage={handleMessage}
-        onLoadStart={() => {
-          setLoadError(null);
-          setIsLoading(true);
-        }}
-        onLoadEnd={() => {
-          setIsLoading(false);
-          // Proactively send session after load so web can bootstrap without showing login.
-          sendNativeSession("web_load_end");
-        }}
-        onError={(e) => {
-          const desc = String(e?.nativeEvent?.description ?? "Unknown error");
-          setLoadError(desc);
-          setIsLoading(false);
-        }}
-        onHttpError={(e) => {
-          const status = e?.nativeEvent?.statusCode;
-          setLoadError(`HTTP error${typeof status === "number" ? ` (${status})` : ""}`);
-          setIsLoading(false);
-        }}
-        javaScriptEnabled
-        domStorageEnabled
-        sharedCookiesEnabled
-        {...androidCookieProps}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={["top"]}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={backgroundColor}
       />
+      <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+        <WebView
+          ref={webViewRef}
+          source={{ uri: initialUrl }}
+          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+          injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
+          onMessage={handleMessage}
+          onLoadStart={() => {
+            setLoadError(null);
+            setIsLoading(true);
+          }}
+          onLoadEnd={() => {
+            setIsLoading(false);
+            // Proactively send session after load so web can bootstrap without showing login.
+            sendNativeSession("web_load_end");
+          }}
+          onError={(e) => {
+            const desc = String(e?.nativeEvent?.description ?? "Unknown error");
+            setLoadError(desc);
+            setIsLoading(false);
+          }}
+          onHttpError={(e) => {
+            const status = e?.nativeEvent?.statusCode;
+            setLoadError(`HTTP error${typeof status === "number" ? ` (${status})` : ""}`);
+            setIsLoading(false);
+          }}
+          javaScriptEnabled
+          domStorageEnabled
+          sharedCookiesEnabled
+          {...androidCookieProps}
+        />
 
-      {loadError ? (
-        <View style={styles.errorOverlay}>
-          <Text style={styles.errorTitle}>Could not load wrapped web app</Text>
-          <Text style={styles.errorText}>{initialUrl}</Text>
-          <Text style={styles.errorText}>{loadError}</Text>
+        {loadError ? (
+          <View style={styles.errorOverlay}>
+            <Text style={styles.errorTitle}>Could not load wrapped web app</Text>
+            <Text style={styles.errorText}>{initialUrl}</Text>
+            <Text style={styles.errorText}>{loadError}</Text>
 
-          <View style={styles.errorActions}>
-            <Pressable onPress={() => router.replace("/post-login-gate")} style={styles.errorButton}>
-              <Text style={styles.errorButtonText}>Back</Text>
-            </Pressable>
-            <Pressable onPress={() => openExternally(initialUrl)} style={styles.errorButtonSecondary}>
-              <Text style={styles.errorButtonText}>Open in browser</Text>
-            </Pressable>
+            <View style={styles.errorActions}>
+              <Pressable onPress={() => router.replace("/post-login-gate")} style={styles.errorButton}>
+                <Text style={styles.errorButtonText}>Back</Text>
+              </Pressable>
+              <Pressable onPress={() => openExternally(initialUrl)} style={styles.errorButtonSecondary}>
+                <Text style={styles.errorButtonText}>Open in browser</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
-      ) : isLoading ? (
-        <View pointerEvents="none" style={styles.loadingOverlay}>
-          <ActivityIndicator />
-        </View>
-      ) : null}
-    </View>
+        ) : isLoading ? (
+          <View pointerEvents="none" style={styles.loadingOverlay}>
+            <ActivityIndicator />
+          </View>
+        ) : null}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
