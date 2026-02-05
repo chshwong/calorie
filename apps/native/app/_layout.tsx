@@ -14,6 +14,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" />
           <Stack.Screen name="post-login-gate" />
           <Stack.Screen name="onboarding" />
+          <Stack.Screen name="web-onboarding" />
           <Stack.Screen name="web" />
         </Stack>
       </AuthProvider>

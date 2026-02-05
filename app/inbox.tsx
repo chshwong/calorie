@@ -56,7 +56,7 @@ export default function InboxScreen() {
   const isNativeWebWrapper =
     Platform.OS === 'web' &&
     typeof window !== 'undefined' &&
-    (window as any).__AVOVIBE_CONTAINER__?.type === 'native';
+    ['native', 'native_onboarding'].includes((window as any).__AVOVIBE_CONTAINER__?.type);
 
   const [cursor, setCursor] = useState<{ createdAt: string; id: string } | null>(null);
   const [items, setItems] = useState<Notification[]>([]);

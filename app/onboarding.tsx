@@ -21,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOnboardingForm } from '@/hooks/useOnboardingForm';
 import { kgToLb } from '@/lib/domain/weight-constants';
@@ -41,10 +42,25 @@ import {
 } from 'react-native';
 
 export default function OnboardingScreen() {
+  const { user, loading: authLoading } = useAuth();
+
+  const containerType =
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? String((window as any).__AVOVIBE_CONTAINER__?.type ?? '')
+      : '';
+  const isNativeWrapperWeb = Platform.OS === 'web' && (containerType === 'native' || containerType === 'native_onboarding');
+
   // Wrapped-native mode: never show web onboarding inside the native WebView.
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).__AVOVIBE_CONTAINER__?.type === 'native') {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && containerType === 'native') {
     (window as any).ReactNativeWebView?.postMessage?.('NEED_POST_LOGIN_GATE');
     return <BlockingBrandedLoader enabled timeoutMs={6000} overlay={false} />;
+  }
+
+  // Wrapped-native onboarding mode: wait for the bridged native session instead of bouncing to web /login.
+  // This prevents rapid route churn (/onboarding <-> /login) while the auth bridge is applying.
+  if (isNativeWrapperWeb && (authLoading || !user)) {
+    (window as any).ReactNativeWebView?.postMessage?.('REQUEST_NATIVE_SESSION');
+    return <BlockingBrandedLoader enabled timeoutMs={8000} overlay={false} />;
   }
 
   const { t } = useTranslation();

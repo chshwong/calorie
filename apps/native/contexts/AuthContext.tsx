@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import type { Session, User } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 type AuthContextType = {
   session: Session | null;
@@ -8,6 +8,7 @@ type AuthContextType = {
   loading: boolean;
   onboardingComplete: boolean | null;
   refreshProfile: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   onboardingComplete: null,
   refreshProfile: async () => {},
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -117,6 +119,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetchProfile(user.id);
   };
 
+  const signOut = async () => {
+    // Clear local state synchronously to avoid redirect loops while Supabase completes sign-out.
+    setSession(null);
+    setUser(null);
+    setOnboardingComplete(null);
+    setLoading(false);
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
+  };
+
   const value = useMemo(
     () => ({
       session,
@@ -124,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       onboardingComplete,
       refreshProfile,
+      signOut,
     }),
     [session, user, loading, onboardingComplete]
   );

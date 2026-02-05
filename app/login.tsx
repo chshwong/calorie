@@ -571,15 +571,24 @@ export default function LoginScreen() {
 
   // Wrapped-native mode: never show the web login UI inside a native WebView.
   // Instead, request the native session and render a branded blocking loader.
-  const isNativeWrapper =
-    isWeb && typeof window !== 'undefined' && (window as any).__AVOVIBE_CONTAINER__?.type === 'native';
+  const isNativeWrapper = isWeb && typeof window !== 'undefined' && (() => {
+    const type = String((window as any).__AVOVIBE_CONTAINER__?.type ?? '');
+    return type === 'native' || type === 'native_onboarding';
+  })();
 
   useEffect(() => {
     if (!isNativeWrapper) return;
+    if (authLoading) return;
+
     // If we somehow arrived here without an authenticated session, ask native for it.
-    if (!authLoading && !user) {
+    if (!user) {
       (window as any).ReactNativeWebView?.postMessage?.('REQUEST_NATIVE_SESSION');
+      return;
     }
+
+    // If we *do* have a user, tell native to re-evaluate routing (so we leave web /login
+    // and land on the correct wrapped destination via native gate).
+    (window as any).ReactNativeWebView?.postMessage?.('NEED_POST_LOGIN_GATE');
   }, [isNativeWrapper, authLoading, user]);
 
   if (isNativeWrapper) {

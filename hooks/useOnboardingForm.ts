@@ -1,53 +1,52 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
-import { Alert, Platform, Dimensions } from 'react-native';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
-import { ageFromDob, ActivityLevel, calculateBMR, calculateTDEE, calculateRequiredDailyCalorieDiff, calculateSafeCalorieTarget } from '@/utils/calculations';
-import { 
-  validatePreferredName, 
-  validateDateOfBirth,
-  validateHeightCm as validateHeightCmUtil, 
-  validateActivityLevel as validateActivityLevelUtil, 
-  validateWeightKg as validateWeightKgUtil, 
-  validateBodyFatPercent as validateBodyFatPercentUtil,
-  validateSex as validateSexUtil, 
-  validateGoal as validateGoalUtil 
-} from '@/utils/validation';
-import { validateGoalWeight as validateGoalWeightNew } from '@/lib/onboarding/goal-weight-validation';
-import { 
-  convertHeightToCm, 
-  kgToLb, 
-  lbToKg,
-  roundTo1,
-  roundTo2,
-  roundTo3,
-} from '@/utils/bodyMetrics';
-import { 
-  filterNumericInput, 
-  filterPreferredNameInput, 
-  normalizeSpaces 
-} from '@/utils/inputFilters';
-import { useUpdateProfile } from '@/hooks/use-profile-mutations';
-import { uploadUserAvatar, setProfileAvatarUrl } from '@/lib/avatar/avatar-service';
-import { checkProfanity } from '@/utils/profanity';
-import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
-import { PROFILES, DERIVED, POLICY } from '@/constants/constraints';
-import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
-import { 
-  scheduleDraftSave, 
-  flushDraftSave, 
-  type OnboardingDraft,
-  getLastDraftError 
-} from '@/lib/onboarding/onboarding-draft-sync';
-import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 import type { DailyFocusTargets } from '@/components/onboarding/steps/DailyFocusTargetsStep';
-import { fetchActiveLegalDocuments, acceptActiveLegalDocuments } from '@/lib/legal/legal-db';
-import { userConfigQueryKey } from '@/hooks/use-user-config';
-import { setPersistentCache } from '@/lib/persistentCache';
-import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
 import { showAppToast } from '@/components/ui/app-toast';
+import { DERIVED, POLICY, PROFILES } from '@/constants/constraints';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { userConfigQueryKey } from '@/hooks/use-user-config';
+import { setProfileAvatarUrl, uploadUserAvatar } from '@/lib/avatar/avatar-service';
+import { acceptActiveLegalDocuments, fetchActiveLegalDocuments } from '@/lib/legal/legal-db';
+import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
+import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
+import { validateGoalWeight as validateGoalWeightNew } from '@/lib/onboarding/goal-weight-validation';
+import {
+    flushDraftSave,
+    getLastDraftError,
+    scheduleDraftSave,
+    type OnboardingDraft
+} from '@/lib/onboarding/onboarding-draft-sync';
+import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
+import { setPersistentCache } from '@/lib/persistentCache';
+import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
+import {
+    convertHeightToCm,
+    kgToLb,
+    lbToKg,
+    roundTo1,
+    roundTo2,
+    roundTo3,
+} from '@/utils/bodyMetrics';
+import { ActivityLevel, ageFromDob, calculateBMR, calculateSafeCalorieTarget, calculateTDEE } from '@/utils/calculations';
+import {
+    filterPreferredNameInput,
+    normalizeSpaces
+} from '@/utils/inputFilters';
+import { checkProfanity } from '@/utils/profanity';
+import {
+    validateActivityLevel as validateActivityLevelUtil,
+    validateBodyFatPercent as validateBodyFatPercentUtil,
+    validateDateOfBirth,
+    validateGoal as validateGoalUtil,
+    validateHeightCm as validateHeightCmUtil,
+    validatePreferredName,
+    validateSex as validateSexUtil,
+    validateWeightKg as validateWeightKgUtil
+} from '@/utils/validation';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Alert, Dimensions, Platform } from 'react-native';
 
 type GoalType = 'lose' | 'maintain' | 'gain' | 'recomp';
 type ModulePreference = 'Exercise' | 'Med' | 'Water';
@@ -55,12 +54,19 @@ type PlanSelection = 'free' | 'premium';
 
 export function useOnboardingForm() {
   const { t } = useTranslation();
-  const { user, refreshProfile, profile } = useAuth();
+  const { user, loading: authLoading, refreshProfile, profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 12; // Steps 1-12: ... Daily Focus Targets, Module Preferences, Plan, Legal Agreement
   
+  const isNativeWrapperWeb = useMemo(() => {
+    if (Platform.OS !== 'web') return false;
+    if (typeof window === 'undefined') return false;
+    const type = String((window as any).__AVOVIBE_CONTAINER__?.type ?? '');
+    return type === 'native' || type === 'native_onboarding';
+  }, []);
+
   // Step 6: Goal
   const [goal, setGoal] = useState<GoalType | ''>('');
   const [showAdvancedGoals, setShowAdvancedGoals] = useState(false);
@@ -196,10 +202,19 @@ export function useOnboardingForm() {
   
   // Redirect to login if no user
   useEffect(() => {
+    // Avoid redirect churn while auth is still initializing (especially in native-wrapper mode
+    // where a session may be bridged in moments after initial render).
+    if (authLoading) return;
     if (!user) {
+      // In the native WebView wrapper, web login must never appear. Request native session instead
+      // and let the wrapper bridge apply it (or bounce to native login if needed).
+      if (isNativeWrapperWeb) {
+        (window as any).ReactNativeWebView?.postMessage?.('REQUEST_NATIVE_SESSION');
+        return;
+      }
       router.replace('/login');
     }
-  }, [user]);
+  }, [authLoading, isNativeWrapperWeb, user, router]);
   
   // Prefill preferredName from user's display name (from OAuth provider) or existing profile
   useEffect(() => {

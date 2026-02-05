@@ -9,7 +9,8 @@ type NativeSessionMessage = {
 function isNativeWrapperRuntime(): boolean {
   if (typeof window === "undefined") return false;
   const container = (window as any).__AVOVIBE_CONTAINER__;
-  return container?.type === "native";
+  const type = String(container?.type ?? "");
+  return type === "native" || type === "native_onboarding";
 }
 
 function postToNative(message: string) {

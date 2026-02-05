@@ -29,7 +29,7 @@ export default function PostLoginGate() {
   }
 
   if (onboardingComplete === false) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href="/web-onboarding" />;
   }
 
   return <Redirect href={{ pathname: "/web", params: { path: DEFAULT_WEB_PATH } }} />;

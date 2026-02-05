@@ -8,10 +8,10 @@ import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTyp
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  DEFAULT_WEB_PATH,
-  isBlockedPath,
-  isSameOrigin,
-  WEB_BASE_URL,
+    DEFAULT_WEB_PATH,
+    isBlockedPath,
+    isSameOrigin,
+    WEB_BASE_URL,
 } from "@/lib/webWrapper/webConfig";
 
 function coercePathParam(input: unknown): string {
@@ -31,39 +31,41 @@ function safeParseUrl(urlString: string): URL | null {
   }
 }
 
-export default function WebWrapperScreen() {
-  const params = useLocalSearchParams();
-  const { user, session, loading: authLoading } = useAuth();
+type WrappedWebViewProps = {
+  initialPath: unknown;
+  allowOnboardingPaths?: boolean;
+  /**
+   * Container type injected into `window.__AVOVIBE_CONTAINER__`.
+   *
+   * - `/web` MUST use `"native"` (normal wrapper runtime)
+   * - `/web-onboarding` MUST use `"native_onboarding"` (so web onboarding is not blocked)
+   */
+  containerType: "native" | "native_onboarding";
+};
+
+export function WrappedWebView({ initialPath, allowOnboardingPaths = false, containerType }: WrappedWebViewProps) {
+  const { user, session, loading: authLoading, signOut } = useAuth();
   const webViewRef = useRef<WebView>(null);
+  const forcingNativeLoginRef = useRef(false);
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const backgroundColor = isDark ? "#000000" : "#ffffff";
-  const safeAreaEdges = Platform.OS === "android" ? ([] as const) : (["top"] as const);
-  const androidStatusBarHeight = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0;
+  const safeAreaEdges = ["top"] as const;
+  const [lastNavUrl, setLastNavUrl] = useState<string | null>(null);
 
   const StatusBarChrome = useMemo(() => {
-    // iOS: leave as-is. Android: edge-to-edge can make the StatusBar background effectively transparent.
-    if (Platform.OS !== "android") {
-      return <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />;
-    }
-
-    // Android: Render a background "shim" under the status icons and reserve space,
-    // so wrapped web content never overlaps the status bar.
     return (
-      <>
-        <StatusBar
-          hidden={false}
-          translucent={true}
-          barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor="transparent"
-        />
-        <View style={{ height: androidStatusBarHeight, backgroundColor }} />
-      </>
+      <StatusBar
+        hidden={false}
+        translucent={false}
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={backgroundColor}
+      />
     );
-  }, [androidStatusBarHeight, backgroundColor, isDark]);
+  }, [backgroundColor, isDark]);
 
-  const requestedPath = useMemo(() => coercePathParam(params.path), [params.path]);
+  const requestedPath = useMemo(() => coercePathParam(initialPath), [initialPath]);
 
   const initialUrl = useMemo(() => `${WEB_BASE_URL}${requestedPath}`, [requestedPath]);
 
@@ -80,15 +82,15 @@ export default function WebWrapperScreen() {
 
   // B) Initial blocklist guard: never load web login/onboarding screens.
   useEffect(() => {
-    if (isBlockedPath(requestedPath)) {
+    if (isBlockedPath(requestedPath, { allowOnboardingPaths })) {
       router.replace("/post-login-gate");
     }
-  }, [requestedPath]);
+  }, [allowOnboardingPaths, requestedPath]);
 
   const injectedJavaScriptBeforeContentLoaded = useMemo(() => {
     const platform = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : Platform.OS;
     return `
-      window.__AVOVIBE_CONTAINER__ = { type: "native", platform: ${JSON.stringify(platform)} };
+      window.__AVOVIBE_CONTAINER__ = { type: ${JSON.stringify(containerType)}, platform: ${JSON.stringify(platform)} };
       (function () {
         try {
           window.__AVOVIBE_NATIVE_SESSION__ = window.__AVOVIBE_NATIVE_SESSION__ || null;
@@ -146,21 +148,58 @@ export default function WebWrapperScreen() {
     [session?.access_token, session?.refresh_token]
   );
 
+  // Proactively (re)send session whenever tokens become available/refresh.
+  useEffect(() => {
+    if (authLoading) return;
+    if (forcingNativeLoginRef.current) return;
+    if (session?.access_token && session?.refresh_token) {
+      sendNativeSession("native_tokens_available");
+    }
+  }, [authLoading, sendNativeSession, session?.access_token, session?.refresh_token]);
+
   const handleMessage = useCallback((event: any) => {
     const data = String(event?.nativeEvent?.data ?? "");
+    if (__DEV__ && data) {
+      console.log("[WrappedWebView]", containerType, "msg:", data);
+    }
 
     if (data === "REQUEST_NATIVE_SESSION") {
+      // If we're forcing native login, do not continue the bridge loop.
+      if (forcingNativeLoginRef.current) {
+        router.replace("/login");
+        return;
+      }
+      // Web is asking for native tokens. If we're signed out, bounce to true-native login.
+      if (!session?.access_token || !session?.refresh_token) {
+        router.replace("/login");
+        return;
+      }
       sendNativeSession("requested_by_web");
       return;
     }
     if (data === "NEED_NATIVE_LOGIN") {
-      router.replace("/login");
+      // Web couldn't apply the session (expired/invalid tokens). Keep native+web in sync by
+      // signing out native, then showing the true-native login screen.
+      if (forcingNativeLoginRef.current) return;
+      forcingNativeLoginRef.current = true;
+
+      // Stop any in-flight loads to prevent repeated /login navigations inside the WebView.
+      try {
+        webViewRef.current?.stopLoading?.();
+      } catch {
+        // ignore
+      }
+
+      void signOut().finally(() => {
+        router.replace("/login");
+      });
       return;
     }
     if (data === "NEED_POST_LOGIN_GATE") {
+      if (forcingNativeLoginRef.current) return;
       router.replace("/post-login-gate");
     }
-  }, [sendNativeSession]);
+  }, [containerType, sendNativeSession, session?.access_token, session?.refresh_token, signOut]);
 
   const openExternally = useCallback((urlString: string) => {
     // Fire-and-forget: external apps / OS handlers.
@@ -195,24 +234,37 @@ export default function WebWrapperScreen() {
       }
 
       // Block web login/onboarding/auth paths (native must own these).
-      if (isBlockedPath(parsed.pathname)) {
+      if (isBlockedPath(parsed.pathname, { allowOnboardingPaths })) {
         const shouldGoToNativeLogin =
           parsed.pathname.startsWith("/login") || parsed.pathname.startsWith("/auth");
 
-        // If we have a native session, try to apply it to the web app instead of bouncing
-        // the user back to native login (prevents web login UI from ever appearing).
-        if (shouldGoToNativeLogin && session?.access_token && session?.refresh_token) {
-          setTimeout(() => sendNativeSession("web_attempted_login_route"), 0);
+        // If the web app tries to hit /login or /auth while wrapped, NEVER navigate away
+        // (unmounting/remounting causes flicker + repeated full reloads). Instead, block
+        // and inject the native session so the web app can continue without showing web login.
+        if (shouldGoToNativeLogin) {
+          if (forcingNativeLoginRef.current) {
+            setTimeout(() => router.replace("/login"), 0);
+            return false;
+          }
+          // If we have tokens, inject them and keep the WebView mounted (prevents login flicker).
+          if (session?.access_token && session?.refresh_token) {
+            setTimeout(() => sendNativeSession("web_attempted_login_route"), 0);
+            return false;
+          }
+
+          // If we don't have tokens (e.g. user signed out), bounce to true-native login.
+          setTimeout(() => router.replace("/login"), 0);
           return false;
         }
 
-        setTimeout(() => router.replace(shouldGoToNativeLogin ? "/login" : "/post-login-gate"), 0);
+        // Non-login blocked path (e.g. /onboarding when not allowed): return to the gate.
+        setTimeout(() => router.replace("/post-login-gate"), 0);
         return false;
       }
 
       return true;
     },
-    [openExternally, sendNativeSession, session?.access_token, session?.refresh_token]
+    [allowOnboardingPaths, openExternally, sendNativeSession, session?.access_token, session?.refresh_token]
   );
 
   // If guards are about to redirect, keep UI minimal.
@@ -227,7 +279,7 @@ export default function WebWrapperScreen() {
     );
   }
 
-  if (isBlockedPath(requestedPath)) {
+  if (isBlockedPath(requestedPath, { allowOnboardingPaths })) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
         {StatusBarChrome}
@@ -255,6 +307,13 @@ export default function WebWrapperScreen() {
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
           onMessage={handleMessage}
+          onNavigationStateChange={(navState) => {
+            const nextUrl = String(navState?.url ?? "");
+            setLastNavUrl(nextUrl || null);
+            if (__DEV__ && nextUrl) {
+              console.log("[WrappedWebView]", containerType, "nav:", nextUrl);
+            }
+          }}
           onLoadStart={() => {
             setLoadError(null);
             setIsLoading(true);
@@ -284,6 +343,7 @@ export default function WebWrapperScreen() {
           <View style={styles.errorOverlay}>
             <Text style={styles.errorTitle}>Could not load wrapped web app</Text>
             <Text style={styles.errorText}>{initialUrl}</Text>
+            {lastNavUrl ? <Text style={styles.errorText}>{lastNavUrl}</Text> : null}
             <Text style={styles.errorText}>{loadError}</Text>
 
             <View style={styles.errorActions}>
@@ -303,6 +363,11 @@ export default function WebWrapperScreen() {
       </View>
     </SafeAreaView>
   );
+}
+
+export default function WebWrapperScreen() {
+  const params = useLocalSearchParams();
+  return <WrappedWebView initialPath={params.path} allowOnboardingPaths={false} containerType="native" />;
 }
 
 const styles = StyleSheet.create({

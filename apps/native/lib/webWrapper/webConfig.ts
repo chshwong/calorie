@@ -41,15 +41,34 @@ export const DEFAULT_WEB_PATH = "/";
 
 export const BLOCKED_WEB_PATH_PREFIXES = ["/login", "/auth", "/onboarding"] as const;
 
+export type BlockedPathOptions = {
+  /**
+   * When true, allow `/onboarding*` paths in the WebView wrapper.
+   * NOTE: `/login*` and `/auth*` are always blocked (native owns login).
+   */
+  allowOnboardingPaths?: boolean;
+};
+
 function normalizePathname(pathname: string): string {
   const trimmed = pathname.trim();
   if (!trimmed) return "/";
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
-export function isBlockedPath(pathname: string): boolean {
+export function isBlockedPath(pathname: string, options?: BlockedPathOptions): boolean {
   const normalizedPathname = normalizePathname(pathname);
-  return BLOCKED_WEB_PATH_PREFIXES.some((prefix) => normalizedPathname.startsWith(prefix));
+
+  // Web login must never appear in the native wrapper.
+  if (normalizedPathname.startsWith("/login") || normalizedPathname.startsWith("/auth")) {
+    return true;
+  }
+
+  // Onboarding is blocked by default; only allow it on the dedicated web-onboarding route.
+  if (!options?.allowOnboardingPaths && normalizedPathname.startsWith("/onboarding")) {
+    return true;
+  }
+
+  return false;
 }
 
 // Back-compat with earlier naming in the instructions.

@@ -118,7 +118,7 @@ export default function FriendsScreen() {
   const isNativeWebWrapper =
     Platform.OS === 'web' &&
     typeof window !== 'undefined' &&
-    (window as any).__AVOVIBE_CONTAINER__?.type === 'native';
+    ['native', 'native_onboarding'].includes((window as any).__AVOVIBE_CONTAINER__?.type);
 
   const { profile: authProfile } = useAuth();
   const { data: userConfig } = useUserConfig();

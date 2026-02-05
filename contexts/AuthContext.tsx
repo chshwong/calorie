@@ -433,6 +433,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === 'SIGNED_OUT') {
+        // If we sign out while running inside the native WebView wrapper, keep native+web in sync
+        // by telling native to sign out and show the true-native login screen.
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const type = String((window as any).__AVOVIBE_CONTAINER__?.type ?? '');
+          if (type === 'native' || type === 'native_onboarding') {
+            (window as any).ReactNativeWebView?.postMessage?.('NEED_NATIVE_LOGIN');
+          }
+        }
+
         setSession(null);
         setUser(null);
         setProfile(null);
