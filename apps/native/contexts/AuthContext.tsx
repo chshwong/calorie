@@ -26,6 +26,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
 
+  const clearLocalAuthState = () => {
+    setSession(null);
+    setUser(null);
+    setOnboardingComplete(null);
+    setLoading(false);
+  };
+
+  const clearPersistedSupabaseSession = async (reason: string) => {
+    try {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[AuthContext] Clearing persisted session (${reason})`);
+      }
+      await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
+  };
+
   const fetchProfile = async (userId: string) => {
     setOnboardingComplete(null);
 
@@ -69,6 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!isMounted) return;
 
+        // Defensive: a persisted session without refresh_token causes GoTrue recovery/refresh to throw:
+        // "AuthApiError: Invalid Refresh Token: Refresh Token Not Found"
+        // Treat it as signed-out and clear persisted auth state.
+        if (session && !session.refresh_token) {
+          await clearPersistedSupabaseSession("missing_refresh_token");
+          if (!isMounted) return;
+          clearLocalAuthState();
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -78,15 +106,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setOnboardingComplete(null);
         }
-      } catch (error) {
+      } catch (error: any) {
+        const msg = String(error?.message ?? "");
+        if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token")) {
+          await clearPersistedSupabaseSession("invalid_refresh_token");
+        }
         if (process.env.NODE_ENV !== "production") {
           console.warn("[AuthContext] Failed to get session:", error);
         }
         if (!isMounted) return;
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-        setOnboardingComplete(null);
+        clearLocalAuthState();
       }
     };
 
@@ -96,6 +125,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!isMounted) return;
+
+      // Defensive: never allow a session missing refresh_token to linger.
+      if (nextSession && !nextSession.refresh_token) {
+        void clearPersistedSupabaseSession("auth_state_change_missing_refresh_token");
+        clearLocalAuthState();
+        return;
+      }
 
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
@@ -121,10 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     // Clear local state synchronously to avoid redirect loops while Supabase completes sign-out.
-    setSession(null);
-    setUser(null);
-    setOnboardingComplete(null);
-    setLoading(false);
+    clearLocalAuthState();
     try {
       await supabase.auth.signOut();
     } catch {
