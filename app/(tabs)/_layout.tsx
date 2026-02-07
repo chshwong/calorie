@@ -1,33 +1,33 @@
-import { Tabs, useRouter, useSegments } from 'expo-router';
-import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, Text, Animated, PanResponder, Platform, Image } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Tabs, useRouter, useSegments } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import AICustomButtonImg from '@/assets/images/AI_CUSTOM_BUTTON.png';
+import AIQuickLogButtonImg from '@/assets/images/AI_QUICKLOG_BUTTON.png';
+import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import { HapticTab } from '@/components/haptic-tab';
-import { PlusButtonTab } from '@/components/plus-button-tab';
+import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
 import { MoreButtonTab } from '@/components/more-button-tab';
+import { PlusButtonTab } from '@/components/plus-button-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MoreSheetContent } from '@/components/ui/MoreSheetContent';
 import { NewChip } from '@/components/ui/NewChip';
 import { BigCircleMenuTokens, Colors, FontSize, FontWeight, Layout, MoreSheetTokens } from '@/constants/theme';
-import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
-import { ShareChip } from '@/src/components/share/ShareChip';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ConstrainedTabBar } from '@/components/layout/constrained-tab-bar';
+import { useAuth } from '@/contexts/AuthContext';
 import { QuickAddProvider, useQuickAdd } from '@/contexts/quick-add-context';
+import { useTourAnchor } from '@/features/tour/useTourAnchor';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
+import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/navigation/weight';
+import { ShareChip } from '@/src/components/share/ShareChip';
+import { getBigCircleMenuColors } from '@/theme/getBigCircleMenuColors';
+import { getLocalDateString } from '@/utils/calculations';
 import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
 import type { FocusModule } from '@/utils/types';
-import { getLocalDateString } from '@/utils/calculations';
-import { useAuth } from '@/contexts/AuthContext';
-import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/navigation/weight';
-import { getBigCircleMenuColors } from '@/theme/getBigCircleMenuColors';
-import { useTourAnchor } from '@/features/tour/useTourAnchor';
-import AICustomButtonImg from '@/assets/images/AI_CUSTOM_BUTTON.png';
-import AIQuickLogButtonImg from '@/assets/images/AI_QUICKLOG_BUTTON.png';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
@@ -85,6 +85,7 @@ function TabLayoutContent() {
       }
     }
   }, [authLoading, userConfigLoading, user, effectiveProfile, router]);
+
   
   // Compute the remaining module
   const ALL_MODULES: FocusModule[] = ['Food', 'Exercise', 'Med', 'Water'];

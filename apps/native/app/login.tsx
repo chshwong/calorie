@@ -3,23 +3,33 @@ import { supabase } from "@/lib/supabaseClient";
 import { router } from "expo-router";
 import * as React from "react";
 import { useEffect } from "react";
-import { Image, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Linking, ScrollView, StyleSheet, View } from "react-native";
 
+import { clearPendingAuthState, getOAuthRedirectTo, setPendingAuthState } from "@/lib/auth/oauth";
+import { sendMagicLink, signInWithOAuth } from "@/lib/services/auth";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
+import { useColorScheme } from "../components/useColorScheme";
 import { getDeviceRegion } from "../lib/region/getDeviceRegion";
-import { spacing } from "../theme/tokens";
+import { colors, spacing } from "../theme/tokens";
 
 export default function LoginScreen() {
   const { user, loading, onboardingComplete } = useAuth();
+  const colorScheme = useColorScheme() ?? "light";
+  const theme = colors[colorScheme];
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [submitting, setSubmitting] = React.useState<null | "signin" | "signup">(null);
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [googleLoading, setGoogleLoading] = React.useState(false);
+  const [magicLoading, setMagicLoading] = React.useState(false);
+  const [magicSent, setMagicSent] = React.useState(false);
+  const [googleError, setGoogleError] = React.useState<string | null>(null);
+  const [magicError, setMagicError] = React.useState<string | null>(null);
   const [deviceRegion, setDeviceRegion] = React.useState<string | null>(null);
 
   useEffect(() => {
@@ -131,6 +141,96 @@ export default function LoginScreen() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (googleLoading || submitting !== null) return;
+    setGoogleError(null);
+    setMagicError(null);
+    setMagicSent(false);
+    setGoogleLoading(true);
+
+    try {
+      const redirectTo = getOAuthRedirectTo();
+      await setPendingAuthState({
+        stage: "auth_start",
+        provider: "google",
+        startedAt: Date.now(),
+      });
+
+      const { data, error: oauthError } = await signInWithOAuth({
+        provider: "google",
+        redirectTo,
+        queryParams: { prompt: "select_account" },
+      });
+
+      if (oauthError) {
+        await clearPendingAuthState();
+        setGoogleError(oauthError.message || "Failed to start Google sign-in.");
+        return;
+      }
+
+      const authUrl = data?.url;
+      if (!authUrl) {
+        await clearPendingAuthState();
+        setGoogleError("Missing Google sign-in URL. Please try again.");
+        return;
+      }
+
+      await setPendingAuthState({
+        stage: "awaiting_callback",
+        provider: "google",
+        startedAt: Date.now(),
+      });
+
+      await Linking.openURL(authUrl);
+    } catch (e: any) {
+      await clearPendingAuthState();
+      setGoogleError(e?.message || "An unexpected error occurred.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleSendMagicLink = async () => {
+    if (magicLoading || submitting !== null) return;
+    setMagicError(null);
+    setMagicSent(false);
+    setMagicLoading(true);
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      setMagicLoading(false);
+      setMagicError("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      const redirectTo = getOAuthRedirectTo();
+      await setPendingAuthState({
+        stage: "awaiting_callback",
+        provider: "magic",
+        startedAt: Date.now(),
+      });
+
+      const { error: magicLinkError } = await sendMagicLink({
+        email: trimmedEmail,
+        emailRedirectTo: redirectTo,
+      });
+
+      if (magicLinkError) {
+        await clearPendingAuthState();
+        setMagicError(magicLinkError.message || "Failed to send magic link.");
+        return;
+      }
+
+      setMagicSent(true);
+    } catch (e: any) {
+      await clearPendingAuthState();
+      setMagicError(e?.message || "An unexpected error occurred.");
+    } finally {
+      setMagicLoading(false);
+    }
+  };
+
   const isCanada = deviceRegion === "CA";
 
   return (
@@ -210,6 +310,56 @@ export default function LoginScreen() {
         </Card>
 
         <Card>
+          <View style={styles.socialBlock}>
+            <Text variant="body" style={styles.sectionTitle}>
+              Social / Magic Link
+            </Text>
+
+            <Button
+              title={googleLoading ? "Continuing..." : "Continue with Google"}
+              loading={googleLoading}
+              onPress={handleGoogleLogin}
+              disabled={submitting !== null || magicLoading}
+            />
+            {googleError ? (
+              <Text tone="danger" style={styles.centerText}>
+                {googleError}
+              </Text>
+            ) : null}
+
+            <View style={styles.dividerRow}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              <Text tone="muted">or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            </View>
+
+            <Text tone="muted" style={styles.centerText}>
+              Use the email above to receive a sign-in link.
+            </Text>
+
+            <Button
+              variant="secondary"
+              title={magicLoading ? "Sending..." : "Email me a magic link"}
+              loading={magicLoading}
+              onPress={handleSendMagicLink}
+              disabled={submitting !== null || googleLoading}
+            />
+
+            {magicError ? (
+              <Text tone="danger" style={styles.centerText}>
+                {magicError}
+              </Text>
+            ) : null}
+
+            {magicSent ? (
+              <Text tone="muted" style={styles.centerText}>
+                Check your email for a sign-in link.
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+
+        <Card>
           <View style={styles.marketing}>
             <Text variant="body" style={styles.marketingTitle}>
               Fitness made simple
@@ -279,8 +429,24 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing.md,
   },
+  socialBlock: {
+    gap: spacing.md,
+  },
+  sectionTitle: {
+    textAlign: "center",
+    fontWeight: "700",
+  },
   centerText: {
     textAlign: "center",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
   },
   marketing: {
     gap: spacing.sm,

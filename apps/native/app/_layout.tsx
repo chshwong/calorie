@@ -12,6 +12,7 @@ export default function RootLayout() {
       <AuthProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="login" />
+          <Stack.Screen name="auth/callback" />
           <Stack.Screen name="post-login-gate" />
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="web-onboarding" />

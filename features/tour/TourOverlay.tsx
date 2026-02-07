@@ -10,13 +10,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
 
+import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import { useTour } from '@/features/tour/TourProvider';
 import { useTranslation } from 'react-i18next';
-import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -64,7 +64,12 @@ export function TourOverlay() {
     if (!spotlightRect) return null;
     // Slightly asymmetric padding to avoid the hole bleeding into the next row (common on stacked cards).
     // `narrow` steps get a tighter frame (especially on the bottom).
-    const padX = step?.narrow ? 8 : 10;
+    const padX =
+      step?.anchorKey === 'home.burnedPencil'
+        ? 18
+        : step?.narrow
+          ? 8
+          : 10;
     const padTop = step?.narrow ? 8 : 10;
     // Some anchors (like the burned ✏️ tap target) visually relate to a label directly below;
     // give those steps a bit more bottom room so the spotlight covers the full concept.
@@ -73,7 +78,7 @@ export function TourOverlay() {
       step?.anchorKey === 'home.curvyGauge'
         ? 0
         : step?.anchorKey === 'home.burnedPencil'
-          ? 28
+          ? 44
           : step?.narrow
             ? 4
             : 8;

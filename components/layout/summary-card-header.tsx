@@ -26,6 +26,8 @@ type SummaryCardHeaderProps = {
   isLoading?: boolean;
   /** Optional right-side content (e.g., entry count, action buttons) */
   rightContent?: React.ReactNode;
+  /** Optional right-side accessory (e.g., extra action button) */
+  rightAccessory?: React.ReactNode;
   /** Optional right-side title text (e.g., "124 cal") */
   rightTitle?: string;
   /** Optional subtitle text shown below title */
@@ -48,6 +50,7 @@ export function SummaryCardHeader({
   onPressSettings,
   isLoading,
   rightContent,
+  rightAccessory,
   rightTitle,
   subtitle,
   style,
@@ -113,6 +116,7 @@ export function SummaryCardHeader({
               <IconSymbol name="gearshape" size={FontSize.lg} color={colors.text} />
             </TouchableOpacity>
           ) : null}
+          {rightAccessory ?? null}
         </View>
       </View>
       

@@ -23,7 +23,7 @@ import { FOOD_LOG } from '@/constants/constraints';
 import { NUTRIENT_LIMITS } from '@/constants/nutrient-limits';
 import { BorderRadius, Colors, FontSize, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { isTourCompleted, isTourWelcomeShown, setTourWelcomeShown } from '@/features/tour/storage';
+import { isTourCompleted, isTourWelcomeShown, resetTour, setTourWelcomeShown } from '@/features/tour/storage';
 import { useTour } from '@/features/tour/TourProvider';
 import { V1_HOMEPAGE_TOUR_STEPS } from '@/features/tour/tourSteps';
 import { useTourAnchor } from '@/features/tour/useTourAnchor';
@@ -48,9 +48,9 @@ import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import {
-    getButtonAccessibilityProps,
-    getFocusStyle,
-    getMinTouchTargetStyle
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle
 } from '@/utils/accessibility';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
@@ -64,18 +64,18 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Modal,
-    Platform,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 function usePrefersReducedMotion() {
@@ -280,6 +280,99 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
   );
 }
 
+type TapHintOverlayProps = {
+  visible: boolean;
+  targetRect: { x: number; y: number; width: number; height: number } | null;
+};
+
+function TapHintOverlay({ visible, targetRect }: TapHintOverlayProps) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    if (!visible || !targetRect) {
+      animationRef.current?.stop();
+      translateY.setValue(0);
+      scale.setValue(1);
+      opacity.setValue(0);
+      return;
+    }
+
+    translateY.setValue(0);
+    scale.setValue(1);
+    opacity.setValue(0);
+
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+
+    const tapLoop = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: 8,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 0.92,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.delay(900),
+      ]),
+      { resetBeforeIteration: true }
+    );
+
+    animationRef.current = tapLoop;
+    tapLoop.start();
+
+    return () => {
+      animationRef.current?.stop();
+    };
+  }, [opacity, scale, targetRect, translateY, visible]);
+
+  if (!visible || !targetRect) return null;
+
+  const left = targetRect.x + targetRect.width * 0.6;
+  const top = targetRect.y + targetRect.height * 0.35;
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View
+        style={[
+          styles.tapHint,
+          {
+            left,
+            top,
+            opacity,
+            transform: [{ translateY }, { scale }],
+          },
+        ]}
+      >
+        <Text style={styles.tapHintIcon}>👆</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 /**
  * Format a single meal entry for display on home page meal cards
  * Manual entries (food_id is null/undefined) are formatted as "⚡Food-Name"
@@ -335,7 +428,10 @@ export default function FoodLogHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Tour wiring (Home tour)
-  const { startTour, registerScrollContainer, activeTourId, registerOnStepChange, requestRemeasure } = useTour();
+  const { startTour, registerScrollContainer, activeTourId, registerOnStepChange, requestRemeasure, stepIndex, steps } =
+    useTour();
+  const currentStepIndex = stepIndex;
+  const isTapMealStep = activeTourId === 'V1_HomePageTour' && currentStepIndex === 4;
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const didInitTourScrollRef = useRef(false);
@@ -347,11 +443,29 @@ export default function FoodLogHomeScreen() {
   const tourMealLogRef = useTourAnchor('home.mealLog');
   const tourMealSnackRef = useTourAnchor('home.mealSnack');
   const tourCallItADayRef = useTourAnchor('home.callItADay');
+  const lunchRef = useRef<View>(null);
+  const [lunchRect, setLunchRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const updateLunchRect = useCallback(() => {
+    if (!lunchRef.current) return;
+    lunchRef.current.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        setLunchRect({ x, y, width, height });
+      }
+    });
+  }, []);
 
   const [welcomeConfettiVisible, setWelcomeConfettiVisible] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showRestartHomeTourConfirm, setShowRestartHomeTourConfirm] = useState(false);
+  const [restartHomeTourLoading, setRestartHomeTourLoading] = useState(false);
   const isCheckingTourRef = useRef(false);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasOnLastHomeTourStepRef = useRef(false);
+  const prevTourIdRef = useRef<typeof activeTourId>(null);
+  const macroTourTimeoutsRef = useRef<{
+    forward: ReturnType<typeof setTimeout> | null;
+    back: ReturnType<typeof setTimeout> | null;
+  }>({ forward: null, back: null });
   
   // Menu state for meal type options
   const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
@@ -1122,6 +1236,30 @@ export default function FoodLogHomeScreen() {
     void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
   }, [startTour]);
 
+  const handleRestartHomeTourPress = useCallback(() => {
+    if (!user?.id) return;
+    setShowRestartHomeTourConfirm(true);
+  }, [user?.id]);
+
+  const confirmRestartHomeTour = useCallback(async () => {
+    if (!user?.id) return;
+    if (restartHomeTourLoading) return;
+
+    setRestartHomeTourLoading(true);
+    try {
+      await resetTour('V1_HomePageTour', user.id);
+      setShowRestartHomeTourConfirm(false);
+      void startTour('V1_HomePageTour', V1_HOMEPAGE_TOUR_STEPS);
+    } catch (e) {
+      Alert.alert(
+        t('alerts.error_title'),
+        t('common.unexpected_error', { defaultValue: 'Something went wrong.' })
+      );
+    } finally {
+      setRestartHomeTourLoading(false);
+    }
+  }, [restartHomeTourLoading, startTour, t, user?.id]);
+
   const scrollToGaugesPage = useCallback(
     (next: number) => {
       if (!gaugesPagerRef.current || gaugesPagerWidth <= 0) return;
@@ -1185,19 +1323,68 @@ export default function FoodLogHomeScreen() {
     }).start();
   }, [gaugesEntrance, prefersReducedMotion]);
 
-  // Drive UI on step start: show mini gauges on step 4/9 (home-macros)
+  // Drive UI on step start: briefly show mini gauges, then return to macros (step 4/9).
   useEffect(() => {
     const unsubscribe = registerOnStepChange((tourId, step) => {
       if (tourId !== 'V1_HomePageTour') return;
 
+      if (macroTourTimeoutsRef.current.forward) {
+        clearTimeout(macroTourTimeoutsRef.current.forward);
+        macroTourTimeoutsRef.current.forward = null;
+      }
+      if (macroTourTimeoutsRef.current.back) {
+        clearTimeout(macroTourTimeoutsRef.current.back);
+        macroTourTimeoutsRef.current.back = null;
+      }
+
       if (step.id === 'home-macros') {
-        // Ensure mini gauges are visible for the spotlight measurement
-        scrollToGaugesPage(1);
         requestRemeasure();
+        macroTourTimeoutsRef.current.forward = setTimeout(() => {
+          scrollToGaugesPage(1);
+          requestRemeasure();
+          macroTourTimeoutsRef.current.back = setTimeout(() => {
+            scrollToGaugesPage(0);
+            requestRemeasure();
+          }, 1000);
+        }, 1000);
       }
     });
-    return unsubscribe;
+    return () => {
+      if (macroTourTimeoutsRef.current.forward) {
+        clearTimeout(macroTourTimeoutsRef.current.forward);
+        macroTourTimeoutsRef.current.forward = null;
+      }
+      if (macroTourTimeoutsRef.current.back) {
+        clearTimeout(macroTourTimeoutsRef.current.back);
+        macroTourTimeoutsRef.current.back = null;
+      }
+      unsubscribe();
+    };
   }, [registerOnStepChange, requestRemeasure, scrollToGaugesPage]);
+
+  // After finishing the last Home tour step, scroll back to top.
+  useEffect(() => {
+    if (activeTourId === 'V1_HomePageTour') {
+      wasOnLastHomeTourStepRef.current = steps.length > 0 && stepIndex >= steps.length - 1;
+    }
+
+    if (
+      prevTourIdRef.current === 'V1_HomePageTour' &&
+      activeTourId == null &&
+      wasOnLastHomeTourStepRef.current
+    ) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      wasOnLastHomeTourStepRef.current = false;
+    }
+
+    prevTourIdRef.current = activeTourId;
+  }, [activeTourId, stepIndex, steps.length]);
+
+  useEffect(() => {
+    if (isTapMealStep) {
+      updateLunchRect();
+    }
+  }, [isTapMealStep, updateLunchRect]);
 
 
   return (
@@ -1211,6 +1398,20 @@ export default function FoodLogHomeScreen() {
         cancelText={null}
         onConfirm={handleWelcomeModalConfirm}
         onCancel={handleWelcomeModalConfirm}
+        animationType="fade"
+      />
+      <ConfirmModal
+        visible={showRestartHomeTourConfirm}
+        title={t('home.restart_home_tour.title')}
+        message={t('home.restart_home_tour.message')}
+        confirmText={t('home.restart_home_tour.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={confirmRestartHomeTour}
+        onCancel={() => setShowRestartHomeTourConfirm(false)}
+        confirmButtonStyle={{ backgroundColor: colors.tint }}
+        cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
+        cancelTextStyle={{ color: colors.text }}
+        confirmDisabled={restartHomeTourLoading}
         animationType="fade"
       />
       <OfflineBanner />
@@ -1260,6 +1461,7 @@ export default function FoodLogHomeScreen() {
         onScroll={(e) => {
           scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
           if (Platform.OS === 'web') handleWebScroll(e);
+          if (isTapMealStep) updateLunchRect();
         }}
         scrollEventThrottle={16}
       >
@@ -1278,6 +1480,24 @@ export default function FoodLogHomeScreen() {
                   paddingHorizontal: 0,
                   paddingBottom: 2,
                 }}
+                rightAccessory={
+                  <TouchableOpacity
+                    onPress={handleRestartHomeTourPress}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.homeRestartTourButton,
+                      getMinTouchTargetStyle(),
+                      Platform.OS === 'web' ? getFocusStyle(colors.tint) : null,
+                    ]}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    {...getButtonAccessibilityProps(
+                      t('home.restart_home_tour.title'),
+                      t('home.restart_home_tour.message')
+                    )}
+                  >
+                    <Text style={{ fontSize: 20 }}>💡</Text>
+                  </TouchableOpacity>
+                }
               />
 
               <View ref={tourCurvyGaugeRef as any} style={styles.calorieGaugeWrap}>
@@ -1576,51 +1796,107 @@ export default function FoodLogHomeScreen() {
                       {/* Meal Type Header with Totals and Log Food Button */}
                       <View style={styles.mealGroupHeader}>
                         <View style={styles.mealGroupHeaderLeft}>
-                          <TouchableOpacity
-                            style={[
-                              styles.mealTypeBadge, 
-                              getMinTouchTargetStyle(),
-                              { 
-                                backgroundColor: colorScheme === 'dark' ? colors.tint + '25' : colors.tint + '12',
-                                ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                              }
-                            ]}
-                            onPress={() => {
-                              // Filter entries for this meal type and date (may be empty array if no entries)
-                              const mealTypeEntries = group.entries.filter(entry => 
-                                entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
-                                entry.entry_date === selectedDateString
-                              );
-                              // Always go to mealtype-log page (whether entries exist or not)
-                              router.push({
-                                pathname: '/(tabs)/mealtype-log',
-                                params: { 
-                                  mealType: mealType,
-                                  entryDate: selectedDateString,
-                                  preloadedEntries: JSON.stringify(mealTypeEntries)
-                                }
-                              });
-                            }}
-                            activeOpacity={0.7}
-                            {...getButtonAccessibilityProps(
-                              `Log food for ${mealTypeLabel}`,
-                              t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
-                            )}
-                          >
-                            <View style={styles.mealTypeBadgeContent}>
-                              <ThemedText style={[styles.mealTypeText, { color: colors.tint }]}>
-                                {mealTypeLabel}
-                              </ThemedText>
-                              <View 
-                                style={styles.mealTypeEditIcons}
-                                accessibilityElementsHidden={true}
-                                importantForAccessibility="no-hide-descendants"
+                          {(mealType === 'lunch') ? (
+                            <View
+                              ref={lunchRef}
+                              collapsable={false}
+                              onLayout={() => {
+                                updateLunchRect();
+                              }}
+                            >
+                              <TouchableOpacity
+                                style={[
+                                  styles.mealTypeBadge, 
+                                  getMinTouchTargetStyle(),
+                                  { 
+                                    backgroundColor: colorScheme === 'dark' ? colors.tint + '25' : colors.tint + '12',
+                                    ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                                  }
+                                ]}
+                                onPress={() => {
+                                  // Filter entries for this meal type and date (may be empty array if no entries)
+                                  const mealTypeEntries = group.entries.filter(entry => 
+                                    entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                                    entry.entry_date === selectedDateString
+                                  );
+                                  // Always go to mealtype-log page (whether entries exist or not)
+                                  router.push({
+                                    pathname: '/(tabs)/mealtype-log',
+                                    params: { 
+                                      mealType: mealType,
+                                      entryDate: selectedDateString,
+                                      preloadedEntries: JSON.stringify(mealTypeEntries)
+                                    }
+                                  });
+                                }}
+                                activeOpacity={0.7}
+                                {...getButtonAccessibilityProps(
+                                  `Log food for ${mealTypeLabel}`,
+                                  t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
+                                )}
                               >
-                                <IconSymbol name="pencil" size={12} color={colors.tint} decorative={true} />
-                                <IconSymbol name="fork.knife" size={12} color={colors.tint} decorative={true} />
-                              </View>
+                                <View style={styles.mealTypeBadgeContent}>
+                                  <ThemedText style={[styles.mealTypeText, { color: colors.tint }]}>
+                                    {mealTypeLabel}
+                                  </ThemedText>
+                                  <View 
+                                    style={styles.mealTypeEditIcons}
+                                    accessibilityElementsHidden={true}
+                                    importantForAccessibility="no-hide-descendants"
+                                  >
+                                    <IconSymbol name="pencil" size={12} color={colors.tint} decorative={true} />
+                                    <IconSymbol name="fork.knife" size={12} color={colors.tint} decorative={true} />
+                                  </View>
+                                </View>
+                              </TouchableOpacity>
                             </View>
-                          </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={[
+                                styles.mealTypeBadge, 
+                                getMinTouchTargetStyle(),
+                                { 
+                                  backgroundColor: colorScheme === 'dark' ? colors.tint + '25' : colors.tint + '12',
+                                  ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                                }
+                              ]}
+                              onPress={() => {
+                                // Filter entries for this meal type and date (may be empty array if no entries)
+                                const mealTypeEntries = group.entries.filter(entry => 
+                                  entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                                  entry.entry_date === selectedDateString
+                                );
+                                // Always go to mealtype-log page (whether entries exist or not)
+                                router.push({
+                                  pathname: '/(tabs)/mealtype-log',
+                                  params: { 
+                                    mealType: mealType,
+                                    entryDate: selectedDateString,
+                                    preloadedEntries: JSON.stringify(mealTypeEntries)
+                                  }
+                                });
+                              }}
+                              activeOpacity={0.7}
+                              {...getButtonAccessibilityProps(
+                                `Log food for ${mealTypeLabel}`,
+                                t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
+                              )}
+                            >
+                              <View style={styles.mealTypeBadgeContent}>
+                                <ThemedText style={[styles.mealTypeText, { color: colors.tint }]}>
+                                  {mealTypeLabel}
+                                </ThemedText>
+                                <View 
+                                  style={styles.mealTypeEditIcons}
+                                  accessibilityElementsHidden={true}
+                                  importantForAccessibility="no-hide-descendants"
+                                >
+                                  <IconSymbol name="pencil" size={12} color={colors.tint} decorative={true} />
+                                  <IconSymbol name="fork.knife" size={12} color={colors.tint} decorative={true} />
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                          )}
                           {/* Show toggle when entries exist, "← Log Food" when no entries */}
                           {group.entries.length > 0 
                             ? renderMealViewToggle(mealType, mealViewModes[mealType] ?? DEFAULT_MEAL_VIEW_MODE)
@@ -2143,6 +2419,8 @@ export default function FoodLogHomeScreen() {
         </View>
       </Modal>
 
+      <TapHintOverlay visible={isTapMealStep} targetRect={lunchRect} />
+
 
       {/* Note Editor */}
       {noteEditor.mealType && (
@@ -2212,6 +2490,20 @@ const styles = StyleSheet.create({
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  tapHint: {
+    position: 'absolute',
+    zIndex: 10,
+  },
+  tapHintIcon: {
+    fontSize: 24,
+  },
+  homeRestartTourButton: {
+    marginLeft: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   macroGaugeRowWrap: {
     // Keep content clearly below the Energy Balance separator line (avoid overlap with settings gear)

@@ -108,11 +108,11 @@
       "get_started": "Get started"
     },
     "home": {
-      "curvyGauge": "This is your daily calorie target. Click ⚙️ to adjust target.",
-      "burnedEatenNet": "Keep track of your calorie deficit/surplus here.",
-      "burnedPencil": "For best accuracy, always update this with numbers from your wearable⌚.",
+      "curvyGauge": "This is your daily calorie target.\n\nClick ⚙️ to adjust target.",
+      "burnedEatenNet": "Your daily calorie balance.\n\nDeficit → weight loss\nSurplus → weight gain",
+       "burnedPencil": "Use data from your wearable⌚ for accuracy.\n\nSync available",
       "macrosAndOtherLimits": "Stay on track with your macros and goals. Tap ⚙️ to adjust targets.",
-      "mealLog": "Click on the meal you’ve eaten to log.",
+      "mealLog": "Tap a meal (e.g., Lunch) to log what you ate.",
       "mealSnack": "Any quick bites can be logged as Snack.",
       "callItADay": "Optional but helpful:\nDone logging for the day (including burn)?\n\nCall It a Day!",
       "globalFooter": "You’re on Food Diary. Access your other modules here.",
@@ -184,6 +184,11 @@
       "more_details": "More Details",
       "fat": "Fat",
       "hide_other_limits": "Hide other limits"
+    },
+    "restart_home_tour": {
+      "title": "Restart Food Diary Tour",
+      "message": "Restart the Food Diary guidance tour?",
+      "confirm": "Restart"
     },
     "date_picker": {
       "title": "SELECT DATE",
