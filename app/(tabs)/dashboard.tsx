@@ -20,8 +20,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumExercisesStepsForDate } from '@/hooks/use-daily-sum-exercises';
 import {
-    useDailyFoodSummary,
-    useWeeklyCalInVsOut,
+  useDailyFoodSummary,
+  useWeeklyCalInVsOut,
 } from '@/hooks/use-dashboard-data';
 import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
 import { useFitbitConnectionQuery } from '@/hooks/use-fitbit-connection';
@@ -33,9 +33,9 @@ import { useUserConfig } from '@/hooks/use-user-config';
 import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { getFoodLoggingStreakLabel } from '@/src/lib/streaks/foodStreakLabel';
 import {
-    getButtonAccessibilityProps,
-    getFocusStyle,
-    getMinTouchTargetStyle,
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle,
 } from '@/utils/accessibility';
 import { getLocalDateString, getMealTypeFromCurrentTime } from '@/utils/calculations';
 import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';
@@ -209,52 +209,54 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
 
           {/* Gauge area: Cal by meal (left), Burn−Eaten=Deficit (center-right), AvocadoGauge (center), chips (bottom). Sync is in card header. */}
           <View style={styles.caloriesRow}>
-            <TouchableOpacity
-              onPress={onPress}
-              activeOpacity={0.7}
-              style={[styles.mealBreakdownOverlay, getMinTouchTargetStyle()]}
-              {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
-              {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
-            >
-              <View style={[styles.mealBreakdownConnector, { backgroundColor: colors.border }]} />
-              <ThemedText style={[styles.mealBreakdownTitle, { color: colors.textMuted }]}>
-                Cal by meal
-              </ThemedText>
-              <View style={styles.mealBreakdownStack}>
-                {mealRows.map(r => {
-                  const v = Math.round(r.value ?? 0);
-                  const isZero = v === 0;
-                  return (
-                    <View key={r.key} style={[styles.mealRow, isZero && styles.mealRowZero]}>
-                      <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>
-                        {r.emoji}
-                      </ThemedText>
-                      <ThemedText
-                        style={[styles.mealValue, { color: colors.textSecondary }]}
-                      >
-                        {format4(v)}
-                      </ThemedText>
-                    </View>
-                  );
-                })}
-                <View style={[styles.leftOverlayDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity
-                  onPress={onPressExercise}
-                  activeOpacity={0.7}
-                  style={getMinTouchTargetStyle()}
-                  {...getButtonAccessibilityProps(t('dashboard.exercise.title'), t('dashboard.exercise.accessibility_hint'))}
-                  {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
-                >
-                  <ThemedText style={[styles.leftOverlaySubheader, { color: colors.textSecondary }]}>
-                    Steps
-                  </ThemedText>
-                  <View style={[styles.mealRow, styles.stepsRowTight]}>
-                    <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>👣</ThemedText>
-                    <ThemedText style={[styles.mealValue, { color: colors.textSecondary }]}>{format4(stepsForDay)}</ThemedText>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
+            <View style={styles.mealBreakdownOverlay}>
+              <TouchableOpacity
+                onPress={onPress}
+                activeOpacity={0.7}
+                style={getMinTouchTargetStyle()}
+                {...getButtonAccessibilityProps(t('dashboard.food.title'), t('dashboard.food.accessibility_hint'))}
+                {...(Platform.OS === 'web' && getFocusStyle(colors.accentFood))}
+              >
+                <View style={[styles.mealBreakdownConnector, { backgroundColor: colors.border }]} />
+                <ThemedText style={[styles.mealBreakdownTitle, { color: colors.textMuted }]}>
+                  Cal by meal
+                </ThemedText>
+                <View style={styles.mealBreakdownStack}>
+                  {mealRows.map(r => {
+                    const v = Math.round(r.value ?? 0);
+                    const isZero = v === 0;
+                    return (
+                      <View key={r.key} style={[styles.mealRow, isZero && styles.mealRowZero]}>
+                        <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>
+                          {r.emoji}
+                        </ThemedText>
+                        <ThemedText
+                          style={[styles.mealValue, { color: colors.textSecondary }]}
+                        >
+                          {format4(v)}
+                        </ThemedText>
+                      </View>
+                    );
+                  })}
+                </View>
+              </TouchableOpacity>
+              <View style={[styles.leftOverlayDivider, { backgroundColor: colors.border }]} />
+              <TouchableOpacity
+                onPress={onPressExercise}
+                activeOpacity={0.7}
+                style={getMinTouchTargetStyle()}
+                {...getButtonAccessibilityProps(t('dashboard.exercise.title'), t('dashboard.exercise.accessibility_hint'))}
+                {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
+              >
+                <ThemedText style={[styles.leftOverlaySubheader, { color: colors.textSecondary }]}>
+                  Steps
+                </ThemedText>
+                <View style={[styles.mealRow, styles.stepsRowTight]}>
+                  <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>👣</ThemedText>
+                  <ThemedText style={[styles.mealValue, { color: colors.textSecondary }]}>{format4(stepsForDay)}</ThemedText>
+                </View>
+              </TouchableOpacity>
+            </View>
             <View style={styles.burnEquationOverlay} pointerEvents="box-none">
               <EnergyEquation
                 dateKey={dateString}

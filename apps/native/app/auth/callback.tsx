@@ -9,10 +9,10 @@ import { Screen } from "@/components/ui/Screen";
 import { Text } from "@/components/ui/Text";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  clearPendingAuthState,
-  getPendingAuthState,
-  isPendingAuthExpired,
-  setPendingAuthState,
+    clearPendingAuthState,
+    getPendingAuthState,
+    isPendingAuthExpired,
+    setPendingAuthState,
 } from "@/lib/auth/oauth";
 import { exchangeCodeForSession, setSession } from "@/lib/services/auth";
 import { spacing } from "@/theme/tokens";
@@ -22,6 +22,7 @@ type AuthParams = {
   access_token?: string;
   refresh_token?: string;
   error?: string;
+  error_code?: string;
   error_description?: string;
 };
 
@@ -52,6 +53,7 @@ function parseAuthParams(url: string): AuthParams {
       access_token: hashParams.access_token ?? queryParams.access_token,
       refresh_token: hashParams.refresh_token ?? queryParams.refresh_token,
       error: queryParams.error ?? hashParams.error,
+      error_code: queryParams.error_code ?? hashParams.error_code,
       error_description:
         queryParams.error_description ??
         (queryParams as any).errorDescription ??
@@ -73,6 +75,7 @@ export default function AuthCallbackScreen() {
   const [detail, setDetail] = React.useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = React.useState(false);
   const lastUrlRef = React.useRef<string | null>(null);
+  const didProcessRef = React.useRef(false);
 
   const getParam = React.useCallback((value: unknown) => {
     if (typeof value === "string") return value;
@@ -83,7 +86,9 @@ export default function AuthCallbackScreen() {
   const handleAuthUrl = React.useCallback(
     async (url: string) => {
       if (!url) return;
+      if (didProcessRef.current) return;
       if (lastUrlRef.current === url) return;
+      didProcessRef.current = true;
       lastUrlRef.current = url;
 
       setBusy(true);
@@ -94,9 +99,20 @@ export default function AuthCallbackScreen() {
         await clearPendingAuthState();
       }
 
-      const { code, access_token, refresh_token, error, error_description } = parseAuthParams(url);
+      const { code, access_token, refresh_token, error, error_code, error_description } = parseAuthParams(url);
 
-      if (error) {
+      if (error_code === "otp_expired") {
+        setBusy(false);
+        setDetail("This link expired. Please request a new magic link.");
+        return;
+      }
+
+      if (error || error_code) {
+        if (error === "access_denied" || error_code) {
+          setBusy(false);
+          setDetail("Sign-in was cancelled. Please try again.");
+          return;
+        }
         setBusy(false);
         setDetail(error_description || "Authentication failed. Please try again.");
         return;
@@ -110,10 +126,14 @@ export default function AuthCallbackScreen() {
             startedAt: Date.now(),
             lastUrl: url,
           });
-          const { error: exchangeError } = await exchangeCodeForSession(code);
-          if (exchangeError) {
+          try {
+            const { error: exchangeError } = await exchangeCodeForSession(code);
+            if (exchangeError) {
+              throw exchangeError;
+            }
+          } catch {
             setBusy(false);
-            setDetail(exchangeError.message || "Failed to complete sign-in.");
+            setDetail("Could not complete sign-in. Please try again.");
             return;
           }
         } else if (access_token && refresh_token) {
@@ -144,6 +164,13 @@ export default function AuthCallbackScreen() {
     },
     [router]
   );
+
+  const resetAndBackToLogin = React.useCallback(() => {
+    didProcessRef.current = false;
+    setBusy(false);
+    setDetail(null);
+    router.replace("/login");
+  }, [router]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -259,7 +286,7 @@ export default function AuthCallbackScreen() {
               <Button
                 title="Back to login"
                 variant="secondary"
-                onPress={() => router.replace("/login")}
+                onPress={resetAndBackToLogin}
               />
             ) : null}
           </View>

@@ -32,6 +32,10 @@ export default function LoginScreen() {
   const [magicError, setMagicError] = React.useState<string | null>(null);
   const [deviceRegion, setDeviceRegion] = React.useState<string | null>(null);
 
+  const emailValid = email.trim().toLowerCase().includes("@");
+  const passwordValid = password.length >= 6;
+  const busy = submitting !== null || googleLoading || magicLoading;
+
   useEffect(() => {
     const region = getDeviceRegion();
     setDeviceRegion(region);
@@ -52,7 +56,7 @@ export default function LoginScreen() {
   }, [loading, user, onboardingComplete]);
 
   const handleSignIn = async () => {
-    if (submitting) return;
+    if (busy) return;
 
     console.log("SIGNIN pressed", email);
 
@@ -85,15 +89,15 @@ export default function LoginScreen() {
       }
 
       // Success: AuthContext will update, and useEffect will navigate to /home
-    } catch (e: any) {
-      setError(e?.message || "An unexpected error occurred");
+    } catch {
+      setError("Network error. Please try again.");
     } finally {
       setSubmitting(null);
     }
   };
 
   const handleSignUp = async () => {
-    if (submitting) return;
+    if (busy) return;
 
     console.log("SIGNUP pressed", email);
 
@@ -134,15 +138,15 @@ export default function LoginScreen() {
         // Email confirmation is OFF; user is signed in immediately
         // AuthContext will update, and useEffect will navigate to /home
       }
-    } catch (e: any) {
-      setError(e?.message || "An unexpected error occurred");
+    } catch {
+      setError("Network error. Please try again.");
     } finally {
       setSubmitting(null);
     }
   };
 
   const handleGoogleLogin = async () => {
-    if (googleLoading || submitting !== null) return;
+    if (busy) return;
     setGoogleError(null);
     setMagicError(null);
     setMagicSent(false);
@@ -182,16 +186,16 @@ export default function LoginScreen() {
       });
 
       await Linking.openURL(authUrl);
-    } catch (e: any) {
+    } catch {
       await clearPendingAuthState();
-      setGoogleError(e?.message || "An unexpected error occurred.");
+      setGoogleError("Network error. Please try again.");
     } finally {
       setGoogleLoading(false);
     }
   };
 
   const handleSendMagicLink = async () => {
-    if (magicLoading || submitting !== null) return;
+    if (busy) return;
     setMagicError(null);
     setMagicSent(false);
     setMagicLoading(true);
@@ -218,14 +222,19 @@ export default function LoginScreen() {
 
       if (magicLinkError) {
         await clearPendingAuthState();
-        setMagicError(magicLinkError.message || "Failed to send magic link.");
+        const message = magicLinkError.message?.toLowerCase() ?? "";
+        if (message.includes("rate") || message.includes("too many")) {
+          setMagicError("Too many requests. Please wait a few minutes and try again.");
+        } else {
+          setMagicError("Could not send magic link. Please try again.");
+        }
         return;
       }
 
       setMagicSent(true);
-    } catch (e: any) {
+    } catch {
       await clearPendingAuthState();
-      setMagicError(e?.message || "An unexpected error occurred.");
+      setMagicError("Network error. Please try again.");
     } finally {
       setMagicLoading(false);
     }
@@ -261,7 +270,12 @@ export default function LoginScreen() {
             <Input
               label="Email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setError(null);
+                setMagicError(null);
+                setMagicSent(false);
+              }}
               placeholder="you@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -272,7 +286,10 @@ export default function LoginScreen() {
             <Input
               label="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setError(null);
+              }}
               placeholder="Enter your password"
               secureTextEntry
               autoCapitalize="none"
@@ -290,7 +307,7 @@ export default function LoginScreen() {
               title={submitting === "signin" ? "Signing in..." : "Sign in"}
               loading={submitting === "signin"}
               onPress={handleSignIn}
-              disabled={submitting !== null}
+              disabled={busy || !emailValid || !passwordValid}
             />
 
             <Button
@@ -298,7 +315,7 @@ export default function LoginScreen() {
               title={submitting === "signup" ? "Creating account..." : "Create account"}
               loading={submitting === "signup"}
               onPress={handleSignUp}
-              disabled={submitting !== null}
+              disabled={busy || !emailValid || !passwordValid}
             />
 
             {message ? (
@@ -319,7 +336,7 @@ export default function LoginScreen() {
               title={googleLoading ? "Continuing..." : "Continue with Google"}
               loading={googleLoading}
               onPress={handleGoogleLogin}
-              disabled={submitting !== null || magicLoading}
+              disabled={busy}
             />
             {googleError ? (
               <Text tone="danger" style={styles.centerText}>
@@ -342,7 +359,7 @@ export default function LoginScreen() {
               title={magicLoading ? "Sending..." : "Email me a magic link"}
               loading={magicLoading}
               onPress={handleSendMagicLink}
-              disabled={submitting !== null || googleLoading}
+              disabled={busy || !emailValid}
             />
 
             {magicError ? (

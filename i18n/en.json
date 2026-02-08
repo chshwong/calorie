@@ -2580,7 +2580,7 @@
       "status_all": "All"
     },
     "food": {
-      "title": "Food",
+      "title": "In & Out",
       "chart_cal_in_vs_out": "Last 7 days - Eaten vs. Burned",
       "chart_in_zone": "In Target",
       "chart_under": "Under",
