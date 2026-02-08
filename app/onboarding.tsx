@@ -49,6 +49,7 @@ export default function OnboardingScreen() {
       ? String((window as any).__AVOVIBE_CONTAINER__?.type ?? '')
       : '';
   const isNativeWrapperWeb = Platform.OS === 'web' && (containerType === 'native' || containerType === 'native_onboarding');
+  const isNativeOnboardingWrapper = isNativeWrapperWeb && containerType === 'native_onboarding';
 
   // Wrapped-native mode: never show web onboarding inside the native WebView.
   if (Platform.OS === 'web' && typeof window !== 'undefined' && containerType === 'native') {
@@ -163,6 +164,43 @@ export default function OnboardingScreen() {
     shouldDisableNext,
     goalWeightSuggestion,
   } = useOnboardingForm();
+
+  useEffect(() => {
+    if (!isNativeOnboardingWrapper || typeof window === 'undefined') return;
+
+    const handleMessage = (event: any) => {
+      const raw = event?.data != null ? String(event.data) : '';
+      if (!raw) return;
+      let msg: any = null;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (msg?.type !== 'NATIVE_ONBOARDING_BACK') return;
+
+      const canGoBack = currentStep > 1;
+      if (canGoBack) {
+        handleBack();
+      }
+
+      (window as any).ReactNativeWebView?.postMessage?.(
+        JSON.stringify({ type: 'NATIVE_ONBOARDING_BACK_RESULT', handled: canGoBack })
+      );
+    };
+
+    window.addEventListener('message', handleMessage);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('message', handleMessage);
+    }
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('message', handleMessage);
+      }
+    };
+  }, [currentStep, handleBack, isNativeOnboardingWrapper]);
   
   // Scroll to top when step changes
   const scrollViewRef = useRef<ScrollView>(null);

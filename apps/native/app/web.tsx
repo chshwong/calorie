@@ -1,17 +1,19 @@
+import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, useColorScheme, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import type { WebViewNavigation } from "react-native-webview";
 import { WebView } from "react-native-webview";
 import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
-    DEFAULT_WEB_PATH,
-    isBlockedPath,
-    isSameOrigin,
-    WEB_BASE_URL,
+  DEFAULT_WEB_PATH,
+  isBlockedPath,
+  isSameOrigin,
+  WEB_BASE_URL,
 } from "@/lib/webWrapper/webConfig";
 
 function coercePathParam(input: unknown): string {
@@ -34,6 +36,10 @@ function safeParseUrl(urlString: string): URL | null {
 type WrappedWebViewProps = {
   initialPath: unknown;
   allowOnboardingPaths?: boolean;
+  webRef?: React.RefObject<WebView>;
+  canGoBackRef?: React.MutableRefObject<boolean>;
+  onWebMessage?: (data: string) => void;
+  onWebNavigationStateChange?: (navState: WebViewNavigation) => void;
   /**
    * Container type injected into `window.__AVOVIBE_CONTAINER__`.
    *
@@ -43,9 +49,18 @@ type WrappedWebViewProps = {
   containerType: "native" | "native_onboarding";
 };
 
-export function WrappedWebView({ initialPath, allowOnboardingPaths = false, containerType }: WrappedWebViewProps) {
+export function WrappedWebView({
+  initialPath,
+  allowOnboardingPaths = false,
+  containerType,
+  webRef: externalWebRef,
+  canGoBackRef: externalCanGoBackRef,
+  onWebMessage,
+  onWebNavigationStateChange,
+}: WrappedWebViewProps) {
   const { user, session, loading: authLoading, signOut } = useAuth();
-  const webViewRef = useRef<WebView>(null);
+  const webRef = externalWebRef ?? useRef<WebView>(null);
+  const canGoBackRef = externalCanGoBackRef ?? useRef(false);
   const forcingNativeLoginRef = useRef(false);
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -143,7 +158,7 @@ export function WrappedWebView({ initialPath, allowOnboardingPaths = false, cont
         refresh_token: refreshToken,
       });
 
-      webViewRef.current?.postMessage(payload);
+      webRef.current?.postMessage(payload);
     },
     [session?.access_token, session?.refresh_token]
   );
@@ -185,7 +200,7 @@ export function WrappedWebView({ initialPath, allowOnboardingPaths = false, cont
 
       // Stop any in-flight loads to prevent repeated /login navigations inside the WebView.
       try {
-        webViewRef.current?.stopLoading?.();
+        webRef.current?.stopLoading?.();
       } catch {
         // ignore
       }
@@ -198,8 +213,10 @@ export function WrappedWebView({ initialPath, allowOnboardingPaths = false, cont
     if (data === "NEED_POST_LOGIN_GATE") {
       if (forcingNativeLoginRef.current) return;
       router.replace("/post-login-gate");
+      return;
     }
-  }, [containerType, sendNativeSession, session?.access_token, session?.refresh_token, signOut]);
+    onWebMessage?.(data);
+  }, [containerType, onWebMessage, sendNativeSession, session?.access_token, session?.refresh_token, signOut]);
 
   const openExternally = useCallback((urlString: string) => {
     // Fire-and-forget: external apps / OS handlers.
@@ -302,12 +319,14 @@ export function WrappedWebView({ initialPath, allowOnboardingPaths = false, cont
       {StatusBarChrome}
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
         <WebView
-          ref={webViewRef}
+          ref={webRef}
           source={{ uri: initialUrl }}
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
           onMessage={handleMessage}
-          onNavigationStateChange={(navState) => {
+          onNavigationStateChange={(navState: WebViewNavigation) => {
+            canGoBackRef.current = !!navState.canGoBack;
+            onWebNavigationStateChange?.(navState);
             const nextUrl = String(navState?.url ?? "");
             setLastNavUrl(nextUrl || null);
             // Android WebView can occasionally miss `onLoadEnd` for same-origin navigations.
@@ -372,7 +391,40 @@ export function WrappedWebView({ initialPath, allowOnboardingPaths = false, cont
 
 export default function WebWrapperScreen() {
   const params = useLocalSearchParams();
-  return <WrappedWebView initialPath={params.path} allowOnboardingPaths={false} containerType="native" />;
+  const webRef = React.useRef<any>(null);
+  const canGoBackRef = React.useRef(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (Platform.OS !== "android") return;
+
+      const onBackPress = () => {
+        if (canGoBackRef.current && webRef.current?.goBack) {
+          webRef.current.goBack();
+          return true;
+        }
+
+        Alert.alert("Exit AvoVibe?", "Do you want to exit the app?", [
+          { text: "Cancel", style: "cancel" },
+          { text: "Exit", style: "destructive", onPress: () => BackHandler.exitApp() },
+        ]);
+        return true;
+      };
+
+      const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      return () => sub.remove();
+    }, [])
+  );
+
+  return (
+    <WrappedWebView
+      initialPath={params.path}
+      allowOnboardingPaths={false}
+      containerType="native"
+      webRef={webRef}
+      canGoBackRef={canGoBackRef}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
