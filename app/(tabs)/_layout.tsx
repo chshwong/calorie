@@ -26,6 +26,7 @@ import { openWeightEntryForToday as openWeightEntryForTodayNav } from '@/lib/nav
 import { ShareChip } from '@/src/components/share/ShareChip';
 import { getBigCircleMenuColors } from '@/theme/getBigCircleMenuColors';
 import { getLocalDateString } from '@/utils/calculations';
+import { getTodayKey } from '@/utils/dateTime';
 import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
 import type { FocusModule } from '@/utils/types';
 
@@ -85,6 +86,63 @@ function TabLayoutContent() {
       }
     }
   }, [authLoading, userConfigLoading, user, effectiveProfile, router]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const containerType = String((window as any).__AVOVIBE_CONTAINER__?.type ?? '');
+    if (containerType !== 'native') return;
+
+    const handleMessage = (event: any) => {
+      const raw = event?.data != null ? String(event.data) : '';
+      if (!raw) return;
+      let msg: any = null;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (msg?.type !== 'NATIVE_PRE_EXIT_BACK') return;
+
+      const todayKey = getTodayKey();
+      const pathname = window.location?.pathname ?? '/';
+      const search = window.location?.search ?? '';
+      const params = new URLSearchParams(search);
+      const currentDate = params.get('date');
+      const isFoodDiary = pathname === '/' || pathname === '';
+
+      if (!isFoodDiary) {
+        router.replace({ pathname: '/', params: { date: todayKey } });
+        (window as any).ReactNativeWebView?.postMessage?.(
+          JSON.stringify({ type: 'NATIVE_PRE_EXIT_BACK_RESULT', handled: true })
+        );
+        return;
+      }
+
+      if (currentDate && currentDate !== todayKey) {
+        router.replace({ pathname: '/', params: { date: todayKey } });
+        (window as any).ReactNativeWebView?.postMessage?.(
+          JSON.stringify({ type: 'NATIVE_PRE_EXIT_BACK_RESULT', handled: true })
+        );
+        return;
+      }
+
+      (window as any).ReactNativeWebView?.postMessage?.(
+        JSON.stringify({ type: 'NATIVE_PRE_EXIT_BACK_RESULT', handled: false })
+      );
+    };
+
+    window.addEventListener('message', handleMessage);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('message', handleMessage);
+    }
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('message', handleMessage);
+      }
+    };
+  }, [router]);
 
   
   // Compute the remaining module

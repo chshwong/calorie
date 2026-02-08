@@ -1,11 +1,13 @@
 import { useFocusEffect } from "@react-navigation/native";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, BackHandler, Platform } from "react-native";
 import type { WebViewNavigation } from "react-native-webview";
 
 import { WrappedWebView } from "./web";
 
 export default function WebOnboardingScreen() {
+  const { t } = useTranslation();
   const webRef = React.useRef<any>(null);
   const canGoBackRef = React.useRef(false);
   const pendingOnboardingBackRef = React.useRef(false);
@@ -16,11 +18,11 @@ export default function WebOnboardingScreen() {
   }, []);
 
   const showExitModal = React.useCallback(() => {
-    Alert.alert("Exit AvoVibe?", "Do you want to exit the app?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Exit", style: "destructive", onPress: () => BackHandler.exitApp() },
+    Alert.alert(t("native.exit_app.title"), t("native.exit_app.body"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("native.exit_app.confirm"), style: "destructive", onPress: () => BackHandler.exitApp() },
     ]);
-  }, []);
+  }, [t]);
 
   const requestOnboardingStepBack = React.useCallback(() => {
     pendingOnboardingBackRef.current = true;

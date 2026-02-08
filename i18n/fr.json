@@ -32,6 +32,18 @@
     "pending": "En attente",
     "someone": "Quelqu’un"
   },
+  "native": {
+    "exit_app": {
+      "title": "Quitter AvoVibe ?",
+      "body": "Voulez-vous quitter l’application ?",
+      "confirm": "Quitter"
+    },
+    "exit_tour": {
+      "title": "Quitter le guide ?",
+      "body": "Vous pouvez relancer la visite à tout moment via l’icône d’aide.",
+      "confirm": "Quitter"
+    }
+  },
 
   "date": {
     "yday": "Hier"

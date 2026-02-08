@@ -2,6 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, BackHandler, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, useColorScheme, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { WebViewNavigation } from "react-native-webview";
@@ -390,24 +391,129 @@ export function WrappedWebView({
 }
 
 export default function WebWrapperScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
   const webRef = React.useRef<any>(null);
   const canGoBackRef = React.useRef(false);
+  const pendingPreExitRef = React.useRef(false);
+  const preExitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tourActiveRef = React.useRef(false);
+  const pendingTourBackRef = React.useRef(false);
+  const tourBackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showExitModal = React.useCallback(() => {
+    Alert.alert(t("native.exit_app.title"), t("native.exit_app.body"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("native.exit_app.confirm"), style: "destructive", onPress: () => BackHandler.exitApp() },
+    ]);
+  }, [t]);
+
+  const requestPreExitBack = React.useCallback(() => {
+    pendingPreExitRef.current = true;
+    webRef.current?.postMessage?.(JSON.stringify({ type: "NATIVE_PRE_EXIT_BACK" }));
+    if (preExitTimerRef.current) {
+      clearTimeout(preExitTimerRef.current);
+    }
+    preExitTimerRef.current = setTimeout(() => {
+      if (!pendingPreExitRef.current) return;
+      pendingPreExitRef.current = false;
+      showExitModal();
+    }, 500);
+  }, [showExitModal]);
+
+  const requestTourBack = React.useCallback(() => {
+    pendingTourBackRef.current = true;
+    webRef.current?.postMessage?.(JSON.stringify({ type: "NATIVE_TOUR_BACK" }));
+
+    if (tourBackTimerRef.current) {
+      clearTimeout(tourBackTimerRef.current);
+    }
+    tourBackTimerRef.current = setTimeout(() => {
+      if (!pendingTourBackRef.current) return;
+      pendingTourBackRef.current = false;
+      // If the web doesn't reply, do nothing (tour owns back).
+    }, 350);
+  }, []);
+
+  const handleWebMessage = React.useCallback(
+    (data: string) => {
+      let msg: any = null;
+      try {
+        msg = JSON.parse(data);
+      } catch {
+        return;
+      }
+
+      if (msg?.type === "NATIVE_PRE_EXIT_BACK_RESULT") {
+        pendingPreExitRef.current = false;
+        if (preExitTimerRef.current) {
+          clearTimeout(preExitTimerRef.current);
+          preExitTimerRef.current = null;
+        }
+        if (msg.handled === false) {
+          showExitModal();
+        }
+        return;
+      }
+
+      if (msg?.type === "TOUR_ACTIVE") {
+        tourActiveRef.current = !!msg.active;
+        return;
+      }
+
+      if (msg?.type === "NATIVE_TOUR_BACK_RESULT") {
+        pendingTourBackRef.current = false;
+        if (tourBackTimerRef.current) {
+          clearTimeout(tourBackTimerRef.current);
+          tourBackTimerRef.current = null;
+        }
+        if (msg.handled === true) return;
+
+        Alert.alert(t("native.exit_tour.title"), t("native.exit_tour.body"), [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("native.exit_tour.confirm"),
+            style: "destructive",
+            onPress: () => {
+              webRef.current?.postMessage?.(JSON.stringify({ type: "NATIVE_TOUR_EXIT" }));
+            },
+          },
+        ]);
+        return;
+      }
+    },
+    [showExitModal, t]
+  );
+
+  React.useEffect(() => {
+    return () => {
+      if (preExitTimerRef.current) {
+        clearTimeout(preExitTimerRef.current);
+        preExitTimerRef.current = null;
+      }
+      if (tourBackTimerRef.current) {
+        clearTimeout(tourBackTimerRef.current);
+        tourBackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
       if (Platform.OS !== "android") return;
 
       const onBackPress = () => {
+        if (tourActiveRef.current) {
+          requestTourBack();
+          return true;
+        }
+
         if (canGoBackRef.current && webRef.current?.goBack) {
           webRef.current.goBack();
           return true;
         }
 
-        Alert.alert("Exit AvoVibe?", "Do you want to exit the app?", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Exit", style: "destructive", onPress: () => BackHandler.exitApp() },
-        ]);
+        requestPreExitBack();
         return true;
       };
 
@@ -423,6 +529,7 @@ export default function WebWrapperScreen() {
       containerType="native"
       webRef={webRef}
       canGoBackRef={canGoBackRef}
+      onWebMessage={handleWebMessage}
     />
   );
 }

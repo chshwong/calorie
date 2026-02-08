@@ -37,6 +37,67 @@ export function TourOverlay() {
   const [tooltipHeight, setTooltipHeight] = useState<number>(0);
   const stepMessage = step?.messageKey ? t(step.messageKey) : '';
 
+  const containerType =
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? String((window as any).__AVOVIBE_CONTAINER__?.type ?? '')
+      : '';
+  const isNativeWrapperWeb = Platform.OS === 'web' && (containerType === 'native' || containerType === 'native_onboarding');
+
+  useEffect(() => {
+    if (!isNativeWrapperWeb || typeof window === 'undefined') return;
+    (window as any).ReactNativeWebView?.postMessage?.(
+      JSON.stringify({ type: 'TOUR_ACTIVE', active: isVisible })
+    );
+  }, [isNativeWrapperWeb, isVisible]);
+
+  useEffect(() => {
+    if (!isNativeWrapperWeb || typeof window === 'undefined') return;
+
+    const handleMessage = (event: any) => {
+      const raw = event?.data != null ? String(event.data) : '';
+      if (!raw) return;
+      let msg: any = null;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (msg?.type === 'NATIVE_TOUR_BACK') {
+        if (!isVisible || stepIndex <= 0) {
+          (window as any).ReactNativeWebView?.postMessage?.(
+            JSON.stringify({ type: 'NATIVE_TOUR_BACK_RESULT', handled: false })
+          );
+          return;
+        }
+
+        back();
+        (window as any).ReactNativeWebView?.postMessage?.(
+          JSON.stringify({ type: 'NATIVE_TOUR_BACK_RESULT', handled: true })
+        );
+        return;
+      }
+
+      if (msg?.type === 'NATIVE_TOUR_EXIT') {
+        skip();
+        (window as any).ReactNativeWebView?.postMessage?.(
+          JSON.stringify({ type: 'TOUR_ACTIVE', active: false })
+        );
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('message', handleMessage);
+    }
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('message', handleMessage);
+      }
+    };
+  }, [back, isNativeWrapperWeb, isVisible, skip, stepIndex]);
+
   // Subtle "breathing" pulse for the spotlight border (visual-only; does not affect measurement).
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {

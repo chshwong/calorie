@@ -41,6 +41,18 @@
     "pending": "Pending",
     "someone": "Someone"
   },
+  "native": {
+    "exit_app": {
+      "title": "Exit AvoVibe?",
+      "body": "Do you want to exit the app?",
+      "confirm": "Exit"
+    },
+    "exit_tour": {
+      "title": "Exit tour guide?",
+      "body": "You can restart the tour anytime from the 💡 icon.",
+      "confirm": "Exit"
+    }
+  },
   "wearable_sync_label": "⌚ Sync",
   "wearable_syncing_label": "⏳ Syncing…",
   "wearable_updated_label": "✓ Updated",
