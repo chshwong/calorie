@@ -26,6 +26,13 @@ export interface CalorieEntry {
   updated_at: string;
 }
 
+export type DailyLogStatus = "unknown" | "completed" | "fasted" | "reopened";
+
+export interface DailyEntriesWithStatus {
+  entries: CalorieEntry[];
+  log_status: DailyLogStatus | null;
+}
+
 export interface DailyTotals {
   calories: number;
   protein: number;

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { toDateKey } from "@/lib/foodDiary/dateKey";
-import type { CalorieEntry, MealType } from "@/lib/foodDiary/types";
+import type { CalorieEntry, DailyEntriesWithStatus, MealType } from "@/lib/foodDiary/types";
 import { createEntry } from "@/services/calorieEntries";
 import type { FoodMaster } from "@/services/foodSearch";
 
@@ -59,9 +59,9 @@ export function useAddMealEntryMutation() {
       const dateKey = toDateKey(entryDate);
       const queryKey = ["entries", userId, dateKey] as const;
 
-      queryClient.setQueryData<CalorieEntry[]>(queryKey, (prev) => {
-        const list = prev ?? [];
-        return [...list, created];
+      queryClient.setQueryData<DailyEntriesWithStatus>(queryKey, (prev) => {
+        const list = prev?.entries ?? [];
+        return { entries: [...list, created], log_status: prev?.log_status ?? null };
       });
 
       queryClient.invalidateQueries({ queryKey });

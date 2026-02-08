@@ -10,9 +10,9 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { getEntriesForDate, createEntry, deleteEntries } from './calorieEntries';
-import { getMealtypeMetaByDate, upsertMealtypeMeta } from './calories-entries-mealtype-meta';
 import type { CalorieEntry } from '@/utils/types';
+import { createEntry, deleteEntries, getEntriesForDate } from './calorieEntries';
+import { getMealtypeMetaByDate, upsertMealtypeMeta } from './calories-entries-mealtype-meta';
 
 export interface CloneMealtypeResult {
   entriesCloned: number;
@@ -66,7 +66,7 @@ export async function transferMealtypeEntries(
 
   try {
     // Step 1: Get source entries
-    const sourceEntries = await getEntriesForDate(userId, normalizedSource);
+    const { entries: sourceEntries } = await getEntriesForDate(userId, normalizedSource);
     
     // Filter entries by source meal type
     const entriesToTransfer = sourceEntries.filter(entry => 

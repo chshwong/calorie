@@ -73,6 +73,7 @@ import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatt
 import {
   type FoodMaster
 } from '@/utils/nutritionMath';
+import type { DailyEntriesWithStatus } from '@/utils/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -400,7 +401,14 @@ export default function LogFoodScreen() {
   }, [showEntryDetails, loadingDetailsPreference]);
 
   // Use React Query hook for entries (shared cache with Home screen)
-  const { data: allEntriesForDay = [], isLoading: entriesLoading, isFetching: entriesFetching, isError: entriesError, refetch: refetchEntries } = useDailyEntries(entryDate);
+  const {
+    data: entriesPayload,
+    isLoading: entriesLoading,
+    isFetching: entriesFetching,
+    isError: entriesError,
+    refetch: refetchEntries,
+  } = useDailyEntries(entryDate);
+  const allEntriesForDay = entriesPayload?.entries ?? [];
   
   // Filter entries by current meal type (client-side filtering)
   // Memoize to prevent unnecessary re-renders and useEffect triggers
@@ -817,7 +825,7 @@ export default function LogFoodScreen() {
     
     // Use React Query cache to check if previous day has entries or notes for this meal type
     const previousDayQueryKey = ['entries', user?.id, previousDateString];
-    const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
+    const cachedPreviousDayEntries = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>(previousDayQueryKey);
     const previousDayMetaQueryKey = ['mealtypeMeta', user?.id, previousDateString];
     const cachedPreviousDayMeta = queryClient.getQueryData<any[]>(previousDayMetaQueryKey);
     
@@ -827,8 +835,11 @@ export default function LogFoodScreen() {
     
     // Check entries
     if (cachedPreviousDayEntries !== undefined) {
-      if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
-        const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+      const cachedEntries = Array.isArray(cachedPreviousDayEntries)
+        ? cachedPreviousDayEntries
+        : cachedPreviousDayEntries?.entries ?? null;
+      if (cachedEntries !== null && cachedEntries.length > 0) {
+        const mealTypeEntries = cachedEntries.filter(entry => 
           entry.meal_type?.toLowerCase() === selectedMealType.toLowerCase()
         );
         hasEntries = mealTypeEntries.length > 0;

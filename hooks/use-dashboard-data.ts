@@ -17,20 +17,18 @@
  * staleTime: 60s, gcTime: 5min
  */
 
-import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDailyEntries } from '@/hooks/use-daily-entries';
-import { useExerciseLogsForDate } from '@/hooks/use-exercise-logs';
-import { useMedLogsForDate } from '@/hooks/use-med-logs';
-import { useExerciseSummaryForRecentDays } from '@/hooks/use-exercise-logs';
-import { useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
-import { calculateDailyTotals } from '@/utils/dailyTotals';
-import { useUserConfig } from '@/hooks/use-user-config';
-import { getEntriesForDateRange } from '@/lib/services/calorieEntries';
-import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
-import { addDays } from '@/utils/dateKey';
 import { useDailySumBurnedRange } from '@/hooks/use-daily-sum-burned-range';
-import { getCalorieZone, type CalorieZone, type GoalType } from '@/lib/utils/calorie-zone';
+import { useExerciseLogsForDate, useExerciseSummaryForRecentDays } from '@/hooks/use-exercise-logs';
+import { useMedLogsForDate, useMedSummaryForRecentDays } from '@/hooks/use-med-logs';
+import { useUserConfig } from '@/hooks/use-user-config';
+import { compareDateKeys, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
+import { getEntriesForDateRange } from '@/lib/services/calorieEntries';
+import { getCalorieZone, type GoalType } from '@/lib/utils/calorie-zone';
+import { calculateDailyTotals } from '@/utils/dailyTotals';
+import { addDays } from '@/utils/dateKey';
+import { useQuery } from '@tanstack/react-query';
 
 function buildDateKeysInclusive(startKey: string, endKey: string, maxDays: number): string[] {
   const keys: string[] = [];
@@ -50,10 +48,11 @@ function buildDateKeysInclusive(startKey: string, endKey: string, maxDays: numbe
 export function useDailyFoodSummary(dateString: string) {
   const { user } = useAuth();
   const userId = user?.id;
-  const { data: entries = [] } = useDailyEntries(dateString);
+  const { data: entriesPayload, isLoading, isFetching } = useDailyEntries(dateString);
   const { data: userConfig } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility
 
+  const entries = entriesPayload?.entries ?? [];
   const totals = calculateDailyTotals(entries);
   
   // Get goals from profile (matching index.tsx - using onboarding target columns)
@@ -76,6 +75,9 @@ export function useDailyFoodSummary(dateString: string) {
     fiberGoalG: fiberGoal,
     sugarG: totals.sugar,
     entries,
+    logStatus: entriesPayload?.log_status ?? null,
+    isLoading,
+    isFetching,
   };
 }
 

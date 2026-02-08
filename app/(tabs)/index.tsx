@@ -12,6 +12,7 @@ import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { MacroGauge } from '@/components/MacroGauge';
 import { NoteEditor } from '@/components/note-editor';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { TapHintOverlay } from '@/components/TapHintOverlay';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AICameraFunnelModal } from '@/components/ui/AICameraFunnelModal';
@@ -56,7 +57,7 @@ import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getLocalDateKey } from '@/utils/dateTime';
-import { MEAL_TYPE_ORDER, type CalorieEntry } from '@/utils/types';
+import { MEAL_TYPE_ORDER, type CalorieEntry, type DailyEntriesWithStatus } from '@/utils/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
@@ -155,7 +156,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     
     // Check entries cache
     const previousDayQueryKey = ['entries', user.id, previousDateKey];
-    const cachedPreviousDayEntries = queryClient.getQueryData<CalorieEntry[]>(previousDayQueryKey);
+    const cachedPreviousDayEntries = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>(previousDayQueryKey);
     
     // Check meta cache
     const previousDayMetaQueryKey = ['mealtypeMeta', user.id, previousDateKey];
@@ -168,8 +169,11 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     
     // Check entries
     if (cachedPreviousDayEntries !== undefined) {
-      if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
-        const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+      const cachedEntries = Array.isArray(cachedPreviousDayEntries)
+        ? cachedPreviousDayEntries
+        : cachedPreviousDayEntries?.entries ?? null;
+      if (cachedEntries !== null && cachedEntries.length > 0) {
+        const mealTypeEntries = cachedEntries.filter(entry => 
           entry.meal_type?.toLowerCase() === mealType.toLowerCase()
         );
         if (mealTypeEntries.length > 0) {
@@ -200,7 +204,7 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     
     // Use React Query cache to check if previous day has entries or notes for this meal type
     const previousDayQueryKey = ['entries', user?.id, previousDateString];
-    const cachedPreviousDayEntries = queryClient.getQueryData<any[]>(previousDayQueryKey);
+    const cachedPreviousDayEntries = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>(previousDayQueryKey);
     const previousDayMetaQueryKey = ['mealtypeMeta', user?.id, previousDateString];
     const cachedPreviousDayMeta = queryClient.getQueryData<any[]>(previousDayMetaQueryKey);
     
@@ -210,8 +214,11 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
     
     // Check entries
     if (cachedPreviousDayEntries !== undefined) {
-      if (cachedPreviousDayEntries !== null && cachedPreviousDayEntries.length > 0) {
-        const mealTypeEntries = cachedPreviousDayEntries.filter(entry => 
+      const cachedEntries = Array.isArray(cachedPreviousDayEntries)
+        ? cachedPreviousDayEntries
+        : cachedPreviousDayEntries?.entries ?? null;
+      if (cachedEntries !== null && cachedEntries.length > 0) {
+        const mealTypeEntries = cachedEntries.filter(entry => 
           entry.meal_type?.toLowerCase() === mealType.toLowerCase()
         );
         hasEntries = mealTypeEntries.length > 0;
@@ -276,99 +283,6 @@ function MealTypeCopyButton({ mealType, mealTypeLabel, selectedDate, isToday, co
           </ThemedText>
         </>
       )}
-    </View>
-  );
-}
-
-type TapHintOverlayProps = {
-  visible: boolean;
-  targetRect: { x: number; y: number; width: number; height: number } | null;
-};
-
-function TapHintOverlay({ visible, targetRect }: TapHintOverlayProps) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  useEffect(() => {
-    if (!visible || !targetRect) {
-      animationRef.current?.stop();
-      translateY.setValue(0);
-      scale.setValue(1);
-      opacity.setValue(0);
-      return;
-    }
-
-    translateY.setValue(0);
-    scale.setValue(1);
-    opacity.setValue(0);
-
-    Animated.timing(opacity, {
-      toValue: 1,
-      duration: 250,
-      useNativeDriver: true,
-    }).start();
-
-    const tapLoop = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(translateY, {
-            toValue: 8,
-            duration: 220,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scale, {
-            toValue: 0.92,
-            duration: 220,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(translateY, {
-            toValue: 0,
-            duration: 260,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scale, {
-            toValue: 1,
-            duration: 260,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.delay(900),
-      ]),
-      { resetBeforeIteration: true }
-    );
-
-    animationRef.current = tapLoop;
-    tapLoop.start();
-
-    return () => {
-      animationRef.current?.stop();
-    };
-  }, [opacity, scale, targetRect, translateY, visible]);
-
-  if (!visible || !targetRect) return null;
-
-  const left = targetRect.x + targetRect.width * 0.6;
-  const top = targetRect.y + targetRect.height * 0.35;
-
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Animated.View
-        style={[
-          styles.tapHint,
-          {
-            left,
-            top,
-            opacity,
-            transform: [{ translateY }, { scale }],
-          },
-        ]}
-      >
-        <Text style={styles.tapHintIcon}>👆</Text>
-      </Animated.View>
     </View>
   );
 }
@@ -626,10 +540,15 @@ export default function FoodLogHomeScreen() {
   const persistentEntries = useMemo(() => {
     if (!user?.id || !selectedDateString) return null;
     const cacheKey = `dailyEntries:${user.id}:${selectedDateString}`;
-    return getPersistentCache<CalorieEntry[]>(cacheKey, 120 * 24 * 60 * 60 * 1000);
+    const snapshot = getPersistentCache<DailyEntriesWithStatus | CalorieEntry[]>(cacheKey, 120 * 24 * 60 * 60 * 1000);
+    if (Array.isArray(snapshot)) {
+      return { entries: snapshot, log_status: null };
+    }
+    return snapshot;
   }, [user?.id, selectedDateString]);
   
-  const entries = calorieEntries ?? persistentEntries ?? [];
+  const entriesPayload = calorieEntries ?? persistentEntries;
+  const entries = entriesPayload?.entries ?? [];
   const hasFoodEntries = entries.length > 0;
   
   // Only show loading spinner if we're doing initial load AND have no data at all (including persistent cache)
@@ -638,7 +557,7 @@ export default function FoodLogHomeScreen() {
   const showLoadingSpinner =
     entriesLoading && 
     entries.length === 0 && 
-    calorieEntries === undefined &&
+    entriesPayload === undefined &&
     persistentEntries === null;
 
   // UserConfig: use cache immediately - use canonical query key
@@ -2490,13 +2409,6 @@ const styles = StyleSheet.create({
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  tapHint: {
-    position: 'absolute',
-    zIndex: 10,
-  },
-  tapHintIcon: {
-    fontSize: 24,
   },
   homeRestartTourButton: {
     marginLeft: 8,

@@ -5,33 +5,32 @@
  * Handles manual entry creation and editing (entries without food_id).
  */
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Pressable } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { ThemedText } from '@/components/themed-text';
-import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
-import { useAuth } from '@/contexts/AuthContext';
-import { Colors, SemanticColors } from '@/constants/theme';
-import { FOOD_ENTRY, RANGES, TEXT_LIMITS } from '@/constants/constraints';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getCurrentDateTimeUTC } from '@/utils/calculations';
-import { deleteEntry as deleteEntryService, createEntry as createEntryService, updateEntry as updateEntryService } from '@/lib/services/calorieEntries';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  getButtonAccessibilityProps,
-  getInputAccessibilityProps,
-  getWebAccessibilityProps,
-  getMinTouchTargetStyle,
-} from '@/utils/accessibility';
-import type { CalorieEntry } from '@/utils/types';
-import { getEntriesForDate } from '@/lib/services/calorieEntries';
-import { getPersistentCache, setPersistentCache, DEFAULT_CACHE_MAX_AGE_MS } from '@/lib/persistentCache';
-import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { showAppToast } from '@/components/ui/app-toast';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { NumberInput } from '@/components/input/NumberInput';
+import { NutritionLabelLayout } from '@/components/NutritionLabelLayout';
+import { ThemedText } from '@/components/themed-text';
+import { showAppToast } from '@/components/ui/app-toast';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { FOOD_ENTRY, RANGES, TEXT_LIMITS } from '@/constants/constraints';
+import { Colors, SemanticColors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { AIQuickLogConfidence } from '@/lib/ai/aiQuickLogParser';
+import { DEFAULT_CACHE_MAX_AGE_MS, getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { createEntry as createEntryService, deleteEntry as deleteEntryService, getEntriesForDate, updateEntry as updateEntryService } from '@/lib/services/calorieEntries';
+import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
+import {
+    getButtonAccessibilityProps,
+    getInputAccessibilityProps,
+    getMinTouchTargetStyle,
+    getWebAccessibilityProps,
+} from '@/utils/accessibility';
+import { getCurrentDateTimeUTC } from '@/utils/calculations';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type QuickLogFormProps = {
   date: string;                 // ISO date string (YYYY-MM-DD)
@@ -123,16 +122,20 @@ export function QuickLogForm({
 
   const entriesSnapshot = useMemo(() => {
     if (!user?.id || !effectiveDate) return null;
-    return getPersistentCache<CalorieEntry[]>(
+    const snapshot = getPersistentCache<DailyEntriesWithStatus | CalorieEntry[]>(
       `dailyEntries:${user.id}:${effectiveDate}`,
       ENTRIES_CACHE_MAX_AGE_MS
     );
+    if (Array.isArray(snapshot)) {
+      return { entries: snapshot, log_status: null };
+    }
+    return snapshot;
   }, [effectiveDate, user?.id]);
 
   const {
-    data: entriesFromQuery = [],
+    data: entriesFromQuery,
     isSuccess: entriesLoaded,
-  } = useQuery<CalorieEntry[]>({
+  } = useQuery<DailyEntriesWithStatus>({
     queryKey: entriesQueryKey,
     queryFn: () => {
       if (!user?.id || !effectiveDate) {
@@ -142,12 +145,15 @@ export function QuickLogForm({
     },
     enabled: !!user?.id && !!effectiveDate,
     initialData: useMemo(() => {
-      const cached = queryClient.getQueryData<CalorieEntry[]>(entriesQueryKey);
-      if (cached && cached.length > 0) {
-        return cached;
+      const cached = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>(entriesQueryKey);
+      const normalizedCached = Array.isArray(cached)
+        ? { entries: cached, log_status: null }
+        : cached;
+      if (normalizedCached && normalizedCached.entries.length > 0) {
+        return normalizedCached;
       }
       if (initialEntry && initialEntry.entry_date === effectiveDate) {
-        return [initialEntry];
+        return { entries: [initialEntry], log_status: normalizedCached?.log_status ?? null };
       }
       if (entriesSnapshot) {
         return entriesSnapshot;
@@ -162,13 +168,15 @@ export function QuickLogForm({
 
   useEffect(() => {
     if (!user?.id || !effectiveDate) return;
-    if (!entriesFromQuery || entriesFromQuery.length === 0) return;
+    const entries = entriesFromQuery?.entries ?? [];
+    if (entries.length === 0) return;
     setPersistentCache(`dailyEntries:${user.id}:${effectiveDate}`, entriesFromQuery);
   }, [effectiveDate, entriesFromQuery, user?.id]);
 
   const entryFromQuery = useMemo(() => {
     if (!quickLogId) return null;
-    return entriesFromQuery.find((entry) => entry.id === quickLogId) ?? null;
+    const entries = entriesFromQuery?.entries ?? [];
+    return entries.find((entry) => entry.id === quickLogId) ?? null;
   }, [entriesFromQuery, quickLogId]);
 
   const hydratedEntry = entryFromQuery ?? initialEntry ?? null;
@@ -560,9 +568,15 @@ export function QuickLogForm({
           error = { message: 'Failed to update entry' };
         } else {
           // Optimistically update cache with returned entry (includes source/ai_confidence)
-          queryClient.setQueryData<CalorieEntry[]>(entriesQueryKey, (prev) => {
-            if (!prev) return [updatedEntry];
-            return prev.map((e) => (e.id === quickLogId ? updatedEntry : e));
+          queryClient.setQueryData<DailyEntriesWithStatus>(entriesQueryKey, (prev) => {
+            const prevEntries = prev?.entries ?? [];
+            if (prevEntries.length === 0) {
+              return { entries: [updatedEntry], log_status: prev?.log_status ?? null };
+            }
+            return {
+              entries: prevEntries.map((e) => (e.id === quickLogId ? updatedEntry : e)),
+              log_status: prev?.log_status ?? null,
+            };
           });
         }
       } else {
@@ -572,8 +586,9 @@ export function QuickLogForm({
           error = { message: 'Failed to create entry' };
         } else {
           // Optimistically update cache with returned entry (includes source/ai_confidence)
-          queryClient.setQueryData<CalorieEntry[]>(entriesQueryKey, (prev) => {
-            return prev ? [...prev, createdEntry] : [createdEntry];
+          queryClient.setQueryData<DailyEntriesWithStatus>(entriesQueryKey, (prev) => {
+            const prevEntries = prev?.entries ?? [];
+            return { entries: [...prevEntries, createdEntry], log_status: prev?.log_status ?? null };
           });
         }
       }
@@ -706,9 +721,13 @@ export function QuickLogForm({
 
       // Invalidate entries cache
       const entriesKey = ['entries', user.id, effectiveDate] as const;
-      queryClient.setQueryData<CalorieEntry[]>(entriesKey, (prev) =>
-        (prev ?? []).filter((e) => e.id !== entryId)
-      );
+      queryClient.setQueryData<DailyEntriesWithStatus>(entriesKey, (prev) => {
+        const prevEntries = prev?.entries ?? [];
+        return {
+          entries: prevEntries.filter((entry) => entry.id !== entryId),
+          log_status: prev?.log_status ?? null,
+        };
+      });
       queryClient.invalidateQueries({ queryKey: entriesKey });
 
       // Invalidate daily sum consumed ranges

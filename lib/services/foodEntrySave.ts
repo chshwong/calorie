@@ -1,7 +1,7 @@
-import type { QueryClient } from '@tanstack/react-query';
-import type { CalorieEntry } from '@/utils/types';
 import { createEntry } from '@/lib/services/calorieEntries';
 import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
+import type { QueryClient } from '@tanstack/react-query';
 
 type FoodEditSaveEntryVars = {
   userId: string;
@@ -21,22 +21,26 @@ export function applyFoodEditEntrySaveSuccessSideEffects(
   // (engineering-guidelines.md §4.2)
   const savedKey = ['entries', vars.userId, saved.entry_date] as const;
 
-  queryClient.setQueryData<CalorieEntry[]>(savedKey, (prev) => {
-    const list = prev ?? [];
+  queryClient.setQueryData<DailyEntriesWithStatus>(savedKey, (prev) => {
+    const list = prev?.entries ?? [];
     const idx = list.findIndex((e) => e.id === saved.id);
     if (idx >= 0) {
       const next = list.slice();
       next[idx] = saved;
-      return next;
+      return { entries: next, log_status: prev?.log_status ?? null };
     }
-    return [...list, saved];
+    return { entries: [...list, saved], log_status: prev?.log_status ?? null };
   });
 
   if (vars.previousDateKey && vars.previousDateKey !== saved.entry_date) {
     const prevKey = ['entries', vars.userId, vars.previousDateKey] as const;
-    queryClient.setQueryData<CalorieEntry[]>(prevKey, (prev) =>
-      (prev ?? []).filter((e) => e.id !== saved.id)
-    );
+    queryClient.setQueryData<DailyEntriesWithStatus>(prevKey, (prev) => {
+      const prevEntries = prev?.entries ?? [];
+      return {
+        entries: prevEntries.filter((e) => e.id !== saved.id),
+        log_status: prev?.log_status ?? null,
+      };
+    });
   }
 
   queryClient.invalidateQueries({ queryKey: savedKey });

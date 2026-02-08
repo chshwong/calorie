@@ -15,7 +15,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { CalorieEntry } from '@/utils/types';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
 
 // Columns to select - avoid select('*') per guideline 3.2
 const ENTRY_COLUMNS = `
@@ -56,28 +56,28 @@ const ENTRY_COLUMNS = `
 export async function getEntriesForDate(
   userId: string,
   dateString: string
-): Promise<CalorieEntry[]> {
+): Promise<DailyEntriesWithStatus> {
   if (!userId) {
-    return [];
+    return { entries: [], log_status: null };
   }
 
   try {
     const { data, error } = await supabase
-      .from('calorie_entries')
-      .select(ENTRY_COLUMNS)
-      .eq('user_id', userId)
-      .eq('entry_date', dateString)
-      .order('created_at', { ascending: true });
+      .rpc('get_entries_with_log_status', { p_entry_date: dateString })
+      .single();
 
     if (error) {
       console.error('Error fetching entries:', error);
-      return [];
+      return { entries: [], log_status: null };
     }
 
-    return data || [];
+    return {
+      entries: (data?.entries as CalorieEntry[] | null) ?? [],
+      log_status: data?.log_status ?? null,
+    };
   } catch (error) {
     console.error('Exception fetching entries:', error);
-    return [];
+    return { entries: [], log_status: null };
   }
 }
 

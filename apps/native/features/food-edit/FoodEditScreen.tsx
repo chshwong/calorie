@@ -1,30 +1,30 @@
-import { useCallback, useMemo } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { useRouter } from "expo-router";
-import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
+import { NutritionLabelLayout } from "@/components/NutritionLabelLayout";
+import { MacroCompositionDonutChart } from "@/components/charts/MacroCompositionDonutChart";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { Text } from "@/components/ui/Text";
-import { NutritionLabelLayout } from "@/components/NutritionLabelLayout";
-import { MacroCompositionDonutChart } from "@/components/charts/MacroCompositionDonutChart";
 import { useAuth } from "@/contexts/AuthContext";
 import { dateKeyToLocalStartOfDay } from "@/lib/foodDiary/date-guard";
 import { toDateKey } from "@/lib/foodDiary/dateKey";
+import type { CalorieEntry, DailyEntriesWithStatus } from "@/lib/foodDiary/types";
 import { getFoodMasterById } from "@/lib/services/foodMaster";
 import { getServingsForFood } from "@/lib/servings";
 import { createEntry } from "@/services/calorieEntries";
 import { spacing } from "@/theme/tokens";
-import type { CalorieEntry } from "@/lib/foodDiary/types";
-import type { FoodMaster, FoodServing, ServingOption } from "@/utils/nutritionMath";
-import {
-  calculateNutrientsSimple,
-  getDefaultServingSelection,
-  getMasterUnitsFromServingOption,
-  isVolumeUnit,
-} from "@/utils/nutritionMath";
 import { computeAvoScore, normalizeAvoScoreInputToBasis } from "@/utils/avoScore";
+import type { FoodMaster, FoodServing } from "@/utils/nutritionMath";
+import {
+    calculateNutrientsSimple,
+    getDefaultServingSelection,
+    getMasterUnitsFromServingOption,
+    isVolumeUnit,
+} from "@/utils/nutritionMath";
 
 type FoodEditScreenProps = {
   date: string;
@@ -191,9 +191,9 @@ export function FoodEditScreen({ date, mealType, foodId }: FoodEditScreenProps) 
     onSuccess: (created) => {
       if (!user?.id) return;
       const queryKey = ["entries", user.id, dateKey] as const;
-      queryClient.setQueryData<CalorieEntry[]>(queryKey, (prev) => {
-        const list = prev ?? [];
-        return [...list, created];
+      queryClient.setQueryData<DailyEntriesWithStatus>(queryKey, (prev) => {
+        const list = prev?.entries ?? [];
+        return { entries: [...list, created], log_status: prev?.log_status ?? null };
       });
       queryClient.invalidateQueries({ queryKey });
       router.back();

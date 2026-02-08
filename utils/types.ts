@@ -221,6 +221,14 @@ export interface FitbitConnectionPublic {
 export type DailyLogStatus = 'unknown' | 'completed' | 'fasted' | 'reopened';
 
 /**
+ * Calorie entries response with explicit day-level log status.
+ */
+export interface DailyEntriesWithStatus {
+  entries: CalorieEntry[];
+  log_status: DailyLogStatus | null;
+}
+
+/**
  * Durable daily fact row for consumed totals + explicit day state.
  * Maps to the 'daily_sum_consumed' table.
  *

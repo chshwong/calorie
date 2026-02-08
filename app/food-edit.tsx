@@ -25,16 +25,16 @@ import { computeAvoScore, normalizeAvoScoreInputToBasis, type AvoScoreBasis, typ
 import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
 import { toDateKey } from '@/utils/dateKey';
 import {
-  buildServingOptions,
-  calculateNutrientsSimple,
-  convertToMasterUnit,
-  getDefaultServingSelection,
-  isVolumeUnit,
-  type FoodMaster,
-  type FoodServing,
-  type ServingOption,
+    buildServingOptions,
+    calculateNutrientsSimple,
+    convertToMasterUnit,
+    getDefaultServingSelection,
+    isVolumeUnit,
+    type FoodMaster,
+    type FoodServing,
+    type ServingOption,
 } from '@/utils/nutritionMath';
-import type { CalorieEntry } from '@/utils/types';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -154,30 +154,35 @@ export default function FoodEditScreen() {
   useEffect(() => {
     if (!user?.id || !initialEntry) return;
     const cacheKey: [string, string, string] = ['entries', user.id, initialEntry.entry_date];
-    queryClient.setQueryData<CalorieEntry[]>(cacheKey, (existing) => {
-      if (!existing || existing.length === 0) {
-        return [initialEntry];
+    queryClient.setQueryData<DailyEntriesWithStatus>(cacheKey, (existing) => {
+      const existingEntries = existing?.entries ?? [];
+      if (existingEntries.length === 0) {
+        return { entries: [initialEntry], log_status: existing?.log_status ?? null };
       }
-      const hasEntry = existing.some((entry) => entry.id === initialEntry.id);
-      if (hasEntry) {
-        return existing.map((entry) => (entry.id === initialEntry.id ? initialEntry : entry));
-      }
-      return [...existing, initialEntry];
+      const hasEntry = existingEntries.some((entry) => entry.id === initialEntry.id);
+      const nextEntries = hasEntry
+        ? existingEntries.map((entry) => (entry.id === initialEntry.id ? initialEntry : entry))
+        : [...existingEntries, initialEntry];
+      return { entries: nextEntries, log_status: existing?.log_status ?? null };
     });
   }, [initialEntry, queryClient, user?.id]);
 
   const entriesQueryKey: [string, string | undefined, string] = ['entries', user?.id, entryDate];
   const entriesSnapshot = useMemo(() => {
     if (!user?.id || !entryDate) return null;
-    return getPersistentCache<CalorieEntry[]>(
+    const snapshot = getPersistentCache<DailyEntriesWithStatus | CalorieEntry[]>(
       `dailyEntries:${user.id}:${entryDate}`,
       LONG_CACHE_MS
     );
+    if (Array.isArray(snapshot)) {
+      return { entries: snapshot, log_status: null };
+    }
+    return snapshot;
   }, [entryDate, user?.id]);
   const {
-    data: entriesFromQuery = [],
+    data: entriesFromQuery,
     isSuccess: entriesLoaded,
-  } = useQuery<CalorieEntry[]>({
+  } = useQuery<DailyEntriesWithStatus>({
     queryKey: entriesQueryKey,
     queryFn: () => {
       if (!user?.id || !entryDate) {
@@ -187,12 +192,15 @@ export default function FoodEditScreen() {
     },
     enabled: !!user?.id && !!entryDate,
     initialData: useMemo(() => {
-      const cached = queryClient.getQueryData<CalorieEntry[]>(entriesQueryKey);
-      if (cached && cached.length > 0) {
-        return cached;
+      const cached = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>(entriesQueryKey);
+      const normalizedCached = Array.isArray(cached)
+        ? { entries: cached, log_status: null }
+        : cached;
+      if (normalizedCached && normalizedCached.entries.length > 0) {
+        return normalizedCached;
       }
       if (initialEntry && initialEntry.entry_date === entryDate) {
-        return [initialEntry];
+        return { entries: [initialEntry], log_status: normalizedCached?.log_status ?? null };
       }
       if (entriesSnapshot) {
         return entriesSnapshot;
@@ -207,13 +215,15 @@ export default function FoodEditScreen() {
 
   useEffect(() => {
     if (!user?.id || !entryDate) return;
-    if (!entriesFromQuery || entriesFromQuery.length === 0) return;
+    const entries = entriesFromQuery?.entries ?? [];
+    if (entries.length === 0) return;
     setPersistentCache(`dailyEntries:${user.id}:${entryDate}`, entriesFromQuery);
   }, [entriesFromQuery, entryDate, user?.id]);
 
   const entryFromQuery = useMemo(() => {
     if (!entryId) return null;
-    return entriesFromQuery.find((entry) => entry.id === entryId) ?? null;
+    const entries = entriesFromQuery?.entries ?? [];
+    return entries.find((entry) => entry.id === entryId) ?? null;
   }, [entriesFromQuery, entryId]);
 
   const targetFoodId = useMemo(() => {
@@ -780,9 +790,13 @@ export default function FoodEditScreen() {
       // Invalidate entries cache
       const entryDateKey = entryDate || entryDateParam || '';
       const entriesKey = ['entries', user.id, entryDateKey] as const;
-      queryClient.setQueryData<CalorieEntry[]>(entriesKey, (prev) =>
-        (prev ?? []).filter((e) => e.id !== entryId)
-      );
+      queryClient.setQueryData<DailyEntriesWithStatus>(entriesKey, (prev) => {
+        const prevEntries = prev?.entries ?? [];
+        return {
+          entries: prevEntries.filter((entry) => entry.id !== entryId),
+          log_status: prev?.log_status ?? null,
+        };
+      });
       queryClient.invalidateQueries({ queryKey: entriesKey });
 
       // Invalidate daily sum consumed ranges

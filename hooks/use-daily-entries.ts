@@ -8,12 +8,12 @@
  * This prevents loading states when navigating between dates that are already cached.
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getEntriesForDate } from '@/lib/services/calorieEntries';
-import type { CalorieEntry } from '@/utils/types';
 import { getPersistentCache, setPersistentCache } from '@/lib/persistentCache';
+import { getEntriesForDate } from '@/lib/services/calorieEntries';
 import { toDateKey } from '@/utils/dateKey';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const DAILY_ENTRIES_MAX_AGE_MS = 120 * 24 * 60 * 60 * 1000; // ~180 days
 
@@ -30,10 +30,18 @@ export function useDailyEntries(entryDate: string | Date) {
   // NEW: read persistent snapshot once when hook is created
   const snapshot =
     cacheKey !== null
-      ? getPersistentCache<CalorieEntry[]>(cacheKey, DAILY_ENTRIES_MAX_AGE_MS)
+      ? getPersistentCache<DailyEntriesWithStatus | CalorieEntry[]>(cacheKey, DAILY_ENTRIES_MAX_AGE_MS)
       : null;
 
-  return useQuery<CalorieEntry[]>({
+  const normalizeEntriesPayload = (
+    value: DailyEntriesWithStatus | CalorieEntry[] | null | undefined
+  ): DailyEntriesWithStatus | undefined => {
+    if (!value) return value ?? undefined;
+    if (Array.isArray(value)) return { entries: value, log_status: null };
+    return value;
+  };
+
+  return useQuery<DailyEntriesWithStatus>({
     queryKey: ['entries', userId, dateKey],
     queryFn: async () => {
       const networkStart = performance.now();
@@ -71,17 +79,18 @@ export function useDailyEntries(entryDate: string | Date) {
       }
 
       // 2) Otherwise, check React Query's in-memory cache
-      const cachedData = queryClient.getQueryData<CalorieEntry[]>([
+      const cachedData = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>([
         'entries',
         userId,
         dateKey,
       ]);
-      if (cachedData !== undefined) {
-        return cachedData;
+      const normalizedCached = normalizeEntriesPayload(cachedData);
+      if (normalizedCached !== undefined) {
+        return normalizedCached;
       }
 
       // 3) Finally, fall back to persistent snapshot (survives full reloads)
-      return snapshot ?? undefined;
+      return normalizeEntriesPayload(snapshot) ?? undefined;
     },
   });
 }

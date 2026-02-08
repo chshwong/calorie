@@ -23,7 +23,7 @@ import { clampDateKey } from '@/lib/date-guard';
 import { getWebAccessibilityProps } from '@/utils/accessibility';
 import { getLocalDateString } from '@/utils/calculations';
 import { toDateKey } from '@/utils/dateKey';
-import type { CalorieEntry } from '@/utils/types';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -96,15 +96,16 @@ export default function QuickLogScreen() {
   useEffect(() => {
     if (!user?.id || !initialEntry) return;
     const cacheKey: [string, string, string] = ['entries', user.id, initialEntry.entry_date];
-    queryClient.setQueryData<CalorieEntry[]>(cacheKey, (existing) => {
-      if (!existing || existing.length === 0) {
-        return [initialEntry];
+    queryClient.setQueryData<DailyEntriesWithStatus>(cacheKey, (existing) => {
+      const existingEntries = existing?.entries ?? [];
+      if (existingEntries.length === 0) {
+        return { entries: [initialEntry], log_status: existing?.log_status ?? null };
       }
-      const hasEntry = existing.some((e) => e.id === initialEntry.id);
-      if (hasEntry) {
-        return existing.map((e) => (e.id === initialEntry.id ? initialEntry : e));
-      }
-      return [...existing, initialEntry];
+      const hasEntry = existingEntries.some((e) => e.id === initialEntry.id);
+      const nextEntries = hasEntry
+        ? existingEntries.map((e) => (e.id === initialEntry.id ? initialEntry : e))
+        : [...existingEntries, initialEntry];
+      return { entries: nextEntries, log_status: existing?.log_status ?? null };
     });
   }, [initialEntry, queryClient, user?.id]);
 

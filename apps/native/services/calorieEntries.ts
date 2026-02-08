@@ -1,63 +1,35 @@
+import type { CalorieEntry, DailyEntriesWithStatus } from "@/lib/foodDiary/types";
 import { supabase } from "@/lib/supabaseClient";
-import type { CalorieEntry } from "@/lib/foodDiary/types";
-
-const ENTRY_COLUMNS = `
-  id,
-  user_id,
-  entry_date,
-  eaten_at,
-  meal_type,
-  item_name,
-  food_id,
-  serving_id,
-  quantity,
-  unit,
-  calories_kcal,
-  protein_g,
-  carbs_g,
-  fat_g,
-  fiber_g,
-  saturated_fat_g,
-  trans_fat_g,
-  sugar_g,
-  sodium_mg,
-  notes,
-  source,
-  ai_raw_text,
-  ai_confidence,
-  created_at,
-  updated_at
-`;
 
 export async function getEntriesForDate(
   userId: string,
   dateString: string
-): Promise<CalorieEntry[]> {
+): Promise<DailyEntriesWithStatus> {
   if (!userId) {
-    return [];
+    return { entries: [], log_status: null };
   }
 
   try {
     const { data, error } = await supabase
-      .from("calorie_entries")
-      .select(ENTRY_COLUMNS)
-      .eq("user_id", userId)
-      .eq("entry_date", dateString)
-      .order("created_at", { ascending: true });
+      .rpc("get_entries_with_log_status", { p_entry_date: dateString })
+      .single();
 
     if (error) {
       if (process.env.NODE_ENV !== "production") {
         console.warn("[calorieEntries] fetch error", error.message);
       }
-      return [];
+      return { entries: [], log_status: null };
     }
 
-    return data ?? [];
+    return {
+      entries: (data?.entries as CalorieEntry[] | null) ?? [],
+      log_status: data?.log_status ?? null,
+    };
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn("[calorieEntries] fetch exception", error);
     }
-    return [];
+    return { entries: [], log_status: null };
   }
 }
 

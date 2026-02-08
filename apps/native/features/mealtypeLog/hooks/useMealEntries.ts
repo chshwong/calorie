@@ -9,7 +9,7 @@ export function useMealEntries(entryDate: string | Date, mealType: MealType) {
   const query = useDailyEntries(dateKey);
 
   const entries = useMemo(
-    () => (query.data ?? []).filter((entry) => entry.meal_type === mealType),
+    () => (query.data?.entries ?? []).filter((entry) => entry.meal_type === mealType),
     [mealType, query.data]
   );
 

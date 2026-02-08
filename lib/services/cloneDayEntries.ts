@@ -11,11 +11,10 @@
  * This service is platform-agnostic and can be reused in React Native.
  */
 
-import { supabase } from '@/lib/supabase';
-import { getMedLogsForDate, createMedLog, type MedLog } from './medLogs';
-import { getExerciseLogsForDate, createExerciseLog, type ExerciseLog } from './exerciseLogs';
-import { getEntriesForDate, createEntry } from './calorieEntries';
 import type { CalorieEntry } from '@/utils/types';
+import { createEntry, getEntriesForDate } from './calorieEntries';
+import { createExerciseLog, getExerciseLogsForDate, type ExerciseLog } from './exerciseLogs';
+import { createMedLog, getMedLogsForDate, type MedLog } from './medLogs';
 
 /**
  * Entity types that can be cloned
@@ -153,7 +152,7 @@ async function cloneFoodLogForDate(
 ): Promise<number> {
   try {
     // Fetch all entries for the source date
-    const sourceEntries = await getEntriesForDate(userId, sourceDate);
+    const { entries: sourceEntries } = await getEntriesForDate(userId, sourceDate);
 
     if (!sourceEntries || sourceEntries.length === 0) {
       return 0; // No entries to clone

@@ -2615,7 +2615,15 @@
       "carbs": "Carbs",
       "fat": "Fat",
       "protein": "Protein",
-      "left": "left"
+      "left": "left",
+      "start_logging_empty_title": "No meals logged yet",
+      "start_logging_empty_subtitle": "(Tap here to log)",
+
+      "start_logging_button": "Log first meal",
+      "status_fasted_chip": "🌙 Fasted",
+      "status_completed_chip": "✅ Completed",
+      "status_fasted_hint": "Fasting day — food intentionally 0.",
+      "status_completed_hint": "Completed — no food logged today."
     },
     "exercise": {
       "activity_one": "activity",
