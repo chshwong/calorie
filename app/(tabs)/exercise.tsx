@@ -26,7 +26,7 @@ import { RANGES, TEXT_LIMITS } from '@/constants/constraints';
 import { pickRandomDayCompletionMessage } from '@/constants/dayCompletionMessages';
 import { BorderRadius, Colors, FontSize, Layout, ModuleThemes, SemanticColors, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { isTourCompleted } from '@/features/tour/storage';
+import { isTourCompleted, resetTour } from '@/features/tour/storage';
 import { useTour } from '@/features/tour/TourProvider';
 import { V1_EXERCISES_TOUR_STEPS } from '@/features/tour/tourSteps';
 import { useTourAnchor } from '@/features/tour/useTourAnchor';
@@ -67,7 +67,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View, ViewStyle, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ViewStyle, useWindowDimensions } from 'react-native';
 
 // Constants for responsive breakpoints and conversion factors
 // These are UI layout constants, not spacing tokens, so they live here per guideline 11
@@ -583,6 +583,8 @@ export default function ExerciseHomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const [quickAddY, setQuickAddY] = useState(0);
+  const [showRestartExerciseConfirm, setShowRestartExerciseConfirm] = useState(false);
+  const [restartExerciseLoading, setRestartExerciseLoading] = useState(false);
   const isCheckingExerciseTourRef = useRef(false);
 
   const tourScreenRef = useTourAnchor('exercise.screen');
@@ -596,6 +598,24 @@ export default function ExerciseHomeScreen() {
     if (input === 'completed' || input === 'fasted' || input === 'unknown') return input;
     return 'unknown';
   };
+
+  const onPressRestartExercise = useCallback(() => {
+    setShowRestartExerciseConfirm(true);
+  }, []);
+
+  const onConfirmRestartExercise = useCallback(async () => {
+    if (!user?.id) return;
+    if (restartExerciseLoading) return;
+
+    setRestartExerciseLoading(true);
+    try {
+      await resetTour('V1_ExercisesTour', user.id);
+      setShowRestartExerciseConfirm(false);
+      void startTour('V1_ExercisesTour', V1_EXERCISES_TOUR_STEPS);
+    } finally {
+      setRestartExerciseLoading(false);
+    }
+  }, [restartExerciseLoading, startTour, user?.id]);
   
   const dayStatus = normalizeStatus(todayRow?.log_status);
   const prevStatusRef = useRef<string | null>(null);
@@ -1719,6 +1739,15 @@ export default function ExerciseHomeScreen() {
                           >
                             <IconSymbol name="trash.fill" size={20} color={SemanticColors.error} />
                           </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={onPressRestartExercise}
+                            activeOpacity={0.7}
+                            style={[styles.restartTourButton, getMinTouchTargetStyle()]}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            {...getButtonAccessibilityProps(t('exercise_log.restart_tour.title'))}
+                          >
+                            <Text style={styles.restartTourIcon}>💡</Text>
+                          </TouchableOpacity>
                         </>
                       ) : (
                         /* Exit edit mode button */
@@ -2550,6 +2579,20 @@ export default function ExerciseHomeScreen() {
         onCancel={handleMassDeleteCancel}
         confirmButtonStyle={{ backgroundColor: SemanticColors.error }}
       />
+      <ConfirmModal
+        visible={showRestartExerciseConfirm}
+        title={t('exercise_log.restart_tour.title')}
+        message={t('exercise_log.restart_tour.message')}
+        confirmText={t('exercise_log.restart_tour.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={onConfirmRestartExercise}
+        onCancel={() => setShowRestartExerciseConfirm(false)}
+        confirmDisabled={restartExerciseLoading}
+        confirmButtonStyle={{ backgroundColor: colors.tint }}
+        cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
+        cancelTextStyle={{ color: colors.text }}
+        animationType="fade"
+      />
 
       {/* Reps Range Bottom Sheet */}
       {repsSheetLogId && (
@@ -3302,6 +3345,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     // Ensure minimum touch target size
     ...getMinTouchTargetStyle(),
+  },
+  restartTourButton: {
+    backgroundColor: 'transparent',
+    padding: (44 - 18) / 2, // align with 18px icon size
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...getMinTouchTargetStyle(),
+  },
+  restartTourIcon: {
+    fontSize: FontSize.lg,
   },
   iconButtonInRow: {
     width: 36,

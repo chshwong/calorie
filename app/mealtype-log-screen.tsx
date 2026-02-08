@@ -17,8 +17,8 @@ import { NoteEditor } from '@/components/note-editor';
 import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
 import { AICameraFunnelModal } from '@/components/ui/AICameraFunnelModal';
+import { AnimatedTabContent, TabKey } from '@/components/ui/animated-tab-content';
 import { AppDatePicker } from '@/components/ui/app-date-picker';
 import { showAppToast } from '@/components/ui/app-toast';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -28,7 +28,7 @@ import UniversalBarcodeScanner from '@/components/UniversalBarcodeScanner';
 import { getTabColor, getTabListBackgroundColor } from '@/constants/mealtype-ui-helpers';
 import { CategoryColors, Colors, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { isTourCompleted } from '@/features/tour/storage';
+import { isTourCompleted, resetTour } from '@/features/tour/storage';
 import { useTour } from '@/features/tour/TourProvider';
 import { V1_MEALTYPELOG_TOUR_STEPS } from '@/features/tour/tourSteps';
 import { useTourAnchor } from '@/features/tour/useTourAnchor';
@@ -78,7 +78,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Animated, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type CalorieEntry = {
@@ -124,8 +124,12 @@ export default function LogFoodScreen() {
   const {
     activeTourId,
     startTour,
+    registerAnchor,
+    unregisterAnchor,
     registerOnStepChange,
     requestRemeasure,
+    stepIndex,
+    steps,
   } = useTour();
 
   const tourRootRef = useTourAnchor('mealtype.root');
@@ -135,7 +139,19 @@ export default function LogFoodScreen() {
   const tourCustomExpandedRef = useTourAnchor('mealtype.customTabExpanded');
   const tourBundlesExpandedRef = useTourAnchor('mealtype.bundlesTabExpanded');
   const tourQuickLogTabRef = useTourAnchor('mealtype.quickLogTab');
+  const tourQuickLogPanelRef = useTourAnchor('mealtype.quickLogPanel');
   const tourFoodLogSectionRef = useTourAnchor('mealtype.foodLogSection');
+  const foodLogTitleRef = useRef<View>(null);
+  const [foodLogTitleRect, setFoodLogTitleRect] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const foodSearchRef = useRef<TextInput>(null);
+  const wasOnLastMealtypeTourStepRef = useRef(false);
+  const prevTourIdRef = useRef<typeof activeTourId>(null);
 
   // Refs for individual tab buttons (for precise "scroll into view" during tour)
   const frequentTabBtnRef = useRef<any>(null);
@@ -278,6 +294,8 @@ export default function LogFoodScreen() {
   // Consolidated modal state
   type ModalType = 'delete_entry' | 'delete_bundle' | 'delete_custom' | 'mass_delete' | 'menu' | 'add_bundle' | 'bundle_warning' | null;
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [showRestartMealLogConfirm, setShowRestartMealLogConfirm] = useState(false);
+  const [restartMealLogLoading, setRestartMealLogLoading] = useState(false);
   
   // Modal data states
   const [entryToDelete, setEntryToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -600,8 +618,12 @@ export default function LogFoodScreen() {
       // Keep signature stable, but prefer precise scrolling so we don't overshoot and hide labels.
       scrollTabIntoView(tab);
 
-      if (tab === 'manual') {
-        // Do not auto-navigate during tour; we only spotlight the tab.
+      if (tab === 'quick-log') {
+        // Do not navigate away; just select and expand the tab panel for spotlight.
+        if (activeTab !== tab) {
+          setPreviousTabKey(activeTab);
+          setActiveTab(tab);
+        }
         if (opts?.expand === true) setTabContentCollapsed(false);
         return;
       }
@@ -668,14 +690,75 @@ export default function LogFoodScreen() {
       }
 
       if (step.id === 'mt-quicklog') {
-        // Do not navigate; just ensure the tab is visible.
-        setTabForTour('manual', { scroll: 'right' });
-        setTimeout(() => requestRemeasure(), 200);
+        // Auto-scroll right to reveal Quick Log, expand panel, then spotlight it.
+        handleScrollRight();
+        setTimeout(() => {
+          handleQuickLogTabPress();
+          setTabContentCollapsed(false);
+          setTabForTour('quick-log', { expand: true, scroll: 'right' });
+          requestRemeasure();
+        }, 320);
       }
     });
 
     return unsubscribe;
-  }, [registerOnStepChange, requestRemeasure, setTabForTour]);
+  }, [handleQuickLogTabPress, handleScrollRight, registerOnStepChange, requestRemeasure, setTabForTour]);
+
+  useEffect(() => {
+    registerAnchor('mealtype.foodLogTitle', foodLogTitleRef);
+    return () => {
+      unregisterAnchor('mealtype.foodLogTitle');
+    };
+  }, [registerAnchor, unregisterAnchor]);
+
+  useEffect(() => {
+    if (activeTourId === 'V1_MealtypeLogTour' && foodLogTitleRect) {
+      requestRemeasure();
+    }
+  }, [activeTourId, foodLogTitleRect, requestRemeasure]);
+
+  useEffect(() => {
+    if (activeTourId === 'V1_MealtypeLogTour') {
+      wasOnLastMealtypeTourStepRef.current = steps.length > 0 && stepIndex >= steps.length - 1;
+    }
+
+    if (
+      prevTourIdRef.current === 'V1_MealtypeLogTour' &&
+      activeTourId == null &&
+      wasOnLastMealtypeTourStepRef.current
+    ) {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      setTimeout(() => {
+        foodSearchRef.current?.focus();
+      }, 300);
+      wasOnLastMealtypeTourStepRef.current = false;
+    }
+
+    prevTourIdRef.current = activeTourId;
+  }, [activeTourId, stepIndex, steps.length]);
+
+  const onPressRestartMealLog = useCallback(() => {
+    setShowRestartMealLogConfirm(true);
+  }, []);
+
+  const onConfirmRestartMealLog = useCallback(async () => {
+    if (!user?.id) return;
+    if (restartMealLogLoading) return;
+
+    setRestartMealLogLoading(true);
+    try {
+      await resetTour('V1_MealtypeLogTour', user.id);
+      setShowRestartMealLogConfirm(false);
+      void startTour('V1_MealtypeLogTour', V1_MEALTYPELOG_TOUR_STEPS);
+    } catch {
+      Alert.alert(
+        t('alerts.error_title'),
+        t('common.unexpected_error', { defaultValue: 'Something went wrong.' })
+      );
+    } finally {
+      setRestartMealLogLoading(false);
+    }
+  }, [restartMealLogLoading, startTour, t, user?.id]);
   
   
   // Use React Query hooks for tab data
@@ -2009,14 +2092,16 @@ export default function LogFoodScreen() {
       
       case 'quick-log':
         return (
-          <QuickLogLanding
-            entryDate={entryDate}
-            mealType={mealType}
-            colors={colors}
-            t={t}
-            onManualLog={handleQuickLog}
-            onAiCamera={handleAiCamera}
-          />
+          <View ref={tourQuickLogPanelRef as any} collapsable={false}>
+            <QuickLogLanding
+              entryDate={entryDate}
+              mealType={mealType}
+              colors={colors}
+              t={t}
+              onManualLog={handleQuickLog}
+              onAiCamera={handleAiCamera}
+            />
+          </View>
         );
       
       default:
@@ -2085,7 +2170,8 @@ export default function LogFoodScreen() {
         accentColor={colors.tint}
       />
 
-      <ScrollView 
+      <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
@@ -2110,6 +2196,7 @@ export default function LogFoodScreen() {
         <View style={styles.searchContainer}>
             <View ref={tourSearchBarRef as any} style={styles.searchBarWrapper}>
               <FoodSearchBar
+                inputRef={foodSearchRef}
                 searchQuery={searchQuery}
                 onSearchChange={handleSearchChange}
                 onEnterPress={() => {
@@ -2348,7 +2435,18 @@ export default function LogFoodScreen() {
           <View style={styles.entriesSection}>
             <View style={styles.entriesHeader}>
               {/* Left: Label + Item Count */}
-              <View style={styles.entriesHeaderLeft}>
+              <View
+                ref={foodLogTitleRef}
+                collapsable={false}
+                style={styles.entriesHeaderLeft}
+                onLayout={() => {
+                  requestAnimationFrame(() => {
+                    foodLogTitleRef.current?.measureInWindow((x, y, width, height) => {
+                      setFoodLogTitleRect({ x, y, width, height });
+                    });
+                  });
+                }}
+              >
                 <ThemedText style={[styles.foodLogTitle, { color: colors.text }]}>
                   {t('mealtype_log.food_log.title')}
                 </ThemedText>
@@ -2366,6 +2464,15 @@ export default function LogFoodScreen() {
 
               {/* Right: Controls */}
               <View style={styles.entriesHeaderRight}>
+                <TouchableOpacity
+                  onPress={onPressRestartMealLog}
+                  activeOpacity={0.7}
+                  style={[styles.mealLogRestartTourButton, getMinTouchTargetStyle()]}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  {...getButtonAccessibilityProps(t('meal_log.restart_tour.title'))}
+                >
+                  <Text style={styles.mealLogRestartTourIcon}>💡</Text>
+                </TouchableOpacity>
                 {!showLoadingSpinner && entries.length > 0 && (
                   <View style={styles.detailsToggleStack}>
                     <ThemedText style={[styles.detailsToggleLabelSmall, { color: colors.textSecondary }]}>
@@ -2733,6 +2840,21 @@ export default function LogFoodScreen() {
           </View>
         </ThemedView>
       </Modal>
+
+      <ConfirmModal
+        visible={showRestartMealLogConfirm}
+        title={t('meal_log.restart_tour.title')}
+        message={t('meal_log.restart_tour.message')}
+        confirmText={t('meal_log.restart_tour.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={onConfirmRestartMealLog}
+        onCancel={() => setShowRestartMealLogConfirm(false)}
+        confirmDisabled={restartMealLogLoading}
+        confirmButtonStyle={{ backgroundColor: colors.tint }}
+        cancelButtonStyle={{ backgroundColor: colors.backgroundSecondary }}
+        cancelTextStyle={{ color: colors.text }}
+        animationType="fade"
+      />
 
       {/* Delete Entry Confirmation Modal */}
       <ConfirmModal

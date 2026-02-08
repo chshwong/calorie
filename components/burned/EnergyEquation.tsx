@@ -130,14 +130,22 @@ export function EnergyEquation({
           {wearableSyncSlot ? (
             <View style={styles.minimalSyncRow}>{wearableSyncSlot}</View>
           ) : null}
-          <View style={styles.minimalRow}>
+          <TouchableOpacity
+            style={[
+              styles.minimalRow,
+              Platform.OS === 'web' && onEditBurned ? ({ cursor: 'pointer' } as any) : null,
+              Platform.OS === 'web' && onEditBurned ? getFocusStyle(colors.tint) : null,
+            ]}
+            disabled={!onEditBurned}
+            {...burnedPressableProps}
+          >
             <Text style={styles.eqEmoji} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               🔥
             </Text>
             <ThemedText style={[styles.eqValue, { color: colors.textSecondary }]} numberOfLines={1}>
               {burnedCal == null ? t('burned.week.placeholder') : formatWholeNumber(burnedCal)}
             </ThemedText>
-          </View>
+          </TouchableOpacity>
           <View style={styles.eqRowTight}>
             <ThemedText style={[styles.eqMinusInline, { color: colors.textSecondary }]}>−</ThemedText>
             <Text style={styles.eqEmoji} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

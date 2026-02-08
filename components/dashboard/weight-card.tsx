@@ -8,16 +8,16 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { WeightTrendLineChart } from '@/components/weight/WeightTrendLineChart';
 import { BorderRadius, Colors, FontSize, FontWeight, ModuleThemes, Nudge, Shadows, Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBodyMetrics } from '@/hooks/use-body-metrics';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
 import { useWeightLogs366d } from '@/hooks/use-weight-logs';
 import { deriveDailyLatestWeight } from '@/lib/derive/daily-latest-weight';
 import { buildWeightSeriesForDayKeys } from '@/lib/derive/weight-chart-series';
 import { getLatestWeightDisplayFromLogs } from '@/lib/derive/weight-display';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
-import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { getBMICategory } from '@/utils/bmi';
+import { lbToKg, roundTo1 } from '@/utils/bodyMetrics';
 import { buildDayKeysInclusive } from '@/utils/dateRangeMath';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
 import { useRouter } from 'expo-router';
@@ -258,7 +258,15 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
           </View>
         ) : (
           <>
-            <View style={styles.weightDisplay}>
+            <TouchableOpacity
+              onPress={handlePress}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              activeOpacity={0.7}
+              style={[styles.weightDisplay, getMinTouchTargetStyle()]}
+              {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
+              {...getButtonAccessibilityProps(accessibilityLabel, t('weight.dashboard.accessibility_hint'))}
+            >
               <ThemedText style={[styles.weightValue, { color: colors.text }]}>
                 {latestWeightDisplay}
               </ThemedText>
@@ -267,7 +275,7 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
                   {latestBodyFatDisplay} {t('weight.dashboard.body_fat')}
                 </ThemedText>
               )}
-            </View>
+            </TouchableOpacity>
 
             {/* 7-day weight chart */}
             {(() => {

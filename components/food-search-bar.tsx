@@ -6,27 +6,27 @@
  * - Consistent styling and behavior
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  StyleSheet,
-  Platform,
-  Animated,
-  Easing,
-  Text,
-  useWindowDimensions,
-} from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FoodSourceBadge } from '@/components/food-source-badge';
 import { FoodStatusChip } from '@/components/food-status-chip';
+import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
-import type { FoodMaster } from '@/utils/nutritionMath';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getButtonAccessibilityProps, getMinTouchTargetStyle } from '@/utils/accessibility';
+import type { FoodMaster } from '@/utils/nutritionMath';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Easing,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
 
 export interface FoodSearchBarProps {
   /** Current search query */
@@ -79,6 +79,8 @@ export interface FoodSearchBarProps {
   onBarcodePress?: () => void;
   /** Optional handler for AI camera button press */
   onAiPress?: () => void;
+  /** Optional external ref for focusing the input */
+  inputRef?: React.RefObject<TextInput | null>;
 }
 
 /**
@@ -107,8 +109,10 @@ export function FoodSearchBar({
   onHighlightChange,
   onBarcodePress,
   onAiPress,
+  inputRef,
 }: FoodSearchBarProps) {
-  const inputRef = useRef<TextInput>(null);
+  const internalInputRef = useRef<TextInput>(null);
+  const resolvedInputRef = inputRef ?? internalInputRef;
   const scrollViewRef = useRef<ScrollView>(null);
   const wrapperRef = useRef<View>(null);
   const isInteractingWithDropdownRef = useRef(false);
@@ -124,7 +128,7 @@ export function FoodSearchBar({
       onClearSearch();
     }
     // Blur the input
-    inputRef.current?.blur();
+    resolvedInputRef.current?.blur();
   }, [onClearSearch]);
 
   // Handle clear button click
@@ -412,7 +416,7 @@ export function FoodSearchBar({
                 )}
 
                 <TextInput
-                  ref={inputRef}
+                  ref={resolvedInputRef}
                   style={[
                     styles.searchInput,
                     {
@@ -499,7 +503,7 @@ export function FoodSearchBar({
               )}
 
               <TextInput
-                ref={inputRef}
+                ref={resolvedInputRef}
                 style={[
                   styles.searchInput,
                   {

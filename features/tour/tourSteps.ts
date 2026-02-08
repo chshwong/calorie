@@ -66,15 +66,21 @@ export const V1_HOMEPAGE_TOUR_STEPS: TourStep[] = [
 ];
 
 export const V1_MEALTYPELOG_TOUR_STEPS: TourStep[] = [
-  { id: 'mt-intro', anchorKey: 'mealtype.root', messageKey: 'tour.mealtype.intro' },
+  {
+    id: 'mt-intro',
+    anchorKey: 'mealtype.foodLogTitle',
+    messageKey: 'tour.mealtype.intro',
+    placement: 'top',
+    spotlight: false,
+    overlayOpacity: 0,
+    offsetY: -12,
+  },
 
   {
     id: 'mt-search',
     anchorKey: 'mealtype.searchBar',
     messageKey: 'tour.mealtype.search',
   },
-
-  { id: 'mt-barcode', anchorKey: 'mealtype.barcodeBtn', messageKey: 'tour.mealtype.barcode' },
 
   {
     id: 'mt-frequent',
@@ -96,7 +102,7 @@ export const V1_MEALTYPELOG_TOUR_STEPS: TourStep[] = [
 
   {
     id: 'mt-quicklog',
-    anchorKey: 'mealtype.quickLogTab',
+    anchorKey: 'mealtype.quickLogPanel',
     messageKey: 'tour.mealtype.quicklog',
   },
 

@@ -119,21 +119,21 @@
       "quickAddPlus": "Tap +Plus to log anything (food, weight, exercise, supplements, etc.), fast.\n\nGet started!"
     },
     "mealtype": {
-      "intro": "View and log your meal items here.",
-      "search": "Search food to add (i.e., egg, pho, quinoa, skim milk).\n\nQuick tip: Perfection isn’t required. Chips, for example, are nutritionally similar across most flavors and brands. Labels are estimates. Log it, relax, and keep going.",
+      "intro": "This is your meal log. \n\nPerfection isn’t required—log it and move on.",
+      "search": "Search food to add (e.g., tofu, pho).",
       "barcode": "You may scan the barcode from a food package.",
       "frequent": "Frequent and Recent help you add your common items faster.",
-      "custom": "Item not in the database? Create your own (e.g., local bakery keto bar).",
-      "bundles": "Bundles save frequent multi-item meals so you can log them in one tap. E.g., my protein berry shake, mom’s special lunch box.",
-      "quicklog": "Short on time? Use ⚡Quick Log.\nLess precise, but gives you a break—perfect after a big buffet.",
+      "custom": "Item not in the database? Create your own.\n\nE.g., local bakery keto bar.",
+      "bundles": "Bundles save frequent multi-item meals so you can log them in one tap.\n\nE.g., my protein berry shake, mom’s special lunch box.",
+      "quicklog": "Short on time? Use ⚡Quick Log.\n\nLess precise, but gives you a break—perfect after a big buffet.",
       "foodlog": "Your logged items appear here. You can edit them anytime.\n\nHappy logging. Progress over perfection."
     },
     "exercises": {
       "intro": "Track exercises here, built for fast logging.",
-      "daySummary": "Exercise logs are for tracking activities, not calorie burn. Users rely on wearable data for more accurate full-day energy burn.",
+      "daySummary": "Exercise logs track activity, NOT calories.",
       "daySummaryGear": "Tap the ⚙️ to set unit preferences and toggle tracking for duration, distance, reps, and more.",
       "quickAdd": "Tap activities from the list to log.\nTip: Log as detailed or as simple as you like—some choose bench press & push-ups, others just chest.",
-      "logExerciseBtn": "Can’t find your activity? Tap Log Exercise.\n\nHappy logging!"
+      "logExerciseBtn": "Can’t find your activity? Tap Create Exercise.\n\nHappy logging!"
     },
     "reset_toast": "Tour guide reset. Go to Food Diary or Meal Log to start again."
   },
@@ -186,7 +186,7 @@
       "hide_other_limits": "Hide other limits"
     },
     "restart_home_tour": {
-      "title": "Restart Food Diary Tour",
+      "title": "Food Diary Guidance",
       "message": "Restart the Food Diary guidance tour?",
       "confirm": "Restart"
     },
@@ -2065,6 +2065,13 @@
       "delete_selected": "Delete Selected"
     }
   },
+  "meal_log": {
+    "restart_tour": {
+      "title": "Meal Log Guidance",
+      "message": "Restart the Meal Log guidance tour?",
+      "confirm": "Restart"
+    }
+  },
   "create_custom_food": {
     "title_create": "Create Custom Food",
     "title_edit": "Edit Custom Food",
@@ -2372,7 +2379,7 @@
       "saving": "Saving..."
     },
     "quick_add": {
-      "add_custom": "Log Exercise",
+      "add_custom": "Create Exercise",
       "your_recent_frequent": "Your recent & frequent",
       "common_cardio_mind_body": "Common Cardio & Mind-Body",
       "common_strength": "Common Strength Workouts",
@@ -2525,6 +2532,13 @@
     },
     "loading": "Loading exercises...",
     "error": "Failed to load exercises"
+  },
+  "exercise_log": {
+    "restart_tour": {
+      "title": "Exercise Log Guidance",
+      "message": "Restart the Exercise Log guidance tour?",
+      "confirm": "Restart"
+    }
   },
   "dashboard": {
     "body": {
@@ -2815,7 +2829,7 @@
   },
   "quick_add": {
     "log_food": "Log Food",
-    "log_exercise": "Log Exercise",
+    "log_exercise": "Create Exercise",
     "log_med_supp": "Log Med/Supp",
     "log_water": "Log Water",
     "enter_weight": "Log Weight",

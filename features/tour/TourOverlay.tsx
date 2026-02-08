@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    Animated,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from 'react-native';
 
 import { BorderRadius, Colors, FontSize, FontWeight, Shadows, Spacing } from '@/constants/theme';
@@ -32,6 +32,8 @@ export function TourOverlay() {
   const isVisible = activeTourId != null && steps.length > 0;
   const isLast = stepIndex >= steps.length - 1;
   const step = steps[stepIndex];
+  const showSpotlight = step?.spotlight !== false;
+  const overlayOpacity = step?.overlayOpacity ?? 1;
   const [tooltipHeight, setTooltipHeight] = useState<number>(0);
   const stepMessage = step?.messageKey ? t(step.messageKey) : '';
 
@@ -67,10 +69,17 @@ export function TourOverlay() {
     const padX =
       step?.anchorKey === 'home.burnedPencil'
         ? 18
+        : step?.anchorKey === 'mealtype.quickLogTab'
+          ? 16
+          : step?.narrow
+            ? 8
+            : 10;
+    const padTop =
+      step?.anchorKey === 'mealtype.quickLogPanel'
+        ? 68
         : step?.narrow
           ? 8
           : 10;
-    const padTop = step?.narrow ? 8 : 10;
     // Some anchors (like the burned ✏️ tap target) visually relate to a label directly below;
     // give those steps a bit more bottom room so the spotlight covers the full concept.
     // Conversely, the curvy gauge step should stop tight at the divider line (no bleed into the next row).
@@ -79,9 +88,11 @@ export function TourOverlay() {
         ? 0
         : step?.anchorKey === 'home.burnedPencil'
           ? 44
-          : step?.narrow
-            ? 4
-            : 8;
+          : step?.anchorKey === 'mealtype.quickLogTab'
+            ? 16
+            : step?.narrow
+              ? 4
+              : 8;
 
     const x = clamp(spotlightRect.x - padX, 0, screenW);
     const y = clamp(spotlightRect.y - padTop, 0, screenH);
@@ -94,6 +105,7 @@ export function TourOverlay() {
     const margin = Spacing.lg;
     const maxWidth = screenW - margin * 2;
     const cardH = tooltipHeight > 0 ? tooltipHeight : 220; // conservative fallback before first layout
+    const offsetY = step?.offsetY ?? 0;
 
     if (step?.placement === 'center') {
       const top = clamp(Math.round(screenH / 2 - cardH / 2), margin, screenH - margin - cardH);
@@ -117,6 +129,26 @@ export function TourOverlay() {
     const desiredLeft = clamp(hole.x, margin, screenW - margin - Math.min(maxWidth, 360));
     const belowTop = hole.y + hole.height + 12;
     const nearBottom = hole.y + hole.height > screenH * 0.62;
+
+    if (step?.placement === 'bottom') {
+      const top = clamp(belowTop + offsetY, margin, screenH - margin - cardH);
+      return {
+        top,
+        left: desiredLeft,
+        maxWidth,
+        placement: 'below' as const,
+      };
+    }
+
+    if (step?.placement === 'top') {
+      const top = clamp(hole.y - 12 - cardH + offsetY, margin, screenH - margin - cardH);
+      return {
+        top,
+        left: desiredLeft,
+        maxWidth,
+        placement: 'above' as const,
+      };
+    }
 
     // Special-case: Mealtype log anchors can be very tall, which tends to push the tooltip above
     // and block key UI. Force a stable mid/lower placement and keep the caret pointing upward.
@@ -151,14 +183,14 @@ export function TourOverlay() {
       };
     }
 
-    const top = clamp(belowTop, margin, screenH - margin - cardH);
+    const top = clamp(belowTop + offsetY, margin, screenH - margin - cardH);
     return {
       top,
       left: desiredLeft,
       maxWidth,
       placement: 'below' as const,
     };
-  }, [activeTourId, hole, screenH, screenW, step?.anchorKey, step?.placement, tooltipHeight]);
+  }, [activeTourId, hole, screenH, screenW, step?.anchorKey, step?.offsetY, step?.placement, tooltipHeight]);
 
   if (!isVisible) return null;
 
@@ -175,12 +207,12 @@ export function TourOverlay() {
         <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
 
         {/* Dim background + spotlight hole via 4 blocks (skipped for centered steps) */}
-        {hole ? (
+        {hole && showSpotlight ? (
           <>
             <View
               style={[
                 styles.dimBlock,
-                { backgroundColor: colors.overlay, left: 0, top: 0, right: 0, height: hole.y },
+                { backgroundColor: colors.overlay, left: 0, top: 0, right: 0, height: hole.y, opacity: overlayOpacity },
               ]}
             />
             <View
@@ -192,6 +224,7 @@ export function TourOverlay() {
                   top: hole.y,
                   width: hole.x,
                   height: hole.height,
+                  opacity: overlayOpacity,
                 },
               ]}
             />
@@ -204,6 +237,7 @@ export function TourOverlay() {
                   top: hole.y,
                   right: 0,
                   height: hole.height,
+                  opacity: overlayOpacity,
                 },
               ]}
             />
@@ -216,6 +250,7 @@ export function TourOverlay() {
                   top: hole.y + hole.height,
                   right: 0,
                   bottom: 0,
+                  opacity: overlayOpacity,
                 },
               ]}
             />
@@ -238,7 +273,12 @@ export function TourOverlay() {
             />
           </>
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]} />
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.overlay, opacity: overlayOpacity },
+            ]}
+          />
         )}
 
         {/* Tooltip */}

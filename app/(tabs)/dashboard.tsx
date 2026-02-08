@@ -1,3 +1,4 @@
+import { BurnedCaloriesModal } from '@/components/burned/BurnedCaloriesModal';
 import { DailyBurnWearableSyncSlot } from '@/components/burned/DailyBurnWearableSyncSlot';
 import { EnergyEquation } from '@/components/burned/EnergyEquation';
 import { CalInVsOutChart } from '@/components/charts/cal-in-vs-out-chart';
@@ -58,12 +59,14 @@ type DashboardFoodSectionProps = {
   isMobile: boolean;
   onPress: () => void;
   onDateSelect: (dateString: string) => void;
+  onEditBurned: () => void;
+  onPressExercise: () => void;
   foodSummary: ReturnType<typeof useDailyFoodSummary>;
   willSyncWeight?: boolean;
   willSyncSteps?: boolean;
 };
 
-function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, foodSummary, willSyncWeight, willSyncSteps }: DashboardFoodSectionProps) {
+function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, onEditBurned, onPressExercise, foodSummary, willSyncWeight, willSyncSteps }: DashboardFoodSectionProps) {
   const { t } = useTranslation();
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
   const { data: stepsRow } = useDailySumExercisesStepsForDate(dateString);
@@ -235,13 +238,21 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                   );
                 })}
                 <View style={[styles.leftOverlayDivider, { backgroundColor: colors.border }]} />
-                <ThemedText style={[styles.leftOverlaySubheader, { color: colors.textSecondary }]}>
-                  Steps
-                </ThemedText>
-                <View style={[styles.mealRow, styles.stepsRowTight]}>
-                  <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>👣</ThemedText>
-                  <ThemedText style={[styles.mealValue, { color: colors.textSecondary }]}>{format4(stepsForDay)}</ThemedText>
-                </View>
+                <TouchableOpacity
+                  onPress={onPressExercise}
+                  activeOpacity={0.7}
+                  style={getMinTouchTargetStyle()}
+                  {...getButtonAccessibilityProps(t('dashboard.exercise.title'), t('dashboard.exercise.accessibility_hint'))}
+                  {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
+                >
+                  <ThemedText style={[styles.leftOverlaySubheader, { color: colors.textSecondary }]}>
+                    Steps
+                  </ThemedText>
+                  <View style={[styles.mealRow, styles.stepsRowTight]}>
+                    <ThemedText style={[styles.mealEmoji, { color: colors.textSecondary }]}>👣</ThemedText>
+                    <ThemedText style={[styles.mealValue, { color: colors.textSecondary }]}>{format4(stepsForDay)}</ThemedText>
+                  </View>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
             <View style={styles.burnEquationOverlay} pointerEvents="box-none">
@@ -251,6 +262,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                 variant="minimalVertical"
                 showSync={false}
                 compact={isSmallScreen || isMobile}
+                onEditBurned={onEditBurned}
               />
             </View>
             <View style={styles.gaugeArea}>
@@ -969,6 +981,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [burnedModalVisible, setBurnedModalVisible] = useState(false);
   
   // Get user config for avatar
   const { data: userConfig } = useUserConfig();
@@ -1126,6 +1139,8 @@ export default function DashboardScreen() {
           isMobile={isMobile}
           onPress={() => router.push(`/?date=${selectedDateString}`)}
           onDateSelect={handleDateSelect}
+          onEditBurned={() => setBurnedModalVisible(true)}
+          onPressExercise={() => router.push(`/exercise?date=${selectedDateString}`)}
           foodSummary={foodSummary}
           willSyncWeight={userConfig?.weight_sync_provider === 'fitbit'}
           willSyncSteps={userConfig?.exercise_sync_steps === true}
@@ -1166,6 +1181,11 @@ export default function DashboardScreen() {
             colors={colors}
             isLoading={false}
           />
+        <BurnedCaloriesModal
+          visible={burnedModalVisible}
+          onClose={() => setBurnedModalVisible(false)}
+          entryDate={selectedDateString}
+        />
         </View>
         </DesktopPageContainer>
       </CollapsibleModuleHeader>

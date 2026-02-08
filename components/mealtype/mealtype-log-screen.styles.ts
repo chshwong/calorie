@@ -1,5 +1,5 @@
-import { StyleSheet, Platform } from 'react-native';
-import { Spacing, BorderRadius, FontSize, FontWeight, Shadows, FontFamilies } from '@/constants/theme';
+import { BorderRadius, FontFamilies, FontSize, FontWeight, Shadows, Spacing } from '@/constants/theme';
+import { Platform, StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
   container: {
@@ -134,6 +134,16 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 0,
     gap: Spacing.sm,
+  },
+  mealLogRestartTourButton: {
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xxs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealLogRestartTourIcon: {
+    fontSize: FontSize.lg,
   },
   foodLogTitle: {
     fontSize: FontSize.base,
