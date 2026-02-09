@@ -16,7 +16,8 @@ export const supabase = createClient(url, anonKey, {
   auth: {
     storage: AsyncStorage,
     persistSession: true,
-    autoRefreshToken: true,
+    // We'll start auto-refresh manually once we confirm a valid session.
+    autoRefreshToken: false,
     flowType: "pkce",
     detectSessionInUrl: false, // important for native
   },

@@ -13,6 +13,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useColorScheme,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,19 +21,12 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { clearPendingAuthState, getOAuthRedirectTo, setPendingAuthState } from "@/lib/auth/oauth";
 import { sendMagicLink, signInWithOAuth } from "@/lib/services/auth";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { NativeModulesProxy } from "expo-modules-core";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Text } from "../components/ui/Text";
-import { useColorScheme } from "../components/useColorScheme";
 import { colors, opacity, radius, spacing } from "../theme/tokens";
-
-const logoLight = require("../assets/images/brand/Logo_LightMode_Name&Tag.png");
-const logoDark = require("../assets/images/brand/Logo_DarkMode_Name&Tag.png");
 
 const LEGAL = {
   privacy: "https://avovibe.app/legal/privacy",
@@ -43,7 +37,8 @@ const LEGAL = {
 export default function LoginScreen() {
   const { t } = useTranslation();
   const { user, loading, onboardingComplete } = useAuth();
-  const colorScheme = useColorScheme() ?? "light";
+  const scheme = useColorScheme();
+  const colorScheme = scheme ?? "light";
   const theme = colors[colorScheme];
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
@@ -61,8 +56,10 @@ export default function LoginScreen() {
 
   const emailValid = email.trim().toLowerCase().includes("@");
   const busy = submitting !== null || googleLoading || magicLoading;
-  const logoSource = isDark ? logoDark : logoLight;
-  const hasLinearGradient = Boolean(NativeModulesProxy?.ExpoLinearGradient);
+  const nameTagLogo =
+    scheme === "dark"
+      ? require("../assets/images/brand/Logo_DarkMode_NameTag.png")
+      : require("../assets/images/brand/Logo_LightMode_NameTag.png");
 
   const cardStyle = [
     styles.actionsCard,
@@ -328,50 +325,20 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            {hasLinearGradient ? (
-              <LinearGradient
-                colors={
-                  isDark
-                    ? ["rgba(20,30,55,0.45)", "rgba(0,0,0,0)"]
-                    : ["rgba(0,150,180,0.1)", "rgba(255,255,255,0)"]
-                }
-                style={styles.headerGradient}
-              >
-                <View style={styles.header}>
-                  <Image
-                    source={require("../assets/images/brand/Logo_MascotOnly.png")}
-                    style={styles.logo}
-                    resizeMode="contain"
-                    accessibilityLabel={t("auth.login.brand_logo_alt")}
-                  />
-                  <Image
-                    source={logoSource}
-                    style={styles.wordmark}
-                    resizeMode="contain"
-                    accessibilityRole="image"
-                    accessibilityLabel="AvoVibe"
-                  />
-                </View>
-              </LinearGradient>
-            ) : (
-              <View style={styles.headerGradient}>
-                <View style={styles.header}>
-                  <Image
-                    source={require("../assets/images/brand/Logo_MascotOnly.png")}
-                    style={styles.logo}
-                    resizeMode="contain"
-                    accessibilityLabel={t("auth.login.brand_logo_alt")}
-                  />
-                  <Image
-                    source={logoSource}
-                    style={styles.wordmark}
-                    resizeMode="contain"
-                    accessibilityRole="image"
-                    accessibilityLabel="AvoVibe"
-                  />
-                </View>
-              </View>
-            )}
+            <View style={styles.brandHeader}>
+              <Image
+                source={require("../assets/images/brand/Logo_MascotOnly.png")}
+                style={styles.mascot}
+                resizeMode="contain"
+                accessibilityLabel="AvoVibe mascot"
+              />
+              <Image
+                source={nameTagLogo}
+                style={styles.nameTag}
+                resizeMode="contain"
+                accessibilityLabel="AvoVibe"
+              />
+            </View>
 
             <Card style={cardStyle}>
               <View style={styles.actions}>
@@ -512,11 +479,6 @@ export default function LoginScreen() {
                 </Text>
               </Pressable>
             </View>
-            {__DEV__ ? (
-              <Text style={[styles.devLabel, { color: theme.textMuted }]}>
-                AvoVibe • Dev • {Constants.expoConfig?.version ?? ""}
-              </Text>
-            ) : null}
           </View>
 
           <View style={{ height: Math.max(insets.bottom, spacing.lg) }} />
@@ -540,23 +502,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.xl,
   },
-  header: {
+  brandHeader: {
     alignItems: "center",
-    gap: spacing.sm,
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 24,
+    marginBottom: 12,
   },
-  headerGradient: {
-    paddingTop: 24,
-    paddingBottom: 12,
-    alignItems: "center",
-    borderRadius: radius.xl,
+  mascot: {
+    width: 64,
+    height: 64,
   },
-  logo: {
-    width: spacing.xxl * 2,
-    height: spacing.xxl * 2,
-  },
-  wordmark: {
+  nameTag: {
     width: 240,
-    height: 70,
+    height: 72,
   },
   actionsCard: {
     shadowOpacity: 0.16,
@@ -643,10 +602,5 @@ const styles = StyleSheet.create({
   footerDot: {
     fontSize: 13,
     marginHorizontal: 8,
-  },
-  devLabel: {
-    textAlign: "center",
-    fontSize: 12,
-    marginTop: 10,
   },
 });

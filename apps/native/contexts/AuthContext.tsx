@@ -38,7 +38,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (process.env.NODE_ENV !== "production") {
         console.warn(`[AuthContext] Clearing persisted session (${reason})`);
       }
+      await supabase.auth.stopAutoRefresh();
       await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
+  };
+
+  const setAutoRefreshEnabled = async (enabled: boolean) => {
+    try {
+      if (enabled) {
+        await supabase.auth.startAutoRefresh();
+      } else {
+        await supabase.auth.stopAutoRefresh();
+      }
     } catch {
       // ignore
     }
@@ -100,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        await setAutoRefreshEnabled(!!session?.refresh_token);
 
         if (session?.user) {
           void fetchProfile(session.user.id);
@@ -116,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (!isMounted) return;
         clearLocalAuthState();
+        await setAutoRefreshEnabled(false);
       }
     };
 
@@ -136,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setLoading(false);
+      void setAutoRefreshEnabled(!!nextSession?.refresh_token);
 
       if (nextSession?.user) {
         void fetchProfile(nextSession.user.id);
@@ -159,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear local state synchronously to avoid redirect loops while Supabase completes sign-out.
     clearLocalAuthState();
     try {
+      await setAutoRefreshEnabled(false);
       await supabase.auth.signOut();
     } catch {
       // ignore
