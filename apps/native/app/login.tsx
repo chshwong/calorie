@@ -20,7 +20,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { clearPendingAuthState, getOAuthRedirectTo, setPendingAuthState } from "@/lib/auth/oauth";
 import { sendMagicLink, signInWithOAuth } from "@/lib/services/auth";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import * as Haptics from "expo-haptics";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -33,6 +32,7 @@ const LEGAL = {
   terms: "https://avovibe.app//legal/terms",
   health: "https://avovibe.app/legal/health",
 };
+const googleLogo = require("../assets/images/brand/google/google-g.png");
 
 export default function LoginScreen() {
   const { t } = useTranslation();
@@ -60,6 +60,7 @@ export default function LoginScreen() {
     scheme === "dark"
       ? require("../assets/images/brand/Logo_DarkMode_NameTag.png")
       : require("../assets/images/brand/Logo_LightMode_NameTag.png");
+  const googleTextColor = "#111111";
 
   const cardStyle = [
     styles.actionsCard,
@@ -349,25 +350,25 @@ export default function LoginScreen() {
                   accessibilityLabel={t("auth.login.google_sign_in")}
                   style={({ pressed }) => [
                     styles.primaryButton,
-                    { shadowColor: theme.text },
                     pressed && !busy ? styles.buttonPressed : null,
                     busy ? styles.buttonDisabled : null,
                   ]}
                 >
-                  {googleLoading ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={theme.primaryText}
-                      style={styles.buttonSpinner}
-                    />
-                  ) : (
-                    <FontAwesome name="google" size={18} color={theme.primaryText} />
-                  )}
-                  <Text style={[styles.buttonLabel, { color: theme.primaryText }]}>
-                    {googleLoading
-                      ? t("auth.login.native.google_loading")
-                      : t("auth.login.google_sign_in")}
-                  </Text>
+                  <View style={styles.googleButtonContent}>
+                    <View style={styles.googleIconWrapper}>
+                      {googleLoading ? (
+                        <ActivityIndicator size="small" color={googleTextColor} />
+                      ) : (
+                        <Image source={googleLogo} style={styles.googleIcon} resizeMode="contain" />
+                      )}
+                    </View>
+                    <Text style={[styles.buttonLabel, { color: googleTextColor }]}>
+                      {googleLoading
+                        ? t("auth.login.native.google_loading")
+                        : t("auth.login.google_sign_in")}
+                    </Text>
+                    <View style={styles.googleIconSpacer} />
+                  </View>
                 </Button>
 
                 {googleError ? (
@@ -407,21 +408,17 @@ export default function LoginScreen() {
                   onBlur={() => setEmailFocused(false)}
                 />
 
-                <Text tone="muted" style={styles.helperText}>
-                  {t("auth.login.native.magic_link_helper")}
-                </Text>
-
                 <Button
                   variant="secondary"
                   title={
                     magicLoading
                       ? t("auth.login.native.magic_link_sending")
-                      : t("auth.login.native.magic_link_send")
+                      : "Send me a sign-in email"
                   }
                   loading={magicLoading}
                   onPress={handleSendMagicLink}
                   disabled={busy || !emailValid}
-                  accessibilityLabel={t("auth.login.native.magic_link_send")}
+                  accessibilityLabel="Send me a sign-in email"
                   style={({ pressed }) => [
                     styles.secondaryButton,
                     pressed && !busy ? styles.buttonPressed : null,
@@ -543,18 +540,19 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
   },
-  helperText: {
-    textAlign: "center",
-  },
   primaryButton: {
     width: "100%",
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md + spacing.xs,
+    borderRadius: 10,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     minHeight: 48,
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.12)",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   secondaryButton: {
     width: "100%",
@@ -568,8 +566,27 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-  buttonSpinner: {
+  googleButtonContent: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleIconWrapper: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: spacing.sm,
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+  },
+  googleIconSpacer: {
+    width: 20,
+    height: 20,
+    marginLeft: spacing.sm,
   },
   buttonLabel: {
     fontWeight: "600",

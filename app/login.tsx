@@ -11,31 +11,32 @@ import { useGeoCountry } from '@/hooks/use-geo-country';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
 import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
 import {
-    getButtonAccessibilityProps,
-    getInputAccessibilityProps,
-    getLinkAccessibilityProps,
-    getMinTouchTargetStyle,
-    getWebAccessibilityProps,
+  getButtonAccessibilityProps,
+  getInputAccessibilityProps,
+  getLinkAccessibilityProps,
+  getMinTouchTargetStyle,
+  getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Lottie from "lottie-react";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Image,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
-    type LayoutChangeEvent,
-    type ScrollView as ScrollViewType,
+  ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+  type ScrollView as ScrollViewType,
 } from 'react-native';
 import animationData from "../assets/lottie/Wobbling.json";
+const googleGLogo = require('@/assets/brand/google/google-g.png');
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -1078,7 +1079,8 @@ export default function LoginScreen() {
                         getMinTouchTargetStyle(),
                         {
                           height: buttonHeight,
-                          backgroundColor: colors.tint,
+                          backgroundColor: '#ffffff',
+                          borderColor: 'rgba(0,0,0,0.12)',
                           opacity: googleLoading ? 0.7 : pressed ? 0.9 : 1,
                           transform:
                             isWeb && hovered && !pressed && !googleLoading ? [{ translateY: -1 }] : [{ translateY: 0 }],
@@ -1091,19 +1093,20 @@ export default function LoginScreen() {
                   >
                     {googleLoading ? (
                       <View style={styles.buttonLoading} accessibilityElementsHidden={true}>
-                        <ActivityIndicator color={colors.textInverse} size="small" />
-                        <Text style={[styles.primaryButtonText, { color: colors.textInverse }]}>
+                        <ActivityIndicator color="#111111" size="small" />
+                        <Text style={[styles.primaryButtonText, { color: '#111111' }]}>
                           {t('auth.login.signing_in_google')}
                         </Text>
                       </View>
                     ) : (
-                      <View style={styles.buttonInner}>
-                        <View style={styles.leftIconPill}>
-                          <Text style={styles.leftIconText}>G</Text>
+                      <View style={styles.googleButtonContent}>
+                        <View style={styles.googleIconWrapper}>
+                          <Image source={googleGLogo} style={styles.googleIcon} resizeMode="contain" />
                         </View>
-                        <Text style={[styles.primaryButtonText, { color: colors.textInverse }]}>
+                        <Text style={[styles.primaryButtonText, { color: '#111111' }]}>
                           {t('auth.login.google_sign_in')}
                         </Text>
+                        <View style={styles.googleIconSpacer} />
                       </View>
                     )}
                   </Pressable>
@@ -1630,10 +1633,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primaryButton: {
-    borderRadius: 14,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
+    borderWidth: 1,
   },
   primaryButtonText: {
     fontSize: 16,
@@ -1661,41 +1665,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
   },
-  buttonInner: {
+  googleButtonContent: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    // Reserve space for the absolute-positioned Google icon pill so it never overlaps the label.
-    paddingLeft: Spacing['5xl'],
-    paddingRight: Spacing.lg,
   },
-  leftIconPill: {
-    position: 'absolute',
-    left: 14,
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+  googleIconWrapper: {
+    width: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.12)',
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.12,
-        shadowRadius: 2,
-        elevation: 2,
-      },
-    }),
+    marginRight: Spacing.sm,
   },
-  leftIconText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#4285F4',
+  googleIcon: {
+    width: 18,
+    height: 18,
+  },
+  googleIconSpacer: {
+    width: 20,
+    height: 20,
+    marginLeft: Spacing.sm,
   },
   dividerContainer: {
     flexDirection: 'row',
