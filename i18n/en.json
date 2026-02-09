@@ -551,6 +551,28 @@
       "error_invalid_email": "Please enter a valid email address",
       "error_supabase_not_configured": "Supabase is not configured. Please check your .env file.",
       "error_google_sign_in_failed": "Google sign-in failed. Please try again.",
+      "native": {
+        "title": "AvoVibe",
+        "subtitle": "Simple nutrition tracking.",
+        "divider_or": "or",
+        "magic_link_helper": "We'll email a secure, one-time sign-in link.",
+        "magic_link_send": "Email me a magic link",
+        "magic_link_sending": "Sending...",
+        "magic_link_sent": "Check your inbox for your sign-in link.",
+        "google_loading": "Continuing...",
+        "footer_legal": "By continuing, you agree to our",
+        "footer_privacy": "Privacy Policy",
+        "footer_terms": "Terms",
+        "footer_health": "Health Disclaimer",
+        "errors": {
+          "invalid_email": "Enter a valid email.",
+          "google_start_failed": "Google sign-in failed. Try again.",
+          "google_missing_url": "Something went wrong. Try again.",
+          "magic_link_failed": "Couldn't send link. Try again.",
+          "magic_link_rate_limited": "Too many requests. Try again soon.",
+          "network": "Network issue. Try again."
+        }
+      },
       "marketing": {
         "hero_headline_default": "Simple. Free. Nutrition tracking.",
         "hero_headline_ca": "Simple. Free. Canadian. Nutrition tracking.",

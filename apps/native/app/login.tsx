@@ -3,23 +3,41 @@ import { supabase } from "@/lib/supabaseClient";
 import { router } from "expo-router";
 import * as React from "react";
 import { useEffect } from "react";
-import { Image, Linking, ScrollView, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clearPendingAuthState, getOAuthRedirectTo, setPendingAuthState } from "@/lib/auth/oauth";
 import { sendMagicLink, signInWithOAuth } from "@/lib/services/auth";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
-import { Screen } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
 import { useColorScheme } from "../components/useColorScheme";
-import { getDeviceRegion } from "../lib/region/getDeviceRegion";
-import { colors, spacing } from "../theme/tokens";
+import { colors, opacity, radius, spacing } from "../theme/tokens";
+
+const LEGAL = {
+  privacy: "https://avovibe.app/legal/privacy",
+  terms: "https://avovibe.app//legal/terms",
+  health: "https://avovibe.app/legal/health",
+};
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const { user, loading, onboardingComplete } = useAuth();
   const colorScheme = useColorScheme() ?? "light";
   const theme = colors[colorScheme];
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [submitting, setSubmitting] = React.useState<null | "signin" | "signup">(null);
@@ -30,19 +48,31 @@ export default function LoginScreen() {
   const [magicSent, setMagicSent] = React.useState(false);
   const [googleError, setGoogleError] = React.useState<string | null>(null);
   const [magicError, setMagicError] = React.useState<string | null>(null);
-  const [deviceRegion, setDeviceRegion] = React.useState<string | null>(null);
+  const [emailFocused, setEmailFocused] = React.useState(false);
 
   const emailValid = email.trim().toLowerCase().includes("@");
-  const passwordValid = password.length >= 6;
   const busy = submitting !== null || googleLoading || magicLoading;
 
-  useEffect(() => {
-    const region = getDeviceRegion();
-    setDeviceRegion(region);
-    if (__DEV__) {
-      console.log("Device region:", region ?? "unknown");
-    }
-  }, []);
+  const cardStyle = [
+    styles.actionsCard,
+    {
+      borderRadius: radius.xl,
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      shadowColor: theme.text,
+      shadowOpacity: opacity.muted,
+      shadowRadius: spacing.xl,
+      shadowOffset: { width: 0, height: spacing.md },
+      elevation: spacing.md,
+    },
+  ];
+
+  const openExternal = async (url: string) => {
+    try {
+      const can = await Linking.canOpenURL(url);
+      if (can) await Linking.openURL(url);
+    } catch {}
+  };
 
   // Reactive redirect: ALWAYS funnel post-auth to PostLoginGate
   useEffect(() => {
@@ -67,11 +97,11 @@ export default function LoginScreen() {
     // Validation
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !trimmedEmail.includes("@")) {
-      setError("Please enter a valid email address");
+      setError(t("auth.login.native.errors.invalid_email"));
       return;
     }
     if (!password || password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("auth.login.error_invalid_credentials"));
       return;
     }
 
@@ -84,13 +114,13 @@ export default function LoginScreen() {
       });
 
       if (signInError) {
-        setError(signInError.message || "Failed to sign in");
+        setError(signInError.message || t("auth.login.native.errors.google_start_failed"));
         return;
       }
 
       // Success: AuthContext will update, and useEffect will navigate to /home
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("auth.login.native.errors.network"));
     } finally {
       setSubmitting(null);
     }
@@ -108,11 +138,11 @@ export default function LoginScreen() {
     // Validation
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !trimmedEmail.includes("@")) {
-      setError("Please enter a valid email address");
+      setError(t("auth.login.native.errors.invalid_email"));
       return;
     }
     if (!password || password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("auth.login.error_invalid_credentials"));
       return;
     }
 
@@ -125,7 +155,7 @@ export default function LoginScreen() {
       });
 
       if (signUpError) {
-        setError(signUpError.message || "Failed to create account");
+        setError(signUpError.message || t("auth.login.native.errors.magic_link_failed"));
         return;
       }
 
@@ -133,13 +163,13 @@ export default function LoginScreen() {
       // If signUp succeeds but no session, email confirmation is likely ON
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setMessage("Account created. Check your email to confirm, then sign in.");
+        setMessage(t("auth.login.native.magic_link_sent"));
       } else {
         // Email confirmation is OFF; user is signed in immediately
         // AuthContext will update, and useEffect will navigate to /home
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("auth.login.native.errors.network"));
     } finally {
       setSubmitting(null);
     }
@@ -168,14 +198,14 @@ export default function LoginScreen() {
 
       if (oauthError) {
         await clearPendingAuthState();
-        setGoogleError(oauthError.message || "Failed to start Google sign-in.");
+        setGoogleError(oauthError.message || t("auth.login.native.errors.google_start_failed"));
         return;
       }
 
       const authUrl = data?.url;
       if (!authUrl) {
         await clearPendingAuthState();
-        setGoogleError("Missing Google sign-in URL. Please try again.");
+        setGoogleError(t("auth.login.native.errors.google_missing_url"));
         return;
       }
 
@@ -188,7 +218,7 @@ export default function LoginScreen() {
       await Linking.openURL(authUrl);
     } catch {
       await clearPendingAuthState();
-      setGoogleError("Network error. Please try again.");
+      setGoogleError(t("auth.login.native.errors.network"));
     } finally {
       setGoogleLoading(false);
     }
@@ -203,7 +233,7 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !trimmedEmail.includes("@")) {
       setMagicLoading(false);
-      setMagicError("Please enter a valid email address.");
+      setMagicError(t("auth.login.native.errors.invalid_email"));
       return;
     }
 
@@ -224,9 +254,9 @@ export default function LoginScreen() {
         await clearPendingAuthState();
         const message = magicLinkError.message?.toLowerCase() ?? "";
         if (message.includes("rate") || message.includes("too many")) {
-          setMagicError("Too many requests. Please wait a few minutes and try again.");
+          setMagicError(t("auth.login.native.errors.magic_link_rate_limited"));
         } else {
-          setMagicError("Could not send magic link. Please try again.");
+          setMagicError(t("auth.login.native.errors.magic_link_failed"));
         }
         return;
       }
@@ -234,227 +264,221 @@ export default function LoginScreen() {
       setMagicSent(true);
     } catch {
       await clearPendingAuthState();
-      setMagicError("Network error. Please try again.");
+      setMagicError(t("auth.login.native.errors.network"));
     } finally {
       setMagicLoading(false);
     }
   };
 
-  const isCanada = deviceRegion === "CA";
-
   return (
-    <Screen padding={0}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: theme.background }]}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.header}>
-          <Image
-            source={require("../assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-            accessibilityLabel="AvoVibe logo"
-          />
-          <Text variant="title" style={styles.heroTitle}>
-            {isCanada
-              ? "Simple nutrition tracking, built for Canadians."
-              : "Simple nutrition tracking that stays out of your way."}
-          </Text>
-          <Text tone="muted" style={styles.subtitle}>
-            Log fast. No costs. No upsells. Just fitness and health.
-          </Text>
-        </View>
-
-        <Card>
-          <View style={styles.form}>
-            <Input
-              label="Email"
-              value={email}
-              onChangeText={(value) => {
-                setEmail(value);
-                setError(null);
-                setMagicError(null);
-                setMagicSent(false);
-              }}
-              placeholder="you@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={submitting === null}
-            />
-
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={(value) => {
-                setPassword(value);
-                setError(null);
-              }}
-              placeholder="Enter your password"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={submitting === null}
-            />
-
-            {error ? (
-              <Text tone="danger" style={styles.centerText}>
-                {error}
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, spacing.lg) },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <Image
+                source={require("../assets/images/brand/Logo_MascotOnly.png")}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel={t("auth.login.brand_logo_alt")}
+              />
+              <Text variant="title" style={styles.title}>
+                {t("auth.login.native.title")}
               </Text>
-            ) : null}
-
-            <Button
-              title={submitting === "signin" ? "Signing in..." : "Sign in"}
-              loading={submitting === "signin"}
-              onPress={handleSignIn}
-              disabled={busy || !emailValid || !passwordValid}
-            />
-
-            <Button
-              variant="secondary"
-              title={submitting === "signup" ? "Creating account..." : "Create account"}
-              loading={submitting === "signup"}
-              onPress={handleSignUp}
-              disabled={busy || !emailValid || !passwordValid}
-            />
-
-            {message ? (
-              <Text tone="muted" style={styles.centerText}>
-                {message}
+              <Text tone="muted" style={styles.subtitle}>
+                {t("auth.login.native.subtitle")}
               </Text>
-            ) : null}
-          </View>
-        </Card>
-
-        <Card>
-          <View style={styles.socialBlock}>
-            <Text variant="body" style={styles.sectionTitle}>
-              Social / Magic Link
-            </Text>
-
-            <Button
-              title={googleLoading ? "Continuing..." : "Continue with Google"}
-              loading={googleLoading}
-              onPress={handleGoogleLogin}
-              disabled={busy}
-            />
-            {googleError ? (
-              <Text tone="danger" style={styles.centerText}>
-                {googleError}
-              </Text>
-            ) : null}
-
-            <View style={styles.dividerRow}>
-              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-              <Text tone="muted">or</Text>
-              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
             </View>
 
-            <Text tone="muted" style={styles.centerText}>
-              Use the email above to receive a sign-in link.
-            </Text>
+            <Card style={cardStyle}>
+              <View style={styles.actions}>
+                <Button
+                  loading={googleLoading}
+                  onPress={handleGoogleLogin}
+                  disabled={busy}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    { shadowColor: theme.text },
+                    pressed && styles.buttonPressed,
+                  ]}
+                >
+                  <FontAwesome name="google" size={18} color={theme.primaryText} />
+                  <Text style={[styles.buttonLabel, { color: theme.primaryText }]}>
+                    {googleLoading
+                      ? t("auth.login.native.google_loading")
+                      : t("auth.login.google_sign_in")}
+                  </Text>
+                </Button>
 
-            <Button
-              variant="secondary"
-              title={magicLoading ? "Sending..." : "Email me a magic link"}
-              loading={magicLoading}
-              onPress={handleSendMagicLink}
-              disabled={busy || !emailValid}
-            />
+                {googleError ? (
+                  <Text tone="danger" style={styles.centerText}>
+                    {googleError}
+                  </Text>
+                ) : null}
 
-            {magicError ? (
-              <Text tone="danger" style={styles.centerText}>
-                {magicError}
-              </Text>
-            ) : null}
+                <View style={styles.dividerRow}>
+                  <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+                  <Text tone="muted">{t("auth.login.native.divider_or")}</Text>
+                  <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+                </View>
 
-            {magicSent ? (
-              <Text tone="muted" style={styles.centerText}>
-                Check your email for a sign-in link.
-              </Text>
-            ) : null}
-          </View>
-        </Card>
+                <Input
+                  label={t("auth.login.email_label")}
+                  value={email}
+                  onChangeText={(value) => {
+                    setEmail(value);
+                    setError(null);
+                    setMagicError(null);
+                    setMagicSent(false);
+                  }}
+                  placeholder={t("auth.login.email_placeholder_short")}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  editable={!busy}
+                  containerStyle={styles.fullWidth}
+                  style={[
+                    styles.emailInput,
+                    emailFocused && { borderColor: theme.primary },
+                  ]}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                />
 
-        <Card>
-          <View style={styles.marketing}>
-            <Text variant="body" style={styles.marketingTitle}>
-              Fitness made simple
-            </Text>
-            <View style={styles.bullet}>
-              <Text style={styles.bulletIcon}>⚡</Text>
-              <Text>Simple. Reliable. Build great habits.</Text>
-            </View>
-            <View style={styles.bullet}>
-              <Text style={styles.bulletIcon}>📊</Text>
-              <Text>Track nutrition, activity, and goals.</Text>
-            </View>
-            <View style={styles.bullet}>
-              <Text style={styles.bulletIcon}>🔒</Text>
-              <Text>Engineered for health, not paywalls.</Text>
-            </View>
-            {isCanada ? (
-              <View style={styles.bullet}>
-                <Text style={styles.bulletIcon}>🇨🇦</Text>
-                <Text>Built with Canadian values.</Text>
+                <Text tone="muted" style={styles.helperText}>
+                  {t("auth.login.native.magic_link_helper")}
+                </Text>
+
+                <Button
+                  variant="secondary"
+                  title={
+                    magicLoading
+                      ? t("auth.login.native.magic_link_sending")
+                      : t("auth.login.native.magic_link_send")
+                  }
+                  loading={magicLoading}
+                  onPress={handleSendMagicLink}
+                  disabled={busy || !emailValid}
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.buttonPressed,
+                  ]}
+                />
+
+                {magicError ? (
+                  <Text tone="danger" style={styles.centerText}>
+                    {magicError}
+                  </Text>
+                ) : null}
+
+                {magicSent ? (
+                  <Text tone="muted" style={styles.centerText}>
+                    {t("auth.login.native.magic_link_sent")}
+                  </Text>
+                ) : null}
+
+                {error ? (
+                  <Text tone="danger" style={styles.centerText}>
+                    {error}
+                  </Text>
+                ) : null}
+
+                {message ? (
+                  <Text tone="muted" style={styles.centerText}>
+                    {message}
+                  </Text>
+                ) : null}
               </View>
-            ) : null}
+            </Card>
           </View>
-        </Card>
 
-        <View style={styles.socialProof}>
-          <Text tone="muted" style={styles.socialItem}>
-            ✅ Designed for real life
-          </Text>
-          <Text tone="muted" style={styles.socialItem}>
-            ✅ Simple insights, no noise
-          </Text>
-          <Text tone="muted" style={styles.socialItem}>
-            ✅ Your data stays yours
-          </Text>
-        </View>
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.textMuted }]}>
+              {t("auth.login.native.footer_legal")}
+            </Text>
+            <View style={styles.footerLinksRow}>
+              <Pressable onPress={() => openExternal(LEGAL.privacy)} hitSlop={8}>
+                <Text style={[styles.footerLink, { color: theme.primary }]}>
+                  {t("auth.login.native.footer_privacy")}
+                </Text>
+              </Pressable>
+              <Text style={[styles.footerDot, { color: theme.textMuted }]}>·</Text>
+              <Pressable onPress={() => openExternal(LEGAL.terms)} hitSlop={8}>
+                <Text style={[styles.footerLink, { color: theme.primary }]}>
+                  {t("auth.login.native.footer_terms")}
+                </Text>
+              </Pressable>
+              <Text style={[styles.footerDot, { color: theme.textMuted }]}>·</Text>
+              <Pressable onPress={() => openExternal(LEGAL.health)} hitSlop={8}>
+                <Text style={[styles.footerLink, { color: theme.primary }]}>
+                  {t("auth.login.native.footer_health")}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
 
-        <Text tone="muted" style={styles.authStatus}>
-          {loading ? "Auth: loading..." : user ? `Auth: signed in (${user.email})` : "Auth: signed out"}
-        </Text>
-      </ScrollView>
-    </Screen>
+          <View style={{ height: Math.max(insets.bottom, spacing.lg) }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
-    padding: spacing.xl,
-    gap: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  content: {
+    flexGrow: 1,
+    justifyContent: "center",
+    gap: spacing.xl,
   },
   header: {
     alignItems: "center",
     gap: spacing.sm,
   },
   logo: {
-    width: 72,
-    height: 72,
+    width: spacing.xxl * 2,
+    height: spacing.xxl * 2,
   },
-  heroTitle: {
+  title: {
     textAlign: "center",
   },
   subtitle: {
-    marginTop: spacing.xs,
     textAlign: "center",
   },
-  form: {
+  actionsCard: {
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  actions: {
     gap: spacing.md,
+    alignItems: "center",
   },
-  socialBlock: {
-    gap: spacing.md,
+  fullWidth: {
+    width: "100%",
   },
-  sectionTitle: {
-    textAlign: "center",
-    fontWeight: "700",
-  },
-  centerText: {
-    textAlign: "center",
+  emailInput: {
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
   },
   dividerRow: {
     flexDirection: "row",
@@ -465,29 +489,56 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
   },
-  marketing: {
-    gap: spacing.sm,
+  helperText: {
+    textAlign: "center",
   },
-  marketingTitle: {
-    fontWeight: "700",
+  primaryButton: {
+    width: "100%",
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md + spacing.xs,
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  bullet: {
+  secondaryButton: {
+    width: "100%",
+    borderRadius: radius.lg,
+  },
+  buttonPressed: {
+    opacity: opacity.image,
+    transform: [{ scale: 0.99 }],
+  },
+  buttonLabel: {
+    fontWeight: "600",
+  },
+  centerText: {
+    textAlign: "center",
+  },
+  footer: {
+    alignItems: "center",
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  footerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  footerLinksRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    flexWrap: "wrap",
+    justifyContent: "center",
   },
-  bulletIcon: {
-    width: 24,
-    textAlign: "center",
+  footerLink: {
+    fontSize: 13,
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
-  socialProof: {
-    gap: spacing.sm,
-    alignItems: "center",
-  },
-  socialItem: {
-    textAlign: "center",
-  },
-  authStatus: {
-    textAlign: "center",
+  footerDot: {
+    fontSize: 13,
+    marginHorizontal: 8,
   },
 });

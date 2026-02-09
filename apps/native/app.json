@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "native",
-    "slug": "native",
+    "name": "AvoVibe",
+    "slug": "avovibe",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/brand/app-icon/Logo_MascotOnly1024x1024.png",
     "scheme": "avovibe",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,12 +14,14 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/images/brand/app-icon/Logo_MascotOnly1024x1024.png"
     },
     "android": {
+      "label": "AvoVibe",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/brand/app-icon/Logo_MascotOnly1024x1024.png",
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

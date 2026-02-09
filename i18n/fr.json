@@ -492,6 +492,28 @@
       "error_facebook_sign_in_failed": "La connexion Facebook a échoué. Veuillez réessayer.",
       "accessibility_show_password": "Afficher le mot de passe",
       "accessibility_hide_password": "Masquer le mot de passe",
+      "native": {
+        "title": "AvoVibe",
+        "subtitle": "Suivi nutritionnel simple.",
+        "divider_or": "ou",
+        "magic_link_helper": "Nous vous enverrons un lien de connexion unique et sécurisé.",
+        "magic_link_send": "M'envoyer un lien magique",
+        "magic_link_sending": "Envoi...",
+        "magic_link_sent": "Vérifiez votre boîte de réception pour le lien de connexion.",
+        "google_loading": "Connexion...",
+        "footer_legal": "En continuant, vous acceptez nos",
+        "footer_privacy": "Politique de confidentialité",
+        "footer_terms": "Conditions",
+        "footer_health": "Avis de non-responsabilité santé",
+        "errors": {
+          "invalid_email": "Entrez un courriel valide.",
+          "google_start_failed": "La connexion Google a échoué. Réessayez.",
+          "google_missing_url": "Un problème est survenu. Réessayez.",
+          "magic_link_failed": "Impossible d'envoyer le lien. Réessayez.",
+          "magic_link_rate_limited": "Trop de demandes. Réessayez bientôt.",
+          "network": "Problème de réseau. Réessayez."
+        }
+      },
       "marketing": {
         "hero_headline_default": "Suivi nutritionnel simple qui ne vous ralentit pas.",
         "hero_headline_ca": "Suivi nutritionnel simple, conçu pour les Canadiens.",
