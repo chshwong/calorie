@@ -11,29 +11,29 @@ import { useGeoCountry } from '@/hooks/use-geo-country';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
 import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
 import {
-  getButtonAccessibilityProps,
-  getInputAccessibilityProps,
-  getLinkAccessibilityProps,
-  getMinTouchTargetStyle,
-  getWebAccessibilityProps,
+    getButtonAccessibilityProps,
+    getInputAccessibilityProps,
+    getLinkAccessibilityProps,
+    getMinTouchTargetStyle,
+    getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Lottie from "lottie-react";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-  type LayoutChangeEvent,
-  type ScrollView as ScrollViewType,
+    ActivityIndicator,
+    Image,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
+    type LayoutChangeEvent,
+    type ScrollView as ScrollViewType,
 } from 'react-native';
 import animationData from "../assets/lottie/Wobbling.json";
 
@@ -43,6 +43,14 @@ function easeInOutCubic(t: number) {
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
+}
+
+function useClientOnlyValue<S, C>(server: S, client: C): S | C {
+  const [value, setValue] = useState<S | C>(server);
+  useEffect(() => {
+    setValue(client);
+  }, [client]);
+  return value;
 }
 
 function animateScrollTo(scrollViewRef: React.RefObject<ScrollViewType | null>, targetY: number, durationMs = 550) {
@@ -549,23 +557,27 @@ export default function LoginScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'] as ThemeColors;
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: rawScreenWidth } = useWindowDimensions();
+  const screenWidth = useClientOnlyValue(0, rawScreenWidth);
   const isTwoCol = screenWidth >= 1024;
   const isWeb = Platform.OS === 'web';
   const isMobileWeb = isWeb && !isTwoCol;
   // Collage mode must NEVER activate on mobile browsers (even if viewport width is large due to viewport/meta quirks).
   // Gate on desktop-like input (fine pointer + hover) AND no touch points.
-  const isDesktopLikePointer = useMemo(() => {
+  const desktopLikePointerClient = useMemo(() => {
     if (!isWeb) return false;
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
     return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   }, [isWeb]);
 
-  const hasTouchPoints = useMemo(() => {
+  const hasTouchPointsClient = useMemo(() => {
     if (!isWeb) return false;
     if (typeof navigator === 'undefined') return false;
     return (navigator as any).maxTouchPoints > 0;
   }, [isWeb]);
+
+  const isDesktopLikePointer = useClientOnlyValue(false, desktopLikePointerClient);
+  const hasTouchPoints = useClientOnlyValue(false, hasTouchPointsClient);
 
   const overlapMode = isWeb && isTwoCol && screenWidth >= 1200 && isDesktopLikePointer && !hasTouchPoints;
 

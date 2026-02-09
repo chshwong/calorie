@@ -2622,8 +2622,8 @@
       "start_logging_button": "Log first meal",
       "status_fasted_chip": "🌙 Fasted",
       "status_completed_chip": "✅ Completed",
-      "status_fasted_hint": "Fasting day — food intentionally 0.",
-      "status_completed_hint": "Completed — no food logged today."
+      "status_fasted_hint": "Fasting — no food logged.",
+      "status_completed_hint": "Completed — no food logged."
     },
     "exercise": {
       "activity_one": "activity",

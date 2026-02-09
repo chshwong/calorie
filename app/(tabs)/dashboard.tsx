@@ -11,6 +11,7 @@ import { AvocadoGauge } from '@/components/gauges/AvocadoGauge';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
+import { TapHintOverlay } from '@/components/TapHintOverlay';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
@@ -42,7 +43,7 @@ import { getDashboardDayLabel } from '@/utils/dashboardDayLabel';
 import { addDays, toDateKey } from '@/utils/dateKey';
 import { getTodayKey, getYesterdayKey } from '@/utils/dateTime';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, Platform, Pressable, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
@@ -62,11 +63,13 @@ type DashboardFoodSectionProps = {
   onEditBurned: () => void;
   onPressExercise: () => void;
   foodSummary: ReturnType<typeof useDailyFoodSummary>;
+  onTapHintRectChange?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
+  onTapHintVisibleChange?: (visible: boolean) => void;
   willSyncWeight?: boolean;
   willSyncSteps?: boolean;
 };
 
-function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, onEditBurned, onPressExercise, foodSummary, willSyncWeight, willSyncSteps }: DashboardFoodSectionProps) {
+function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isMobile, onPress, onDateSelect, onEditBurned, onPressExercise, foodSummary, onTapHintRectChange, onTapHintVisibleChange, willSyncWeight, willSyncSteps }: DashboardFoodSectionProps) {
   const { t } = useTranslation();
   const weeklyCalInVsOut = useWeeklyCalInVsOut(dateString, 7, goalType);
   const { data: stepsRow } = useDailySumExercisesStepsForDate(dateString);
@@ -132,6 +135,26 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
   const statusHint = isFastedOrCompleted
     ? (isFasted ? t('dashboard.food.status_fasted_hint') : t('dashboard.food.status_completed_hint'))
     : null;
+
+  const logFirstMealRef = useRef<View>(null);
+  const updateLogFirstMealRect = useCallback(() => {
+    if (!logFirstMealRef.current) return;
+    logFirstMealRef.current.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        onTapHintRectChange?.({ x, y, width, height });
+      }
+    });
+  }, [onTapHintRectChange]);
+
+  useEffect(() => {
+    onTapHintVisibleChange?.(isStartLogging);
+    if (!isStartLogging) {
+      onTapHintRectChange?.(null);
+      return;
+    }
+    const raf = requestAnimationFrame(updateLogFirstMealRect);
+    return () => cancelAnimationFrame(raf);
+  }, [isStartLogging, onTapHintRectChange, onTapHintVisibleChange, updateLogFirstMealRect]);
 
   // Calculate averages, excluding days with no value (0 or invalid) - memoized for performance
   const avgStats = useMemo(() => {
@@ -339,7 +362,11 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                       </View>
                       {isStartLogging && (
                         <View pointerEvents="none" style={styles.avocadoCtaOverlay}>
-                          <View style={[styles.avocadoCtaPill, { backgroundColor: colors.accentFood }]}>
+                          <View
+                            ref={logFirstMealRef}
+                            onLayout={updateLogFirstMealRect}
+                            style={[styles.avocadoCtaPill, { backgroundColor: colors.accentFood }]}
+                          >
                             <ThemedText style={styles.avocadoCtaPillText}>
                               {t('dashboard.food.start_logging_button')}
                             </ThemedText>
@@ -1049,6 +1076,8 @@ export default function DashboardScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [burnedModalVisible, setBurnedModalVisible] = useState(false);
+  const [tapHintRect, setTapHintRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [tapHintVisible, setTapHintVisible] = useState(false);
   
   // Get user config for avatar
   const { data: userConfig } = useUserConfig();
@@ -1209,6 +1238,8 @@ export default function DashboardScreen() {
           onEditBurned={() => setBurnedModalVisible(true)}
           onPressExercise={() => router.push(`/exercise?date=${selectedDateString}`)}
           foodSummary={foodSummary}
+          onTapHintRectChange={setTapHintRect}
+          onTapHintVisibleChange={setTapHintVisible}
           willSyncWeight={userConfig?.weight_sync_provider === 'fitbit'}
           willSyncSteps={userConfig?.exercise_sync_steps === true}
         />
@@ -1256,6 +1287,7 @@ export default function DashboardScreen() {
         </View>
         </DesktopPageContainer>
       </CollapsibleModuleHeader>
+      <TapHintOverlay visible={tapHintVisible} targetRect={tapHintRect} durationMs={4000} />
     </ThemedView>
   );
 }
