@@ -36,7 +36,10 @@
               "pathPrefix": "/callback"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -56,8 +59,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "07d93073-40a2-48d0-8838-61cd2f1493e5"
+        "projectId": "ed400460-0545-4727-8f97-6ead3997a43f"
       }
-    }
+    },
+    "owner": "chshwong"
   }
 }

@@ -5,6 +5,7 @@ import * as React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -19,12 +20,19 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { clearPendingAuthState, getOAuthRedirectTo, setPendingAuthState } from "@/lib/auth/oauth";
 import { sendMagicLink, signInWithOAuth } from "@/lib/services/auth";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import Constants from "expo-constants";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import { NativeModulesProxy } from "expo-modules-core";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Text } from "../components/ui/Text";
 import { useColorScheme } from "../components/useColorScheme";
 import { colors, opacity, radius, spacing } from "../theme/tokens";
+
+const logoLight = require("../assets/images/brand/Logo_LightMode_Name&Tag.png");
+const logoDark = require("../assets/images/brand/Logo_DarkMode_Name&Tag.png");
 
 const LEGAL = {
   privacy: "https://avovibe.app/legal/privacy",
@@ -37,6 +45,7 @@ export default function LoginScreen() {
   const { user, loading, onboardingComplete } = useAuth();
   const colorScheme = useColorScheme() ?? "light";
   const theme = colors[colorScheme];
+  const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -52,20 +61,46 @@ export default function LoginScreen() {
 
   const emailValid = email.trim().toLowerCase().includes("@");
   const busy = submitting !== null || googleLoading || magicLoading;
+  const logoSource = isDark ? logoDark : logoLight;
+  const hasLinearGradient = Boolean(NativeModulesProxy?.ExpoLinearGradient);
 
   const cardStyle = [
     styles.actionsCard,
     {
-      borderRadius: radius.xl,
-      backgroundColor: theme.card,
-      borderColor: theme.border,
-      shadowColor: theme.text,
-      shadowOpacity: opacity.muted,
-      shadowRadius: spacing.xl,
-      shadowOffset: { width: 0, height: spacing.md },
-      elevation: spacing.md,
+      borderRadius: 20,
+      padding: 16,
+      backgroundColor: isDark ? "rgba(20,30,55,0.65)" : "rgba(255,255,255,0.9)",
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? "rgba(255,255,255,0.08)" : "transparent",
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.18 : 0.12,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: isDark ? 5 : 3,
     },
   ];
+
+  const formatGoogleError = (message?: string | null) => {
+    const lower = message?.toLowerCase() ?? "";
+    if (lower.includes("cancel")) {
+      return "Sign-in cancelled.";
+    }
+    if (lower.includes("network")) {
+      return t("auth.login.native.errors.network");
+    }
+    return message || t("auth.login.native.errors.google_start_failed");
+  };
+
+  const formatMagicError = (message?: string | null) => {
+    const lower = message?.toLowerCase() ?? "";
+    if (lower.includes("expired")) {
+      return "This link expired. Request a new one.";
+    }
+    if (lower.includes("network")) {
+      return t("auth.login.native.errors.network");
+    }
+    return message || t("auth.login.native.errors.magic_link_failed");
+  };
 
   const openExternal = async (url: string) => {
     try {
@@ -180,6 +215,7 @@ export default function LoginScreen() {
     setGoogleError(null);
     setMagicError(null);
     setMagicSent(false);
+    Haptics.selectionAsync().catch(() => {});
     setGoogleLoading(true);
 
     try {
@@ -198,7 +234,8 @@ export default function LoginScreen() {
 
       if (oauthError) {
         await clearPendingAuthState();
-        setGoogleError(oauthError.message || t("auth.login.native.errors.google_start_failed"));
+        setGoogleError(formatGoogleError(oauthError.message));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         return;
       }
 
@@ -206,6 +243,7 @@ export default function LoginScreen() {
       if (!authUrl) {
         await clearPendingAuthState();
         setGoogleError(t("auth.login.native.errors.google_missing_url"));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         return;
       }
 
@@ -216,9 +254,11 @@ export default function LoginScreen() {
       });
 
       await Linking.openURL(authUrl);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch {
       await clearPendingAuthState();
       setGoogleError(t("auth.login.native.errors.network"));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
       setGoogleLoading(false);
     }
@@ -228,6 +268,7 @@ export default function LoginScreen() {
     if (busy) return;
     setMagicError(null);
     setMagicSent(false);
+    Haptics.selectionAsync().catch(() => {});
     setMagicLoading(true);
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -256,15 +297,18 @@ export default function LoginScreen() {
         if (message.includes("rate") || message.includes("too many")) {
           setMagicError(t("auth.login.native.errors.magic_link_rate_limited"));
         } else {
-          setMagicError(t("auth.login.native.errors.magic_link_failed"));
+          setMagicError(formatMagicError(magicLinkError.message));
         }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         return;
       }
 
       setMagicSent(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch {
       await clearPendingAuthState();
       setMagicError(t("auth.login.native.errors.network"));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
       setMagicLoading(false);
     }
@@ -284,20 +328,50 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            <View style={styles.header}>
-              <Image
-                source={require("../assets/images/brand/Logo_MascotOnly.png")}
-                style={styles.logo}
-                resizeMode="contain"
-                accessibilityLabel={t("auth.login.brand_logo_alt")}
-              />
-              <Text variant="title" style={styles.title}>
-                {t("auth.login.native.title")}
-              </Text>
-              <Text tone="muted" style={styles.subtitle}>
-                {t("auth.login.native.subtitle")}
-              </Text>
-            </View>
+            {hasLinearGradient ? (
+              <LinearGradient
+                colors={
+                  isDark
+                    ? ["rgba(20,30,55,0.45)", "rgba(0,0,0,0)"]
+                    : ["rgba(0,150,180,0.1)", "rgba(255,255,255,0)"]
+                }
+                style={styles.headerGradient}
+              >
+                <View style={styles.header}>
+                  <Image
+                    source={require("../assets/images/brand/Logo_MascotOnly.png")}
+                    style={styles.logo}
+                    resizeMode="contain"
+                    accessibilityLabel={t("auth.login.brand_logo_alt")}
+                  />
+                  <Image
+                    source={logoSource}
+                    style={styles.wordmark}
+                    resizeMode="contain"
+                    accessibilityRole="image"
+                    accessibilityLabel="AvoVibe"
+                  />
+                </View>
+              </LinearGradient>
+            ) : (
+              <View style={styles.headerGradient}>
+                <View style={styles.header}>
+                  <Image
+                    source={require("../assets/images/brand/Logo_MascotOnly.png")}
+                    style={styles.logo}
+                    resizeMode="contain"
+                    accessibilityLabel={t("auth.login.brand_logo_alt")}
+                  />
+                  <Image
+                    source={logoSource}
+                    style={styles.wordmark}
+                    resizeMode="contain"
+                    accessibilityRole="image"
+                    accessibilityLabel="AvoVibe"
+                  />
+                </View>
+              </View>
+            )}
 
             <Card style={cardStyle}>
               <View style={styles.actions}>
@@ -305,13 +379,23 @@ export default function LoginScreen() {
                   loading={googleLoading}
                   onPress={handleGoogleLogin}
                   disabled={busy}
+                  accessibilityLabel={t("auth.login.google_sign_in")}
                   style={({ pressed }) => [
                     styles.primaryButton,
                     { shadowColor: theme.text },
-                    pressed && styles.buttonPressed,
+                    pressed && !busy ? styles.buttonPressed : null,
+                    busy ? styles.buttonDisabled : null,
                   ]}
                 >
-                  <FontAwesome name="google" size={18} color={theme.primaryText} />
+                  {googleLoading ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.primaryText}
+                      style={styles.buttonSpinner}
+                    />
+                  ) : (
+                    <FontAwesome name="google" size={18} color={theme.primaryText} />
+                  )}
                   <Text style={[styles.buttonLabel, { color: theme.primaryText }]}>
                     {googleLoading
                       ? t("auth.login.native.google_loading")
@@ -370,9 +454,11 @@ export default function LoginScreen() {
                   loading={magicLoading}
                   onPress={handleSendMagicLink}
                   disabled={busy || !emailValid}
+                  accessibilityLabel={t("auth.login.native.magic_link_send")}
                   style={({ pressed }) => [
                     styles.secondaryButton,
-                    pressed && styles.buttonPressed,
+                    pressed && !busy ? styles.buttonPressed : null,
+                    busy ? styles.buttonDisabled : null,
                   ]}
                 />
 
@@ -426,6 +512,11 @@ export default function LoginScreen() {
                 </Text>
               </Pressable>
             </View>
+            {__DEV__ ? (
+              <Text style={[styles.devLabel, { color: theme.textMuted }]}>
+                AvoVibe • Dev • {Constants.expoConfig?.version ?? ""}
+              </Text>
+            ) : null}
           </View>
 
           <View style={{ height: Math.max(insets.bottom, spacing.lg) }} />
@@ -453,15 +544,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
   },
+  headerGradient: {
+    paddingTop: 24,
+    paddingBottom: 12,
+    alignItems: "center",
+    borderRadius: radius.xl,
+  },
   logo: {
     width: spacing.xxl * 2,
     height: spacing.xxl * 2,
   },
-  title: {
-    textAlign: "center",
-  },
-  subtitle: {
-    textAlign: "center",
+  wordmark: {
+    width: 240,
+    height: 70,
   },
   actionsCard: {
     shadowOpacity: 0.16,
@@ -496,6 +591,7 @@ const styles = StyleSheet.create({
     width: "100%",
     borderRadius: radius.lg,
     paddingVertical: spacing.md + spacing.xs,
+    minHeight: 48,
     shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -504,10 +600,17 @@ const styles = StyleSheet.create({
   secondaryButton: {
     width: "100%",
     borderRadius: radius.lg,
+    minHeight: 48,
   },
   buttonPressed: {
     opacity: opacity.image,
     transform: [{ scale: 0.99 }],
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonSpinner: {
+    marginRight: spacing.sm,
   },
   buttonLabel: {
     fontWeight: "600",
@@ -540,5 +643,10 @@ const styles = StyleSheet.create({
   footerDot: {
     fontSize: 13,
     marginHorizontal: 8,
+  },
+  devLabel: {
+    textAlign: "center",
+    fontSize: 12,
+    marginTop: 10,
   },
 });
