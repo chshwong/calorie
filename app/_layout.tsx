@@ -1,16 +1,17 @@
 import i18n, { loadStoredLanguage } from '@/i18n';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { SplashScreen, Stack } from 'expo-router';
+import { router, SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
 
+import { AppErrorBoundary } from '@/components/system/AppErrorBoundary';
 import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
+import { FriendlyErrorScreen } from '@/components/system/FriendlyErrorScreen';
 import { ToastProvider } from '@/components/ui/app-toast';
-import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { DebugLoadingProvider } from '@/contexts/DebugLoadingContext';
 import { OfflineModeProvider } from '@/contexts/OfflineModeContext';
@@ -86,11 +87,74 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 //   initialRouteName: 'index',
 // };
 
+function isFontTimeoutError(error: unknown): boolean {
+  const msg = String(error instanceof Error ? error.message : error).toLowerCase();
+  const fn = error instanceof Error ? (error.stack ?? '') : '';
+  return (
+    msg.includes('timeout') ||
+    msg.includes('6000ms') ||
+    msg.includes('exceeded') ||
+    fn.includes('fontfaceobserver')
+  );
+}
+
+function normalizeFatalError(payload: unknown): Error {
+  if (payload instanceof Error) return payload;
+  if (typeof payload === 'string') return new Error(payload);
+  return new Error(String(payload));
+}
+
 export default function RootLayout() {
   const mountRef = useRef(false);
+  const [fatalError, setFatalError] = useState<Error | null>(null);
   const { fontsLoaded, fontError } = useAppFonts();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+
+  // Production-only: catch non-React fatal errors (web + native)
+  useEffect(() => {
+    if (__DEV__) return;
+
+    const handleError = (event: ErrorEvent) => {
+      const err = event.error ?? event.message;
+      const normalized = normalizeFatalError(err);
+      if (isFontTimeoutError(normalized)) return;
+      setFatalError(normalized);
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const err = event.reason ?? event;
+      const normalized = normalizeFatalError(err);
+      if (isFontTimeoutError(normalized)) return;
+      setFatalError(normalized);
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('error', handleError);
+      window.addEventListener('unhandledrejection', handleUnhandledRejection);
+      return () => {
+        window.removeEventListener('error', handleError);
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      };
+    }
+
+    // Native: ErrorUtils.setGlobalHandler
+    const ErrorUtils = (global as any).ErrorUtils;
+    if (ErrorUtils?.setGlobalHandler) {
+      const original = ErrorUtils.getGlobalHandler?.() ?? (() => {});
+      ErrorUtils.setGlobalHandler((error: unknown, isFatal?: boolean) => {
+        const normalized = normalizeFatalError(error);
+        if (isFontTimeoutError(normalized)) {
+          original(error, isFatal);
+          return;
+        }
+        setFatalError(normalized);
+      });
+      return () => {
+        ErrorUtils.setGlobalHandler(original);
+      };
+    }
+
+    return () => {};
+  }, []);
 
   // Load stored language preference on app startup
   useEffect(() => {
@@ -168,7 +232,20 @@ export default function RootLayout() {
         <DebugLoadingProvider>
           <AppThemeProvider>
             <OfflineModeProvider>
-              <ThemeProviderWrapper fontsLoaded={fontsLoaded} fontError={fontError} />
+              {fatalError ? (
+                <ToastProvider>
+                  <FriendlyErrorScreen
+                    error={fatalError}
+                    onRetry={() => setFatalError(null)}
+                    onGoHome={() => {
+                      setFatalError(null);
+                      router.replace('/(tabs)');
+                    }}
+                  />
+                </ToastProvider>
+              ) : (
+                <ThemeProviderWrapper fontsLoaded={fontsLoaded} fontError={fontError} />
+              )}
             </OfflineModeProvider>
           </AppThemeProvider>
         </DebugLoadingProvider>
@@ -195,6 +272,7 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
   return (
     <AuthProvider>
       <NativeWrapperBridgeInstaller />
+      <AppErrorBoundary>
       <BlockingGateWithRetry
         fontsLoaded={fontsLoaded}
         fontError={fontError}
@@ -237,6 +315,7 @@ function ThemeProviderWrapper({ fontsLoaded, fontError }: { fontsLoaded: boolean
           </ToastProvider>
         </TourProvider>
       </BlockingGateWithRetry>
+      </AppErrorBoundary>
     </AuthProvider>
   );
 }

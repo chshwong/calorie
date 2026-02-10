@@ -772,6 +772,35 @@
       "not_common": "Not a common password"
     }
   },
+  "friendly_error": {
+    "offline": {
+      "title": "Uh-oh, we're offline",
+      "message": "Looks like AvoVibe can't find the internet right now. Check your Wi-Fi or data, then we'll get you back on track."
+    },
+    "timeout": {
+      "title": "This is taking a bit longer…",
+      "message": "Your connection seems slow right now. AvoVibe is waiting for things to catch up."
+    },
+    "server": {
+      "title": "Our avocado slipped 😅",
+      "message": "Something didn't go as planned on our side. We're fixing it and will be back shortly."
+    },
+    "auth": {
+      "title": "Time to sign back in",
+      "message": "For security reasons, your session expired. Sign in again to keep logging and tracking."
+    },
+    "unknown": {
+      "title": "Our avocado hit a small bump 🥑",
+      "message": "Something unexpected happened, but no worries — your data is safe. Let's try again and get you back on track."
+    },
+    "retry": "Retry",
+    "try_again": "Try again",
+    "sign_in": "Sign in",
+    "go_home": "Go home",
+    "show_details": "Show details",
+    "copy_details": "Copy details",
+    "details_copied": "Details copied"
+  },
   "recovery": {
     "title": "Trouble loading Avovibe",
     "body": "Avovibe is taking longer than expected to start. This can happen after an update or when the network is unstable. You can try again, restart the app, or reset local data.",

@@ -3,12 +3,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, BackHandler, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Linking, Platform, StatusBar, StyleSheet, useColorScheme, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { WebViewNavigation } from "react-native-webview";
 import { WebView } from "react-native-webview";
 import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
+import { FriendlyErrorScreen } from "@/components/system/FriendlyErrorScreen";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DEFAULT_WEB_PATH,
@@ -87,6 +88,8 @@ export function WrappedWebView({
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadHttpStatus, setLoadHttpStatus] = useState<number | undefined>(undefined);
+  const [loadIsOfflineHint, setLoadIsOfflineHint] = useState(false);
 
   // A) Native-session guard: never allow /web when unauthenticated.
   useEffect(() => {
@@ -341,6 +344,8 @@ export function WrappedWebView({
           }}
           onLoadStart={() => {
             setLoadError(null);
+            setLoadHttpStatus(undefined);
+            setLoadIsOfflineHint(false);
             setIsLoading(true);
           }}
           onLoadEnd={() => {
@@ -350,12 +355,23 @@ export function WrappedWebView({
           }}
           onError={(e) => {
             const desc = String(e?.nativeEvent?.description ?? "Unknown error");
+            const lower = desc.toLowerCase();
+            const offlineHint =
+              lower.includes("network") ||
+              lower.includes("disconnect") ||
+              lower.includes("dns") ||
+              lower.includes("err_internet") ||
+              lower.includes("connection");
+            setLoadIsOfflineHint(offlineHint);
             setLoadError(desc);
+            setLoadHttpStatus(undefined);
             setIsLoading(false);
           }}
           onHttpError={(e) => {
             const status = e?.nativeEvent?.statusCode;
+            setLoadHttpStatus(typeof status === "number" ? status : undefined);
             setLoadError(`HTTP error${typeof status === "number" ? ` (${status})` : ""}`);
+            setLoadIsOfflineHint(false);
             setIsLoading(false);
           }}
           javaScriptEnabled
@@ -365,20 +381,23 @@ export function WrappedWebView({
         />
 
         {loadError ? (
-          <View style={styles.errorOverlay}>
-            <Text style={styles.errorTitle}>Could not load wrapped web app</Text>
-            <Text style={styles.errorText}>{initialUrl}</Text>
-            {lastNavUrl ? <Text style={styles.errorText}>{lastNavUrl}</Text> : null}
-            <Text style={styles.errorText}>{loadError}</Text>
-
-            <View style={styles.errorActions}>
-              <Pressable onPress={() => router.replace("/post-login-gate")} style={styles.errorButton}>
-                <Text style={styles.errorButtonText}>Back</Text>
-              </Pressable>
-              <Pressable onPress={() => openExternally(initialUrl)} style={styles.errorButtonSecondary}>
-                <Text style={styles.errorButtonText}>Open in browser</Text>
-              </Pressable>
-            </View>
+          <View style={[styles.errorOverlay, { backgroundColor }]}>
+            <FriendlyErrorScreen
+              error={{
+                message: loadError,
+                statusCode: loadHttpStatus,
+                url: lastNavUrl || initialUrl,
+              }}
+              httpStatus={loadHttpStatus}
+              isOfflineHint={loadIsOfflineHint}
+              onRetry={() => {
+                setLoadError(null);
+                setLoadHttpStatus(undefined);
+                setLoadIsOfflineHint(false);
+                webRef.current?.reload();
+              }}
+              onGoHome={() => router.replace("/post-login-gate")}
+            />
           </View>
         ) : isLoading ? (
           <View pointerEvents="none" style={styles.loadingOverlay}>
@@ -554,45 +573,6 @@ const styles = StyleSheet.create({
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
-    padding: 20,
-    gap: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.98)",
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  errorText: {
-    fontSize: 14,
-    opacity: 0.75,
-    textAlign: "center",
-  },
-  errorActions: {
-    marginTop: 6,
-    width: "100%",
-    gap: 10,
-  },
-  errorButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: "#111827",
-  },
-  errorButtonSecondary: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: "#374151",
-  },
-  errorButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
   },
 });
 
