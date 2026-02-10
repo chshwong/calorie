@@ -11,29 +11,29 @@ import { useGeoCountry } from '@/hooks/use-geo-country';
 import { clearPendingLinkState, getOAuthRedirectTo, setPendingLinkState } from '@/lib/auth/oauth';
 import { sendMagicLink, signInWithOAuth } from '@/lib/services/auth';
 import {
-  getButtonAccessibilityProps,
-  getInputAccessibilityProps,
-  getLinkAccessibilityProps,
-  getMinTouchTargetStyle,
-  getWebAccessibilityProps,
+    getButtonAccessibilityProps,
+    getInputAccessibilityProps,
+    getLinkAccessibilityProps,
+    getMinTouchTargetStyle,
+    getWebAccessibilityProps,
 } from '@/utils/accessibility';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Lottie from "lottie-react";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-  type LayoutChangeEvent,
-  type ScrollView as ScrollViewType,
+    ActivityIndicator,
+    Image,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
+    type LayoutChangeEvent,
+    type ScrollView as ScrollViewType,
 } from 'react-native';
 import animationData from "../assets/lottie/Wobbling.json";
 const googleGLogo = require('@/assets/brand/google/google-g.png');

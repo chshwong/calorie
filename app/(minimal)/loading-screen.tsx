@@ -9,17 +9,17 @@
  * Mobile-first, respects dark/light mode, matches Home container width on desktop.
  */
 
-import { useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, Dimensions } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import Lottie from 'lottie-react';
-import animationData from '../../assets/lottie/Wobbling.json';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
 import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
-import { Colors, Spacing, Layout } from '@/constants/theme';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Colors, Layout, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadingQuotes } from '@/i18n/quotes/loadingQuotes';
+import Lottie from 'lottie-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Dimensions, Platform, StyleSheet, View } from 'react-native';
+import animationData from '../../assets/lottie/Wobbling.json';
 
 export default function LoadingScreen() {
   const { t } = useTranslation();

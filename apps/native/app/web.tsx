@@ -11,10 +11,10 @@ import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTyp
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  DEFAULT_WEB_PATH,
-  isBlockedPath,
-  isSameOrigin,
-  WEB_BASE_URL,
+    DEFAULT_WEB_PATH,
+    isBlockedPath,
+    isSameOrigin,
+    WEB_BASE_URL,
 } from "@/lib/webWrapper/webConfig";
 
 function coercePathParam(input: unknown): string {
@@ -87,6 +87,9 @@ export function WrappedWebView({
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [canPullToRefresh, setCanPullToRefresh] = useState(true);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // A) Native-session guard: never allow /web when unauthenticated.
   useEffect(() => {
@@ -219,11 +222,48 @@ export function WrappedWebView({
     onWebMessage?.(data);
   }, [containerType, onWebMessage, sendNativeSession, session?.access_token, session?.refresh_token, signOut]);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    webRef.current?.reload();
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+    refreshTimeoutRef.current = setTimeout(() => {
+      setRefreshing(false);
+    }, 9000);
+  }, [webRef]);
+
+  const handleScroll = useCallback((event: any) => {
+    if (Platform.OS !== "android") return;
+    const offsetY = event?.nativeEvent?.contentOffset?.y;
+    if (typeof offsetY !== "number") return;
+    const atTop = offsetY <= 0;
+    setCanPullToRefresh(atTop);
+  }, []);
+
+  const androidRefreshProps =
+    Platform.OS === "android"
+      ? ({
+          pullToRefreshEnabled: canPullToRefresh,
+          refreshing,
+          onRefresh,
+        } as const)
+      : ({} as const);
+
   const openExternally = useCallback((urlString: string) => {
     // Fire-and-forget: external apps / OS handlers.
     Linking.openURL(urlString).catch(() => {
       // ignore
     });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   const handleShouldStartLoadWithRequest = useCallback(
@@ -325,6 +365,8 @@ export function WrappedWebView({
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
           onMessage={handleMessage}
+          onScroll={handleScroll}
+          {...androidRefreshProps}
           onNavigationStateChange={(navState: WebViewNavigation) => {
             canGoBackRef.current = !!navState.canGoBack;
             onWebNavigationStateChange?.(navState);
@@ -345,6 +387,7 @@ export function WrappedWebView({
           }}
           onLoadEnd={() => {
             setIsLoading(false);
+            setRefreshing(false);
             // Proactively send session after load so web can bootstrap without showing login.
             sendNativeSession("web_load_end");
           }}

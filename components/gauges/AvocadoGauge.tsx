@@ -2,10 +2,13 @@ import { MACRO_GAUGE_TEXT } from '@/components/MacroGauge';
 import { Colors, FontFamilies, FontSize, Nudge } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ensureContrast } from '@/theme/contrast';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path, Text as SvgText, TSpan } from 'react-native-svg';
+
+const AVOCADO_GAUGE_FILL_DURATION_MS = 1600;
+const AVOCADO_GAUGE_FILL_EASING = Easing.out(Easing.cubic);
 
 type GoalType = 'lose' | 'maintain' | 'recomp' | 'gain';
 
@@ -41,6 +44,10 @@ export type AvocadoGaugeProps = {
    */
   surfaceBg?: string;
   showLabel?: boolean;
+  /** When true, skip fill animation (e.g. prefers-reduced-motion). */
+  reduceMotion?: boolean;
+  /** Change to re-run fill animation (e.g. selected date key). */
+  animationKey?: string;
 };
 
 // Avocado silhouette outline (single closed path). The progress "start" is the path's `M` point.
@@ -109,6 +116,8 @@ export function AvocadoGauge({
   trackColor,
   surfaceBg,
   showLabel = true,
+  reduceMotion = false,
+  animationKey,
 }: AvocadoGaugeProps) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
@@ -126,6 +135,33 @@ export function AvocadoGauge({
 
   const pct = safeTarget > 0 ? safeConsumed / safeTarget : 0;
   const fillT = Math.max(0, Math.min(1, pct));
+
+  // Fill animation (0 -> 1) when target > 0 and !reduceMotion. Re-runs when animationKey changes (e.g. date change).
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [animatedProgress, setAnimatedProgress] = useState(reduceMotion || safeTarget === 0 ? 1 : 0);
+
+  useEffect(() => {
+    if (reduceMotion || safeTarget === 0) {
+      setAnimatedProgress(1);
+      return;
+    }
+    progressAnim.setValue(0);
+    setAnimatedProgress(0);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: AVOCADO_GAUGE_FILL_DURATION_MS,
+      easing: AVOCADO_GAUGE_FILL_EASING,
+      useNativeDriver: false,
+    }).start(() => setAnimatedProgress(1));
+  }, [reduceMotion, safeTarget, progressAnim, animationKey]);
+
+  useEffect(() => {
+    const listener = progressAnim.addListener(({ value: v }) => setAnimatedProgress(v));
+    return () => progressAnim.removeListener(listener);
+  }, [progressAnim]);
+
+  const displayFillT = fillT * animatedProgress;
+  const displayConsumed = safeConsumed * animatedProgress;
 
   // Same calorie gauge color rules as `CalorieCurvyGauge`.
   // NOTE: These threshold values are visual state rules (not user-configurable "constraints").
@@ -153,22 +189,22 @@ export function AvocadoGauge({
     return ORANGE; // <90%
   }, [pct, goalType, safeTarget, colors.textSecondary, GREEN, ORANGE, PINK, RED, TEAL]);
 
+  const remainingDisplay = safeTarget > 0 ? safeTarget - displayConsumed : 0;
   const remainingRaw = safeTarget > 0 ? Math.round(safeTarget - safeConsumed) : 0;
   const isOverBudget = safeTarget > 0 && remainingRaw < 0;
-  const remainingAmount = safeTarget > 0 ? (isOverBudget ? Math.abs(remainingRaw) : remainingRaw) : 0;
+  const remainingAmount = safeTarget > 0 ? (isOverBudget ? Math.abs(remainingRaw) : Math.round(remainingDisplay)) : 0;
   const bgForContrast = surfaceBg ?? colors.background;
   const calTextColor =
     safeTarget > 0 ? ensureContrast(lineColor, bgForContrast, modeKey, 4.5) : colors.textSecondary;
 
-  // Calculate consumed calories and percentage (same as CalorieCurvyGauge)
-  const consumedRounded = Math.round(safeConsumed);
+  // Display consumed and percentage (animated)
+  const consumedRounded = Math.round(displayConsumed);
   const percentDisplay = useMemo(() => {
     if (safeTarget <= 0) return null;
-    const rawPct = (safeConsumed / safeTarget) * 100;
+    const rawPct = (displayConsumed / safeTarget) * 100;
     if (!Number.isFinite(rawPct)) return null;
-    // 1 decimal, but trim trailing ".0"
     return rawPct.toFixed(1).replace(/\.0$/, '');
-  }, [safeConsumed, safeTarget]);
+  }, [displayConsumed, safeTarget]);
 
   // Calculate tip position along the avocado path
   // Sample points along the path to find where fillT percentage is
@@ -191,12 +227,12 @@ export function AvocadoGauge({
   const segmentSamples = 60;
   const segmentLengths = pathSegments.map(seg => cubicLength(seg.p0, seg.p1, seg.p2, seg.p3, segmentSamples));
   
-  // Find which segment contains the tip position
+  // Find which segment contains the tip position (use displayFillT for animated fill)
   let accumulatedLength = 0;
   let tipSegmentIndex = 0;
   let tipTInSegment = 0;
-  const targetLength = AVOCADO_TOTAL_LEN * fillT;
-  
+  const targetLength = AVOCADO_TOTAL_LEN * displayFillT;
+
   for (let i = 0; i < segmentLengths.length; i++) {
     if (accumulatedLength + segmentLengths[i] >= targetLength) {
       tipSegmentIndex = i;
@@ -205,11 +241,8 @@ export function AvocadoGauge({
     }
     accumulatedLength += segmentLengths[i];
   }
-  
-  // Clamp tipTInSegment to [0, 1] to avoid edge cases
+
   tipTInSegment = Math.max(0, Math.min(1, tipTInSegment));
-  
-  // Calculate tip position
   const tipSegment = pathSegments[tipSegmentIndex];
   const tip = cubicPoint(tipTInSegment, tipSegment.p0, tipSegment.p1, tipSegment.p2, tipSegment.p3);
 
@@ -282,7 +315,7 @@ export function AvocadoGauge({
         />
 
         {/* Progress (dash) */}
-        {fillT > 0 && (
+        {displayFillT > 0 && (
           <Path
             d={AVOCADO_PATH}
             fill="none"
@@ -291,7 +324,7 @@ export function AvocadoGauge({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeDasharray={`${AVOCADO_TOTAL_LEN}`}
-            strokeDashoffset={AVOCADO_TOTAL_LEN * (1 - fillT)}
+            strokeDashoffset={AVOCADO_TOTAL_LEN * (1 - displayFillT)}
           />
         )}
 
@@ -368,7 +401,7 @@ export function AvocadoGauge({
         )}
 
         {/* Tip marker + consumed label (moves with progress, rendered last in group to appear on top) */}
-        {fillT > 0 && (
+        {displayFillT > 0 && (
           <G>
             <Circle cx={tip.x} cy={tip.y} r={4} fill={lineColor} />
             {/* Text halo (drawn first for contrast) */}

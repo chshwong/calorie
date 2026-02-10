@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { router } from "expo-router";
+import LottieView from "lottie-react-native";
 import * as React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -327,12 +328,21 @@ export default function LoginScreen() {
         >
           <View style={styles.content}>
             <View style={styles.brandHeader}>
-              <Image
+              {/* Rollback: mascot PNG */}
+              {/* <Image
                 source={require("../assets/images/brand/Logo_MascotOnly.png")}
                 style={styles.mascot}
                 resizeMode="contain"
                 accessibilityLabel="AvoVibe mascot"
-              />
+              /> */}
+              <View style={styles.mascotContainer} accessibilityLabel="AvoVibe mascot">
+                <LottieView
+                  source={require("../assets/images/lottie/Wobbling.json")}
+                  autoPlay
+                  loop
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </View>
               <Image
                 source={nameTagLogo}
                 style={styles.nameTag}
@@ -509,6 +519,11 @@ const styles = StyleSheet.create({
   mascot: {
     width: 64,
     height: 64,
+  },
+  mascotContainer: {
+    width: 64,
+    height: 64,
+    alignSelf: "center",
   },
   nameTag: {
     width: 240,

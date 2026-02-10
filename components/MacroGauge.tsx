@@ -1,19 +1,26 @@
 import { ThemedText } from '@/components/themed-text';
 import { Colors, FontFamilies, GaugeText } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTranslation } from 'react-i18next';
-import React, { useMemo } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
-import Svg, { Circle, Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import { ensureContrast } from '@/theme/contrast';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
+
+const GAUGE_FILL_DURATION_MS = 1600;
+const GAUGE_FILL_EASING = Easing.out(Easing.cubic);
 
 type MacroGaugeProps = {
   label: string;
   value: number;   // consumed
   target: number;  // goal
   unit?: string;
-  size?: 'sm' | 'md'; // new
+  size?: 'sm' | 'md';
   mode?: 'min' | 'max';
+  /** When true, skip mount fill animation (e.g. prefers-reduced-motion). */
+  reduceMotion?: boolean;
+  /** Change to re-run fill animation (e.g. selected date key). */
+  animationKey?: string;
 };
 
 const clamp = (n: number, min: number, max: number) =>
@@ -47,6 +54,8 @@ export function MacroGauge({
   unit = 'g',
   size = 'md',
   mode = 'min',
+  reduceMotion = false,
+  animationKey,
 }: MacroGaugeProps) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
@@ -69,7 +78,31 @@ export function MacroGauge({
   // For max-mode warning colors, we compare against the true target (not gaugeMax)
   const pctOfTarget = safeTarget > 0 ? value / safeTarget : 0;
 
-  const angle = 180 - 180 * pct;
+  // Fill animation (0 -> 1) when target > 0 and !reduceMotion. Re-runs when animationKey changes (e.g. date change).
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [animatedProgress, setAnimatedProgress] = useState(reduceMotion || safeTarget === 0 ? 1 : 0);
+
+  useEffect(() => {
+    if (reduceMotion || safeTarget === 0) {
+      setAnimatedProgress(1);
+      return;
+    }
+    progressAnim.setValue(0);
+    setAnimatedProgress(0);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: GAUGE_FILL_DURATION_MS,
+      easing: GAUGE_FILL_EASING,
+      useNativeDriver: false,
+    }).start(() => setAnimatedProgress(1));
+  }, [reduceMotion, safeTarget, progressAnim, animationKey]);
+
+  useEffect(() => {
+    const listener = progressAnim.addListener(({ value: v }) => setAnimatedProgress(v));
+    return () => progressAnim.removeListener(listener);
+  }, [progressAnim]);
+
+  const angle = 180 - 180 * pct * animatedProgress;
 
   const aNow = angle; // current needle angle (180 -> 0)
 
@@ -162,7 +195,7 @@ export function MacroGauge({
   // Single source of truth: this is the same color used for the active arc state.
   const activeColor = safeTarget > 0 ? filledColor : undefined;
   const consumedColor = activeColor ? ensureContrast(activeColor, colors.card, modeKey, 4.5) : undefined;
-  const consumedFormatted = `${Math.round(value)}${unit}`;
+  const consumedFormatted = `${Math.round(value * animatedProgress)}${unit}`;
   const targetFormatted = safeTarget > 0 ? `${Math.round(safeTarget)}${unit}` : t('common.no_target');
 
   return (

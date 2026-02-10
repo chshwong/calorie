@@ -358,6 +358,7 @@ function DashboardFoodSection({ dateString, goalType, colors, isSmallScreen, isM
                           strokeWidth={8}
                           surfaceBg={colors.card}
                           showLabel
+                          animationKey={dateString}
                         />
                       </View>
                       {isStartLogging && (

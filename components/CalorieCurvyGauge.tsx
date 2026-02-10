@@ -2,10 +2,13 @@ import { MACRO_GAUGE_TEXT } from '@/components/MacroGauge';
 import { Colors, FontFamilies, FontSize, Nudge, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ensureContrast } from '@/theme/contrast';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path, Text as SvgText, TSpan } from 'react-native-svg';
+
+const CURVY_GAUGE_FILL_DURATION_MS = 1600;
+const CURVY_GAUGE_FILL_EASING = Easing.out(Easing.cubic);
 
 type GoalType = 'lose' | 'maintain' | 'recomp' | 'gain';
 
@@ -13,6 +16,10 @@ type CalorieCurvyGaugeProps = {
   consumed: number;
   target: number;
   goalType: GoalType;
+  /** When true, skip mount fill animation (e.g. prefers-reduced-motion). */
+  reduceMotion?: boolean;
+  /** Change to re-run fill animation (e.g. selected date key). */
+  animationKey?: string;
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -36,7 +43,7 @@ function cubicPoint(
   };
 }
 
-export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGaugeProps) {
+export function CalorieCurvyGauge({ consumed, target, goalType, reduceMotion = false, animationKey }: CalorieCurvyGaugeProps) {
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const colors = Colors[scheme ?? 'light'];
@@ -54,14 +61,39 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
   const pct = safeTarget > 0 ? safeConsumed / safeTarget : 0;
   const fillT = clamp(pct, 0, 1); // cap fill at 100% of path
 
-  const consumedRounded = Math.round(safeConsumed);
+  // Fill animation (0 -> 1) when target > 0 and !reduceMotion. Re-runs when animationKey changes (e.g. date change).
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [animatedProgress, setAnimatedProgress] = useState(reduceMotion || safeTarget === 0 ? 1 : 0);
+
+  useEffect(() => {
+    if (reduceMotion || safeTarget === 0) {
+      setAnimatedProgress(1);
+      return;
+    }
+    progressAnim.setValue(0);
+    setAnimatedProgress(0);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: CURVY_GAUGE_FILL_DURATION_MS,
+      easing: CURVY_GAUGE_FILL_EASING,
+      useNativeDriver: false,
+    }).start(() => setAnimatedProgress(1));
+  }, [reduceMotion, safeTarget, progressAnim, animationKey]);
+
+  useEffect(() => {
+    const listener = progressAnim.addListener(({ value: v }) => setAnimatedProgress(v));
+    return () => progressAnim.removeListener(listener);
+  }, [progressAnim]);
+
+  const displayFillT = fillT * animatedProgress;
+  const consumedRounded = Math.round(safeConsumed * animatedProgress);
   const percentDisplay = useMemo(() => {
     if (safeTarget <= 0) return null;
-    const rawPct = (safeConsumed / safeTarget) * 100;
+    const displayConsumed = safeConsumed * animatedProgress;
+    const rawPct = (displayConsumed / safeTarget) * 100;
     if (!Number.isFinite(rawPct)) return null;
-    // 1 decimal, but trim trailing ".0"
     return rawPct.toFixed(1).replace(/\.0$/, '');
-  }, [safeConsumed, safeTarget]);
+  }, [safeConsumed, safeTarget, animatedProgress]);
 
   // Color rules
   const lineColor = useMemo(() => {
@@ -87,7 +119,8 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
     return ORANGE; // <90%
   }, [pct, goalType, safeTarget, colors.textSecondary, GREEN, ORANGE, PINK, RED, TEAL]);
 
-  const remainingRaw = safeTarget > 0 ? Math.round(safeTarget - safeConsumed) : 0;
+  const displayConsumed = safeConsumed * animatedProgress;
+  const remainingRaw = safeTarget > 0 ? Math.round(safeTarget - displayConsumed) : 0;
   const isOverBudget = safeTarget > 0 && remainingRaw < 0;
   const remainingAmount = safeTarget > 0 ? (isOverBudget ? Math.abs(remainingRaw) : remainingRaw) : 0;
 
@@ -115,11 +148,11 @@ export function CalorieCurvyGauge({ consumed, target, goalType }: CalorieCurvyGa
   });
   const totalLen = segLens.reduce((a, b) => a + b, 0);
 
-  // Dash fill
-  const filledLen = totalLen * fillT;
+  // Dash fill (animated on mount)
+  const filledLen = totalLen * displayFillT;
 
-  // Tip position: if over 100%, keep tip at end
-  const tipT = fillT;
+  // Tip position (animated on mount)
+  const tipT = displayFillT;
   const tip = cubicPoint(tipT, p0, p1, p2, p3);
 
   const trackColor = colors.chartGrey;

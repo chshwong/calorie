@@ -49,9 +49,9 @@ import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import {
-  getButtonAccessibilityProps,
-  getFocusStyle,
-  getMinTouchTargetStyle
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle
 } from '@/utils/accessibility';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
@@ -65,18 +65,18 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Modal,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 function usePrefersReducedMotion() {
@@ -1388,7 +1388,7 @@ export default function FoodLogHomeScreen() {
         <DesktopPageContainer>
 
             {/* Daily Totals Summary */}
-            <View style={[styles.dailyTotalsCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.dailyTotalsCard, { backgroundColor: colorScheme === 'dark' ? colors.backgroundSecondary + 'E6' : colors.surfaceSoft }]}>
               <SummaryCardHeader
                 titleKey="home.summary.title_other"
                 icon="fork.knife"
@@ -1420,7 +1420,7 @@ export default function FoodLogHomeScreen() {
               />
 
               <View ref={tourCurvyGaugeRef as any} style={styles.calorieGaugeWrap}>
-                <CalorieCurvyGauge consumed={calorieConsumed} target={calorieTarget} goalType={goalType} />
+                <CalorieCurvyGauge consumed={calorieConsumed} target={calorieTarget} goalType={goalType} reduceMotion={prefersReducedMotion} animationKey={selectedDateString} />
 
                 <TouchableOpacity
                   style={[
@@ -1523,13 +1523,13 @@ export default function FoodLogHomeScreen() {
                                 ]}
                               >
                                 <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                                  <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" />
+                                  <MacroGauge label={t('home.summary.protein')} value={proteinConsumed} target={proteinTarget} unit="g" size="sm" mode="min" reduceMotion={prefersReducedMotion} animationKey={selectedDateString} />
                                 </View>
                                 <View style={{ flex: 1, ...(Platform.OS !== 'web' ? { marginRight: 4 } : {}) }}>
-                                  <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" />
+                                  <MacroGauge label={t('home.summary.fiber')} value={fiberConsumed} target={fiberTarget} unit="g" size="sm" mode="min" reduceMotion={prefersReducedMotion} animationKey={selectedDateString} />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                  <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" />
+                                  <MacroGauge label={t('home.summary.carbs')} value={carbsConsumed} target={carbsMax} unit="g" size="sm" mode="max" reduceMotion={prefersReducedMotion} animationKey={selectedDateString} />
                                 </View>
                               </View>
                             </View>
@@ -1619,7 +1619,7 @@ export default function FoodLogHomeScreen() {
           </View>
 
           {/* Today's Calorie Entries */}
-          <View ref={tourMealLogRef as any} style={[styles.entriesSectionCard, { backgroundColor: colors.card }]}>
+          <View ref={tourMealLogRef as any} style={[styles.entriesSectionCard, { backgroundColor: colorScheme === 'dark' ? colors.card + 'F2' : colors.backgroundSecondary }]}>
             {nonEmptyMealTypes.length >= 1 && (() => {
               const allMealsMatchMaster =
                 nonEmptyMealTypes.length > 0 &&
