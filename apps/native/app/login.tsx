@@ -12,6 +12,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   useColorScheme,
@@ -54,6 +55,7 @@ export default function LoginScreen() {
   const [googleError, setGoogleError] = React.useState<string | null>(null);
   const [magicError, setMagicError] = React.useState<string | null>(null);
   const [emailFocused, setEmailFocused] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const emailValid = email.trim().toLowerCase().includes("@");
   const busy = submitting !== null || googleLoading || magicLoading;
@@ -263,6 +265,23 @@ export default function LoginScreen() {
     }
   };
 
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    setMessage(null);
+    setGoogleError(null);
+    setMagicError(null);
+    setMagicSent(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        router.replace("/post-login-gate");
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   const handleSendMagicLink = async () => {
     if (busy) return;
     setMagicError(null);
@@ -325,6 +344,12 @@ export default function LoginScreen() {
             { paddingBottom: Math.max(insets.bottom, spacing.lg) },
           ]}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          }
         >
           <View style={styles.content}>
             <View style={styles.brandHeader}>
