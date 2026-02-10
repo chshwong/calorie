@@ -290,9 +290,20 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
                     </ThemedText>
                   </View>
                   {finiteValues.length === 0 ? (
-                    <ThemedText style={[styles.noWeighIns, { color: colors.textTertiary }]}>
-                      {t('weight.dashboard.no_weigh_ins')}
-                    </ThemedText>
+                    <TouchableOpacity
+                      onPress={handlePress}
+                      activeOpacity={0.7}
+                      style={[styles.noWeighInsRow, getMinTouchTargetStyle(), Platform.OS === 'web' && styles.noWeighInsRowWeb]}
+                      {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
+                      {...getButtonAccessibilityProps(
+                        t('weight.dashboard.no_weigh_ins_empty_state'),
+                        t('weight.dashboard.accessibility_hint')
+                      )}
+                    >
+                      <ThemedText style={[styles.noWeighIns, { color: colors.textSecondary }]}>
+                        {t('weight.dashboard.no_weigh_ins_empty_state')}
+                      </ThemedText>
+                    </TouchableOpacity>
                   ) : (
                     <WeightTrendLineChart
                       values={chartData.values}
@@ -310,6 +321,7 @@ export function WeightCard({ dateString, onPress }: WeightCardProps) {
                       onDayPress={(dayKey) => {
                         router.push(`/weight?date=${dayKey}`);
                       }}
+                      onEmptyStatePress={handlePress}
                     />
                   )}
                 </View>
@@ -392,10 +404,17 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '600',
   },
+  noWeighInsRow: {
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noWeighInsRowWeb: {
+    cursor: 'pointer',
+  },
   noWeighIns: {
     fontSize: FontSize.sm,
     textAlign: 'center',
-    paddingVertical: Spacing.md,
   },
   loadingContainer: {
     paddingVertical: Spacing.lg,

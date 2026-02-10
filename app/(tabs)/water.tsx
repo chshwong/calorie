@@ -1,6 +1,7 @@
 import { BarChart } from '@/components/charts/bar-chart';
 import { CollapsibleModuleHeader } from '@/components/header/CollapsibleModuleHeader';
 import { DatePickerButton } from '@/components/header/DatePickerButton';
+import { NumberInput } from '@/components/input/NumberInput';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
 import { SummaryCardHeader } from '@/components/layout/summary-card-header';
 import { ThemedText } from '@/components/themed-text';
@@ -24,10 +25,9 @@ import {
 import { addDays, getDateString, getLastNDays } from '@/utils/calculations';
 import { formatWaterValue, fromMl, getEffectiveGoal, toMl, WATER_LIMITS, WaterUnit } from '@/utils/waterUnits';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { NumberInput } from '@/components/input/NumberInput';
 
 // ============================================================================
 // QUICK ADD ICON LAYOUT CONSTANTS (theme-token based; no magic numbers)
@@ -135,6 +135,30 @@ export default function WaterScreen() {
   const [errorModalTitle, setErrorModalTitle] = useState('');
   const [errorModalMessage, setErrorModalMessage] = useState('');
 
+  // Refs to blur inputs before closing modals (avoids focus/unmount console errors on web)
+  const customInputRef = useRef<TextInput | null>(null);
+  const editTotalInputRef = useRef<TextInput | null>(null);
+
+  const closeCustomModal = useCallback(() => {
+    customInputRef.current?.blur();
+    // Defer state updates so blur completes before unmount (avoids web console errors)
+    requestAnimationFrame(() => {
+      setShowCustomModal(false);
+      setCustomInput('');
+      setCustomInputError('');
+    });
+  }, []);
+
+  const closeEditTotalModal = useCallback(() => {
+    editTotalInputRef.current?.blur();
+    requestAnimationFrame(() => {
+      setShowEditTotalModal(false);
+      setEditTotalInput('');
+      setEditTotalError('');
+      setEditTotalDateString(null);
+    });
+  }, []);
+
   // Open the existing Edit Total modal (reused by the droplet pressable)
   const openEditTotalModal = useCallback(() => {
     setEditTotalDateString(selectedDateString);
@@ -219,8 +243,7 @@ export default function WaterScreen() {
     
     setCustomInputError('');
     addWater(inputMl, goalMl);
-    setCustomInput('');
-    setShowCustomModal(false);
+    closeCustomModal();
   };
 
   // Handle edit total (set absolute value in profile unit)
@@ -264,9 +287,7 @@ export default function WaterScreen() {
       } else {
         setTotalForDate(valueInRowUnit, dateString);
       }
-      setEditTotalInput('');
-      setEditTotalDateString(null);
-      setShowEditTotalModal(false);
+      closeEditTotalModal();
     } catch (error: unknown) {
       // Error can be from setTotal/setTotalForDate mutations or validation
       // Extract message safely for user display
@@ -763,7 +784,7 @@ export default function WaterScreen() {
         visible={showCustomModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowCustomModal(false)}
+        onRequestClose={closeCustomModal}
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
@@ -772,7 +793,7 @@ export default function WaterScreen() {
                 {t('water.custom_input')}
               </ThemedText>
               <TouchableOpacity
-                onPress={() => setShowCustomModal(false)}
+                onPress={closeCustomModal}
                 style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
                 {...getButtonAccessibilityProps(t('common.close'))}
               >
@@ -785,6 +806,7 @@ export default function WaterScreen() {
                 {t('water.custom_input_label', { unit: profileWaterUnit === 'floz' ? 'fl oz' : profileWaterUnit === 'cup' ? 'cups' : 'ml' })}
               </ThemedText>
               <NumberInput
+                ref={customInputRef}
                 style={[
                   styles.formInput,
                   {
@@ -805,20 +827,16 @@ export default function WaterScreen() {
                 maxIntegers={4}
                 autoFocus
               />
-              {customInputError && (
+              {customInputError ? (
                 <ThemedText style={[styles.errorText, { color: colors.error }]}>
                   {customInputError}
                 </ThemedText>
-              )}
+              ) : null}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
-                  onPress={() => {
-                    setShowCustomModal(false);
-                    setCustomInput('');
-                    setCustomInputError('');
-                  }}
+                  onPress={closeCustomModal}
                   {...getButtonAccessibilityProps(t('common.cancel'))}
                 >
                   <ThemedText style={{ color: colors.text }}>{t('common.cancel')}</ThemedText>
@@ -848,10 +866,7 @@ export default function WaterScreen() {
         visible={showEditTotalModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => {
-          setShowEditTotalModal(false);
-          setEditTotalDateString(null);
-        }}
+        onRequestClose={closeEditTotalModal}
       >
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
@@ -860,10 +875,7 @@ export default function WaterScreen() {
                 {t('water.edit_total.title')}
               </ThemedText>
               <TouchableOpacity
-                onPress={() => {
-                  setShowEditTotalModal(false);
-                  setEditTotalDateString(null);
-                }}
+                onPress={closeEditTotalModal}
                 style={[styles.closeButton, { backgroundColor: colors.backgroundSecondary }]}
                 {...getButtonAccessibilityProps(t('common.close'))}
               >
@@ -876,6 +888,7 @@ export default function WaterScreen() {
                 {t('water.edit_total.label', { unit: editTotalWaterUnit === 'floz' ? 'fl oz' : editTotalWaterUnit === 'cup' ? 'cups' : 'ml' })}
               </ThemedText>
               <NumberInput
+                ref={editTotalInputRef}
                 style={[
                   styles.formInput,
                   {
@@ -896,21 +909,16 @@ export default function WaterScreen() {
                 maxIntegers={4}
                 autoFocus
               />
-              {editTotalError && (
+              {editTotalError ? (
                 <ThemedText style={[styles.errorText, { color: colors.error }]}>
                   {editTotalError}
                 </ThemedText>
-              )}
+              ) : null}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
-                  onPress={() => {
-                    setShowEditTotalModal(false);
-                    setEditTotalInput('');
-                    setEditTotalError('');
-                    setEditTotalDateString(null);
-                  }}
+                  onPress={closeEditTotalModal}
                   {...getButtonAccessibilityProps(t('common.cancel'))}
                 >
                   <ThemedText style={{ color: colors.text }}>{t('common.cancel')}</ThemedText>
@@ -1020,11 +1028,11 @@ export default function WaterScreen() {
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="numeric"
                   />
-                  {settingsGoalError && (
+                  {settingsGoalError ? (
                     <ThemedText style={[styles.errorText, { color: colors.error }]}>
                       {settingsGoalError}
                     </ThemedText>
-                  )}
+                  ) : null}
                 </View>
 
                 <View style={styles.modalButtons}>

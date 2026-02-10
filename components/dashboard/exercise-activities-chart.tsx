@@ -102,9 +102,24 @@ export function ExerciseActivitiesChart({
       </View>
       {/* Check if there are any exercises across all days */}
       {recentDaysData.every(day => day.totalCount === 0) ? (
-        <ThemedText style={[styles.exerciseChipsNone, { color: colors.textTertiary }]}>
-          {t('dashboard.snapshot.status_none')}
-        </ThemedText>
+        <TouchableOpacity
+          onPress={() => router.push(`/exercise?date=${dateString}`)}
+          activeOpacity={0.7}
+          style={[styles.exerciseChipsNoneRow, getMinTouchTargetStyle(), Platform.OS === 'web' && styles.exerciseChipsNoneRowWeb]}
+          {...(Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
+          {...getButtonAccessibilityProps(
+            category === 'cardio_mind_body'
+              ? t('dashboard.exercise.empty_cardio')
+              : t('dashboard.exercise.empty_strength'),
+            t('dashboard.exercise.accessibility_hint')
+          )}
+        >
+          <ThemedText style={[styles.exerciseChipsNone, { color: colors.textSecondary }]}>
+            {category === 'cardio_mind_body'
+              ? t('dashboard.exercise.empty_cardio')
+              : t('dashboard.exercise.empty_strength')}
+          </ThemedText>
+        </TouchableOpacity>
       ) : (
         <View style={styles.exerciseChipsGrid}>
           {recentDaysData.map((dayData) => {
@@ -334,10 +349,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
-  exerciseChipsNone: {
-    fontSize: FontSize.base,
-    lineHeight: FontSize.base + 2,
-    textAlign: 'center',
+  exerciseChipsNoneRow: {
     paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseChipsNoneRowWeb: {
+    cursor: 'pointer',
+  },
+  exerciseChipsNone: {
+    fontSize: FontSize.sm,
+    textAlign: 'center',
   },
 });

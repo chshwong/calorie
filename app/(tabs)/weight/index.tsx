@@ -22,9 +22,9 @@ import { useFitbitSyncOrchestrator } from '@/hooks/use-fitbit-sync-orchestrator'
 import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useUserConfig } from '@/hooks/use-user-config';
 import {
-    getLatestBodyFatEntry,
-    getLatestWeightEntry,
-    useWeightLogs366d,
+  getLatestBodyFatEntry,
+  getLatestWeightEntry,
+  useWeightLogs366d,
 } from '@/hooks/use-weight-logs';
 import { clampDateKey, dateKeyToLocalStartOfDay, getMinAllowedDateKeyFromSignupAt } from '@/lib/date-guard';
 import { deriveDailyLatestWeight } from '@/lib/derive/daily-latest-weight';
@@ -310,9 +310,13 @@ export default function WeightHomeScreen() {
                         } else {
                           router.push({
                             pathname: '/weight/entry',
-                            params: { mode: 'add_today' },
+                            params: {
+                              mode: day.date === todayKey ? 'add_today' : 'add_for_date',
+                              date: day.date, // IMPORTANT: prefill date based on clicked row
+                            },
                           });
                         }
+                        
                         }}
                       >
                         <View style={{ gap: Spacing.xs }}>

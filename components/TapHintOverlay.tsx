@@ -124,6 +124,124 @@ export function TapHintOverlay({ visible, targetRect, durationMs }: TapHintOverl
   );
 }
 
+/**
+ * Anchored tap hint - renders inside a position:relative container.
+ * Use when the hint must scroll with the target (e.g. "Log first meal" button).
+ */
+type TapHintAnchoredProps = {
+  visible: boolean;
+  durationMs?: number;
+};
+
+export function TapHintAnchored({ visible, durationMs }: TapHintAnchoredProps) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isTimedOut, setIsTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      animationRef.current?.stop();
+      translateY.setValue(0);
+      scale.setValue(1);
+      opacity.setValue(0);
+      setIsTimedOut(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      return;
+    }
+
+    translateY.setValue(0);
+    scale.setValue(1);
+    opacity.setValue(0);
+    setIsTimedOut(false);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+
+    const tapLoop = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: 8,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 0.92,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.delay(900),
+      ]),
+      { resetBeforeIteration: true }
+    );
+
+    animationRef.current = tapLoop;
+    tapLoop.start();
+
+    if (typeof durationMs === 'number' && durationMs > 0) {
+      timeoutRef.current = setTimeout(() => {
+        animationRef.current?.stop();
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start(() => {
+          setIsTimedOut(true);
+        });
+      }, durationMs);
+    }
+
+    return () => {
+      animationRef.current?.stop();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [durationMs, opacity, scale, translateY, visible]);
+
+  if (!visible || isTimedOut) return null;
+
+  return (
+    <View pointerEvents="none" style={styles.anchoredOverlay}>
+      <Animated.View
+        style={{
+          opacity,
+          transform: [{ translateY }, { scale }],
+        }}
+      >
+        <Text style={styles.tapHintIcon}>👆</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   tapHint: {
     position: 'absolute',
@@ -131,5 +249,11 @@ const styles = StyleSheet.create({
   },
   tapHintIcon: {
     fontSize: 24,
+  },
+  anchoredOverlay: {
+    position: 'absolute',
+    right: 8,
+    bottom: -10,
+    zIndex: 2,
   },
 });

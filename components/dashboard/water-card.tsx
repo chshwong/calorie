@@ -166,6 +166,8 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
 
   const accessibilityLabel = t('water.dashboard.card_label', { ml: totalMl, goal: goalMl });
 
+  const isAllLast7DaysEmpty = historyData.every((d) => d.value === 0) && !isLoading;
+
   return (
     <Animated.View
       style={[
@@ -177,6 +179,7 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
         },
       ]}
     >
+      <View style={styles.cardInner}>
       {/* Header-only button to avoid nested <button> hydration errors on web (chart bars are interactive). */}
       <TouchableOpacity
         onPress={handlePress}
@@ -197,65 +200,98 @@ export function WaterCard({ dateString, onPress }: WaterCardProps) {
         </View>
       </TouchableOpacity>
 
-        <View style={styles.content}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
-                {t('common.loading')}
-              </ThemedText>
-            </View>
-          ) : (
-            <View style={styles.mainContent}>
-              {/* Left: Horizontal chart */}
-              <View style={styles.chartColumn}>
-                <View style={styles.rangeTitleRow}>
-                  <ThemedText style={[styles.rangeTitle, { color: colors.text }]}>
-                    {t('common.last_7_days')}
+        <View style={styles.contentWrapper}>
+          <View style={styles.content}>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+                  {t('common.loading')}
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={styles.mainContent}>
+                {/* Left: Horizontal chart */}
+                <View style={styles.chartColumn}>
+                  <View style={styles.rangeTitleRow}>
+                    <ThemedText style={[styles.rangeTitle, { color: colors.text }]}>
+                      {t('common.last_7_days')}
+                    </ThemedText>
+                  </View>
+                  <HorizontalBarChart
+                    data={historyData}
+                    maxValue={chartMax}
+                    goalValue={chartGoalMl}
+                    goalDisplayValue={goalDisplayValue}
+                    todayDateString={todayDateString}
+                    yesterdayDateString={yesterdayDateString}
+                    useYdayLabel
+                    color={accentColor}
+                    width={180}
+                    onRowPress={(dateString) => {
+                      router.push({
+                        pathname: '/(tabs)/water',
+                        params: { date: dateString },
+                      } as any);
+                    }}
+                  />
+                </View>
+                
+                {/* Right: Droplet gauge */}
+                <Pressable
+                  onPress={handleDropPress}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  android_ripple={null}
+                  hitSlop={Spacing.sm}
+                  style={[
+                    styles.dropletColumn,
+                    Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : undefined,
+                  ]}
+                  {...getButtonAccessibilityProps(accessibilityLabel)}
+                >
+                  <WaterDropGauge
+                    totalMl={totalMl}
+                    goalMl={goalMl}
+                    unitPreference={unitPreference}
+                    size="medium"
+                    variant="dashboard"
+                  />
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          {isAllLast7DaysEmpty && (
+            <>
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.overlayScrim,
+                  {
+                    backgroundColor: colorScheme === 'dark' ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.20)',
+                  },
+                ]}
+              />
+              <TouchableOpacity
+                onPress={handlePress}
+                activeOpacity={0.9}
+                style={[styles.overlayCtaWrap, Platform.OS === 'web' && styles.overlayCtaWeb]}
+                {...(Platform.OS === 'web' && getFocusStyle(accentColor))}
+                {...getButtonAccessibilityProps(
+                  t('water.dashboard.empty_state'),
+                  t('water.dashboard.accessibility_hint')
+                )}
+              >
+                <View style={[styles.overlayCta, { backgroundColor: colors.card, ...Shadows.card }]}>
+                  <ThemedText style={[styles.overlayCtaText, { color: colors.text }]}>
+                    {t('water.dashboard.empty_state')}
                   </ThemedText>
                 </View>
-                <HorizontalBarChart
-                  data={historyData}
-                  maxValue={chartMax}
-                  goalValue={chartGoalMl}
-                  goalDisplayValue={goalDisplayValue}
-                  todayDateString={todayDateString}
-                  yesterdayDateString={yesterdayDateString}
-                  useYdayLabel
-                  color={accentColor}
-                  width={180}
-                  onRowPress={(dateString) => {
-                    router.push({
-                      pathname: '/(tabs)/water',
-                      params: { date: dateString },
-                    } as any);
-                  }}
-                />
-              </View>
-              
-              {/* Right: Droplet gauge */}
-              <Pressable
-                onPress={handleDropPress}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                android_ripple={null}
-                hitSlop={Spacing.sm}
-                style={[
-                  styles.dropletColumn,
-                  Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : undefined,
-                ]}
-                {...getButtonAccessibilityProps(accessibilityLabel)}
-              >
-                <WaterDropGauge
-                  totalMl={totalMl}
-                  goalMl={goalMl}
-                  unitPreference={unitPreference}
-                  size="medium"
-                  variant="dashboard"
-                />
-              </Pressable>
-            </View>
+              </TouchableOpacity>
+            </>
           )}
         </View>
+      </View>
     </Animated.View>
   );
 }
@@ -265,6 +301,39 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.card,
     padding: Spacing.md,
     marginBottom: Spacing.md,
+  },
+  cardInner: {
+    position: 'relative',
+    flex: 1,
+  },
+  overlayScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: BorderRadius.card,
+  },
+  overlayCtaWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overlayCtaWeb: {
+    cursor: 'pointer',
+  },
+  overlayCta: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+  },
+  overlayCtaText: {
+    fontSize: FontSize.sm,
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -281,6 +350,9 @@ const styles = StyleSheet.create({
     // Match dashboard card titles (e.g., "Weight", "Move & Groove")
     fontSize: FontSize.lg,
     fontWeight: '700',
+  },
+  contentWrapper: {
+    position: 'relative',
   },
   content: {
     alignItems: 'center',

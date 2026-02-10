@@ -32,6 +32,8 @@ type Props = {
   /** Optional dot radius (default 5); use 4 for long ranges 3m/6m/1y to reduce clutter. */
   dotRadius?: number;
   onDayPress?: (dateKey: string) => void; // Optional: enable per-day navigation (dashboard)
+  /** Optional: when user taps "Add one more weigh-in" empty state (dashboard) */
+  onEmptyStatePress?: () => void;
 };
 
 export function WeightTrendLineChart({ 
@@ -49,6 +51,7 @@ export function WeightTrendLineChart({
   unit = 'lbs',
   dotRadius = 5,
   onDayPress,
+  onEmptyStatePress,
 }: Props) {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
@@ -452,6 +455,19 @@ export function WeightTrendLineChart({
             );
           })()}
         </View>
+      ) : onEmptyStatePress ? (
+        <TouchableOpacity
+          onPress={onEmptyStatePress}
+          activeOpacity={0.7}
+          style={[styles.emptyStateRow, getMinTouchTargetStyle(), Platform.OS === 'web' && styles.emptyStateRowWeb]}
+          {...(Platform.OS === 'web' && getFocusStyle(colors.tint))}
+          {...getButtonAccessibilityProps(
+            t('weight.chart_add_one_more'),
+            t('weight.dashboard.accessibility_hint')
+          )}
+        >
+          <ThemedText style={{ color: colors.textSecondary }}>{t('weight.chart_add_one_more')}</ThemedText>
+        </TouchableOpacity>
       ) : (
         <ThemedText style={{ color: colors.textSecondary }}>{t('weight.chart_add_one_more')}</ThemedText>
       )}
@@ -527,6 +543,13 @@ const styles = StyleSheet.create({
   },
   labelToday: {
     fontWeight: FontWeight.bold,
+  },
+  emptyStateRow: {
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+  },
+  emptyStateRowWeb: {
+    cursor: 'pointer',
   },
 });
 

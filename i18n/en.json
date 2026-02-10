@@ -2600,7 +2600,7 @@
       }
     },
     "snapshot": {
-      "ex": "Move & Groove",
+      "ex": "Exercises",
       "items": "items",
       "status_none": "None",
       "food": "Food",
@@ -2651,6 +2651,8 @@
       "activity_one": "activity",
       "activity_other": "activities",
       "no_exercises": "No exercises logged today",
+      "empty_cardio": "No cardio / mind-body activities yet — 👆tap to log",
+      "empty_strength": "No strength activities yet — 👆tap to log",
       "last_days": "Last {{days}} days",
       "accessibility_hint": "Double tap to view exercise log for this date",
       "duration": "{{minutes}} minutes",
@@ -2664,6 +2666,7 @@
     },
     "meds": {
       "title": "Supplements & Meds",
+      "empty_state": "No meds/supps logged yet — 👆tap to log",
       "last": "Last: {{name}}{{dose}}",
       "med": "med",
       "supp": "supp",
@@ -2884,6 +2887,8 @@
     "dashboard": {
       "title": "Water",
       "card_label": "Water: {{ml}} / {{goal}} ml",
+      "empty_state": "No water yet — 👆tap to log",
+      "accessibility_hint": "Double tap to view water log",
       "ml": "ml",
       "goal": "Goal: {{goal}} ml",
       "set_goal": "Set Goal"
@@ -3025,6 +3030,7 @@
       "card_label": "Weight: {{weight}}",
       "no_data": "No weight data",
       "no_weigh_ins": "No weigh-ins",
+      "no_weigh_ins_empty_state": "No weigh-ins yet — 👆tap to log",
       "log_weight": "Log Weight",
       "body_fat": "body fat",
       "accessibility_hint": "Double tap to view weight log"
