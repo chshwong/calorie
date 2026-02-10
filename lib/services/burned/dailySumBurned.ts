@@ -85,6 +85,36 @@ export async function getDailySumBurnedForRange(
   return (data as DailySumBurned[]) ?? [];
 }
 
+/**
+ * Returns the burn_reduction_pct_int from the most recent existing row
+ * with entry_date < entryDate for this user. Used to carry forward burn
+ * correction when creating a new day's row. Does not create or backfill any rows.
+ */
+export async function getLatestBurnReductionPctBeforeDate(
+  userId: string,
+  entryDate: string
+): Promise<number> {
+  if (!userId || !entryDate) return 0;
+
+  const { data, error } = await supabase
+    .from('daily_sum_burned')
+    .select('burn_reduction_pct_int')
+    .eq('user_id', userId)
+    .lt('entry_date', entryDate)
+    .order('entry_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching latest burn_reduction_pct_int:', error);
+    return 0;
+  }
+
+  const raw = (data as { burn_reduction_pct_int?: number } | null)?.burn_reduction_pct_int;
+  const pct = typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : 0;
+  return Math.max(0, Math.min(50, pct));
+}
+
 export async function insertDailySumBurned(
   row: Omit<DailySumBurned, 'id' | 'updated_at'>
 ): Promise<DailySumBurned | null> {

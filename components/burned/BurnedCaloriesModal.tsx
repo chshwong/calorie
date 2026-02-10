@@ -685,9 +685,24 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
               </View>
 
               {reductionEnabled && (
-                <ThemedText style={[styles.helperText, styles.burnHintTight, { color: colors.textSecondary }]}>
-                  {t('burned.burn_correction.applied_hint', { pct: reductionPct, base: Math.round(baseActivity) })}
-                </ThemedText>
+                <View style={[styles.burnCorrectionRow, styles.burnHintTight]}>
+                  <ThemedText
+                    style={[styles.helperText, styles.burnCorrectionText, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {t('burned.burn_correction.applied_hint', { pct: reductionPct, base: Math.round(baseActivity) })}
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => setBurnCorrectionModalVisible(true)}
+                    hitSlop={8}
+                    disabled={isBusy}
+                    activeOpacity={0.7}
+                    style={Platform.OS === 'web' ? getFocusStyle(colors.tint) : undefined}
+                    {...getButtonAccessibilityProps(t('burned.burn_correction.title'))}
+                  >
+                    <IconSymbol name="gearshape.fill" size={14} color={colors.textSecondary} decorative />
+                  </TouchableOpacity>
+                </View>
               )}
 
               <View style={[styles.row, styles.tdeeRowTight]}>
@@ -1349,6 +1364,14 @@ const styles = StyleSheet.create({
   burnHintTight: {
     marginTop: -Spacing.md + 3, // results in ~3px after parent gap
     marginBottom: -Spacing.md + 6, // results in ~6px before next row
+  },
+  burnCorrectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  burnCorrectionText: {
+    flexShrink: 1,
   },
   tdeeRowTight: {
     marginTop: -Spacing.xs,

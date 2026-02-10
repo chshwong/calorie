@@ -410,6 +410,8 @@
       },
       "pct_label": "Burn Reduction %",
       "pct_helper": "Applies to activity calories only (not BMR)",
+      "applies_today_and_future": "Applies to today and going forward.",
+      "applies_this_day_only": "Applies to this day only.",
       "raw_burn_label": "Activity input",
       "apply_button": "Apply correction",
       "why_title": "Why burn correction exists",

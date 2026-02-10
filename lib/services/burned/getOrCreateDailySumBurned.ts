@@ -1,9 +1,13 @@
-import { toDateKey, getTodayKey } from '@/utils/dateKey';
-import type { DailySumBurned } from '@/utils/types';
-import { getUserConfig } from '@/lib/services/userConfig';
 import { computeSystemBurnedDefaults } from '@/lib/domain/burned/systemBurnedDefaults';
-import { getDailySumBurnedByDate, insertDailySumBurned } from '@/lib/services/burned/dailySumBurned';
+import {
+    getDailySumBurnedByDate,
+    getLatestBurnReductionPctBeforeDate,
+    insertDailySumBurned,
+} from '@/lib/services/burned/dailySumBurned';
+import { getUserConfig } from '@/lib/services/userConfig';
 import { fetchLatestWeighInAtOrBefore } from '@/lib/services/weightLogs';
+import { getTodayKey, toDateKey } from '@/utils/dateKey';
+import type { DailySumBurned } from '@/utils/types';
 
 /**
  * CANONICAL SERVICE FUNCTION (SPEC)
@@ -57,6 +61,9 @@ export async function getOrCreateDailySumBurned(
     throw new Error('BURNED_DEFAULTS_INPUT_MISSING');
   }
 
+  // Carry forward burn correction from the most recent prior existing row (no backfill).
+  const inheritedPct = await getLatestBurnReductionPctBeforeDate(userId, entryDate);
+
   // 4) Insert new row (lazy creation)
   const inserted = await insertDailySumBurned({
     user_id: userId,
@@ -67,7 +74,7 @@ export async function getOrCreateDailySumBurned(
     tdee_cal: defaults.system_tdee_cal,
 
     // Option 2: RAW is always populated. Default raw is the system activity burn baseline.
-    burn_reduction_pct_int: 0,
+    burn_reduction_pct_int: inheritedPct,
     raw_burn: defaults.system_active_cal,
     raw_tdee: null,
     raw_burn_source: 'system',

@@ -366,6 +366,8 @@
       "pct_helper": "S’applique uniquement aux calories d’activité",
       "raw_burn_label": "Entrée d’activité",
       "apply_button": "Appliquer la correction",
+      "applies_today_and_future": "S'applique à aujourd'hui et aux jours suivants.",
+      "applies_this_day_only": "S'applique à ce jour uniquement.",
       "why_title": "Pourquoi la correction existe",
       "why_body": "Les appareils estiment les calories à partir de la fréquence cardiaque, des mouvements et de modèles populationnels. Pour certaines activités, cela peut surestimer la dépense réelle. La correction permet d’appliquer un ajustement constant pour garder des chiffres quotidiens réalistes.",
       "why_footer": "Les résultats varient selon la personne, la forme physique et l’activité.",

@@ -10,6 +10,7 @@ import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import { useSaveDailySumBurned } from '@/hooks/use-burned-mutations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { getTodayKey, toDateKey } from '@/utils/dateKey';
 import type { DailySumBurned } from '@/utils/types';
 
 type Props = {
@@ -50,6 +51,7 @@ export function BurnReductionModal({ visible, onClose, entryDate, burnedRow, ref
   };
 
   const burnCorrectionEnabled = pct > 0;
+  const isToday = toDateKey(entryDate) === getTodayKey();
 
   useEffect(() => {
     if (pct > 0) {
@@ -170,6 +172,11 @@ export function BurnReductionModal({ visible, onClose, entryDate, burnedRow, ref
 
                     <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
                       {t('burned.burn_correction.pct_helper')}
+                    </ThemedText>
+                    <ThemedText style={[styles.appliesText, { color: colors.textSecondary }]}>
+                      {isToday
+                        ? t('burned.burn_correction.applies_today_and_future')
+                        : t('burned.burn_correction.applies_this_day_only')}
                     </ThemedText>
 
                     <View style={[styles.sliderWrap, !burnCorrectionEnabled && styles.sliderWrapDisabled]}>
@@ -357,6 +364,11 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: FontSize.xs,
     fontWeight: '600',
+  },
+  appliesText: {
+    marginTop: 4,
+    fontSize: FontSize.sm,
+    lineHeight: 18,
   },
   controlDivider: {
     height: 1,
