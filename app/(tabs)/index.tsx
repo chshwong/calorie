@@ -49,9 +49,9 @@ import { fetchCustomFoods } from '@/lib/services/customFoods';
 import { fetchFrequentFoods } from '@/lib/services/frequentFoods';
 import { fetchRecentFoods } from '@/lib/services/recentFoods';
 import {
-    getButtonAccessibilityProps,
-    getFocusStyle,
-    getMinTouchTargetStyle
+  getButtonAccessibilityProps,
+  getFocusStyle,
+  getMinTouchTargetStyle
 } from '@/utils/accessibility';
 import { getGreetingKey } from '@/utils/bmi';
 import { calculateDailyTotals, groupEntriesByMealType } from '@/utils/dailyTotals';
@@ -65,18 +65,18 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Modal,
-    Platform,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 function usePrefersReducedMotion() {
@@ -380,7 +380,12 @@ export default function FoodLogHomeScreen() {
     forward: ReturnType<typeof setTimeout> | null;
     back: ReturnType<typeof setTimeout> | null;
   }>({ forward: null, back: null });
-  
+  const gaugesAutoSwipeTimeoutsRef = useRef<{
+    forward: ReturnType<typeof setTimeout> | null;
+    back: ReturnType<typeof setTimeout> | null;
+  }>({ forward: null, back: null });
+  const gaugesAutoSwipeRanRef = useRef(false);
+
   // Menu state for meal type options
   const [threeDotMealMenuVisible, setThreeDotMealMenuVisible] = useState<{ mealType: string | null }>({ mealType: null });
   const [aiCameraFunnel, setAiCameraFunnel] = useState<{ visible: boolean; mealType: string | null }>({
@@ -1280,6 +1285,41 @@ export default function FoodLogHomeScreen() {
       unsubscribe();
     };
   }, [registerOnStepChange, requestRemeasure, scrollToGaugesPage]);
+
+  // When not in tour: same auto-swipe (macros → mini gauges → back) once per mount.
+  useEffect(() => {
+    if (activeTourId === 'V1_HomePageTour') {
+      if (gaugesAutoSwipeTimeoutsRef.current.forward) {
+        clearTimeout(gaugesAutoSwipeTimeoutsRef.current.forward);
+        gaugesAutoSwipeTimeoutsRef.current.forward = null;
+      }
+      if (gaugesAutoSwipeTimeoutsRef.current.back) {
+        clearTimeout(gaugesAutoSwipeTimeoutsRef.current.back);
+        gaugesAutoSwipeTimeoutsRef.current.back = null;
+      }
+      return;
+    }
+    if (gaugesPagerWidth <= 0 || gaugesAutoSwipeRanRef.current) return;
+    gaugesAutoSwipeRanRef.current = true;
+    gaugesAutoSwipeTimeoutsRef.current.forward = setTimeout(() => {
+      scrollToGaugesPage(1);
+      requestRemeasure();
+      gaugesAutoSwipeTimeoutsRef.current.back = setTimeout(() => {
+        scrollToGaugesPage(0);
+        requestRemeasure();
+      }, 1000);
+    }, 1000);
+    return () => {
+      if (gaugesAutoSwipeTimeoutsRef.current.forward) {
+        clearTimeout(gaugesAutoSwipeTimeoutsRef.current.forward);
+        gaugesAutoSwipeTimeoutsRef.current.forward = null;
+      }
+      if (gaugesAutoSwipeTimeoutsRef.current.back) {
+        clearTimeout(gaugesAutoSwipeTimeoutsRef.current.back);
+        gaugesAutoSwipeTimeoutsRef.current.back = null;
+      }
+    };
+  }, [activeTourId, gaugesPagerWidth, requestRemeasure, scrollToGaugesPage]);
 
   // After finishing the last Home tour step, scroll back to top.
   useEffect(() => {

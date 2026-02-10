@@ -521,8 +521,8 @@ const styles = StyleSheet.create({
     height: 64,
   },
   mascotContainer: {
-    width: 64,
-    height: 64,
+    width: 192,
+    height: 192,
     alignSelf: "center",
   },
   nameTag: {
