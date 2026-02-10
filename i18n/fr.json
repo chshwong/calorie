@@ -240,6 +240,10 @@
       "notes_a11y_hint": "Ajouter ou modifier les notes pour {{mealType}}"
     },
     "food_log": {
+      "empty_state": {
+        "nudge_title": "🥑 Commencez la journée en enregistrant votre première bouchée",
+        "nudge_subtext": "Même une estimation rapide aide à prendre l'habitude"
+      },
       "log_food_prompt": "← Ajouter aliment",
       "kcal": "cal",
       "master_view_collapse": "Réduire",

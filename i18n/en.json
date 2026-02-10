@@ -236,6 +236,10 @@
       "notes_a11y_hint": "Add or edit notes for {{mealType}}"
     },
     "food_log": {
+      "empty_state": {
+        "nudge_title": "🥑 Start your day by logging your first bite",
+        "nudge_subtext": "Even a quick estimate helps build the habit"
+      },
       "log_food_prompt": "← Log Food",
       "kcal": "cal",
       "master_view_collapse": "Collapse",

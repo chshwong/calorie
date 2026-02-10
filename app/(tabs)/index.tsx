@@ -555,6 +555,7 @@ export default function FoodLogHomeScreen() {
   const entriesPayload = calorieEntries ?? persistentEntries;
   const entries = entriesPayload?.entries ?? [];
   const hasFoodEntries = entries.length > 0;
+  const isFoodLogEmpty = entries.length === 0;
   
   // Only show loading spinner if we're doing initial load AND have no data at all (including persistent cache)
   // placeholderData should provide cached data immediately, so if we have no data from any source,
@@ -1736,6 +1737,16 @@ export default function FoodLogHomeScreen() {
                 </View>
               ) : (
                 <View style={styles.entriesList}>
+                {isFoodLogEmpty && (
+                  <View style={styles.emptyStateNudge}>
+                    <ThemedText style={[styles.emptyStateNudgeTitle, { color: colors.text }]}>
+                      {t('home.food_log.empty_state.nudge_title')}
+                    </ThemedText>
+                    <ThemedText style={[styles.emptyStateNudgeSubtext, { color: colors.textSecondary }]}>
+                      {t('home.food_log.empty_state.nudge_subtext')}
+                    </ThemedText>
+                  </View>
+                )}
                 {sortedMealTypes.map((mealType, index) => {
                   const group = groupedEntries[mealType];
                   // Use i18n for meal type labels
@@ -1745,7 +1756,172 @@ export default function FoodLogHomeScreen() {
                   const meta = dataByMealType[mealType];
                   const hasNotes = meta?.note != null && meta.note.trim().length > 0;
                   const isLast = index === sortedMealTypes.length - 1;
-                  
+                  const contentBelowHeader = (
+                    <>
+                      {/* Copy from yesterday button + AI Camera button - only show when no entries AND no notes */}
+                      {group.entries.length === 0 && !hasNotes && (
+                        <View style={styles.copyFromYesterdayContainer}>
+                          <View style={styles.emptyActionsRow}>
+                            <View style={styles.leftActions}>
+                              <MealTypeCopyButton
+                                mealType={mealType}
+                                mealTypeLabel={mealTypeLabel}
+                                selectedDate={selectedDate}
+                                isToday={isToday}
+                                colors={colors}
+                                t={t}
+                              />
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.aiCameraButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
+                              onPress={() => {
+                                setAiCameraFunnel({ visible: true, mealType });
+                              }}
+                              activeOpacity={0.7}
+                              {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
+                              {...getButtonAccessibilityProps('AI Camera (New)', 'Opens AI Quick Log')}
+                            >
+                              <Text style={[styles.aiCameraButtonText, { color: colors.tint }]}>
+                                AI 📷
+                              </Text>
+                              <View
+                                style={{
+                                  backgroundColor: colors.tint + '30',
+                                  borderColor: colors.tint + '60',
+                                  borderWidth: 1,
+                                  borderRadius: 3,
+                                  paddingHorizontal: 3,
+                                  paddingVertical: 1,
+                                  marginLeft: 4,
+                                }}
+                              >
+                                <Text style={{ fontSize: 8, fontWeight: '700', color: colors.tint, textTransform: 'uppercase' }}>
+                                  NEW
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Conditional rendering based on view mode (only when entries exist) */}
+                      {group.entries.length > 0 && (() => {
+                        const mode = mealViewModes[mealType] ?? DEFAULT_MEAL_VIEW_MODE;
+                        if (mode === 'collapsed') return null;
+                        if (mode === 'semi') {
+                          const consolidatedItems = group.entries
+                            .map(entry => formatMealEntryLabel(entry))
+                            .join(', ');
+                          return (
+                            <>
+                              <View style={styles.mealGroupItems}>
+                                <TouchableOpacity
+                                  key={`items-${mealType}`}
+                                  style={[
+                                    styles.mealGroupItem,
+                                    getMinTouchTargetStyle(),
+                                    { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
+                                  ]}
+                                  onPress={() => {
+                                    const mealTypeEntries = group.entries.filter(entry =>
+                                      entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                                      entry.entry_date === selectedDateString
+                                    );
+                                    router.push({
+                                      pathname: '/(tabs)/mealtype-log',
+                                      params: { mealType: mealType, entryDate: selectedDateString, preloadedEntries: JSON.stringify(mealTypeEntries) }
+                                    });
+                                  }}
+                                  activeOpacity={0.7}
+                                  {...getButtonAccessibilityProps(`Log food for ${mealTypeLabel}`, t('home.accessibility.log_food_hint', { mealType: mealTypeLabel }))}
+                                >
+                                  <View style={styles.mealGroupItemLeft}>
+                                    <ThemedText style={[styles.mealGroupItemName, { color: colors.text }]} numberOfLines={6} ellipsizeMode="tail">
+                                      {consolidatedItems}
+                                    </ThemedText>
+                                  </View>
+                                </TouchableOpacity>
+                              </View>
+                              {dataByMealType[mealType]?.note && dataByMealType[mealType].note.trim().length > 0 && (
+                                <TouchableOpacity
+                                  style={[styles.noteRow, getMinTouchTargetStyle(), Platform.OS === 'web' && getFocusStyle(colors.tint)]}
+                                  onPress={() => setNoteEditor({ visible: true, mealType })}
+                                  activeOpacity={0.7}
+                                  {...getButtonAccessibilityProps(t('food.note.edit', { mealType: mealTypeLabel }))}
+                                >
+                                  <ThemedText style={[styles.noteRowText, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">
+                                    📝 {dataByMealType[mealType].note}
+                                  </ThemedText>
+                                </TouchableOpacity>
+                              )}
+                            </>
+                          );
+                        }
+                        const mealTypeEntries = group.entries.filter(entry =>
+                          entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
+                          entry.entry_date === selectedDateString
+                        );
+                        return (
+                          <>
+                            <View style={styles.mealExpandedContainer}>
+                              {mealTypeEntries.map((entry, idx) => (
+                                <View key={entry.id ?? idx}>
+                                  <TouchableOpacity
+                                    style={[styles.mealItemRow, getMinTouchTargetStyle(), Platform.OS === 'web' && getFocusStyle(colors.tint)]}
+                                    onPress={() => {
+                                      router.push({
+                                        pathname: '/(tabs)/mealtype-log',
+                                        params: { mealType: mealType, entryDate: selectedDateString, preloadedEntries: JSON.stringify(mealTypeEntries) }
+                                      });
+                                    }}
+                                    activeOpacity={0.7}
+                                    {...getButtonAccessibilityProps(`View ${entry.item_name}`, t('home.accessibility.log_food_hint', { mealType: mealTypeLabel }))}
+                                  >
+                                    <View style={styles.mealItemNameContainer}>
+                                      <ThemedText style={[styles.mealItemName, { color: colors.text }]} numberOfLines={1}>{entry.item_name}</ThemedText>
+                                      {entry.food_id && (
+                                        <ThemedText style={[styles.mealItemAmount, { color: colors.textSecondary }]} numberOfLines={1}>
+                                          {Math.round(entry.quantity) === entry.quantity ? entry.quantity.toString() : entry.quantity.toFixed(1)} x {entry.unit}
+                                        </ThemedText>
+                                      )}
+                                      {!entry.food_id && (
+                                        <View style={[styles.mealItemSourceBadge, { backgroundColor: 'transparent' }]}>
+                                          <ThemedText style={[styles.mealItemSourceBadgeText, { color: colors.textSecondary }]}>
+                                            {entry.source === 'ai' ? 'AI' : '⚡'}
+                                          </ThemedText>
+                                        </View>
+                                      )}
+                                    </View>
+                                    <View style={[styles.calCol, { width: CAL_COL_WIDTH }]}>
+                                      <ThemedText style={[styles.mealItemCalories, { color: colors.text }]}>
+                                        {Math.round(entry.calories_kcal)} {t('home.food_log.kcal')}
+                                      </ThemedText>
+                                    </View>
+                                  </TouchableOpacity>
+                                  {idx < mealTypeEntries.length - 1 && (
+                                    <View style={[styles.mealItemDivider, { backgroundColor: colors.separator }]} />
+                                  )}
+                                </View>
+                              ))}
+                            </View>
+                            {dataByMealType[mealType]?.note && dataByMealType[mealType].note.trim().length > 0 && (
+                              <TouchableOpacity
+                                style={[styles.noteRow, getMinTouchTargetStyle(), Platform.OS === 'web' && getFocusStyle(colors.tint)]}
+                                onPress={() => setNoteEditor({ visible: true, mealType })}
+                                activeOpacity={0.7}
+                                {...getButtonAccessibilityProps(t('food.note.edit', { mealType: mealTypeLabel }))}
+                              >
+                                <ThemedText style={[styles.noteRowText, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">
+                                  📝 {dataByMealType[mealType].note}
+                                </ThemedText>
+                              </TouchableOpacity>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </>
+                  );
+
                   return (
                     <View key={mealType}>
                       <View 
@@ -1812,23 +1988,24 @@ export default function FoodLogHomeScreen() {
                           ) : (
                             <TouchableOpacity
                               style={[
-                                styles.mealTypeBadge, 
+                                styles.mealTypeBadge,
                                 getMinTouchTargetStyle(),
-                                { 
+                                {
                                   backgroundColor: colorScheme === 'dark' ? colors.tint + '25' : colors.tint + '12',
                                   ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
+                                  ...(isFoodLogEmpty && mealType === 'breakfast' ? { backgroundColor: colorScheme === 'dark' ? colors.tint + '35' : colors.tint + '20', borderWidth: 1, borderColor: colors.tint + '50' } : {}),
                                 }
                               ]}
                               onPress={() => {
                                 // Filter entries for this meal type and date (may be empty array if no entries)
-                                const mealTypeEntries = group.entries.filter(entry => 
+                                const mealTypeEntries = group.entries.filter(entry =>
                                   entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
                                   entry.entry_date === selectedDateString
                                 );
                                 // Always go to mealtype-log page (whether entries exist or not)
                                 router.push({
                                   pathname: '/(tabs)/mealtype-log',
-                                  params: { 
+                                  params: {
                                     mealType: mealType,
                                     entryDate: selectedDateString,
                                     preloadedEntries: JSON.stringify(mealTypeEntries)
@@ -1865,17 +2042,18 @@ export default function FoodLogHomeScreen() {
                                   styles.addFoodPrompt,
                                   getMinTouchTargetStyle(),
                                   Platform.OS === 'web' && getFocusStyle(colors.tint),
+                                  ...(isFoodLogEmpty && mealType === 'breakfast' ? [{ borderWidth: 1, borderColor: colors.tint + '45', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }] : []),
                                 ]}
                                 onPress={() => {
                                   // Filter entries for this meal type and date (may be empty array if no entries)
-                                  const mealTypeEntries = group.entries.filter(entry => 
+                                  const mealTypeEntries = group.entries.filter(entry =>
                                     entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
                                     entry.entry_date === selectedDateString
                                   );
                                   // Always go to mealtype-log page (whether entries exist or not)
                                   router.push({
                                     pathname: '/(tabs)/mealtype-log',
-                                    params: { 
+                                    params: {
                                       mealType: mealType,
                                       entryDate: selectedDateString,
                                       preloadedEntries: JSON.stringify(mealTypeEntries)
@@ -1888,7 +2066,7 @@ export default function FoodLogHomeScreen() {
                                   t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
                                 )}
                               >
-                                <ThemedText style={[styles.addFoodPromptText, { color: colors.tint }]}>
+                                <ThemedText style={[styles.addFoodPromptText, { color: colors.tint }, ...(isFoodLogEmpty && mealType === 'breakfast' ? [{ fontWeight: '700' as const }] : [])]}>
                                   {t('home.food_log.log_food_prompt')}
                                 </ThemedText>
                               </TouchableOpacity>
@@ -1954,241 +2132,12 @@ export default function FoodLogHomeScreen() {
                         </View>
                       </View>
 
-                      {/* Copy from yesterday button + AI Camera button - only show when no entries AND no notes */}
-                      {group.entries.length === 0 && !hasNotes && (
-                        <View style={styles.copyFromYesterdayContainer}>
-                          <View style={styles.emptyActionsRow}>
-                            <View style={styles.leftActions}>
-                              <MealTypeCopyButton
-                                mealType={mealType}
-                                mealTypeLabel={mealTypeLabel}
-                                selectedDate={selectedDate}
-                                isToday={isToday}
-                                colors={colors}
-                                t={t}
-                              />
-                            </View>
-                            <TouchableOpacity
-                              style={[styles.aiCameraButton, { borderColor: colors.icon + '30' }, getMinTouchTargetStyle()]}
-                              onPress={() => {
-                                setAiCameraFunnel({ visible: true, mealType });
-                              }}
-                              activeOpacity={0.7}
-                              {...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {})}
-                              {...getButtonAccessibilityProps('AI Camera (New)', 'Opens AI Quick Log')}
-                            >
-                              <Text style={[styles.aiCameraButtonText, { color: colors.tint }]}>
-                                AI 📷
-                              </Text>
-                              <View
-                                style={{
-                                  backgroundColor: colors.tint + '30',
-                                  borderColor: colors.tint + '60',
-                                  borderWidth: 1,
-                                  borderRadius: 3,
-                                  paddingHorizontal: 3,
-                                  paddingVertical: 1,
-                                  marginLeft: 4,
-                                }}
-                              >
-                                <Text style={{ fontSize: 8, fontWeight: '700', color: colors.tint, textTransform: 'uppercase' }}>
-                                  NEW
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
+                      {isFoodLogEmpty ? (
+                        <View style={{ opacity: 0.88 }}>{contentBelowHeader}</View>
+                      ) : (
+                        contentBelowHeader
                       )}
-
-                      {/* Conditional rendering based on view mode (only when entries exist) */}
-                      {group.entries.length > 0 && (() => {
-                        const mode = mealViewModes[mealType] ?? DEFAULT_MEAL_VIEW_MODE;
-                        
-                        // Collapsed: render nothing below header
-                        if (mode === 'collapsed') {
-                          return null;
-                        }
-                        
-                        // Semi: consolidated view (existing behavior)
-                        if (mode === 'semi') {
-                          const consolidatedItems = group.entries
-                            .map(entry => formatMealEntryLabel(entry))
-                            .join(', ');
-                          
-                          return (
-                            <>
-                              <View style={styles.mealGroupItems}>
-                                <TouchableOpacity
-                                  key={`items-${mealType}`}
-                                  style={[
-                                    styles.mealGroupItem,
-                                    getMinTouchTargetStyle(),
-                                    { ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}) }
-                                  ]}
-                                  onPress={() => {
-                                    // Filter entries for this meal type and date (may be empty array if no entries)
-                                    const mealTypeEntries = group.entries.filter(entry => 
-                                      entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
-                                      entry.entry_date === selectedDateString
-                                    );
-                                    // Always go to mealtype-log page (whether entries exist or not)
-                                    router.push({
-                                      pathname: '/(tabs)/mealtype-log',
-                                      params: { 
-                                        mealType: mealType,
-                                        entryDate: selectedDateString,
-                                        preloadedEntries: JSON.stringify(mealTypeEntries)
-                                      }
-                                    });
-                                  }}
-                                  activeOpacity={0.7}
-                                  {...getButtonAccessibilityProps(
-                                    `Log food for ${mealTypeLabel}`,
-                                    t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
-                                  )}
-                                >
-                                  <View style={styles.mealGroupItemLeft}>
-                                    <ThemedText 
-                                      style={[styles.mealGroupItemName, { color: colors.text }]}
-                                      numberOfLines={6}
-                                      ellipsizeMode="tail"
-                                    >
-                                      {consolidatedItems}
-                                    </ThemedText>
-                                  </View>
-                                </TouchableOpacity>
-                              </View>
-                              {/* Notes row - visible in semi mode */}
-                              {dataByMealType[mealType]?.note && dataByMealType[mealType].note.trim().length > 0 && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.noteRow,
-                                    getMinTouchTargetStyle(),
-                                    Platform.OS === 'web' && getFocusStyle(colors.tint),
-                                  ]}
-                                  onPress={() => {
-                                    setNoteEditor({ visible: true, mealType });
-                                  }}
-                                  activeOpacity={0.7}
-                                  {...getButtonAccessibilityProps(
-                                    t('food.note.edit', { mealType: mealTypeLabel })
-                                  )}
-                                >
-                                  <ThemedText
-                                    style={[styles.noteRowText, { color: colors.text }]}
-                                    numberOfLines={2}
-                                    ellipsizeMode="tail"
-                                  >
-                                    📝 {dataByMealType[mealType].note}
-                                  </ThemedText>
-                                </TouchableOpacity>
-                              )}
-                            </>
-                          );
-                        }
-                        
-                        // Expanded: individual rows for each entry
-                        const mealTypeEntries = group.entries.filter(entry => 
-                          entry.meal_type.toLowerCase() === mealType.toLowerCase() &&
-                          entry.entry_date === selectedDateString
-                        );
-                        
-                        return (
-                          <>
-                            <View style={styles.mealExpandedContainer}>
-                              {mealTypeEntries.map((entry, idx) => (
-                                <View key={entry.id ?? idx}>
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.mealItemRow,
-                                      getMinTouchTargetStyle(),
-                                      Platform.OS === 'web' && getFocusStyle(colors.tint),
-                                    ]}
-                                    onPress={() => {
-                                      // Navigate to mealtype-log page
-                                      router.push({
-                                        pathname: '/(tabs)/mealtype-log',
-                                        params: { 
-                                          mealType: mealType,
-                                          entryDate: selectedDateString,
-                                          preloadedEntries: JSON.stringify(mealTypeEntries)
-                                        }
-                                      });
-                                    }}
-                                    activeOpacity={0.7}
-                                    {...getButtonAccessibilityProps(
-                                      `View ${entry.item_name}`,
-                                      t('home.accessibility.log_food_hint', { mealType: mealTypeLabel })
-                                    )}
-                                  >
-                                    <View style={styles.mealItemNameContainer}>
-                                      <ThemedText style={[styles.mealItemName, { color: colors.text }]} numberOfLines={1}>
-                                        {entry.item_name}
-                                      </ThemedText>
-                                      {entry.food_id && (
-                                        <ThemedText style={[styles.mealItemAmount, { color: colors.textSecondary }]} numberOfLines={1}>
-                                          {Math.round(entry.quantity) === entry.quantity 
-                                            ? entry.quantity.toString() 
-                                            : entry.quantity.toFixed(1)} x {entry.unit}
-                                        </ThemedText>
-                                      )}
-                                      {!entry.food_id && (
-                                        <View style={[
-                                          styles.mealItemSourceBadge,
-                                          {
-                                            backgroundColor: 'transparent',
-                                          }
-                                        ]}>
-                                          <ThemedText style={[
-                                            styles.mealItemSourceBadgeText,
-                                            { color: colors.textSecondary }
-                                          ]}>
-                                            {entry.source === 'ai' ? 'AI' : '⚡'}
-                                          </ThemedText>
-                                        </View>
-                                      )}
-                                    </View>
-                                    <View style={[styles.calCol, { width: CAL_COL_WIDTH }]}>
-                                      <ThemedText style={[styles.mealItemCalories, { color: colors.text }]}>
-                                        {Math.round(entry.calories_kcal)} {t('home.food_log.kcal')}
-                                      </ThemedText>
-                                    </View>
-                                  </TouchableOpacity>
-                                  {idx < mealTypeEntries.length - 1 && (
-                                    <View style={[styles.mealItemDivider, { backgroundColor: colors.separator }]} />
-                                  )}
-                                </View>
-                              ))}
-                            </View>
-                            {/* Notes row - visible in expanded mode */}
-                            {dataByMealType[mealType]?.note && dataByMealType[mealType].note.trim().length > 0 && (
-                              <TouchableOpacity
-                                style={[
-                                  styles.noteRow,
-                                  getMinTouchTargetStyle(),
-                                  Platform.OS === 'web' && getFocusStyle(colors.tint),
-                                ]}
-                                onPress={() => {
-                                  setNoteEditor({ visible: true, mealType });
-                                }}
-                                activeOpacity={0.7}
-                                {...getButtonAccessibilityProps(
-                                  t('food.note.edit', { mealType: mealTypeLabel })
-                                )}
-                              >
-                                <ThemedText
-                                  style={[styles.noteRowText, { color: colors.text }]}
-                                  numberOfLines={2}
-                                  ellipsizeMode="tail"
-                                >
-                                  📝 {dataByMealType[mealType].note}
-                                </ThemedText>
-                              </TouchableOpacity>
-                            )}
-                          </>
-                        );
-                      })()}
-                      </View>
+                        </View>
                       {!isLast && (
                         <View style={[styles.mealTypeDivider, { backgroundColor: colors.separator }]} />
                       )}
@@ -3025,6 +2974,18 @@ const styles = StyleSheet.create({
   },
   entriesList: {
     gap: 0,
+  },
+  emptyStateNudge: {
+    marginBottom: Spacing.md,
+  },
+  emptyStateNudgeTitle: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  emptyStateNudgeSubtext: {
+    fontSize: FontSize.sm,
+    opacity: 0.9,
   },
   mealGroupContainer: {
     width: '100%',
