@@ -32,6 +32,7 @@ import {
     getFocusStyle,
 } from '@/utils/accessibility';
 import { filterNumericInput } from '@/utils/inputFilters';
+import { Redirect } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -42,7 +43,7 @@ import {
 } from 'react-native';
 
 export default function OnboardingScreen() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, onboardingComplete } = useAuth();
 
   const containerType =
     Platform.OS === 'web' && typeof window !== 'undefined'
@@ -62,6 +63,11 @@ export default function OnboardingScreen() {
   if (isNativeWrapperWeb && (authLoading || !user)) {
     (window as any).ReactNativeWebView?.postMessage?.('REQUEST_NATIVE_SESSION');
     return <BlockingBrandedLoader enabled timeoutMs={8000} overlay={false} />;
+  }
+
+  // Web: if authenticated and onboarding already complete, do not allow staying on /onboarding — go to Food Diary.
+  if (Platform.OS === 'web' && !isNativeWrapperWeb && !authLoading && user && onboardingComplete) {
+    return <Redirect href="/(tabs)" />;
   }
 
   const { t } = useTranslation();
