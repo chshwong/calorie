@@ -18,11 +18,11 @@
  * - Platform-aware styling
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadows } from '@/constants/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Animated, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Toast configuration - standardized duration
 const TOAST_DURATION = 3000; // 3 seconds (standardized)
@@ -155,23 +155,31 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {message && (
-        <View style={styles.toastWrapper} pointerEvents="none">
-          <Animated.View
-            style={[
-              styles.toastContainer,
-              {
-                opacity: fadeAnim,
-                top: insets.top + Spacing.md,
-                backgroundColor: colors.card,
-                ...Shadows.lg,
-              },
-            ]}
-            accessibilityLiveRegion="polite"
-            accessibilityRole="alert"
-          >
-            <Text style={[styles.toastText, { color: colors.text }]}>{message}</Text>
-          </Animated.View>
-        </View>
+        <Modal
+          visible={true}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          pointerEvents="box-none"
+        >
+          <View style={styles.toastWrapper} pointerEvents="none">
+            <Animated.View
+              style={[
+                styles.toastContainer,
+                {
+                  opacity: fadeAnim,
+                  top: insets.top + Spacing.md,
+                  backgroundColor: colors.card,
+                  ...Shadows.lg,
+                },
+              ]}
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              <Text style={[styles.toastText, { color: colors.text }]}>{message}</Text>
+            </Animated.View>
+          </View>
+        </Modal>
       )}
     </ToastContext.Provider>
   );

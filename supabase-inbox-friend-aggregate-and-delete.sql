@@ -36,8 +36,11 @@ DECLARE
   v_pending_count int;
   v_created timestamptz;
 BEGIN
-  -- INSERT: new pending request for resolved target
+  -- INSERT: new pending request for resolved target (skip if target has blocked requester)
   IF TG_OP = 'INSERT' AND new.status = 'pending' AND new.target_user_id IS NOT NULL THEN
+    IF public.is_blocked(new.requester_user_id, new.target_user_id) THEN
+      RETURN new;
+    END IF;
     v_target := new.target_user_id;
     SELECT count(*)::int INTO v_pending_count
       FROM public.friend_requests

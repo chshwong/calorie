@@ -431,6 +431,8 @@ export default function LogFoodScreen() {
     return mealTotals?.kcal ?? 0;
   }, [mealTotals]);
 
+  const isFoodLogEmpty = entries.length === 0;
+
   // Calculate AvoScore from meal totals
   const avo = useMemo(() => {
     if (!mealTotals || mealTotals.kcal === 0) {
@@ -540,7 +542,7 @@ export default function LogFoodScreen() {
     ? openFoodSearchParam[0] === 'true' 
     : openFoodSearchParam === 'true';
   const [tabContentCollapsed, setTabContentCollapsed] = useState(!shouldStartExpanded);
-  const COLLAPSED_HEIGHT = 140;
+  const COLLAPSED_HEIGHT = 100; // ~2.5 rows when collapsed (was 140 for ~3.5 rows)
   
   // Helper function to handle tab press - toggles content collapse if already active
   const handleTabPress = (tab: 'frequent' | 'recent' | 'custom' | 'bundle' | 'quick-log', additionalActions?: () => void) => {
@@ -2461,16 +2463,29 @@ export default function LogFoodScreen() {
                 <ThemedText style={[styles.foodLogTitle, { color: colors.text }]}>
                   {t('mealtype_log.food_log.title')}
                 </ThemedText>
-                <ThemedText style={[styles.foodLogItemCount, { color: colors.textMuted, fontWeight: entries.length === 1 ? '600' : '400' }]}>
-                  {entries.length} {entries.length === 1 ? t('mealtype_log.food_log.item_one') : t('mealtype_log.food_log.item_other')}
-                </ThemedText>
+                {!isFoodLogEmpty && (
+                  <ThemedText style={[styles.foodLogItemCount, { color: colors.textMuted, fontWeight: entries.length === 1 ? '600' : '400' }]}>
+                    {entries.length} {entries.length === 1 ? t('mealtype_log.food_log.item_one') : t('mealtype_log.food_log.item_other')}
+                  </ThemedText>
+                )}
               </View>
 
               {/* Center/Mid-right: Calories */}
               <View style={styles.entriesHeaderCenter}>
-                <ThemedText style={[styles.foodLogCalories, { color: colors.tint }]}>
-                  {Math.round(mealCaloriesTotal).toLocaleString('en-US')} {t('home.food_log.kcal')}
-                </ThemedText>
+                {isFoodLogEmpty ? (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <ThemedText style={[styles.foodLogCalories, { color: colors.textMuted, fontWeight: '500' }]}>
+                      — {t('home.food_log.kcal')}
+                    </ThemedText>
+                    <ThemedText style={[styles.foodLogCaloriesEmptySubtext, { color: colors.textMuted }]}>
+                      {t('mealtype_log.food_log.no_entries')}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={[styles.foodLogCalories, { color: colors.tint }]}>
+                    {Math.round(mealCaloriesTotal).toLocaleString('en-US')} {t('home.food_log.kcal')}
+                  </ThemedText>
+                )}
               </View>
 
               {/* Right: Controls */}

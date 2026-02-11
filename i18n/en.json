@@ -3306,6 +3306,7 @@
     "error_already_friends": "You're already friends.",
     "error_request_already_sent": "Request already sent.",
     "error_they_sent_you_request": "They already sent you a request. Check Incoming.",
+    "error_unblock_first": "You need to unblock this user first to send an invite. To see your blocked users, tap ⚙️ on the Friends page.",
     "remove_friend_action": "Remove Friend",
     "remove_friend_confirm_title": "Remove Friend?",
     "remove_friend_confirm_message": "They won't be notified.",

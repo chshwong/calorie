@@ -1,30 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  TextInput,
-  Animated,
-  Dimensions,
-  Platform,
-  useWindowDimensions,
-} from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Button } from '@/components/ui/button';
-import { SegmentedTabs } from '@/components/SegmentedTabs';
-import { showAppToast } from '@/components/ui/app-toast';
-import { useSendFriendRequest } from '@/hooks/use-friends';
-import { validateAvoId, validateEmailFormat } from '@/utils/validation';
-import { Colors, Spacing, BorderRadius, FontSize, Layout } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-  getButtonAccessibilityProps,
-  getMinTouchTargetStyle,
+    Animated,
+    Dimensions,
+    Modal,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View
+} from 'react-native';
+
+import { SegmentedTabs } from '@/components/SegmentedTabs';
+import { ThemedText } from '@/components/themed-text';
+import { showAppToast } from '@/components/ui/app-toast';
+import { Button } from '@/components/ui/button';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BorderRadius, Colors, FontSize, Layout, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSendFriendRequest } from '@/hooks/use-friends';
+import {
+    getButtonAccessibilityProps,
+    getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { validateAvoId, validateEmailFormat } from '@/utils/validation';
 
 type AddFriendSheetProps = {
   visible: boolean;
@@ -85,11 +84,11 @@ export function AddFriendSheet({ visible, onClose, onSuccess }: AddFriendSheetPr
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'FRIENDS_CANNOT_REQUEST_SELF') showAppToast(t('friends.cannot_request_self'));
-      else if (msg === 'FRIENDS_BLOCKED') showAppToast(t('friends.error_blocked'));
       else if (msg === 'FRIENDS_ALREADY_FRIENDS') showAppToast(t('friends.error_already_friends'));
       else if (msg === 'FRIENDS_REQUEST_ALREADY_SENT') showAppToast(t('friends.error_request_already_sent'));
       else if (msg === 'FRIENDS_THEY_SENT_YOU_REQUEST') showAppToast(t('friends.error_they_sent_you_request'));
-      else if (msg === 'FRIENDS_TARGET_REQUIRED') showAppToast(t('friends.error_blocked'));
+      else if (msg === 'FRIENDS_UNBLOCK_FIRST') showAppToast(t('friends.error_unblock_first'));
+      else if (msg === 'FRIENDS_TARGET_REQUIRED') showAppToast(t('common.unexpected_error'));
       else showAppToast(t('common.unexpected_error'));
     }
   };
@@ -109,11 +108,11 @@ export function AddFriendSheet({ visible, onClose, onSuccess }: AddFriendSheetPr
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'FRIENDS_CANNOT_REQUEST_SELF') showAppToast(t('friends.cannot_request_self'));
-      else if (msg === 'FRIENDS_BLOCKED') showAppToast(t('friends.error_blocked'));
       else if (msg === 'FRIENDS_ALREADY_FRIENDS') showAppToast(t('friends.error_already_friends'));
       else if (msg === 'FRIENDS_REQUEST_ALREADY_SENT') showAppToast(t('friends.error_request_already_sent'));
       else if (msg === 'FRIENDS_THEY_SENT_YOU_REQUEST') showAppToast(t('friends.error_they_sent_you_request'));
-      else if (msg === 'FRIENDS_TARGET_REQUIRED') showAppToast(t('friends.error_blocked'));
+      else if (msg === 'FRIENDS_UNBLOCK_FIRST') showAppToast(t('friends.error_unblock_first'));
+      else if (msg === 'FRIENDS_TARGET_REQUIRED') showAppToast(t('common.unexpected_error'));
       else showAppToast(t('common.unexpected_error'));
     }
   };

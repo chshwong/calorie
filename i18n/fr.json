@@ -2416,6 +2416,7 @@
     "error_already_friends": "Vous êtes déjà amis.",
     "error_request_already_sent": "Demande déjà envoyée.",
     "error_they_sent_you_request": "Ils vous ont déjà envoyé une demande. Consultez Demandes reçues.",
+    "error_unblock_first": "Vous devez d'abord débloquer cet utilisateur pour envoyer une invitation. Pour gérer les utilisateurs bloqués, appuyez sur l'icône engrenage sur la page Amis.",
     "remove_friend_action": "Supprimer l'ami",
     "remove_friend_confirm_title": "Supprimer l'ami ?",
     "remove_friend_confirm_message": "Il ne sera pas notifié.",

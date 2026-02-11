@@ -164,6 +164,13 @@ export const styles = StyleSheet.create({
     fontFamily: FontFamilies.semibold,
     lineHeight: FontSize.md * 1.2,
   },
+  foodLogCaloriesEmptySubtext: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.regular,
+    fontFamily: FontFamilies.regular,
+    lineHeight: FontSize.xs * 1.2,
+    marginTop: 2,
+  },
   foodLogDivider: {
     height: 1,
     width: '100%',
@@ -175,7 +182,7 @@ export const styles = StyleSheet.create({
     alignSelf: 'stretch' as const,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    paddingVertical: 8,
+    paddingVertical: Spacing.md,
     marginTop: 8,
     marginHorizontal: 0,
     overflow: 'hidden' as const,
@@ -314,6 +321,45 @@ export const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 14,
     opacity: 0.7,
+  },
+  emptyStateCardShadow: {
+    ...Platform.select({
+      web: {
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+        elevation: 1,
+      },
+    }),
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 14,
+  },
+  gridBtn: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  actionBtn: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  actionBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    fontFamily: FontFamilies.semibold,
   },
   entryCard: {
     paddingVertical: Platform.select({ web: 4, default: 6 }),

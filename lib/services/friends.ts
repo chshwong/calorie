@@ -166,12 +166,13 @@ export async function sendFriendRequest(params: {
   if (error) {
     if (error.code === 'P0003') throw new Error('FRIENDS_CANNOT_REQUEST_SELF');
     if (error.code === 'P0002') throw new Error('FRIENDS_TARGET_REQUIRED');
-    if (error.code === 'P0010') throw new Error('FRIENDS_BLOCKED');
     if (error.code === 'P0011') throw new Error('FRIENDS_ALREADY_FRIENDS');
     if (error.code === 'P0012') throw new Error('FRIENDS_REQUEST_ALREADY_SENT');
     if (error.code === 'P0013') throw new Error('FRIENDS_THEY_SENT_YOU_REQUEST');
+    if (error.code === 'P0014') throw new Error('FRIENDS_UNBLOCK_FIRST');
     throw error;
   }
+  // RPC returns void; ON CONFLICT DO NOTHING yields success with no error — treat as success
 }
 
 export async function acceptFriendRequest(requestId: string): Promise<void> {

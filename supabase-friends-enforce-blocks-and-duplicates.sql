@@ -65,8 +65,11 @@ begin
     end if;
 
     if v_target_user_id is not null then
-      if public.is_blocked(v_requester, v_target_user_id) then
-        raise exception 'blocked' using errcode = 'P0010';
+      if exists (
+        select 1 from public.friend_blocks
+        where blocker_user_id = v_requester and blocked_user_id = v_target_user_id
+      ) then
+        raise exception 'unblock_first' using errcode = 'P0014';
       end if;
       if exists (
         select 1 from public.friends f
@@ -77,16 +80,14 @@ begin
       end if;
       if exists (
         select 1 from public.friend_requests
-        where requester_user_id = v_requester and target_user_id = v_target_user_id and status = 'pending'
-      ) then
-        raise exception 'request_already_sent' using errcode = 'P0012';
-      end if;
-      if exists (
-        select 1 from public.friend_requests
         where requester_user_id = v_target_user_id and target_user_id = v_requester and status = 'pending'
       ) then
         raise exception 'they_sent_you_request' using errcode = 'P0013';
       end if;
+      insert into public.friend_requests (requester_user_id, target_user_id, target_avoid, requested_via, note_key)
+      values (v_requester, v_target_user_id, v_target_avoid, 'avoid', p_note_key)
+      on conflict (requester_user_id, target_user_id) where (status = 'pending' and target_user_id is not null) do nothing;
+      return;
     else
       if exists (
         select 1 from public.friend_requests
@@ -94,11 +95,10 @@ begin
       ) then
         raise exception 'request_already_sent' using errcode = 'P0012';
       end if;
+      insert into public.friend_requests (requester_user_id, target_user_id, target_avoid, requested_via, note_key)
+      values (v_requester, v_target_user_id, v_target_avoid, 'avoid', p_note_key);
+      return;
     end if;
-
-    insert into public.friend_requests (requester_user_id, target_user_id, target_avoid, requested_via, note_key)
-    values (v_requester, v_target_user_id, v_target_avoid, 'avoid', p_note_key);
-    return;
 
   elsif p_target_type = 'email' then
     v_target_email := btrim(p_target_value);
@@ -113,8 +113,11 @@ begin
     end if;
 
     if v_target_user_id is not null then
-      if public.is_blocked(v_requester, v_target_user_id) then
-        raise exception 'blocked' using errcode = 'P0010';
+      if exists (
+        select 1 from public.friend_blocks
+        where blocker_user_id = v_requester and blocked_user_id = v_target_user_id
+      ) then
+        raise exception 'unblock_first' using errcode = 'P0014';
       end if;
       if exists (
         select 1 from public.friends f
@@ -125,16 +128,14 @@ begin
       end if;
       if exists (
         select 1 from public.friend_requests
-        where requester_user_id = v_requester and target_user_id = v_target_user_id and status = 'pending'
-      ) then
-        raise exception 'request_already_sent' using errcode = 'P0012';
-      end if;
-      if exists (
-        select 1 from public.friend_requests
         where requester_user_id = v_target_user_id and target_user_id = v_requester and status = 'pending'
       ) then
         raise exception 'they_sent_you_request' using errcode = 'P0013';
       end if;
+      insert into public.friend_requests (requester_user_id, target_user_id, target_email, requested_via, note_key)
+      values (v_requester, v_target_user_id, v_target_email, 'email', p_note_key)
+      on conflict (requester_user_id, target_user_id) where (status = 'pending' and target_user_id is not null) do nothing;
+      return;
     else
       if exists (
         select 1 from public.friend_requests
@@ -142,11 +143,10 @@ begin
       ) then
         raise exception 'request_already_sent' using errcode = 'P0012';
       end if;
+      insert into public.friend_requests (requester_user_id, target_user_id, target_email, requested_via, note_key)
+      values (v_requester, v_target_user_id, v_target_email, 'email', p_note_key);
+      return;
     end if;
-
-    insert into public.friend_requests (requester_user_id, target_user_id, target_email, requested_via, note_key)
-    values (v_requester, v_target_user_id, v_target_email, 'email', p_note_key);
-    return;
 
   else
     raise exception 'invalid_target_type' using errcode = 'P0004';
@@ -158,7 +158,7 @@ revoke all on function public.rpc_send_friend_request(text, text, text) from pub
 grant execute on function public.rpc_send_friend_request(text, text, text) to authenticated;
 
 -- ============================================================================
--- 3) rpc_accept_friend_request — is_blocked + idempotency then accept
+-- 3) rpc_accept_friend_request — is_blocked + idempotency then accept + notify requester
 -- ============================================================================
 create or replace function public.rpc_accept_friend_request(p_request_id uuid)
 returns void
@@ -169,6 +169,9 @@ as $$
 declare
   v_requester uuid;
   v_target uuid;
+  v_accepter_first_name text;
+  v_accepter_avatar_url text;
+  v_accepter_avoid text;
 begin
   select requester_user_id, target_user_id into v_requester, v_target
   from public.friend_requests
@@ -187,6 +190,27 @@ begin
   insert into public.friends (user_id, friend_user_id)
   values (auth.uid(), v_requester), (v_requester, auth.uid())
   on conflict (user_id, friend_user_id) do nothing;
+
+  -- Accepter display fields for requester's inbox (idempotent via unique index)
+  select p.first_name, p.avatar_url, p.avoid
+  into v_accepter_first_name, v_accepter_avatar_url, v_accepter_avoid
+  from public.profiles p
+  where p.user_id = auth.uid();
+
+  insert into public.notifications (user_id, type, link_path, meta)
+  values (
+    v_requester,
+    'friend_request_accepted',
+    '/friends',
+    jsonb_build_object(
+      'accepter_user_id', auth.uid(),
+      'accepter_first_name', v_accepter_first_name,
+      'accepter_avatar_url', v_accepter_avatar_url,
+      'accepter_avoid', v_accepter_avoid,
+      'friend_request_id', p_request_id
+    )
+  )
+  on conflict do nothing;
 end;
 $$;
 
