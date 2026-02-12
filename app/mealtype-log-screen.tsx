@@ -69,7 +69,7 @@ import { computeAvoScore, type AvoScoreInput } from '@/utils/avoScore';
 import { getCurrentDateTimeUTC, getLocalDateString } from '@/utils/calculations';
 import { calculateMealNutritionTotals } from '@/utils/dailyTotals';
 import { getLocalDateKey } from '@/utils/dateTime';
-import { formatDate, getMealTypeLabel, getMealTypeLabels } from '@/utils/formatters';
+import { formatDate } from '@/utils/formatters';
 import {
   type FoodMaster
 } from '@/utils/nutritionMath';
@@ -253,10 +253,19 @@ export default function LogFoodScreen() {
   // Formatter functions moved to @/utils/formatters.ts
   // Wrapper functions to maintain component API with translation function
   const getMealTypeLabelLocal = useCallback((type: string) => {
-    return getMealTypeLabel(type, t);
+    const normalized = (type || '').toLowerCase();
+    const mealTypeKey = normalized === 'snack' ? 'afternoon_snack' : normalized;
+    const translationKey = `home.meal_types.${mealTypeKey}`;
+    const translated = t(translationKey);
+    return translated === translationKey ? type : translated;
   }, [t]);
   
-  const mealTypeLabels = useMemo(() => getMealTypeLabels(t), [t]);
+  const mealTypeLabels = useMemo(() => ({
+    breakfast: getMealTypeLabelLocal('breakfast'),
+    lunch: getMealTypeLabelLocal('lunch'),
+    afternoon_snack: getMealTypeLabelLocal('afternoon_snack'),
+    dinner: getMealTypeLabelLocal('dinner'),
+  }), [getMealTypeLabelLocal]);
   
   const formatDateLocal = useCallback((dateString: string) => {
     return formatDate(dateString, t);
