@@ -1,25 +1,25 @@
-import React from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Linking } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { ThemedView } from '@/components/themed-view';
+import { TightBrandHeader } from '@/components/layout/tight-brand-header';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { TightBrandHeader } from '@/components/layout/tight-brand-header';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserConfig } from '@/hooks/use-user-config';
 import { useAnnouncementById } from '@/hooks/use-announcements';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { getAnnouncementImagePublicUrl } from '@/lib/services/announcements';
-import { pickI18n } from '@/utils/i18n';
+import { AccessibilityHints, getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { parseAnnouncementBodyRichText } from '@/utils/announcementRichText';
 import { formatUTCDate } from '@/utils/calculations';
 import { formatDate } from '@/utils/formatters';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
-import { AccessibilityHints, getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { pickI18n } from '@/utils/i18n';
 
 export default function AnnouncementDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -56,6 +56,7 @@ export default function AnnouncementDetailScreen() {
 
   const title = pickI18n(announcement.title_i18n, locale);
   const body = pickI18n(announcement.body_i18n, locale);
+  const bodySegments = parseAnnouncementBodyRichText(body).segments;
   const dateLabel = formatDate(formatUTCDate(announcement.published_at ?? announcement.created_at), t);
   const linkPath = announcement.link_path;
   const imagePaths = Array.isArray(announcement.image_paths) ? announcement.image_paths.filter((x) => typeof x === 'string') : [];
@@ -91,7 +92,28 @@ export default function AnnouncementDetailScreen() {
             {title}
           </ThemedText>
           <ThemedText style={[styles.date, { color: colors.textSecondary }]}>{dateLabel}</ThemedText>
-          <ThemedText style={[styles.body, { color: colors.text }]}>{body}</ThemedText>
+          <ThemedText style={[styles.body, { color: colors.text }]}>
+            {bodySegments.map((segment, index) => {
+              if (segment.type === 'text') {
+                return <React.Fragment key={`text-${index}`}>{segment.text}</React.Fragment>;
+              }
+              return (
+                <ThemedText
+                  key={`link-${index}`}
+                  style={[styles.bodyLink, { color: colors.tint }]}
+                  onPress={() => {
+                    if (segment.isInternal) {
+                      router.push(segment.url as any);
+                      return;
+                    }
+                    Linking.openURL(segment.url);
+                  }}
+                >
+                  {segment.text}
+                </ThemedText>
+              );
+            })}
+          </ThemedText>
 
           {imageUrls.length > 0 && (
             <View style={styles.imagesSection}>
@@ -188,6 +210,9 @@ const styles = StyleSheet.create({
   body: {
     fontSize: FontSize.md,
     lineHeight: 22,
+  },
+  bodyLink: {
+    textDecorationLine: 'underline',
   },
   ctaRow: {
     marginTop: Spacing.sm,

@@ -1,39 +1,40 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
-
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { useAuth } from '@/contexts/AuthContext';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  useAnnouncementById,
-  useCreateAnnouncementDraft,
-  useDeleteAnnouncement,
-  usePublishAnnouncement,
-  useUpdateAnnouncementDraft,
-} from '@/hooks/use-announcements';
-import { useAddAnnouncementImages, useReorderAnnouncementImages, useRemoveAnnouncementImage } from '@/hooks/use-announcement-images';
-import { getAnnouncementImagePublicUrl } from '@/lib/services/announcements';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
-import { AccessibilityHints, getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
+import { Button } from '@/components/ui/button';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BorderRadius, Colors, FontSize, FontWeight, Layout, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAddAnnouncementImages, useRemoveAnnouncementImage, useReorderAnnouncementImages } from '@/hooks/use-announcement-images';
+import {
+    useAnnouncementById,
+    useCreateAnnouncementDraft,
+    useDeleteAnnouncement,
+    usePublishAnnouncement,
+    useUpdateAnnouncementDraft,
+} from '@/hooks/use-announcements';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getAnnouncementImagePublicUrl } from '@/lib/services/announcements';
+import { AccessibilityHints, getButtonAccessibilityProps, getFocusStyle, getMinTouchTargetStyle } from '@/utils/accessibility';
+import { parseAnnouncementBodyRichText } from '@/utils/announcementRichText';
 import { validateAnnouncementDraft } from '@/utils/validation';
 
 export default function AdminAnnouncementEditorScreen() {
@@ -92,6 +93,7 @@ export default function AdminAnnouncementEditorScreen() {
 
   const previewTitle = previewLocale === 'fr' ? titleFr : titleEn;
   const previewBody = previewLocale === 'fr' ? bodyFr : bodyEn;
+  const previewBodySegments = parseAnnouncementBodyRichText(previewBody).segments;
 
   const isImagesBusy = addImages.isPending || removeImage.isPending || reorderImages.isPending;
   const isBusy =
@@ -102,7 +104,7 @@ export default function AdminAnnouncementEditorScreen() {
     isImagesBusy;
 
   const validateDraft = () => {
-    const result = validateAnnouncementDraft({ titleEn, bodyEn, linkPath });
+    const result = validateAnnouncementDraft({ titleEn, bodyEn, bodyFr, linkPath });
     if (!result.valid) {
       Alert.alert(t('settings.admin.validation_title'), t(result.errorKey ?? 'common.unexpected_error'));
     }
@@ -384,6 +386,9 @@ export default function AdminAnnouncementEditorScreen() {
 
         <View style={styles.fieldGroup}>
           <ThemedText style={[styles.fieldLabel, { color: colors.text }]}>{t('settings.admin.body_en')}</ThemedText>
+          <ThemedText style={[styles.helperText, { color: colors.textSecondary }]}>
+            {t('settings.admin.body_links_helper')}
+          </ThemedText>
           <TextInput
             value={bodyEn}
             onChangeText={setBodyEn}
@@ -548,7 +553,30 @@ export default function AdminAnnouncementEditorScreen() {
           </ThemedText>
           {renderImagesPreview(imagePaths)}
           <ThemedText style={[styles.previewBody, { color: colors.textSecondary }]}>
-            {previewBody || t('settings.admin.preview_placeholder_body')}
+            {previewBody ? (
+              previewBodySegments.map((segment, index) => {
+                if (segment.type === 'text') {
+                  return <React.Fragment key={`preview-text-${index}`}>{segment.text}</React.Fragment>;
+                }
+                return (
+                  <ThemedText
+                    key={`preview-link-${index}`}
+                    style={[styles.previewBodyLink, { color: colors.tint }]}
+                    onPress={() => {
+                      if (segment.isInternal) {
+                        router.push(segment.url as any);
+                        return;
+                      }
+                      Linking.openURL(segment.url);
+                    }}
+                  >
+                    {segment.text}
+                  </ThemedText>
+                );
+              })
+            ) : (
+              t('settings.admin.preview_placeholder_body')
+            )}
           </ThemedText>
         </View>
 
@@ -770,6 +798,9 @@ const styles = StyleSheet.create({
   previewBody: {
     fontSize: FontSize.sm,
     lineHeight: 18,
+  },
+  previewBodyLink: {
+    textDecorationLine: 'underline',
   },
   actionRow: {
     gap: Spacing.sm,

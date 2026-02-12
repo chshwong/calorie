@@ -8,7 +8,8 @@
 // constants/constraints.ts is where lives all the constraints constants that his file refers to.
 // to change ranges or other constraints, refer to constants/constraints
 
-import { PROFILES, DERIVED, POLICY, BURNED } from '@/constants/constraints';
+import { BURNED, DERIVED, POLICY, PROFILES } from '@/constants/constraints';
+import { validateAnnouncementBodyRichText } from '@/utils/announcementRichText';
 
 export type ValidationResult = {
   valid: boolean;
@@ -121,10 +122,12 @@ export function validateEmailFormat(rawValue: string): ValidationResult {
 export function validateAnnouncementDraft(params: {
   titleEn: string;
   bodyEn: string;
+  bodyFr?: string;
   linkPath?: string;
 }): AnnouncementValidationResult {
   const title = params.titleEn.trim();
   const body = params.bodyEn.trim();
+  const bodyFr = params.bodyFr?.trim() ?? '';
   const linkPath = params.linkPath?.trim() ?? '';
 
   if (!title || !body) {
@@ -133,6 +136,18 @@ export function validateAnnouncementDraft(params: {
 
   if (linkPath && !linkPath.startsWith('/')) {
     return { valid: false, errorKey: 'settings.admin.validation_link_path' };
+  }
+
+  const bodyEnValidation = validateAnnouncementBodyRichText(body);
+  if (!bodyEnValidation.valid) {
+    return { valid: false, errorKey: bodyEnValidation.errorKey };
+  }
+
+  if (bodyFr) {
+    const bodyFrValidation = validateAnnouncementBodyRichText(bodyFr);
+    if (!bodyFrValidation.valid) {
+      return { valid: false, errorKey: bodyFrValidation.errorKey };
+    }
   }
 
   return { valid: true };

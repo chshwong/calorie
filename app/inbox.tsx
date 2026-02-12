@@ -34,6 +34,7 @@ import {
     getFocusStyle,
     getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { projectAnnouncementBodyPlainText } from '@/utils/announcementRichText';
 import { formatUTCDate } from '@/utils/calculations';
 import { formatDate } from '@/utils/formatters';
 import { pickI18n } from '@/utils/i18n';
@@ -454,11 +455,7 @@ export default function InboxScreen() {
 }
 
 function buildPreview(body: string) {
-  const normalized = body.replace(/\s+/g, ' ').trim();
-  if (!normalized) return '';
-  const maxLen = 120;
-  if (normalized.length <= maxLen) return normalized;
-  return `${normalized.slice(0, maxLen - 1)}…`;
+  return projectAnnouncementBodyPlainText(body, { maxLength: 120 });
 }
 
 const styles = StyleSheet.create({
