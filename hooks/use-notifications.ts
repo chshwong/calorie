@@ -1,13 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Notification } from '@/utils/types';
 import {
-  getInboxNotifications,
-  getUnreadNotificationCount,
-  markAllInboxNotificationsRead,
-  markNotificationRead,
-  type NotificationCursor,
+    getInboxNotifications,
+    getUnreadNotificationCount,
+    markAllInboxNotificationsRead,
+    markNotificationRead,
+    type NotificationCursor,
 } from '@/lib/services/notifications';
+import type { Notification } from '@/utils/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type NotificationPage = {
   items: Notification[];

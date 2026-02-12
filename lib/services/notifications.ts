@@ -15,6 +15,8 @@ const NOTIFICATION_COLUMNS = `
   user_id,
   type,
   announcement_id,
+  title_i18n,
+  body_i18n,
   link_path,
   read_at,
   meta,

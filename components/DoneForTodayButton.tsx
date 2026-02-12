@@ -1,33 +1,33 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
-import { Colors, Spacing, BorderRadius, SemanticColors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/contexts/AuthContext';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
 import { ThemedText } from '@/components/themed-text';
 import { showAppToast } from '@/components/ui/app-toast';
-import { ConfettiCelebrationModal } from '@/components/ConfettiCelebrationModal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { FOOD_LOG } from '@/constants/constraints';
 import {
   pickRandomDayCompletionMessage,
   pickRandomWeightLossOnTargetMessage,
 } from '@/constants/dayCompletionMessages';
-import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
-import { useUserConfig } from '@/hooks/use-user-config';
+import { BorderRadius, Colors, SemanticColors, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailySumBurned } from '@/hooks/use-daily-sum-burned';
-import type { DailyLogStatus, DailySumConsumed } from '@/utils/types';
 import { useDailySumConsumedRange } from '@/hooks/use-daily-sum-consumed-range';
 import { useSetDailyConsumedStatus } from '@/hooks/use-set-daily-consumed-status';
+import { useUserConfig } from '@/hooks/use-user-config';
+import { useConfettiToastMessage } from '@/hooks/useConfettiToastMessage';
 import { compareDateKeys } from '@/lib/date-guard';
-import { addDays } from '@/utils/dateKey';
-import { FOOD_LOG } from '@/constants/constraints';
-import { formatWeeklyLossProjection } from '@/utils/weeklyLossProjection';
 import {
   getButtonAccessibilityProps,
   getFocusStyle,
   getMinTouchTargetStyle,
 } from '@/utils/accessibility';
+import { addDays } from '@/utils/dateKey';
+import type { DailyLogStatus, DailySumConsumed } from '@/utils/types';
+import { formatWeeklyLossProjection } from '@/utils/weeklyLossProjection';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const DONE_FOR_TODAY_CTA_HEIGHT = 32;
 
@@ -211,11 +211,14 @@ export function DoneForTodayButton({
           // Weight loss + on target ALWAYS uses the weight-loss on-target pool
           if (isWeightLoss && isWithinTarget) {
             message = pickRandomWeightLossOnTargetMessage();
-            if (isHighDeficit) {
-              message += `\n\n${formatWeeklyLossProjection(deficit, weightUnit, t)}`;
-            }
           } else {
             message = pickRandomDayCompletionMessage();
+          }
+
+          // Weekly projection is shown for weight-loss users with a high deficit,
+          // regardless of whether the day finished on/under calorie target.
+          if (isWeightLoss && isHighDeficit) {
+            message += `\n\n${formatWeeklyLossProjection(deficit, weightUnit, t)}`;
           }
 
           const title = next === 'completed' ? '✅ Day Complete' : '✅ Fasted Day';

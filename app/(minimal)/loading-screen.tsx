@@ -9,14 +9,15 @@
  * Mobile-first, respects dark/light mode, matches Home container width on desktop.
  */
 
+import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
+import { getStartupTagline } from '@/components/system/startupVisualState';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Layout, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadingQuotes } from '@/i18n/quotes/loadingQuotes';
 import Lottie from 'lottie-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dimensions, Platform, StyleSheet, View } from 'react-native';
 import animationData from '../../assets/lottie/Wobbling.json';
@@ -46,11 +47,8 @@ export default function LoadingScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Pick random quote once per mount
-  const quote = useMemo(() => {
-    if (loadingQuotes.length === 0) return '';
-    return loadingQuotes[Math.floor(Math.random() * loadingQuotes.length)];
-  }, []);
+  // Stable across startup remounts via global singleton.
+  const quote = getStartupTagline();
 
   // Determine if desktop (for container width)
   const screenWidth = Dimensions.get('window').width;
@@ -71,11 +69,17 @@ export default function LoadingScreen() {
         <View style={styles.column}>
           {/* Lottie Animation */}
           <View style={styles.lottieContainer}>
-            <Lottie
-              animationData={animationData}
-              style={styles.lottie}
-              loop={true}
-            />
+            <View style={styles.mascotStage}>
+              <View style={styles.mascotFallback}>
+                <BrandLogoMascotOnly width={200} />
+              </View>
+              <Lottie
+                animationData={animationData}
+                style={styles.lottie}
+                loop={true}
+                autoplay={true}
+              />
+            </View>
           </View>
 
           {/* Spacer between Lottie and Quote */}
@@ -84,7 +88,10 @@ export default function LoadingScreen() {
           {/* Quote Text - Between animation and logo */}
           {quote && (
             <View style={styles.quoteWrapper}>
-              <ThemedText style={[styles.quoteText, { color: colors.textSecondary }]}>
+              <ThemedText
+                nativeID="startup-quote"
+                style={[styles.quoteText, { color: colors.textSecondary }]}
+              >
                 {quote}
               </ThemedText>
             </View>
@@ -148,6 +155,20 @@ const styles = StyleSheet.create({
   lottieContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  mascotStage: {
+    width: 200,
+    height: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mascotFallback: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.98,
   },
   lottie: {
     width: 200,

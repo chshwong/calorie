@@ -410,6 +410,8 @@ export interface Notification {
   user_id: string;
   type: string;
   announcement_id: string | null;
+  title_i18n?: AnnouncementI18n | null;
+  body_i18n?: AnnouncementI18n | null;
   link_path: string | null;
   read_at: string | null;
   meta: Record<string, any> | null;

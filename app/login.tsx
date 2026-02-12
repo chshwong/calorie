@@ -1247,6 +1247,22 @@ export default function LoginScreen() {
                     ) : null}
                   </View>
 
+                  {isWeb ? (
+                    <View style={styles.noInstallCallout}>
+                      <ThemedText style={[styles.noInstallCalloutTitle, { color: colors.text }]}>
+                        {t('auth.login.no_install_title')}
+                      </ThemedText>
+                      <View style={styles.noInstallCalloutSubtextWrap}>
+                        <ThemedText style={[styles.noInstallCalloutSubtext, { color: colors.textSecondary }]}>
+                          {t('auth.login.no_install_subtext_line1')}
+                        </ThemedText>
+                        <ThemedText style={[styles.noInstallCalloutSubtext, { color: colors.textSecondary }]}>
+                          {t('auth.login.no_install_subtext_line2')}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  ) : null}
+
                   {/* Legal footer */}
                   <View style={[styles.legalRow, { borderTopColor: colors.border }]}>
                     <Pressable
@@ -1721,6 +1737,28 @@ const styles = StyleSheet.create({
   successText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  noInstallCallout: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+  },
+  noInstallCalloutTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+  },
+  noInstallCalloutSubtextWrap: {
+    marginTop: Spacing.xs,
+    gap: Spacing.xxs,
+    alignItems: 'center',
+  },
+  noInstallCalloutSubtext: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.regular,
+    textAlign: 'center',
   },
   trustLine: {
     marginTop: 2,

@@ -229,11 +229,13 @@ export default function InboxScreen() {
     const friendRequestCount = isAggregateFriendRequest && typeof pendingCount === 'number' ? pendingCount : 1;
 
     const nudgeCount = isNudges ? ((item.meta as any)?.unack_count as number | undefined) ?? 1 : 0;
+    const fallbackTitle = item.title_i18n ? pickI18n(item.title_i18n, locale) : null;
+    const fallbackBody = item.body_i18n ? pickI18n(item.body_i18n, locale) : '';
 
     const title = isAnnouncement
       ? announcement
         ? pickI18n(announcement.title_i18n, locale)
-        : t('inbox.announcement_default_title')
+        : fallbackTitle || t('inbox.announcement_default_title')
       : isCaseReply
         ? t('inbox.case_reply_title')
         : isFriendRequestAccepted
@@ -244,9 +246,9 @@ export default function InboxScreen() {
           ? t('inbox.nudges_title', { defaultValue: 'Nudges' })
         : isFriendRequest
           ? t('inbox.friend_request_title', { defaultValue: 'Friend request' })
-        : t('inbox.announcement_default_title');
+        : fallbackTitle || t('inbox.announcement_default_title');
 
-    const body = isAnnouncement && announcement ? pickI18n(announcement.body_i18n, locale) : '';
+    const body = isAnnouncement && announcement ? pickI18n(announcement.body_i18n, locale) : fallbackBody;
     const preview = isCaseReply
       ? t('inbox.case_reply_body')
       : isNudges
