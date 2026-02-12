@@ -21,7 +21,7 @@
 import { BorderRadius, Colors, FontSize, FontWeight, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Toast configuration - standardized duration
@@ -75,7 +75,7 @@ export function showAppToast(message: string, options?: { durationMs?: number })
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queueRef = useRef<ToastItem[]>([]);
   const isShowingRef = useRef(false);
   const colorScheme = useColorScheme();
@@ -155,47 +155,36 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {message && (
-        <Modal
-          visible={true}
-          transparent
-          animationType="fade"
-          statusBarTranslucent
-          pointerEvents="box-none"
-        >
-          <View style={styles.toastWrapper} pointerEvents="none">
-            <Animated.View
-              style={[
-                styles.toastContainer,
-                {
-                  opacity: fadeAnim,
-                  top: insets.top + Spacing.md,
-                  backgroundColor: colors.card,
-                  ...Shadows.lg,
-                },
-              ]}
-              accessibilityLiveRegion="polite"
-              accessibilityRole="alert"
-            >
-              <Text style={[styles.toastText, { color: colors.text }]}>{message}</Text>
-            </Animated.View>
-          </View>
-        </Modal>
+        <View style={styles.toastOverlay} pointerEvents="none">
+          <Animated.View
+            pointerEvents="auto"
+            style={[
+              styles.toastContainer,
+              {
+                opacity: fadeAnim,
+                top: insets.top + Spacing.md,
+                backgroundColor: colors.card,
+                ...Shadows.lg,
+              },
+            ]}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+          >
+            <Text style={[styles.toastText, { color: colors.text }]}>{message}</Text>
+          </Animated.View>
+        </View>
       )}
     </ToastContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
-  toastWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
+  toastOverlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'flex-start',
     zIndex: 9999,
-    pointerEvents: 'none',
+    elevation: 9999,
   },
   toastContainer: {
     paddingVertical: Spacing.md,

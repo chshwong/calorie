@@ -514,6 +514,9 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
             </View>
           </View>
         </TouchableOpacity>
+        <ThemedText style={[styles.exerciseLastDaysMuted, { color: colors.textMuted }]}>
+          {t('dashboard.exercise.last_days', { days: daysToShow })}
+        </ThemedText>
 
           {/* Cardio/Mind-body Activities Chart */}
           <ExerciseActivitiesChart
@@ -526,11 +529,12 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
               { name: 'figure.run', size: 16 },
               { name: 'figure.seated', size: 16 },
             ]}
-            titleText="Cardio & Mind-Body"
+            titleText="🏃 Cardio & Mind-Body"
             isWide={isWide}
             showTopBorder={false}
             showSelectedOutline={false}
             showFocusOutline={false}
+            hideLastDaysPrefix
           />
           
           {/* Strength Activities Chart */}
@@ -544,10 +548,11 @@ function DashboardExerciseSection({ dateString, colors, isSmallScreen, isMobile,
               { name: 'dumbbell.fill', size: 16 },
               { name: 'figure.strengthtraining.traditional', size: 16 },
             ]}
-            titleText="Strength Activities"
+            titleText="🏋️ Strength"
             isWide={isWide}
             showSelectedOutline={false}
             showFocusOutline={false}
+            hideLastDaysPrefix
           />
       </PremiumCard>
     </DashboardSectionContainer>
@@ -1865,6 +1870,11 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     textAlign: 'center',
     paddingVertical: Spacing.md,
+  },
+  exerciseLastDaysMuted: {
+    fontSize: 12,
+    marginTop: -4,
+    marginBottom: 4,
   },
 });
 

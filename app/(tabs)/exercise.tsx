@@ -621,24 +621,6 @@ export default function ExerciseHomeScreen() {
   const prevStatusRef = useRef<string | null>(null);
   const ENABLE_EXERCISE_DAY_COMPLETE_CELEBRATION = false;
 
-  useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'app/(tabs)/exercise.tsx:selectedDate/dayStatus',
-        message: 'Exercise date/status snapshot',
-        data: { selectedDateString, dayStatus },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [selectedDateString, dayStatus]);
-
   // Track status transitions and trigger celebration
   useEffect(() => {
     const prev = prevStatusRef.current;
@@ -647,60 +629,13 @@ export default function ExerciseHomeScreen() {
       return; // first load: do nothing
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'app/(tabs)/exercise.tsx:celebrationEffect',
-        message: 'Exercise celebration check',
-        data: { selectedDateString, prev, next: dayStatus },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     if (!ENABLE_EXERCISE_DAY_COMPLETE_CELEBRATION) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H4',
-          location: 'app/(tabs)/exercise.tsx:celebrationEffect',
-          message: 'Exercise celebration disabled (expected: only Food Home should celebrate)',
-          data: { selectedDateString, prev, next: dayStatus },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-
       prevStatusRef.current = dayStatus;
       return;
     }
 
     if (prev === 'unknown' && dayStatus === 'completed') {
       const msg = pickRandomDayCompletionMessage();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H1',
-          location: 'app/(tabs)/exercise.tsx:celebrateCompleted',
-          message: 'Triggering Day Complete celebration from Exercise screen',
-          data: { selectedDateString, prev, next: dayStatus },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       show({ 
         title: '✅ Day Complete',
         message: msg,
@@ -710,21 +645,6 @@ export default function ExerciseHomeScreen() {
     }
     if (prev === 'unknown' && dayStatus === 'fasted') {
       const msg = pickRandomDayCompletionMessage();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/6dbd28e8-a63a-4048-96f8-d0b4e4ef93ee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H1',
-          location: 'app/(tabs)/exercise.tsx:celebrateFasted',
-          message: 'Triggering Fasted Day celebration from Exercise screen',
-          data: { selectedDateString, prev, next: dayStatus },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       show({ 
         title: '✅ Fasted Day',
         message: msg,

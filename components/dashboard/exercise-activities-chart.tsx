@@ -26,6 +26,7 @@ type ExerciseActivitiesChartProps = {
   showTopBorder?: boolean;
   showSelectedOutline?: boolean;
   showFocusOutline?: boolean;
+  hideLastDaysPrefix?: boolean;
 };
 
 export function ExerciseActivitiesChart({
@@ -40,6 +41,7 @@ export function ExerciseActivitiesChart({
   showTopBorder = true,
   showSelectedOutline = true,
   showFocusOutline = true,
+  hideLastDaysPrefix = false,
 }: ExerciseActivitiesChartProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -83,10 +85,12 @@ export function ExerciseActivitiesChart({
       !showTopBorder && { borderTopWidth: 0, marginTop: 0, paddingTop: 0 }
     ]}>
       <View style={styles.exerciseChipsTitleRow}>
-        <ThemedText style={[styles.exerciseChipsTitle, { color: colors.text }]}>
-          {t('dashboard.exercise.last_days', { days: daysToShow })} - 
-        </ThemedText>
-        {titleIcons.map((icon, idx) => (
+        {!hideLastDaysPrefix && (
+          <ThemedText style={[styles.exerciseChipsTitle, { color: colors.text }]}>
+            {t('dashboard.exercise.last_days', { days: daysToShow })} –{' '}
+          </ThemedText>
+        )}
+        {!hideLastDaysPrefix && titleIcons.map((icon, idx) => (
           <IconSymbol
             key={idx}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,7 +100,7 @@ export function ExerciseActivitiesChart({
             decorative
           />
         ))}
-        <ThemedText style={[styles.exerciseChipsTitle, { color: colors.text }]}>
+        <ThemedText style={[styles.exerciseChipsTitle, hideLastDaysPrefix && styles.exerciseChipsTitleShort, { color: colors.text }]}>
           {titleText}
         </ThemedText>
       </View>
@@ -114,7 +118,8 @@ export function ExerciseActivitiesChart({
             t('dashboard.exercise.accessibility_hint')
           )}
         >
-          <ThemedText style={[styles.exerciseChipsNone, { color: colors.textSecondary }]}>
+          <ThemedText style={[styles.exerciseChipsNone, { color: colors.textMuted }]} numberOfLines={1}>
+            {category === 'cardio_mind_body' ? '🏃 ' : '🏋️ '}
             {category === 'cardio_mind_body'
               ? t('dashboard.exercise.empty_cardio')
               : t('dashboard.exercise.empty_strength')}
@@ -122,8 +127,12 @@ export function ExerciseActivitiesChart({
         </TouchableOpacity>
       ) : (
         <View style={styles.exerciseChipsGrid}>
-          {recentDaysData.map((dayData) => {
+          {recentDaysData.map((dayData, dayIndex) => {
             const isSelected = dayData.dayKey === dateString;
+            const isLastColumn = dayIndex === recentDaysData.length - 1;
+            const isInactive = category === 'cardio_mind_body'
+              ? dayData.totalMinutes === 0 && dayData.totalDistanceKm === 0
+              : dayData.totalCount === 0;
             const date = new Date(dayData.dayKey + 'T00:00:00');
             const todayKey = getTodayKey();
             const yesterdayKey = getYesterdayKey();
@@ -154,6 +163,7 @@ export function ExerciseActivitiesChart({
                 key={dayData.dayKey}
                 style={[
                   styles.exerciseDayColumn,
+                  !isLastColumn && { borderRightWidth: 1, borderRightColor: colors.icon + '10' },
                   showSelectedOutline && isSelected && { borderColor: colors.accentExercise, borderWidth: 2 },
                   getMinTouchTargetStyle(),
                 ]}
@@ -166,10 +176,10 @@ export function ExerciseActivitiesChart({
                 {...(showFocusOutline && Platform.OS === 'web' && getFocusStyle(colors.accentExercise))}
               >
                 <View style={[styles.columnContent, { flex: 1, justifyContent: 'flex-end' }]}>
-                  <View style={styles.exerciseChipsColumn}>
+                  <View style={[styles.exerciseChipsColumn, isInactive && { opacity: 0.82 }]}>
                     {chipsToShow.length === 0 ? (
                       <View style={styles.exerciseChipPlaceholder}>
-                        <ThemedText style={[styles.exerciseChipPlaceholderText, { color: colors.textTertiary }]}>
+                        <ThemedText style={[styles.exerciseChipPlaceholderText, { color: isInactive ? colors.textMuted : colors.textTertiary }]}>
                           —
                         </ThemedText>
                       </View>
@@ -204,15 +214,19 @@ export function ExerciseActivitiesChart({
                   </View>
                 </View>
                 {/* Date label as X-axis baseline */}
-                <ThemedText style={[styles.exerciseDayLabel, { color: colors.textSecondary }]}>
+                <ThemedText style={[
+                  styles.exerciseDayLabel,
+                  { color: isInactive ? colors.textMuted : colors.textSecondary },
+                  isInactive && styles.exerciseDayLabelInactive,
+                ]}>
                   {weekdayLabel}
                 </ThemedText>
                 {/* Duration and Distance display below the date axis (only for cardio_mind_body) */}
                 {category === 'cardio_mind_body' && (showDuration || showDistance) && (
-                  <View style={styles.belowAxisContainer}>
+                  <View style={[styles.belowAxisContainer, isInactive && { opacity: 0.8 }]}>
                     {showDuration && (
                       <ThemedText 
-                        style={[styles.metricText, { color: colors.textSecondary }]}
+                        style={[styles.metricText, { color: isInactive ? colors.textMuted : colors.textSecondary }]}
                         accessibilityLabel={t('dashboard.exercise.duration', { minutes: dayData.totalMinutes })}
                       >
                         🕐{dayData.totalMinutes}m
@@ -220,7 +234,7 @@ export function ExerciseActivitiesChart({
                     )}
                     {showDistance && (
                       <ThemedText 
-                        style={[styles.metricText, { color: colors.textSecondary }]}
+                        style={[styles.metricText, { color: isInactive ? colors.textMuted : colors.textSecondary }]}
                         accessibilityLabel={(() => {
                           // Convert distance based on user preference
                           let distanceValue = dayData.totalDistanceKm;
@@ -274,6 +288,9 @@ const styles = StyleSheet.create({
   exerciseChipsTitle: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
+  },
+  exerciseChipsTitleShort: {
+    fontSize: FontSize.sm,
   },
   exerciseChipsGrid: {
     flexDirection: 'row',
@@ -348,6 +365,9 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     textAlign: 'center',
     width: '100%',
+  },
+  exerciseDayLabelInactive: {
+    fontWeight: FontWeight.regular as any,
   },
   exerciseChipsNoneRow: {
     paddingVertical: Spacing.md,

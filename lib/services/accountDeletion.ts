@@ -1,3 +1,4 @@
+import { logAppError } from '@/lib/services/founderAnalytics';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -74,9 +75,12 @@ export async function deleteUserAccountData(params: { userId: string }): Promise
     if (error) throw error;
   }
 
-  // 8) Delete the profile row
+  // 8) Soft-delete profile row (analytics trigger logs user_deleted)
   {
-    const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ deleted_at: new Date().toISOString(), is_active: false })
+      .eq('user_id', userId);
     if (error) throw error;
   }
 
@@ -113,6 +117,16 @@ export async function deleteUserAccountData(params: { userId: string }): Promise
       throw new Error(result?.error || 'Failed to delete auth user');
     }
   } catch (err) {
+    await logAppError({
+      error_type: 'edge',
+      severity: 'warn',
+      message: String((err as { message?: string })?.message ?? 'delete-auth-user function failed'),
+      meta: {
+        source: 'accountDeletion.deleteUserAccountData',
+        function: 'delete-auth-user',
+      },
+      user_id: userId,
+    });
     if (process.env.NODE_ENV !== 'production') {
       console.error('Error deleting auth user (profile and data already deleted):', err);
     }

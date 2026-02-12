@@ -1,47 +1,47 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Platform, ActivityIndicator } from 'react-native';
-import { router as appRouter, usePathname } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import Constants from 'expo-constants';
-import * as Application from 'expo-application';
-import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { setLanguage, languageNames, SupportedLanguage } from '../i18n';
-import { ThemedView } from '@/components/themed-view';
+import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ThemedView } from '@/components/themed-view';
+import { showAppToast } from '@/components/ui/app-toast';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, Typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Colors, Typography } from '@/constants/theme';
+import { resetTour } from '@/features/tour/storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useUserConfig } from '@/hooks/use-user-config';
-import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
 import { useUnreadNotificationCount } from '@/hooks/use-notifications';
-import {
-  getButtonAccessibilityProps,
-  getLinkAccessibilityProps,
-  AccessibilityHints,
-  getMinTouchTargetStyle,
-  getFocusStyle,
-} from '@/utils/accessibility';
-import { ProfileAvatarPicker } from '@/components/profile/ProfileAvatarPicker';
-import { openWeightEntryForToday } from '@/lib/navigation/weight';
+import { useUpdateProfile } from '@/hooks/use-profile-mutations';
+import { useUserConfig } from '@/hooks/use-user-config';
 import { openMyGoalEdit } from '@/lib/navigation/my-goal';
+import { openWeightEntryForToday } from '@/lib/navigation/weight';
 import { deleteUserAccountData } from '@/lib/services/accountDeletion';
-import { showAppToast } from '@/components/ui/app-toast';
-import { resetTour } from '@/features/tour/storage';
-import { ShareButton } from '@/src/components/share/ShareButton';
-import { useAddToHomeScreen } from '@/src/features/install/useAddToHomeScreen';
-import { AddToHomeScreenModal } from '@/src/features/install/AddToHomeScreenModal';
+import { isFounder as fetchIsFounder } from '@/lib/services/founderAnalytics';
 import {
-  loadSettingsPreferences,
-  saveSettingsPreferences,
-  type SettingsPreferences,
+    loadSettingsPreferences,
+    saveSettingsPreferences,
+    type SettingsPreferences,
 } from '@/lib/services/settingsPreferences';
+import { ShareButton } from '@/src/components/share/ShareButton';
+import { AddToHomeScreenModal } from '@/src/features/install/AddToHomeScreenModal';
+import { useAddToHomeScreen } from '@/src/features/install/useAddToHomeScreen';
+import {
+    AccessibilityHints,
+    getButtonAccessibilityProps,
+    getFocusStyle,
+    getMinTouchTargetStyle
+} from '@/utils/accessibility';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
+import { router as appRouter, usePathname } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { languageNames, setLanguage, SupportedLanguage } from '../i18n';
 
 export default function SettingsScreen() {
   const APP_VERSION =
@@ -144,6 +144,7 @@ export default function SettingsScreen() {
   const email = profile?.email || user?.email || '';
   const showUnreadBadge = unreadCount > 0;
   const isAdmin = !!profile?.is_admin;
+  const [isFounder, setIsFounder] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
   useEffect(() => {
     setAvatarUrl(profile?.avatar_url ?? null);
@@ -184,6 +185,21 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const founder = await fetchIsFounder();
+        if (!cancelled) {
+          setIsFounder(founder);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   const loadSettings = async () => {
     // NOTE: This is local-only UI preference data (not Supabase).
@@ -619,6 +635,19 @@ export default function SettingsScreen() {
               subtitle={t('settings.admin.support_cases_subtitle')}
               onPress={() => {
                 appRouter.push('/settings/admin/support-cases');
+              }}
+            />
+          </SettingSection>
+        )}
+
+        {isFounder && (
+          <SettingSection title="Founder">
+            <SettingItem
+              icon="chart.bar.fill"
+              title="Founder Analytics"
+              subtitle="Growth, deletes, digest, and free-tier watchdog"
+              onPress={() => {
+                appRouter.push('/founder');
               }}
             />
           </SettingSection>

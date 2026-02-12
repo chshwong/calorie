@@ -803,6 +803,16 @@ export function BurnedCaloriesModal({ visible, onClose, entryDate }: Props) {
                       disabled={!fitbitEnabled || fitbitConn?.status !== 'active'}
                     />
                   </FitbitConnectionCard>
+                  <View
+                    style={[
+                      styles.integrationNoticeRow,
+                      { backgroundColor: colors.tint + '0D', borderColor: colors.tint + '24' },
+                    ]}
+                  >
+                    <ThemedText style={[styles.helperText, styles.integrationNoticeText, { color: colors.textSecondary }]}>
+                      Apple Health and Google Fit are ripening soon — stay tuned. 🥑
+                    </ThemedText>
+                  </View>
                 </>
               )}
 
@@ -1355,6 +1365,16 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: FontSize.xs,
+    fontWeight: '500',
+  },
+  integrationNoticeRow: {
+    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+  },
+  integrationNoticeText: {
     fontWeight: '500',
   },
   // Tighten spacing between Activity → hint → TDEE (without affecting other sections).

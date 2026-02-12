@@ -2,10 +2,10 @@ import { BURNED } from '@/constants/constraints';
 import { computeSystemBurnedDefaults } from '@/lib/domain/burned/systemBurnedDefaults';
 import { getUserConfig } from '@/lib/services/userConfig';
 import {
-  fetchLatestWeighInAtOrBefore,
-  fetchNextWeighInAfter,
-  fetchWeightLogsRange,
-  type WeightLogRow,
+    fetchLatestWeighInAtOrBefore,
+    fetchNextWeighInAfter,
+    fetchWeightLogsRange,
+    type WeightLogRow,
 } from '@/lib/services/weightLogs';
 import { addDays, getTodayKey, toDateKey } from '@/utils/dateKey';
 import type { DailySumBurned } from '@/utils/types';
@@ -113,11 +113,17 @@ export async function refreshBurnedFromWeightChange(params: {
       }
     }
 
+    const nowIso = new Date().toISOString();
     const updates: Partial<DailySumBurned> = {
       system_bmr_cal: defaults.system_bmr_cal,
       system_active_cal: defaults.system_active_cal,
       system_tdee_cal: defaults.system_tdee_cal,
     };
+
+    // Option 2 invariant: every row must have raw_burn and raw_burn_source NOT NULL.
+    // Always send them on every update so the constraint cannot fail (avoids partial-update/legacy nulls).
+    const safeRawBurn = row.raw_burn ?? row.active_cal ?? row.system_active_cal ?? 0;
+    const safeRawSource = row.raw_burn_source ?? 'legacy_backfill';
 
     if (!isOverridden) {
       updates.bmr_cal = defaults.system_bmr_cal;
@@ -128,11 +134,20 @@ export async function refreshBurnedFromWeightChange(params: {
       updates.raw_burn = defaults.system_active_cal;
       updates.raw_tdee = null;
       updates.raw_burn_source = 'system';
-      updates.raw_last_synced_at = null;
+      // Compatibility with both legacy 3-state and Option 2 invariants:
+      // when pct=0 and raw_burn is present, legacy schemas require non-null synced_at.
+      updates.raw_last_synced_at = row.raw_last_synced_at ?? nowIso;
       updates.bmr_overridden = false;
       updates.active_overridden = false;
       updates.tdee_overridden = false;
       updates.is_overridden = false;
+    } else {
+      updates.raw_burn = safeRawBurn;
+      updates.raw_burn_source = safeRawSource;
+      // Keep legacy invariant valid for overridden rows when pct=0 and RAW is present.
+      if ((row.burn_reduction_pct_int ?? 0) === 0) {
+        updates.raw_last_synced_at = row.raw_last_synced_at ?? nowIso;
+      }
     }
 
     const res = await updateDailySumBurnedById({
@@ -175,11 +190,16 @@ export async function refreshBurnedTodayFromProfileChange(userId: string): Promi
   if (!defaults) return null;
 
   const isOverridden = Boolean(existing.is_overridden);
+  const nowIso = new Date().toISOString();
   const updates: Partial<DailySumBurned> = {
     system_bmr_cal: defaults.system_bmr_cal,
     system_active_cal: defaults.system_active_cal,
     system_tdee_cal: defaults.system_tdee_cal,
   };
+
+  // Option 2 invariant: every row must have raw_burn and raw_burn_source NOT NULL; always send them.
+  const safeRawBurn = existing.raw_burn ?? existing.active_cal ?? existing.system_active_cal ?? 0;
+  const safeRawSource = existing.raw_burn_source ?? 'legacy_backfill';
 
   if (!isOverridden) {
     updates.bmr_cal = defaults.system_bmr_cal;
@@ -190,11 +210,18 @@ export async function refreshBurnedTodayFromProfileChange(userId: string): Promi
     updates.raw_burn = defaults.system_active_cal;
     updates.raw_tdee = null;
     updates.raw_burn_source = 'system';
-    updates.raw_last_synced_at = null;
+    // Compatibility with both legacy 3-state and Option 2 invariants.
+    updates.raw_last_synced_at = existing.raw_last_synced_at ?? nowIso;
     updates.bmr_overridden = false;
     updates.active_overridden = false;
     updates.tdee_overridden = false;
     updates.is_overridden = false;
+  } else {
+    updates.raw_burn = safeRawBurn;
+    updates.raw_burn_source = safeRawSource;
+    if ((existing.burn_reduction_pct_int ?? 0) === 0) {
+      updates.raw_last_synced_at = existing.raw_last_synced_at ?? nowIso;
+    }
   }
 
   return (

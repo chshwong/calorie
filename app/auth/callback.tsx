@@ -1,23 +1,24 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useTranslation } from 'react-i18next';
-import { exchangeCodeForSession, getSession, getUser, signOut } from '@/lib/services/auth';
-import { hardReloadNow } from '@/lib/hardReload';
-import { withTimeout } from '@/lib/withTimeout';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemedView } from '@/components/themed-view';
 import { showAppToast } from '@/components/ui/app-toast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-  clearPendingLinkState,
-  getPendingLinkState,
-  isPendingLinkExpired,
-  setPendingLinkState,
+    clearPendingLinkState,
+    getPendingLinkState,
+    isPendingLinkExpired,
+    setPendingLinkState,
 } from '@/lib/auth/oauth';
+import { hardReloadNow } from '@/lib/hardReload';
+import { exchangeCodeForSession, getSession, getUser, signOut } from '@/lib/services/auth';
+import { logAppError } from '@/lib/services/founderAnalytics';
+import { withTimeout } from '@/lib/withTimeout';
+import { useTranslation } from 'react-i18next';
 
 function isAccountExistsError(error: string, description?: string) {
   const s = `${error} ${description ?? ''}`.toLowerCase();
@@ -208,6 +209,17 @@ export default function AuthCallbackScreen() {
         clearPendingLinkState();
         router.replace('/(tabs)');
       } catch (e: any) {
+        await logAppError({
+          error_type: 'auth',
+          severity: 'error',
+          message: e?.message ?? 'auth callback failed',
+          meta: {
+            source: 'auth_callback',
+            hasCode: Boolean(code),
+            oauthError: oauthError ?? null,
+            isTimeout: String(e?.message ?? '').includes('timed out'),
+          },
+        });
         setBusy(false);
         // Check if it's a timeout error
         const isTimeout = e?.message?.includes('timed out');

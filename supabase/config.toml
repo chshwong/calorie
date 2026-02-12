@@ -19,3 +19,9 @@ verify_jwt = false
 [functions.delete-auth-user]
 verify_jwt = false
 
+[functions.founder-digest]
+verify_jwt = false
+
+[functions.founder-notify]
+verify_jwt = false
+

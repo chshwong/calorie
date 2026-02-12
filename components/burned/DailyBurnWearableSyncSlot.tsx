@@ -7,6 +7,7 @@ import { showAppToast } from '@/components/ui/app-toast';
 import { Colors, FontSize, FontWeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserConfig } from '@/hooks/use-user-config';
+import { logAppError } from '@/lib/services/founderAnalytics';
 import { getButtonAccessibilityProps } from '@/utils/accessibility';
 
 type Props = {
@@ -122,6 +123,17 @@ export function DailyBurnWearableSyncSlot({
         stopPhaseRotation();
         setStatus('idle');
       }
+      await logAppError({
+        error_type: 'sync',
+        severity: 'error',
+        message: String((error as { message?: string })?.message ?? 'fitbit sync failed'),
+        meta: {
+          source: 'daily_burn_wearable_sync_slot',
+          variant,
+          syncWeight,
+          syncSteps,
+        },
+      });
       handleErrorToast(error);
     }
   };
