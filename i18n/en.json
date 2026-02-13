@@ -39,7 +39,8 @@
     "accept": "Accept",
     "decline": "Decline",
     "pending": "Pending",
-    "someone": "Someone"
+    "someone": "Someone",
+    "got_it": "Got it"
   },
   "native": {
     "exit_app": {
@@ -90,6 +91,19 @@
     "label": "AvoScore",
     "label_per_100g": "AvoScore (per 100g)",
     "label_per_100ml": "AvoScore (per 100ml)",
+    "modal": {
+      "title": "AvoScore",
+      "section_grades": "The Grades",
+      "section_what": "What is AvoScore?",
+      "grade": {
+        "A": "You love your body. Broccoli runs in your blood.",
+        "B": "Strong choice. Keep it up.",
+        "C": "Decent. Some room to improve.",
+        "D": "Not great balance. Try to limit these.",
+        "F": "Mostly energy, little nutrition. Best kept occasional."
+      },
+      "body": "AvoScore is AvoVibe's quick nutrition snapshot.\nIt grades foods and meals based on macro balance — protein, fiber, fat quality, sugar, and sodium — relative to energy.\nIt's for perspective, not perfection. Not medical advice and not affiliated with any health authority.\nAvoScore does not evaluate micronutrients, ingredient quality, processing level, allergies, dietary needs, medical conditions, or food volume.\nIt's usually more meaningful for a full meal than a single ingredient."
+    },
     "reasons": {
       "high_protein": "✅High protein",
       "high_fiber": "✅High fiber",
@@ -1458,6 +1472,7 @@
       "notifications": "Notifications",
       "notifications_subtitle": "Enable push notifications",
       "language_english": "English",
+      "language_more_coming_soon": "French and other languages coming soon",
       "language_french": "Fran├ºais",
       "units": "Units",
       "units_metric": "Metric (kg, cm)",

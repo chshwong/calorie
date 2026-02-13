@@ -8,21 +8,22 @@
  * - Theme-aware colors (light/dark mode)
  */
 
-import React, { useMemo } from 'react';
-import { View, StyleSheet, ViewStyle, Text } from 'react-native';
-import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import {
-  Colors,
-  BorderRadius,
-  FontSize,
-  FontWeight,
-  Nudge,
-  Spacing,
+    BorderRadius,
+    Colors,
+    FontSize,
+    FontWeight,
+    Nudge,
+    Spacing,
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTranslation } from 'react-i18next';
 import type { AvoScoreGrade } from '@/utils/avoScore';
+import { getAvoScoreGradeColor } from '@/utils/avoScoreColors';
 import { getMacroColors } from '@/utils/macroColors';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 
 type MacroCompositionDonutChartProps = {
   gramsCarbTotal: number;
@@ -40,6 +41,8 @@ type MacroCompositionDonutChartProps = {
   centerLabel?: string; // default "AvoScore"
   centerReasons?: string[]; // 1-2 callouts rendered in overlay at donut center
   getGradeColor?: (grade: AvoScoreGrade, colors: typeof Colors.light | typeof Colors.dark) => string;
+  /** When set, the center grade/label becomes pressable (e.g. to open AvoScore info modal). */
+  onCenterPress?: () => void;
   style?: ViewStyle;
 };
 
@@ -113,6 +116,7 @@ export function MacroCompositionDonutChart({
   centerLabel,
   centerReasons,
   getGradeColor,
+  onCenterPress,
   style,
 }: MacroCompositionDonutChartProps) {
   const { t } = useTranslation();
@@ -194,19 +198,7 @@ export function MacroCompositionDonutChart({
   const gradeColor = useMemo(() => {
     if (!centerGrade) return colors.text;
     if (getGradeColor) return getGradeColor(centerGrade, colors);
-    switch (centerGrade) {
-      case 'A':
-        return colors.gradeA;
-      case 'B':
-        return colors.gradeB;
-      case 'C':
-        return colors.gradeC;
-      case 'D':
-        return colors.gradeD;
-      case 'F':
-      default:
-        return colors.gradeF;
-    }
+    return getAvoScoreGradeColor(centerGrade, colors);
   }, [centerGrade, colors, getGradeColor]);
 
   // Calculate inner ring segments
@@ -458,9 +450,10 @@ export function MacroCompositionDonutChart({
     );
   }
 
+  const containerPointerEvents = onCenterPress ? 'box-none' : 'none';
+
   return (
-    // Important: disable pointer events so the surrounding ScrollView can scroll.
-    <View pointerEvents="none" style={[styles.container, style]}>
+    <View pointerEvents={containerPointerEvents} style={[styles.container, style]}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {/* Inner ring segments */}
         {innerSegments.map((segment, idx) => {
@@ -608,31 +601,48 @@ export function MacroCompositionDonutChart({
         })}
       </View>
 
-      {/* Center overlay (always on top of the SVG) */}
+      {/* Center overlay (always on top of the SVG); pressable when onCenterPress is provided */}
       {centerGrade ? (
-        <View style={[styles.centerOverlay, { width: size, height: size }]}>
-          <View style={[styles.centerInner, { maxWidth: innerInnerR * 2 - 12 }]}>
-            <Text style={[styles.centerGradeText, { color: gradeColor }]}>{centerGrade}</Text>
-            <Text style={[styles.centerLabelText, { color: colors.text }]}>{centerLabelText}</Text>
-            {reasons.length > 0 ? (
-              <View style={styles.centerReasonsRow}>
-                {reasons.map((r) => (
-                  <View
-                    key={r}
-                    style={[
-                      styles.centerReasonChip,
-                      { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                    ]}
-                  >
-                    <Text style={[styles.centerReasonChipText, { color: colors.textSecondary }]}>
-                      {r}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        </View>
+        (() => {
+          const centerContent = (
+            <View style={[styles.centerInner, { maxWidth: innerInnerR * 2 - 12 }]}>
+              <Text style={[styles.centerGradeText, { color: gradeColor }]}>{centerGrade}</Text>
+              <Text style={[styles.centerLabelText, { color: colors.text }]}>{centerLabelText}</Text>
+              {reasons.length > 0 ? (
+                <View style={styles.centerReasonsRow}>
+                  {reasons.map((r) => (
+                    <View
+                      key={r}
+                      style={[
+                        styles.centerReasonChip,
+                        { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                      ]}
+                    >
+                      <Text style={[styles.centerReasonChipText, { color: colors.textSecondary }]}>
+                        {r}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          );
+          const overlayStyle = [styles.centerOverlay, { width: size, height: size }];
+          if (onCenterPress) {
+            return (
+              <Pressable
+                style={overlayStyle}
+                onPress={onCenterPress}
+                accessibilityRole="button"
+                accessibilityLabel="AvoScore info"
+                {...(Platform.OS === 'web' && { cursor: 'pointer' })}
+              >
+                {centerContent}
+              </Pressable>
+            );
+          }
+          return <View style={overlayStyle}>{centerContent}</View>;
+        })()
       ) : null}
     </View>
   );

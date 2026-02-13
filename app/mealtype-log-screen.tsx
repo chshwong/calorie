@@ -1,3 +1,4 @@
+import { AvoScoreInfoModal } from '@/components/avoScore/AvoScoreInfoModal';
 import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
 import { FoodSearchBar } from '@/components/food-search-bar';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -313,6 +314,7 @@ export default function LogFoodScreen() {
   const [bundleToAdd, setBundleToAdd] = useState<Bundle | null>(null);
   const [customFoodToDelete, setCustomFoodToDelete] = useState<FoodMaster | null>(null);
   const [bundleWarningData, setBundleWarningData] = useState<{ food: FoodMaster; bundleNames: string; bundleCount: number } | null>(null);
+  const [isAvoScoreInfoOpen, setIsAvoScoreInfoOpen] = useState(false);
   
   // Entry details preference managed by custom hook
   const { showEntryDetails, setShowEntryDetails, toggleAnimation, loading: loadingDetailsPreference } = useEntryDetailsPreference();
@@ -2753,6 +2755,7 @@ export default function LogFoodScreen() {
                   centerGrade={avo.grade}
                   centerLabel="avo_score.label"
                   centerReasons={avo.reasons}
+                  onCenterPress={() => setIsAvoScoreInfoOpen(true)}
                 />
               </View>
             </>
@@ -2822,6 +2825,11 @@ export default function LogFoodScreen() {
           </View>
         </>
       )}
+
+      <AvoScoreInfoModal
+        isOpen={isAvoScoreInfoOpen}
+        onClose={() => setIsAvoScoreInfoOpen(false)}
+      />
       
       {/* Barcode Scanner Modal - Always rendered unconditionally, visibility controlled by showBarcodeScanner state */}
       <Modal

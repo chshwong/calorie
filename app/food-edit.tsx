@@ -1,3 +1,4 @@
+import { AvoScoreInfoModal } from '@/components/avoScore/AvoScoreInfoModal';
 import { MacroCompositionDonutChart } from '@/components/charts/MacroCompositionDonutChart';
 import { NumberInput } from '@/components/input/NumberInput';
 import { DesktopPageContainer } from '@/components/layout/desktop-page-container';
@@ -150,6 +151,7 @@ export default function FoodEditScreen() {
   const [initializing, setInitializing] = useState(mode === 'create');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAvoScoreInfoOpen, setIsAvoScoreInfoOpen] = useState(false);
 
   useEffect(() => {
     if (!user?.id || !initialEntry) return;
@@ -1316,6 +1318,7 @@ export default function FoodEditScreen() {
                     : 'avo_score.label_per_100g'
                 }
                 centerReasons={avo.reasons}
+                onCenterPress={() => setIsAvoScoreInfoOpen(true)}
               />
             </View>
 
@@ -1413,6 +1416,11 @@ export default function FoodEditScreen() {
           visible={portionGuideVisible}
           onClose={() => setPortionGuideVisible(false)}
           defaultTab={portionGuideDefaultTab}
+        />
+
+        <AvoScoreInfoModal
+          isOpen={isAvoScoreInfoOpen}
+          onClose={() => setIsAvoScoreInfoOpen(false)}
         />
 
       <ConfirmModal

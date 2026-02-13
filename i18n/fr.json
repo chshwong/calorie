@@ -27,6 +27,7 @@
     "go_back": "Retour",
     "not_set": "Non défini",
     "no_target": "Aucun objectif",
+    "got_it": "Compris",
     "accept": "Accepter",
     "decline": "Refuser",
     "pending": "En attente",
@@ -77,6 +78,19 @@
     "label": "AvoScore",
     "label_per_100g": "AvoScore (pour 100 g)",
     "label_per_100ml": "AvoScore (pour 100 ml)",
+    "modal": {
+      "title": "AvoScore",
+      "section_grades": "Les notes",
+      "section_what": "Qu'est-ce que l'AvoScore ?",
+      "grade": {
+        "A": "Tu aimes ton corps. Le brocoli coule dans tes veines.",
+        "B": "Bon choix. Continue.",
+        "C": "Correct. Une marge de progrès.",
+        "D": "Pas très équilibré. À limiter.",
+        "F": "Surtout de l'énergie, peu de nutrition. À garder occasionnel."
+      },
+      "body": "L'AvoScore est l'aperçu nutritionnel rapide d'AvoVibe.\nIl note les aliments et les repas selon l'équilibre des macros — protéines, fibres, qualité des lipides, sucre et sodium — par rapport à l'énergie.\nC'est pour la perspective, pas la perfection. Pas un avis médical et non affilié à une autorité de santé.\nL'AvoScore n'évalue pas les micronutriments, la qualité des ingrédients, le niveau de transformation, les allergies, les régimes, les conditions médicales ou le volume alimentaire.\nIl est généralement plus parlant pour un repas complet que pour un seul ingrédient."
+    },
     "reasons": {
       "high_protein": "✅Riche en protéines",
       "high_fiber": "✅Riche en fibres",
@@ -1044,6 +1058,7 @@
       "title": "Préférences",
       "language": "Langue",
       "language_english": "English",
+      "language_more_coming_soon": "French and other languages coming soon",
       "language_french": "Français",
       "units": "Unités",
       "units_metric": "Métrique (kg, cm)",
