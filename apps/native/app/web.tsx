@@ -109,6 +109,7 @@ export function WrappedWebView({
   const injectedJavaScriptBeforeContentLoaded = useMemo(() => {
     const platform = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : Platform.OS;
     return `
+      window.__AVOVIBE_NATIVE__ = true;
       window.__AVOVIBE_CONTAINER__ = { type: ${JSON.stringify(containerType)}, platform: ${JSON.stringify(platform)} };
       (function () {
         try {

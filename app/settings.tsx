@@ -10,9 +10,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { resetTour } from '@/features/tour/storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLegalDocuments } from '@/hooks/use-legal-documents';
-import { useUnreadNotificationCount } from '@/hooks/use-notifications';
-import { useUpdateProfile } from '@/hooks/use-profile-mutations';
 import { useUserConfig } from '@/hooks/use-user-config';
+import { isNativeWebView } from '@/lib/env/isNativeWebView';
 import { openMyGoalEdit } from '@/lib/navigation/my-goal';
 import { openWeightEntryForToday } from '@/lib/navigation/weight';
 import { deleteUserAccountData } from '@/lib/services/accountDeletion';
@@ -41,7 +40,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { languageNames, setLanguage, SupportedLanguage } from '../i18n';
 
 export default function SettingsScreen() {
   const APP_VERSION =
@@ -61,7 +59,7 @@ export default function SettingsScreen() {
         : null);
 
   const APP_VERSION_LABEL = APP_BUILD ? `${APP_VERSION} (${APP_BUILD})` : APP_VERSION;
-  const { t, i18n: i18nInstance } = useTranslation();
+  const { t } = useTranslation();
   const { signOut, user } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
   const insets = useSafeAreaInsets();
@@ -127,8 +125,6 @@ export default function SettingsScreen() {
   // Use React Query hooks for user config data (shared cache with Home screen)
   const { data: userConfig, isLoading: userConfigLoading } = useUserConfig();
   const profile = userConfig; // Alias for backward compatibility in this file
-  const updateProfileMutation = useUpdateProfile();
-  const { data: unreadCount = 0 } = useUnreadNotificationCount();
   
   // Fetch legal documents for version display
   const { data: legalDocuments = [] } = useLegalDocuments();
@@ -142,16 +138,12 @@ export default function SettingsScreen() {
   const firstName =
     (profile?.first_name ?? '').trim() || t('settings.profile_section.user_fallback');
   const email = profile?.email || user?.email || '';
-  const showUnreadBadge = unreadCount > 0;
   const isAdmin = !!profile?.is_admin;
   const [isFounder, setIsFounder] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
   useEffect(() => {
     setAvatarUrl(profile?.avatar_url ?? null);
   }, [profile?.avatar_url]);
-  
-  // Use i18n's current language as the source of truth
-  const currentLanguage = (i18nInstance.language as SupportedLanguage) || 'en';
   
   const [settings, setSettings] = useState<SettingsPreferences>({
     notifications: true,
@@ -248,24 +240,6 @@ export default function SettingsScreen() {
     } finally {
       setRestartTourLoading(false);
     }
-  };
-
-  const handleLanguageChange = async () => {
-    const newLanguage: SupportedLanguage = currentLanguage === 'en' ? 'fr' : 'en';
-    await setLanguage(newLanguage);
-    
-    // Save language preference to database using mutation (updates cache automatically)
-    if (user?.id && profile) {
-      try {
-        await updateProfileMutation.mutateAsync({
-          language_preference: newLanguage,
-        });
-      } catch (err) {
-        console.error('Error saving language preference:', err);
-        Alert.alert(t('alerts.error_title'), t('settings.errors.save_language_failed'));
-      }
-    }
-    // The UI will update automatically via useTranslation hook
   };
 
   const handleLogout = async () => {
@@ -550,37 +524,13 @@ export default function SettingsScreen() {
         {/* Preferences */}
         <SettingSection title={t('settings.preferences.title')}>
           <SettingItem
-            icon="bell.fill"
-            title={t('inbox.title')}
-            subtitle={t('inbox.settings_subtitle')}
-            onPress={() => {
-              appRouter.push('/inbox');
-            }}
-            rightComponent={
-              <View style={styles.settingRight}>
-                {showUnreadBadge && (
-                  <View style={[styles.unreadBadge, { backgroundColor: colors.tint }]}>
-                    <ThemedText style={[styles.unreadBadgeText, { color: colors.textOnTint }]}>
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </ThemedText>
-                  </View>
-                )}
-                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
-              </View>
-            }
-          />
-          <SettingItem
             icon="globe"
             title={t('settings.preferences.language')}
-            subtitle={languageNames[currentLanguage]}
-            onPress={handleLanguageChange}
+            subtitle={t('settings.preferences.language_more_coming_soon')}
             rightComponent={
-              <View style={styles.switchContainer}>
-                <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
-                  {languageNames[currentLanguage]}
-                </Text>
-                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
-              </View>
+              <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
+                {t('settings.preferences.language_english')}
+              </Text>
             }
           />
           <SettingItem
@@ -600,23 +550,25 @@ export default function SettingsScreen() {
               </Text>
             }
           />
-          <SettingItem
-            icon="bell.fill"
-            title={t('settings.preferences.notifications')}
-            subtitle={t('settings.preferences.notifications_subtitle')}
-            onPress={() => {
-              saveSettings({ ...settings, notifications: !settings.notifications });
-            }}
-            rightComponent={
-              <Switch
-                value={settings.notifications}
-                onValueChange={(value) => saveSettings({ ...settings, notifications: value })}
-                trackColor={{ false: colors.border, true: colors.tint + '60' }}
-                thumbColor={settings.notifications ? colors.tint : colors.textTertiary}
-              />
-            }
-            showChevron={false}
-          />
+          {isNativeWebView() && (
+            <SettingItem
+              icon="bell.fill"
+              title={t('settings.preferences.notifications')}
+              subtitle={t('settings.preferences.notifications_subtitle')}
+              onPress={() => {
+                saveSettings({ ...settings, notifications: !settings.notifications });
+              }}
+              rightComponent={
+                <Switch
+                  value={settings.notifications}
+                  onValueChange={(value) => saveSettings({ ...settings, notifications: value })}
+                  trackColor={{ false: colors.border, true: colors.tint + '60' }}
+                  thumbColor={settings.notifications ? colors.tint : colors.textTertiary}
+                />
+              }
+              showChevron={false}
+            />
+          )}
         </SettingSection>
 
         {isAdmin && (
@@ -977,31 +929,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.7,
   },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   switchLabel: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  settingRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   logoutButton: {
     flexDirection: 'row',
