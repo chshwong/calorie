@@ -305,6 +305,31 @@ function formatMealEntryLabel(entry: CalorieEntry): string {
   return `${quantity} x ${entry.unit} ${entry.item_name}`;
 }
 
+function rgbaFromHex(hex: string, alpha: number): string {
+  const a = Number.isFinite(alpha) ? Math.min(1, Math.max(0, alpha)) : 1;
+  const raw = (hex ?? "").trim();
+  if (!raw.startsWith("#")) return raw;
+
+  const h = raw.slice(1);
+  const expanded =
+    h.length === 3
+      ? `${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`
+      : h.length === 6
+        ? h
+        : h.length === 8
+          ? h.slice(0, 6)
+          : null;
+
+  if (!expanded) return raw;
+
+  const r = parseInt(expanded.slice(0, 2), 16);
+  const g = parseInt(expanded.slice(2, 4), 16);
+  const b = parseInt(expanded.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return raw;
+
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 type MealViewMode = 'collapsed' | 'semi' | 'expanded';
 const DEFAULT_MEAL_VIEW_MODE: MealViewMode = 'semi';
 const CAL_COL_WIDTH = 72; // Fixed width for calorie column alignment
@@ -338,8 +363,16 @@ export default function FoodLogHomeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const scheme = colorScheme ?? 'light';
+  const colors = Colors[scheme];
   const [refreshing, setRefreshing] = useState(false);
+
+  const mealHeaderBg = scheme === 'dark' ? rgbaFromHex(colors.tint, 0.12) : rgbaFromHex(colors.tint, 0.08);
+  // De-emphasize title pill so the full-row highlight is the primary cue.
+  const mealTypeBadgeBg = scheme === 'dark' ? rgbaFromHex(colors.tint, 0.08) : rgbaFromHex(colors.tint, 0.05);
+  // Keep empty-state breakfast emphasis behavior (only tint implementation changes).
+  const emptyBreakfastBadgeBg = scheme === 'dark' ? rgbaFromHex(colors.tint, 0.21) : rgbaFromHex(colors.tint, 0.13);
+  const emptyBreakfastBadgeBorder = rgbaFromHex(colors.tint, 0.31);
 
   // Tour wiring (Home tour)
   const { startTour, registerScrollContainer, activeTourId, registerOnStepChange, requestRemeasure, stepIndex, steps } =
@@ -1929,6 +1962,7 @@ export default function FoodLogHomeScreen() {
                         style={styles.mealGroupContainer}
                       >
                       {/* Meal Type Header with Totals and Log Food Button */}
+                      <View style={[styles.mealGroupHeaderHighlight, { backgroundColor: mealHeaderBg }]}>
                       <View style={styles.mealGroupHeader}>
                         <View style={styles.mealGroupHeaderLeft}>
                           {(mealType === 'lunch') ? (
@@ -1944,7 +1978,7 @@ export default function FoodLogHomeScreen() {
                                   styles.mealTypeBadge, 
                                   getMinTouchTargetStyle(),
                                   { 
-                                    backgroundColor: colorScheme === 'dark' ? colors.tint + '25' : colors.tint + '12',
+                                    backgroundColor: mealTypeBadgeBg,
                                     ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
                                   }
                                 ]}
@@ -1991,9 +2025,15 @@ export default function FoodLogHomeScreen() {
                                 styles.mealTypeBadge,
                                 getMinTouchTargetStyle(),
                                 {
-                                  backgroundColor: colorScheme === 'dark' ? colors.tint + '25' : colors.tint + '12',
+                                  backgroundColor: mealTypeBadgeBg,
                                   ...(Platform.OS === 'web' ? getFocusStyle(colors.tint) : {}),
-                                  ...(isFoodLogEmpty && mealType === 'breakfast' ? { backgroundColor: colorScheme === 'dark' ? colors.tint + '35' : colors.tint + '20', borderWidth: 1, borderColor: colors.tint + '50' } : {}),
+                                  ...(isFoodLogEmpty && mealType === 'breakfast'
+                                    ? {
+                                        backgroundColor: emptyBreakfastBadgeBg,
+                                        borderWidth: 1,
+                                        borderColor: emptyBreakfastBadgeBorder,
+                                      }
+                                    : {}),
                                 }
                               ]}
                               onPress={() => {
@@ -2130,6 +2170,7 @@ export default function FoodLogHomeScreen() {
                             <IconSymbol name="ellipsis" size={20} color={colors.textSecondary} decorative />
                           </TouchableOpacity>
                         </View>
+                      </View>
                       </View>
 
                       {isFoodLogEmpty ? (
@@ -2997,6 +3038,14 @@ const styles = StyleSheet.create({
     marginTop: Platform.select({ web: 0, default: 0 }),
     marginBottom: Platform.select({ web: 0, default: 0 }),
     opacity: 0.6,
+  },
+  mealGroupHeaderHighlight: {
+    alignSelf: 'stretch',
+    width: '100%',
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   mealGroupHeader: {
     flexDirection: 'row',
