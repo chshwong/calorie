@@ -10,41 +10,41 @@ import { mapCaloriePlanToDb } from '@/lib/onboarding/calorie-plan';
 import { getSuggestedTargetWeightLb } from '@/lib/onboarding/goal-weight-rules';
 import { validateGoalWeight as validateGoalWeightNew } from '@/lib/onboarding/goal-weight-validation';
 import {
-    flushDraftSave,
-    getLastDraftError,
-    scheduleDraftSave,
-    type OnboardingDraft
+  flushDraftSave,
+  getLastDraftError,
+  scheduleDraftSave,
+  type OnboardingDraft
 } from '@/lib/onboarding/onboarding-draft-sync';
 import { onboardingFlagStore } from '@/lib/onboardingFlagStore';
 import { setPersistentCache } from '@/lib/persistentCache';
 import { insertWeightLogAndUpdateProfile } from '@/lib/services/weightLog';
 import {
-    convertHeightToCm,
-    kgToLb,
-    lbToKg,
-    roundTo1,
-    roundTo2,
-    roundTo3,
+  convertHeightToCm,
+  kgToLb,
+  lbToKg,
+  roundTo1,
+  roundTo2,
+  roundTo3,
 } from '@/utils/bodyMetrics';
 import { ActivityLevel, ageFromDob, calculateBMR, calculateSafeCalorieTarget, calculateTDEE } from '@/utils/calculations';
 import {
-    filterPreferredNameInput,
-    normalizeSpaces
+  filterPreferredNameInput,
+  normalizeSpaces
 } from '@/utils/inputFilters';
 import { checkProfanity } from '@/utils/profanity';
 import {
-    validateActivityLevel as validateActivityLevelUtil,
-    validateBodyFatPercent as validateBodyFatPercentUtil,
-    validateDateOfBirth,
-    validateGoal as validateGoalUtil,
-    validateHeightCm as validateHeightCmUtil,
-    validatePreferredName,
-    validateSex as validateSexUtil,
-    validateWeightKg as validateWeightKgUtil
+  validateActivityLevel as validateActivityLevelUtil,
+  validateBodyFatPercent as validateBodyFatPercentUtil,
+  validateDateOfBirth,
+  validateGoal as validateGoalUtil,
+  validateHeightCm as validateHeightCmUtil,
+  validatePreferredName,
+  validateSex as validateSexUtil,
+  validateWeightKg as validateWeightKgUtil
 } from '@/utils/validation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Dimensions, Platform } from 'react-native';
 
@@ -60,11 +60,20 @@ export function useOnboardingForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 12; // Steps 1-12: ... Daily Focus Targets, Module Preferences, Plan, Legal Agreement
   
-  const isNativeWrapperWeb = useMemo(() => {
-    if (Platform.OS !== 'web') return false;
-    if (typeof window === 'undefined') return false;
-    const type = String((window as any).__AVOVIBE_CONTAINER__?.type ?? '');
-    return type === 'native' || type === 'native_onboarding';
+  // Container type is only defined in web builds; in native it will be empty.
+  const containerType = useMemo(() => {
+    if (Platform.OS !== 'web') return '';
+    if (typeof window === 'undefined') return '';
+    return String((window as any).__AVOVIBE_CONTAINER__?.type ?? '');
+  }, []);
+
+  // Native onboarding WebView only: skip Plan step (step 11).
+  const skipPlanStep = containerType === 'native_onboarding';
+
+  const isNativeWrapperWeb = containerType === 'native' || containerType === 'native_onboarding';
+
+  const goToStep = useCallback((step: number) => {
+    setCurrentStep(step);
   }, []);
 
   // Step 6: Goal
@@ -196,6 +205,13 @@ export function useOnboardingForm() {
     modulePrefsPrefilledRef.current = true;
     setModulePreferences(picks.slice(0, 2));
   }, [profile]);
+
+  // Guard: in native onboarding WebView, never allow Plan step to render/stick.
+  useEffect(() => {
+    if (!skipPlanStep) return;
+    if (currentStep !== 11) return;
+    goToStep(12);
+  }, [currentStep, goToStep, skipPlanStep]);
 
   // Canonical profile update mutation (React Query) per engineering guidelines
   const updateProfileMutation = useUpdateProfile();
@@ -1051,7 +1067,7 @@ export function useOnboardingForm() {
       handleCalorieTargetNext();
     } else if (currentStep === 9) {
       // Daily focus targets step - proceed to module preferences step
-      setCurrentStep(10);
+      goToStep(10);
     } else if (currentStep === 10) {
       // Module preferences step - save focus modules (Food is implied as #1), then proceed to legal
       if (user) {
@@ -1094,8 +1110,7 @@ export function useOnboardingForm() {
           focus_module_3: focus3,
         });
       }
-
-      setCurrentStep(11);
+      goToStep(skipPlanStep ? 12 : 11);
     } else if (currentStep === 11) {
       // Plan step - proceed to legal (toast nudge if Premium selected)
       if (selectedPlan === 'premium' && !premiumInsisted) {
@@ -1103,7 +1118,7 @@ export function useOnboardingForm() {
         const { showAppToast } = require('@/components/ui/app-toast');
         showAppToast(t('onboarding.plan.premium_next_nudge'));
       }
-      setCurrentStep(12);
+      goToStep(12);
     } else if (currentStep === 12) {
       // Legal agreement step - handled by handleProceedToLegal
       handleProceedToLegal();
@@ -1189,9 +1204,11 @@ export function useOnboardingForm() {
   
   const handleBack = () => {
     clearErrors();
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+    if (skipPlanStep && currentStep === 12) {
+      goToStep(10);
+      return;
     }
+    if (currentStep > 1) goToStep(currentStep - 1);
   };
   
   const handleCompleteOnboarding = async (options?: { markComplete?: boolean; navigateTo?: string }) => {

@@ -3,18 +3,18 @@ import { OnboardingErrorBox } from '@/components/onboarding/OnboardingErrorBox';
 import { OnboardingPrimaryButton } from '@/components/onboarding/OnboardingPrimaryButton';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import {
-    ActivityStep,
-    CurrentWeightStep,
-    DailyCalorieTargetStep,
-    DailyFocusTargetsStep,
-    GoalStep,
-    GoalWeightStep,
-    HeightStep,
-    LegalAgreementStep,
-    ModulePreferencesStep,
-    NameStep,
-    PlanStep,
-    SexStep,
+  ActivityStep,
+  CurrentWeightStep,
+  DailyCalorieTargetStep,
+  DailyFocusTargetsStep,
+  GoalStep,
+  GoalWeightStep,
+  HeightStep,
+  LegalAgreementStep,
+  ModulePreferencesStep,
+  NameStep,
+  PlanStep,
+  SexStep,
 } from '@/components/onboarding/steps';
 import { BlockingBrandedLoader } from '@/components/system/BlockingBrandedLoader';
 import { ThemedText } from '@/components/themed-text';
@@ -28,18 +28,18 @@ import { kgToLb } from '@/lib/domain/weight-constants';
 import { onboardingStyles } from '@/theme/onboardingStyles';
 import { onboardingColors } from '@/theme/onboardingTheme';
 import {
-    getButtonAccessibilityProps,
-    getFocusStyle,
+  getButtonAccessibilityProps,
+  getFocusStyle,
 } from '@/utils/accessibility';
 import { filterNumericInput } from '@/utils/inputFilters';
 import { Redirect } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Platform,
-    ScrollView,
-    TouchableOpacity,
-    View,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function OnboardingScreen() {
@@ -432,6 +432,12 @@ export default function OnboardingScreen() {
       />
     ),
   };
+
+  // Progress indicator remap for native onboarding WebView: skip Plan step (11).
+  const progressTotalSteps = isNativeOnboardingWrapper ? totalSteps - 1 : totalSteps;
+  const progressCurrentStep = isNativeOnboardingWrapper
+    ? (currentStep > 11 ? currentStep - 1 : currentStep)
+    : currentStep;
   
   return (
     <ThemedView style={[
@@ -481,7 +487,7 @@ export default function OnboardingScreen() {
             
             {/* Step Indicator - Right under the title */}
             <View style={[onboardingStyles.stepIndicatorTopContainer, { backgroundColor: colors.background }]}>
-              <StepIndicator currentStep={currentStep} totalSteps={totalSteps} colors={colors} />
+              <StepIndicator currentStep={progressCurrentStep} totalSteps={progressTotalSteps} colors={colors} />
             </View>
             
             <View style={onboardingStyles.cardContent}>

@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Platform, useColorScheme as useRNColorScheme } from 'react-native';
 
 type ThemeMode = 'light' | 'dark' | 'auto';
 
@@ -19,13 +18,38 @@ const ThemeContext = createContext<ThemeContextType>({
 
 const THEME_STORAGE_KEY = 'app_theme_mode';
 
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'auto';
+}
+
+function getInitialWebThemeMode(): ThemeMode {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'auto';
+  try {
+    const stored = window.localStorage?.getItem(THEME_STORAGE_KEY);
+    if (isThemeMode(stored)) return stored;
+  } catch {
+    // ignore storage failures and fall back to auto
+  }
+  return 'auto';
+}
+
+function getInitialWebColorScheme(themeMode: ThemeMode): 'light' | 'dark' {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'light';
+  if (themeMode !== 'auto') return themeMode;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useRNColorScheme();
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('auto');
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>('light');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => getInitialWebThemeMode());
+  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(() =>
+    getInitialWebColorScheme(getInitialWebThemeMode())
+  );
 
   // Load theme preference from storage
   useEffect(() => {
+    // Web initializes synchronously to avoid first-paint light flash.
+    if (Platform.OS === 'web') return;
     loadThemeMode();
   }, []);
 
@@ -46,9 +70,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       } else {
         stored = await SecureStore.getItemAsync(THEME_STORAGE_KEY);
       }
-      
-      if (stored && (stored === 'light' || stored === 'dark' || stored === 'auto')) {
-        setThemeModeState(stored as ThemeMode);
+
+      if (isThemeMode(stored)) {
+        setThemeModeState(stored);
       }
     } catch (error) {
       console.error('Error loading theme mode:', error);

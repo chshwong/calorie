@@ -33,6 +33,11 @@
     "pending": "En attente",
     "someone": "Quelqu’un"
   },
+  "loading_screen": {
+    "slow_hint_line1": "Ça prend trop de temps — on a fait tomber l’avocat. 🥑",
+    "slow_hint_line2": "Veuillez fermer complètement le navigateur et rouvrir AvoVibe.",
+    "slow_hint_line2_Native": "Veuillez fermer complètement l’application et rouvrir AvoVibe."
+  },
   "native": {
     "exit_app": {
       "title": "Quitter AvoVibe ?",

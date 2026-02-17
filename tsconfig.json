@@ -15,5 +15,5 @@
     "expo-env.d.ts",
     "react-native-web-refresh-control.d.ts",
     "types/**/*.d.ts"
-  ]
+, "apps/native/app/mealtype-log.tsx", "apps/native/app/onboarding.tsx"  ]
 }

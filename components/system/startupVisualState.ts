@@ -2,6 +2,7 @@ import { loadingQuotes } from '@/i18n/quotes/loadingQuotes';
 
 const STARTUP_TAGLINE_KEY = '__AVO_STARTUP_TAGLINE__';
 const STARTUP_TAGLINE_SESSION_KEY = 'avovibe_startup_tagline';
+const STARTUP_MASCOT_READY_KEY = '__AVO_STARTUP_MASCOT_READY__';
 
 function readFromServerRenderedDom(): string | null {
   if (typeof document === 'undefined') return null;
@@ -62,4 +63,14 @@ export function getStartupTagline(): string {
   globalStore[STARTUP_TAGLINE_KEY] = selected;
   writeToSessionStorage(selected);
   return selected;
+}
+
+export function isStartupMascotReady(): boolean {
+  const globalStore = globalThis as Record<string, unknown>;
+  return globalStore[STARTUP_MASCOT_READY_KEY] === true;
+}
+
+export function markStartupMascotReady(): void {
+  const globalStore = globalThis as Record<string, unknown>;
+  globalStore[STARTUP_MASCOT_READY_KEY] = true;
 }

@@ -11,13 +11,19 @@
 
 import BrandLogoMascotOnly from '@/components/brand/BrandLogoMascotOnly';
 import BrandLogoNameAndTag from '@/components/brand/BrandLogoNameAndTag';
-import { getStartupTagline } from '@/components/system/startupVisualState';
+import {
+  getStartupTagline,
+  isStartupMascotReady,
+  markStartupMascotReady,
+} from '@/components/system/startupVisualState';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Layout, Spacing } from '@/constants/theme';
+import { Colors, Layout, Nudge, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { isNativeWebView } from '@/lib/env/isNativeWebView';
+import type { LottieRefCurrentProps } from 'lottie-react';
 import Lottie from 'lottie-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dimensions, Platform, StyleSheet, View } from 'react-native';
 import animationData from '../../assets/lottie/Wobbling.json';
@@ -26,11 +32,28 @@ export default function LoadingScreen() {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const native = isNativeWebView();
+  const isWeb = Platform.OS === 'web';
+  const startupBackground = isWeb ? 'var(--startup-bg)' : colors.background;
+  const startupTextSecondary = isWeb ? 'var(--startup-text-secondary)' : colors.textSecondary;
   
   // Animated loading dots state
   const [dotsCount, setDotsCount] = useState(0);
   // Show hint after 5s if still on this screen (stuck state)
   const [showSlowHint, setShowSlowHint] = useState(false);
+  // Hydration guard so fallback only appears in pre-hydration first paint on web.
+  const [hasHydrated, setHasHydrated] = useState(false);
+  // Show static mascot until Lottie signals readiness.
+  const [lottieReady, setLottieReady] = useState(() => isStartupMascotReady());
+  const lottieRef = useRef<LottieRefCurrentProps | null>(null);
+
+  const handleLottieReady = useCallback(() => {
+    setLottieReady((prev) => {
+      if (prev) return prev;
+      markStartupMascotReady();
+      return true;
+    });
+  }, []);
 
   // Animate loading dots: 0 → 1 → 2 → 3 → 0 (loop)
   useEffect(() => {
@@ -47,6 +70,20 @@ export default function LoadingScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  // Web startup can hydrate with a paused first frame; explicitly kick playback.
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!lottieRef.current) return;
+    const id = requestAnimationFrame(() => {
+      lottieRef.current?.play();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [hasHydrated, lottieReady]);
+
   // Stable across startup remounts via global singleton.
   const quote = getStartupTagline();
 
@@ -56,9 +93,12 @@ export default function LoadingScreen() {
 
   // Loading text with animated dots (i18n compliant)
   const loadingText = t('common.loading') + '.'.repeat(dotsCount);
+  const slowHintLine2Key = native
+    ? 'loading_screen.slow_hint_line2_Native'
+    : 'loading_screen.slow_hint_line2';
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.container} lightColor={startupBackground} darkColor={startupBackground}>
       <View 
         style={[
           styles.contentContainer,
@@ -70,14 +110,28 @@ export default function LoadingScreen() {
           {/* Lottie Animation */}
           <View style={styles.lottieContainer}>
             <View style={styles.mascotStage}>
-              <View style={styles.mascotFallback}>
-                <BrandLogoMascotOnly width={200} />
-              </View>
+              {!lottieReady ? (
+                <View
+                  nativeID="startup-mascot-fallback"
+                  style={[
+                    styles.mascotFallback,
+                    hasHydrated ? styles.mascotFallbackHidden : null,
+                  ]}
+                  pointerEvents="none"
+                >
+                  <BrandLogoMascotOnly width={200} />
+                </View>
+              ) : null}
               <Lottie
                 animationData={animationData}
+                lottieRef={lottieRef}
                 style={styles.lottie}
                 loop={true}
                 autoplay={true}
+                onDOMLoaded={handleLottieReady}
+                onDataReady={handleLottieReady}
+                onLoadedImages={handleLottieReady}
+                onEnterFrame={handleLottieReady}
               />
             </View>
           </View>
@@ -90,7 +144,7 @@ export default function LoadingScreen() {
             <View style={styles.quoteWrapper}>
               <ThemedText
                 nativeID="startup-quote"
-                style={[styles.quoteText, { color: colors.textSecondary }]}
+                style={[styles.quoteText, { color: startupTextSecondary }]}
               >
                 {quote}
               </ThemedText>
@@ -108,7 +162,7 @@ export default function LoadingScreen() {
 
         {/* Loading text at bottom - separate from main column */}
         <View style={styles.loadingTextContainer}>
-          <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <ThemedText style={[styles.loadingText, { color: startupTextSecondary }]}>
             {loadingText}
           </ThemedText>
         </View>
@@ -116,11 +170,11 @@ export default function LoadingScreen() {
         {/* Slow-loading hint: show after 5s if still stuck */}
         {showSlowHint ? (
           <View style={styles.slowHintContainer}>
-            <ThemedText style={[styles.slowHintText, { color: colors.textSecondary }]}>
-              This is taking too long—we dropped the avocado. 🥑
+            <ThemedText style={[styles.slowHintText, { color: startupTextSecondary }]}>
+              {t('loading_screen.slow_hint_line1')}
             </ThemedText>
-            <ThemedText style={[styles.slowHintText, styles.slowHintTextSecond, { color: colors.textSecondary }]}>
-              Please close the browser completely and reopen AvoVibe.
+            <ThemedText style={[styles.slowHintText, styles.slowHintTextSecond, { color: startupTextSecondary }]}>
+              {t(slowHintLine2Key)}
             </ThemedText>
           </View>
         ) : null}
@@ -138,11 +192,11 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     width: '100%',
-    paddingHorizontal: Spacing.md, // 16px on mobile
+    paddingHorizontal: Spacing.md, // 12px on mobile
     alignItems: 'center',
     ...Platform.select({
       web: {
-        paddingHorizontal: Spacing.lg, // 24px on desktop
+        paddingHorizontal: Spacing.lg, // 16px on desktop
       },
     }),
   },
@@ -170,6 +224,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     opacity: 0.98,
   },
+  mascotFallbackHidden: {
+    opacity: 0,
+  },
   lottie: {
     width: 200,
     height: 200,
@@ -184,9 +241,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   quoteText: {
-    fontSize: Platform.select({ web: 14, default: 13 }),
+    ...Typography.bodySmall,
     textAlign: 'center',
-    lineHeight: Platform.select({ web: 20, default: 18 }),
     fontStyle: 'italic',
     opacity: 0.8,
   },
@@ -200,22 +256,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: Platform.select({
       web: Spacing['2xl'], // 24px
-      default: Spacing['2xl'] + 20, // 44px (24px + safe area)
+      default: Spacing['2xl'] + Spacing.xl, // 44px (24px + 20px)
     }),
     paddingTop: Spacing.lg, // 16px gap from logo
     minWidth: 100, // Fixed width to prevent layout shift
   },
   loadingText: {
-    fontSize: Platform.select({ web: 14, default: 13 }), // +2px from previous
+    ...Typography.bodySmall,
     textAlign: 'center',
     opacity: 0.65,
     marginTop: 0,
     marginBottom: 0,
-    fontFamily: Platform.select({
-      web: 'Inter, system-ui, sans-serif',
-      default: undefined, // Use system default on native
-    }),
-    letterSpacing: 0.5, // Slight spacing for better readability
   },
   slowHintContainer: {
     marginTop: Spacing.lg,
@@ -225,17 +276,12 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.lg,
   },
   slowHintText: {
+    ...Typography.bodySmall,
     textAlign: 'center',
-    fontSize: Platform.select({ web: 14, default: 13 }),
-    lineHeight: Platform.select({ web: 20, default: 18 }),
     opacity: 0.9,
-    fontFamily: Platform.select({
-      web: 'Inter, system-ui, sans-serif',
-      default: undefined,
-    }),
   },
   slowHintTextSecond: {
-    marginTop: 6,
+    marginTop: Spacing.xs + Nudge.px2,
   },
 });
 

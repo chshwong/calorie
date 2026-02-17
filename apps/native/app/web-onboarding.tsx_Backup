@@ -87,7 +87,7 @@ export default function WebOnboardingScreen() {
 
       const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
       return () => sub.remove();
-    }, [requestOnboardingStepBack])
+    }, [])
   );
 
   return (

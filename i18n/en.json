@@ -42,6 +42,11 @@
     "someone": "Someone",
     "got_it": "Got it"
   },
+  "loading_screen": {
+    "slow_hint_line1": "This is taking too long—we dropped the avocado. 🥑",
+    "slow_hint_line2": "Please close the browser completely and reopen AvoVibe.",
+    "slow_hint_line2_Native": "Please close the app completely and reopen AvoVibe."
+  },
   "native": {
     "exit_app": {
       "title": "Exit AvoVibe?",

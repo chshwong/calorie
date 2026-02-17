@@ -1,20 +1,10 @@
-import { useEffect, useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * Web color scheme comes from ThemeContext.
+ * ThemeContext now initializes synchronously on web to avoid light-mode flash.
  */
 export function useColorScheme(): 'light' | 'dark' {
-  const [hasHydrated, setHasHydrated] = useState(false);
   const { colorScheme } = useTheme();
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
+  return colorScheme;
 }
