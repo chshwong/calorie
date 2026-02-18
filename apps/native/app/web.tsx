@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   BackHandler,
+  Keyboard,
   Linking,
   Platform,
   StatusBar,
@@ -89,8 +90,17 @@ export function WrappedWebView({
   const [isReloading, setIsReloading] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
+  const [isOnboardingFromWeb, setIsOnboardingFromWeb] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isScrollingDown, setIsScrollingDown] = useState(false);
+  const [hideAfterReloadUntil, setHideAfterReloadUntil] = useState(0);
+  const [forceShow, setForceShow] = useState(false);
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadTriggeredByUserRef = useRef(false);
+  const loadStartTimeRef = useRef<number>(0);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startYRef = useRef<number | null>(null);
   const triggeredRef = useRef(false);
   const isReloadingRef = useRef(false);
@@ -102,6 +112,7 @@ export function WrappedWebView({
   const PULL_THRESHOLD = 50;
 
   const overlayAnim = useRef(new Animated.Value(0)).current;
+  const fabFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(overlayAnim, {
@@ -223,6 +234,21 @@ export function WrappedWebView({
       console.log("[WrappedWebView]", containerType, "msg:", data);
     }
 
+    try {
+      const parsed = JSON.parse(data) as { type?: string; isOnboarding?: boolean; isModalOpen?: boolean; direction?: string };
+      if (parsed?.type === "UI_STATE") {
+        if (typeof parsed.isOnboarding === "boolean") setIsOnboardingFromWeb(parsed.isOnboarding);
+        if (typeof parsed.isModalOpen === "boolean") setIsModalOpen(parsed.isModalOpen);
+        return;
+      }
+      if (parsed?.type === "UI_SCROLL" && (parsed.direction === "down" || parsed.direction === "up")) {
+        setIsScrollingDown(parsed.direction === "down");
+        return;
+      }
+    } catch {
+      // not JSON or other shape; continue to string handlers
+    }
+
     if (data === "REQUEST_NATIVE_SESSION") {
       // If we're forcing native login, do not continue the bridge loop.
       if (forcingNativeLoginRef.current) {
@@ -263,6 +289,26 @@ export function WrappedWebView({
     onWebMessage?.(data);
   }, [containerType, onWebMessage, sendNativeSession, session?.access_token, session?.refresh_token, signOut]);
 
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setIsKeyboardOpen(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setIsKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hideAfterReloadUntil <= 0) return;
+    const delay = hideAfterReloadUntil - Date.now();
+    if (delay <= 0) {
+      setHideAfterReloadUntil(0);
+      return;
+    }
+    const t = setTimeout(() => setHideAfterReloadUntil(0), delay);
+    return () => clearTimeout(t);
+  }, [hideAfterReloadUntil]);
+
   const openExternally = useCallback((urlString: string) => {
     // Fire-and-forget: external apps / OS handlers.
     Linking.openURL(urlString).catch(() => {
@@ -285,12 +331,15 @@ export function WrappedWebView({
     if (isReloadingRef.current) return;
     if (triggeredRef.current) return;
     triggeredRef.current = true;
+    reloadTriggeredByUserRef.current = true;
+    setForceShow(false);
     setIsReloading(true);
     webRef.current?.reload();
   }, []);
 
   const isOnboarding = useMemo(() => {
     if (containerType === "native_onboarding") return true;
+    if (isOnboardingFromWeb) return true;
     if (!currentUrl) return false;
     try {
       const { pathname } = new URL(currentUrl);
@@ -298,7 +347,36 @@ export function WrappedWebView({
     } catch {
       return false;
     }
-  }, [containerType, currentUrl]);
+  }, [containerType, currentUrl, isOnboardingFromWeb]);
+
+  const fabVisible = useMemo(() => {
+    if (forceShow) return true;
+    if (isOnboarding) return false;
+    if (isModalOpen) return false;
+    if (isKeyboardOpen) return false;
+    if (isScrollingDown) return false;
+    if (hideAfterReloadUntil > 0 && Date.now() < hideAfterReloadUntil) return false;
+    return true;
+  }, [
+    forceShow,
+    isOnboarding,
+    isModalOpen,
+    isKeyboardOpen,
+    isScrollingDown,
+    hideAfterReloadUntil,
+  ]);
+
+  useEffect(() => {
+    if (fabVisible) {
+      Animated.timing(fabFadeAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      fabFadeAnim.setValue(0);
+    }
+  }, [fabVisible, fabFadeAnim]);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: ShouldStartLoadRequest) => {
@@ -419,15 +497,38 @@ export function WrappedWebView({
             setLoadHttpStatus(undefined);
             setLoadIsOfflineHint(false);
             setIsLoading(true);
+            loadStartTimeRef.current = Date.now();
+            if (loadTimeoutRef.current) {
+              clearTimeout(loadTimeoutRef.current);
+              loadTimeoutRef.current = null;
+            }
+            loadTimeoutRef.current = setTimeout(() => {
+              loadTimeoutRef.current = null;
+              setForceShow(true);
+            }, 10000);
           }}
           onLoadEnd={() => {
+            if (loadTimeoutRef.current) {
+              clearTimeout(loadTimeoutRef.current);
+              loadTimeoutRef.current = null;
+            }
             setIsLoading(false);
             setIsReloading(false);
             clearGesture();
+            setHideAfterReloadUntil(Date.now() + 5000);
+            if (reloadTriggeredByUserRef.current) {
+              reloadTriggeredByUserRef.current = false;
+              setForceShow(false);
+            }
             // Proactively send session after load so web can bootstrap without showing login.
             sendNativeSession("web_load_end");
           }}
           onError={(e) => {
+            if (loadTimeoutRef.current) {
+              clearTimeout(loadTimeoutRef.current);
+              loadTimeoutRef.current = null;
+            }
+            setForceShow(true);
             const desc = String(e?.nativeEvent?.description ?? "Unknown error");
             const lower = desc.toLowerCase();
             const offlineHint =
@@ -444,6 +545,11 @@ export function WrappedWebView({
             clearGesture();
           }}
           onHttpError={(e) => {
+            if (loadTimeoutRef.current) {
+              clearTimeout(loadTimeoutRef.current);
+              loadTimeoutRef.current = null;
+            }
+            setForceShow(true);
             const status = e?.nativeEvent?.statusCode;
             setLoadHttpStatus(typeof status === "number" ? status : undefined);
             setLoadError(`HTTP error${typeof status === "number" ? ` (${status})` : ""}`);
@@ -452,6 +558,14 @@ export function WrappedWebView({
             setIsReloading(false);
             clearGesture();
           }}
+          onRenderProcessGone={
+            Platform.OS === "android"
+              ? () => {
+                  setForceShow(true);
+                  return true;
+                }
+              : undefined
+          }
           javaScriptEnabled
           domStorageEnabled
           sharedCookiesEnabled
@@ -486,7 +600,7 @@ export function WrappedWebView({
           </View>
         ) : null}
 
-        {!isOnboarding && (
+        {fabVisible && (
           <Animated.View
             pointerEvents="none"
             style={[
@@ -532,24 +646,28 @@ export function WrappedWebView({
           </Animated.View>
         )}
 
-        {!isOnboarding && (
-          <View
+        {fabVisible && (
+          <Animated.View
+            style={{ opacity: fabFadeAnim }}
             accessibilityRole="button"
             accessibilityLabel={t("common.refresh")}
             accessibilityHint={t("native.refresh_fab_hint")}
-            style={[
-              styles.fab,
-              {
-                bottom: insets.bottom + 56,
-                right: spacing.lg,
-                backgroundColor: isReloading
-                  ? `${theme.surface}B3`
-                  : isArmed
-                    ? theme.surface
-                    : `${theme.surface}4D`,
-              },
-              isArmed && styles.fabArmed,
-            ]}
+            pointerEvents="box-none"
+          >
+            <View
+              style={[
+                styles.fab,
+                {
+                  bottom: insets.bottom + 56,
+                  right: spacing.lg,
+                  backgroundColor: isReloading
+                    ? `${theme.surface}B3`
+                    : isArmed
+                      ? theme.surface
+                      : `${theme.surface}4D`,
+                },
+                isArmed && styles.fabArmed,
+              ]}
             onStartShouldSetResponder={() => true}
             onMoveShouldSetResponder={() => true}
             onResponderGrant={(e) => {
@@ -577,7 +695,8 @@ export function WrappedWebView({
             ) : (
               <Ionicons name="refresh" size={12} color={theme.text} />
             )}
-          </View>
+            </View>
+          </Animated.View>
         )}
       </View>
     </SafeAreaView>
