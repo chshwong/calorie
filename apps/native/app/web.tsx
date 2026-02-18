@@ -6,12 +6,13 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   BackHandler,
   Linking,
   Platform,
-  Pressable,
   StatusBar,
   StyleSheet,
+  Text,
   useColorScheme,
   View,
 } from "react-native";
@@ -84,6 +85,29 @@ export function WrappedWebView({
   const [lastNavUrl, setLastNavUrl] = useState<string | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   const [isReloading, setIsReloading] = useState(false);
+  const [isArmed, setIsArmed] = useState(false);
+  const [pullProgress, setPullProgress] = useState(0);
+
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startYRef = useRef<number | null>(null);
+  const triggeredRef = useRef(false);
+  const isReloadingRef = useRef(false);
+  const isArmedRef = useRef(false);
+  isReloadingRef.current = isReloading;
+  isArmedRef.current = isArmed;
+
+  const HOLD_MS = 0;
+  const PULL_THRESHOLD = 50;
+
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(overlayAnim, {
+      toValue: isArmed && !isReloading ? 1 : 0,
+      duration: isArmed ? 160 : 120,
+      useNativeDriver: true,
+    }).start();
+  }, [isArmed, isReloading, overlayAnim]);
 
   const StatusBarChrome = useMemo(() => {
     return (
@@ -244,7 +268,21 @@ export function WrappedWebView({
     });
   }, []);
 
-  const onReloadPress = useCallback(() => {
+  const clearGesture = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setIsArmed(false);
+    setPullProgress(0);
+    startYRef.current = null;
+    triggeredRef.current = false;
+  }, []);
+
+  const triggerReload = useCallback(() => {
+    if (isReloadingRef.current) return;
+    if (triggeredRef.current) return;
+    triggeredRef.current = true;
     setIsReloading(true);
     webRef.current?.reload();
   }, []);
@@ -383,6 +421,7 @@ export function WrappedWebView({
           onLoadEnd={() => {
             setIsLoading(false);
             setIsReloading(false);
+            clearGesture();
             // Proactively send session after load so web can bootstrap without showing login.
             sendNativeSession("web_load_end");
           }}
@@ -400,6 +439,7 @@ export function WrappedWebView({
             setLoadHttpStatus(undefined);
             setIsLoading(false);
             setIsReloading(false);
+            clearGesture();
           }}
           onHttpError={(e) => {
             const status = e?.nativeEvent?.statusCode;
@@ -408,6 +448,7 @@ export function WrappedWebView({
             setLoadIsOfflineHint(false);
             setIsLoading(false);
             setIsReloading(false);
+            clearGesture();
           }}
           javaScriptEnabled
           domStorageEnabled
@@ -441,26 +482,69 @@ export function WrappedWebView({
         ) : null}
 
         {!isOnboarding && (
-          <Pressable
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.pullOverlay,
+              {
+                right: 16,
+                bottom: insets.bottom + 56 + 72,
+                opacity: overlayAnim,
+                transform: [
+                  { scale: overlayAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.pullOverlayCard}>
+              <Text style={styles.pullOverlayText}>Pull up to refresh</Text>
+              <View style={styles.pullProgressTrack}>
+                <View style={[styles.pullProgressBar, { width: `${pullProgress * 100}%` }]} />
+              </View>
+            </View>
+            <View style={styles.pullOverlayTail} />
+          </Animated.View>
+        )}
+
+        {!isOnboarding && (
+          <View
             accessibilityRole="button"
             accessibilityLabel="Refresh"
-            accessibilityHint="Reloads the current screen"
-            onPress={onReloadPress}
-            disabled={isReloading}
-            style={({ pressed }) => [
+            accessibilityHint="Hold then pull up to refresh"
+            style={[
               styles.fab,
               { bottom: insets.bottom + 56, right: 16 },
-              pressed && styles.fabPressed,
               isReloading && styles.fabDisabled,
+              isArmed && styles.fabArmed,
             ]}
-            hitSlop={12}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(e) => {
+              startYRef.current = e.nativeEvent.pageY;
+              holdTimerRef.current = setTimeout(() => {
+                holdTimerRef.current = null;
+                if (!isReloadingRef.current) {
+                  setIsArmed(true);
+                  setPullProgress(0);
+                }
+              }, HOLD_MS);
+            }}
+            onResponderMove={(e) => {
+              if (!isArmedRef.current || isReloadingRef.current || startYRef.current == null) return;
+              const dy = startYRef.current - e.nativeEvent.pageY;
+              const clamped = Math.max(0, Math.min(dy, PULL_THRESHOLD));
+              setPullProgress(clamped / PULL_THRESHOLD);
+              if (dy >= PULL_THRESHOLD) triggerReload();
+            }}
+            onResponderRelease={clearGesture}
+            onResponderTerminate={clearGesture}
           >
             {isReloading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Ionicons name="refresh" size={12} color="#fff" />
             )}
-          </Pressable>
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -641,11 +725,53 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  fabPressed: {
-    opacity: 0.8,
+  fabArmed: {
+    opacity: 1,
+    transform: [{ scale: 1.05 }],
   },
   fabDisabled: {
     opacity: 0.6,
+  },
+  pullOverlay: {
+    position: "absolute",
+    alignItems: "flex-end",
+    zIndex: 10,
+    elevation: 10,
+  },
+  pullOverlayCard: {
+    backgroundColor: "rgba(0,0,0,0.28)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 180,
+  },
+  pullOverlayText: {
+    color: "#fff",
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  pullOverlayTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 10,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "rgba(0,0,0,0.28)",
+    alignSelf: "center",
+    marginTop: -1,
+  },
+  pullProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    overflow: "hidden",
+  },
+  pullProgressBar: {
+    height: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 2,
   },
 });
 
