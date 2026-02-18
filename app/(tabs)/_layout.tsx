@@ -29,6 +29,7 @@ import { getLocalDateString } from '@/utils/calculations';
 import { getTodayKey } from '@/utils/dateTime';
 import { MODULE_CONFIGS } from '@/utils/moduleConfigs';
 import type { FocusModule } from '@/utils/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 function TabLayoutContent() {
   const colorScheme = useColorScheme();
@@ -41,6 +42,7 @@ function TabLayoutContent() {
   const bigCircleColors = getBigCircleMenuColors(themeKey);
   const router = useRouter();
   const segments = useSegments();
+  const queryClient = useQueryClient();
   const { user, profile: authProfile, loading: authLoading } = useAuth();
   const { isQuickAddVisible, setQuickAddVisible } = useQuickAdd();
   const [isMoreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -101,6 +103,11 @@ function TabLayoutContent() {
       } catch {
         return;
       }
+
+      if (msg?.type === 'SOFT_RELOAD') {
+        queryClient.invalidateQueries();
+        return;
+      }
       if (msg?.type !== 'NATIVE_PRE_EXIT_BACK') return;
 
       const todayKey = getTodayKey();
@@ -142,7 +149,7 @@ function TabLayoutContent() {
         document.removeEventListener('message', handleMessage);
       }
     };
-  }, [router]);
+  }, [queryClient, router]);
 
   
   // Compute the remaining module

@@ -3,7 +3,18 @@ import { router, useLocalSearchParams } from "expo-router";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, BackHandler, Linking, Platform, StatusBar, StyleSheet, useColorScheme, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Linking,
+  Platform,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  useColorScheme,
+  View,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { WebViewNavigation } from "react-native-webview";
 import { WebView } from "react-native-webview";
@@ -17,6 +28,7 @@ import {
   isSameOrigin,
   WEB_BASE_URL,
 } from "@/lib/webWrapper/webConfig";
+import { Ionicons } from "@expo/vector-icons";
 
 function coercePathParam(input: unknown): string {
   const value = Array.isArray(input) ? input[0] : input;
@@ -70,6 +82,8 @@ export function WrappedWebView({
   const backgroundColor = isDark ? "#000000" : "#ffffff";
   const safeAreaEdges = ["top"] as const;
   const [lastNavUrl, setLastNavUrl] = useState<string | null>(null);
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
 
   const StatusBarChrome = useMemo(() => {
     return (
@@ -230,6 +244,22 @@ export function WrappedWebView({
     });
   }, []);
 
+  const onReloadPress = useCallback(() => {
+    setIsReloading(true);
+    webRef.current?.reload();
+  }, []);
+
+  const isOnboarding = useMemo(() => {
+    if (containerType === "native_onboarding") return true;
+    if (!currentUrl) return false;
+    try {
+      const { pathname } = new URL(currentUrl);
+      return pathname.startsWith("/onboarding");
+    } catch {
+      return false;
+    }
+  }, [containerType, currentUrl]);
+
   const handleShouldStartLoadWithRequest = useCallback(
     (request: ShouldStartLoadRequest) => {
       const urlString = request.url ?? "";
@@ -334,6 +364,7 @@ export function WrappedWebView({
             onWebNavigationStateChange?.(navState);
             const nextUrl = String(navState?.url ?? "");
             setLastNavUrl(nextUrl || null);
+            setCurrentUrl(navState?.url ?? null);
             // Android WebView can occasionally miss `onLoadEnd` for same-origin navigations.
             // Use navigation state's `loading` as an additional signal to clear the overlay spinner.
             if (navState && navState.loading === false) {
@@ -351,6 +382,7 @@ export function WrappedWebView({
           }}
           onLoadEnd={() => {
             setIsLoading(false);
+            setIsReloading(false);
             // Proactively send session after load so web can bootstrap without showing login.
             sendNativeSession("web_load_end");
           }}
@@ -367,6 +399,7 @@ export function WrappedWebView({
             setLoadError(desc);
             setLoadHttpStatus(undefined);
             setIsLoading(false);
+            setIsReloading(false);
           }}
           onHttpError={(e) => {
             const status = e?.nativeEvent?.statusCode;
@@ -374,6 +407,7 @@ export function WrappedWebView({
             setLoadError(`HTTP error${typeof status === "number" ? ` (${status})` : ""}`);
             setLoadIsOfflineHint(false);
             setIsLoading(false);
+            setIsReloading(false);
           }}
           javaScriptEnabled
           domStorageEnabled
@@ -405,6 +439,29 @@ export function WrappedWebView({
             <ActivityIndicator />
           </View>
         ) : null}
+
+        {!isOnboarding && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Refresh"
+            accessibilityHint="Reloads the current screen"
+            onPress={onReloadPress}
+            disabled={isReloading}
+            style={({ pressed }) => [
+              styles.fab,
+              { bottom: insets.bottom + 56, right: 16 },
+              pressed && styles.fabPressed,
+              isReloading && styles.fabDisabled,
+            ]}
+            hitSlop={12}
+          >
+            {isReloading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="refresh" size={12} color="#fff" />
+            )}
+          </Pressable>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -574,6 +631,21 @@ const styles = StyleSheet.create({
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  fab: {
+    position: "absolute",
+    width: 29,
+    height: 29,
+    borderRadius: 14.5,
+    backgroundColor: "rgba(0,0,0,0.125)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fabPressed: {
+    opacity: 0.8,
+  },
+  fabDisabled: {
+    opacity: 0.6,
   },
 });
 
