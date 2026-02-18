@@ -29,6 +29,7 @@ import {
   isSameOrigin,
   WEB_BASE_URL,
 } from "@/lib/webWrapper/webConfig";
+import { colors, fontSizes, fontWeights, opacity, radius, spacing } from "@/theme/tokens";
 import { Ionicons } from "@expo/vector-icons";
 
 function coercePathParam(input: unknown): string {
@@ -80,7 +81,8 @@ export function WrappedWebView({
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const backgroundColor = isDark ? "#000000" : "#ffffff";
+  const theme = colors[isDark ? "dark" : "light"];
+  const { t } = useTranslation();
   const safeAreaEdges = ["top"] as const;
   const [lastNavUrl, setLastNavUrl] = useState<string | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
@@ -115,10 +117,10 @@ export function WrappedWebView({
         hidden={false}
         translucent={false}
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={backgroundColor}
+        backgroundColor={theme.background}
       />
     );
-  }, [backgroundColor, isDark]);
+  }, [theme.background, isDark]);
 
   const requestedPath = useMemo(() => coercePathParam(initialPath), [initialPath]);
 
@@ -360,7 +362,7 @@ export function WrappedWebView({
   // If guards are about to redirect, keep UI minimal.
   if (!authLoading && (!session || !user)) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={safeAreaEdges}>
         {StatusBarChrome}
         <View style={styles.centered}>
           <ActivityIndicator />
@@ -371,7 +373,7 @@ export function WrappedWebView({
 
   if (isBlockedPath(requestedPath, { allowOnboardingPaths })) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={safeAreaEdges}>
         {StatusBarChrome}
         <View style={styles.centered}>
           <ActivityIndicator />
@@ -388,7 +390,7 @@ export function WrappedWebView({
       : ({} as const);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={safeAreaEdges}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={safeAreaEdges}>
       {StatusBarChrome}
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
         <WebView
@@ -457,7 +459,7 @@ export function WrappedWebView({
         />
 
         {loadError ? (
-          <View style={[styles.errorOverlay, { backgroundColor }]}>
+          <View style={[styles.errorOverlay, { backgroundColor: theme.background }]}>
             <FriendlyErrorScreen
               error={{
                 message: loadError,
@@ -476,7 +478,10 @@ export function WrappedWebView({
             />
           </View>
         ) : isLoading ? (
-          <View pointerEvents="none" style={styles.loadingOverlay}>
+          <View
+            pointerEvents="none"
+            style={[styles.loadingOverlay, { backgroundColor: theme.background, opacity: opacity.subtle * 0.16 }]}
+          >
             <ActivityIndicator />
           </View>
         ) : null}
@@ -487,7 +492,7 @@ export function WrappedWebView({
             style={[
               styles.pullOverlay,
               {
-                right: 16,
+                right: spacing.lg,
                 bottom: insets.bottom + 56 + 72,
                 opacity: overlayAnim,
                 transform: [
@@ -496,25 +501,53 @@ export function WrappedWebView({
               },
             ]}
           >
-            <View style={styles.pullOverlayCard}>
-              <Text style={styles.pullOverlayText}>Pull up to refresh</Text>
-              <View style={styles.pullProgressTrack}>
-                <View style={[styles.pullProgressBar, { width: `${pullProgress * 100}%` }]} />
+            <View
+              style={[
+                styles.pullOverlayCard,
+                {
+                  backgroundColor: isDark ? `${theme.surface}66` : `${theme.surface}80`,
+                },
+              ]}
+            >
+              <Text style={[styles.pullOverlayText, { color: theme.text }]}>
+                {t("native.refresh_tooltip")}
+              </Text>
+              <View style={[styles.pullProgressTrack, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.pullProgressBar,
+                    { width: `${pullProgress * 100}%`, backgroundColor: theme.text },
+                  ]}
+                />
               </View>
             </View>
-            <View style={styles.pullOverlayTail} />
+            <View
+              style={[
+                styles.pullOverlayTail,
+                {
+                  borderTopColor: isDark ? `${theme.surface}66` : `${theme.surface}80`,
+                },
+              ]}
+            />
           </Animated.View>
         )}
 
         {!isOnboarding && (
           <View
             accessibilityRole="button"
-            accessibilityLabel="Refresh"
-            accessibilityHint="Hold then pull up to refresh"
+            accessibilityLabel={t("common.refresh")}
+            accessibilityHint={t("native.refresh_fab_hint")}
             style={[
               styles.fab,
-              { bottom: insets.bottom + 56, right: 16 },
-              isReloading && styles.fabDisabled,
+              {
+                bottom: insets.bottom + 56,
+                right: spacing.lg,
+                backgroundColor: isReloading
+                  ? `${theme.surface}B3`
+                  : isArmed
+                    ? theme.surface
+                    : `${theme.surface}4D`,
+              },
               isArmed && styles.fabArmed,
             ]}
             onStartShouldSetResponder={() => true}
@@ -540,9 +573,9 @@ export function WrappedWebView({
             onResponderTerminate={clearGesture}
           >
             {isReloading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={theme.text} />
             ) : (
-              <Ionicons name="refresh" size={12} color="#fff" />
+              <Ionicons name="refresh" size={12} color={theme.text} />
             )}
           </View>
         )}
@@ -711,7 +744,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.08)",
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -721,16 +753,15 @@ const styles = StyleSheet.create({
     width: 29,
     height: 29,
     borderRadius: 14.5,
-    backgroundColor: "rgba(0,0,0,0.125)",
     alignItems: "center",
     justifyContent: "center",
   },
   fabArmed: {
-    opacity: 1,
+    opacity: opacity.full,
     transform: [{ scale: 1.05 }],
   },
   fabDisabled: {
-    opacity: 0.6,
+    opacity: opacity.muted,
   },
   pullOverlay: {
     position: "absolute",
@@ -739,39 +770,35 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   pullOverlayCard: {
-    backgroundColor: "rgba(0,0,0,0.28)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
     minWidth: 180,
   },
   pullOverlayText: {
-    color: "#fff",
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: fontSizes.body,
+    fontWeight: fontWeights.semibold,
+    marginBottom: spacing.sm,
   },
   pullOverlayTail: {
     width: 0,
     height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 10,
+    borderLeftWidth: spacing.md,
+    borderRightWidth: spacing.md,
+    borderTopWidth: spacing.md,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderTopColor: "rgba(0,0,0,0.28)",
     alignSelf: "center",
     marginTop: -1,
   },
   pullProgressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    height: spacing.xs,
+    borderRadius: radius.pill,
     overflow: "hidden",
   },
   pullProgressBar: {
     height: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 2,
+    borderRadius: radius.pill,
   },
 });
 

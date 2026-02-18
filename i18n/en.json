@@ -57,7 +57,9 @@
       "title": "Exit tour guide?",
       "body": "You can restart the tour anytime from the 💡 icon.",
       "confirm": "Exit"
-    }
+    },
+    "refresh_tooltip": "Pull ↑ to refresh",
+    "refresh_fab_hint": "Hold then pull up to refresh"
   },
   "wearable_sync_label": "⌚ Sync",
   "wearable_syncing_label": "⏳ Syncing…",
