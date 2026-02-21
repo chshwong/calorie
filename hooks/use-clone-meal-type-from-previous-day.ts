@@ -10,12 +10,13 @@
  * - Query invalidation handled automatically
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { cloneDayEntries } from '@/lib/services/cloneDayEntries';
-import { getLocalDateKey } from '@/utils/dateTime';
 import { getMealtypeMetaByDate, upsertMealtypeMeta } from '@/lib/services/calories-entries-mealtype-meta';
+import { cloneDayEntries } from '@/lib/services/cloneDayEntries';
 import { invalidateDailySumConsumedRangesForDate } from '@/lib/services/consumed/invalidateDailySumConsumedRanges';
+import { getLocalDateKey } from '@/utils/dateTime';
+import type { CalorieEntry, DailyEntriesWithStatus } from '@/utils/types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 export interface CloneMealTypeFromPreviousDayResult {
   entriesCloned: number;
@@ -75,9 +76,13 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       const targetDate = getLocalDateKey(currentDate);
 
       // Check cache first - check for entries, quick log, or notes
+      // Entries cache can be DailyEntriesWithStatus { entries } or CalorieEntry[] (normalize like index.tsx)
       const sourceQueryKey = ['entries', userId, sourceDate];
-      const cachedData = queryClient.getQueryData<any[]>(sourceQueryKey);
-      
+      const cachedData = queryClient.getQueryData<DailyEntriesWithStatus | CalorieEntry[]>(sourceQueryKey);
+      const cachedEntries = Array.isArray(cachedData)
+        ? cachedData
+        : cachedData?.entries ?? null;
+
       // Also check for mealtype meta
       const sourceMetaQueryKey = ['mealtypeMeta', userId, sourceDate];
       const cachedMeta = queryClient.getQueryData<any[]>(sourceMetaQueryKey);
@@ -86,19 +91,17 @@ export function useCloneMealTypeFromPreviousDay(options: CloneMealTypeFromPrevio
       let hasEntries = false;
       let hasNotes = false;
       
-      // Check entries
-      if (cachedData !== undefined) {
-        if (cachedData !== null && cachedData.length > 0) {
-          const mealTypeEntries = cachedData.filter(entry => 
-            entry.meal_type?.toLowerCase() === mealType.toLowerCase()
-          );
-          hasEntries = mealTypeEntries.length > 0;
-        }
+      // Check entries (using normalized array)
+      if (cachedEntries !== null && cachedEntries.length > 0) {
+        const mealTypeEntries = cachedEntries.filter((entry: CalorieEntry) =>
+          entry.meal_type?.toLowerCase() === mealType.toLowerCase()
+        );
+        hasEntries = mealTypeEntries.length > 0;
       }
       
       // Check notes from meta
       if (cachedMeta !== undefined && cachedMeta !== null) {
-        const mealTypeMeta = cachedMeta.find(meta => 
+        const mealTypeMeta = cachedMeta.find(meta =>
           meta.meal_type?.toLowerCase() === mealType.toLowerCase()
         );
         if (mealTypeMeta) {
