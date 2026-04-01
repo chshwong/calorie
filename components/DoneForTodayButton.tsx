@@ -68,6 +68,40 @@ type FrozenModalRender = {
   cancelText: string;
 };
 
+const AI_INSIGHT_URL = 'https://bnntatjspjtaxusruggl.supabase.co/functions/v1/clever-task';
+
+type AiInsightPayload = {
+  calories: number;
+  targetCalories: number;
+  protein: number;
+  targetProtein: number;
+  fiber: number;
+  targetFiber: number;
+};
+
+async function fetchAiInsight(payload: AiInsightPayload, fallbackText: string): Promise<string> {
+  try {
+    const response = await fetch(AI_INSIGHT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        calories: payload.calories,
+        target_calories: payload.targetCalories,
+        protein: payload.protein,
+        target_protein: payload.targetProtein,
+        fiber: payload.fiber,
+        target_fiber: payload.targetFiber,
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+    const insight = typeof data?.insight === 'string' ? data.insight.trim() : '';
+    return insight || fallbackText;
+  } catch {
+    return fallbackText;
+  }
+}
+
 function normalizeStatus(input: string | null | undefined): DailyLogStatus {
   if (input === 'completed' || input === 'fasted' || input === 'unknown' || input === 'reopened') return input;
   return 'unknown';
@@ -106,12 +140,14 @@ export function DoneForTodayButton({
 
   const setStatusMutation = useSetDailyConsumedStatus();
 
-  const { show, props: confettiProps } = useConfettiToastMessage();
+  const { show, setAiInsightText, props: confettiProps } = useConfettiToastMessage();
 
   const [modal, setModal] = useState<ModalState>('none');
   const [frozenModalRender, setFrozenModalRender] = useState<FrozenModalRender | null>(null);
   const [isDismissing, setIsDismissing] = useState(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiInsightSessionRef = useRef(0);
+  const confettiVisibleRef = useRef(false);
 
   const isUnknown = logStatus === 'unknown';
   const isCompleted = logStatus === 'completed';
@@ -221,13 +257,38 @@ export function DoneForTodayButton({
             message += `\n\n${formatWeeklyLossProjection(deficit, weightUnit, t)}`;
           }
 
-          const title = next === 'completed' ? '✅ Day Complete' : '✅ Fasted Day';
+          const title =
+            next === 'completed'
+              ? t('home.done_for_today.success_title_completed', { defaultValue: '✅ Day Complete' })
+              : t('home.done_for_today.success_title_fasted', { defaultValue: '✅ Fasted Day' });
+          const sessionId = aiInsightSessionRef.current + 1;
+          aiInsightSessionRef.current = sessionId;
           show({
             title,
             message,
-            confirmText: 'Got it',
+            confirmText: t('common.got_it', { defaultValue: 'Got it' }),
             withConfetti: true,
+            aiInsight: null,
           });
+
+          // Non-blocking insight fetch; stale responses are ignored.
+          void (async () => {
+            const fallbackInsight = t('home.done_for_today.ai_insight_fallback', {
+              defaultValue: 'Nice work today. Keep building consistency tomorrow.',
+            });
+            const insight = await fetchAiInsight({
+              calories: eaten,
+              targetCalories,
+              protein: Number(todayRow?.protein_g ?? 0),
+              targetProtein: Number(userConfig?.protein_g_min ?? 0),
+              fiber: Number(todayRow?.fibre_g ?? 0),
+              targetFiber: Number(userConfig?.fiber_g_min ?? 0),
+            }, fallbackInsight);
+
+            if (aiInsightSessionRef.current !== sessionId) return;
+            if (!confettiVisibleRef.current) return;
+            setAiInsightText(insight);
+          })();
         }
 
         // Keep existing toast messages (optional)
@@ -446,6 +507,13 @@ export function DoneForTodayButton({
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    confettiVisibleRef.current = confettiProps.visible;
+    if (!confettiProps.visible) {
+      aiInsightSessionRef.current += 1;
+    }
+  }, [confettiProps.visible]);
 
   const freezeForDismiss = () => {
     if (isDismissing) return false;

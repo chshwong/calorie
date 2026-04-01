@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
 import type { ConfettiCelebrationModalProps } from '@/components/ConfettiCelebrationModal';
+import { useCallback, useState } from 'react';
 
 type ShowOptions = {
   title: string;
   message: string;
   confirmText?: string;
   withConfetti?: boolean;
+  aiInsight?: string | null;
 };
 
 export function useConfettiToastMessage() {
@@ -14,6 +15,7 @@ export function useConfettiToastMessage() {
   const [message, setMessage] = useState('');
   const [confirmText, setConfirmText] = useState('Got it');
   const [withConfetti, setWithConfetti] = useState(true);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
 
   const show = useCallback((options: ShowOptions) => {
     // #region agent log
@@ -37,6 +39,7 @@ export function useConfettiToastMessage() {
     setMessage(options.message);
     setConfirmText(options.confirmText ?? 'Got it');
     setWithConfetti(options.withConfetti ?? true);
+    setAiInsight(options.aiInsight ?? null);
     setVisible(true);
   }, []);
 
@@ -62,8 +65,13 @@ export function useConfettiToastMessage() {
     setTimeout(() => {
       setTitle('');
       setMessage('');
+      setAiInsight(null);
     }, 250);
   }, [visible]);
+
+  const setAiInsightText = useCallback((text: string) => {
+    setAiInsight(text);
+  }, []);
 
   const props: ConfettiCelebrationModalProps = {
     visible,
@@ -71,8 +79,9 @@ export function useConfettiToastMessage() {
     message,
     confirmText,
     withConfetti,
+    aiInsight,
     onConfirm,
   };
 
-  return { show, props };
+  return { show, setAiInsightText, props };
 }

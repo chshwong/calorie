@@ -1,6 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import { Platform, useWindowDimensions, StyleSheet, View, Modal } from 'react-native';
+import { ThemedText } from '@/components/themed-text';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { BorderRadius, Colors, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { avoConfetti } from '@/lib/avoConfetti';
+import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 // Conditional import for confetti (native only)
 let ConfettiCannon: any = null;
@@ -18,6 +23,7 @@ export type ConfettiCelebrationModalProps = {
   message: string;
   confirmText?: string;
   withConfetti?: boolean;
+  aiInsight?: string | null;
   onConfirm: () => void;
 };
 
@@ -27,9 +33,13 @@ export function ConfettiCelebrationModal({
   message,
   confirmText = 'Got it',
   withConfetti = true,
+  aiInsight = null,
   onConfirm,
 }: ConfettiCelebrationModalProps) {
+  const { t } = useTranslation();
   const { width: screenWidth } = useWindowDimensions();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const confettiRef = useRef<any>(null);
 
   // Trigger confetti when modal opens
@@ -48,14 +58,16 @@ export function ConfettiCelebrationModal({
             const confettiModule = await import('canvas-confetti');
             const confettiFn = confettiModule.default || confettiModule;
             if (typeof confettiFn === 'function') {
-              // Web confetti: 2-3 small bursts over ~600ms
-              confettiFn({ particleCount: 80, spread: 60, origin: { y: 0.35 } });
-              setTimeout(() => {
-                confettiFn({ particleCount: 50, spread: 80, origin: { y: 0.35 } });
-              }, 200);
-              setTimeout(() => {
-                confettiFn({ particleCount: 40, spread: 100, origin: { y: 0.35 } });
-              }, 450);
+              // Web confetti: 2-3 small bursts over ~600ms (unchanged visuals)
+              avoConfetti(() => {
+                confettiFn({ particleCount: 80, spread: 60, origin: { y: 0.35 } });
+                setTimeout(() => {
+                  confettiFn({ particleCount: 50, spread: 80, origin: { y: 0.35 } });
+                }, 200);
+                setTimeout(() => {
+                  confettiFn({ particleCount: 40, spread: 100, origin: { y: 0.35 } });
+                }, 450);
+              });
             }
           } catch (e) {
             // canvas-confetti not available, skip confetti
@@ -72,7 +84,27 @@ export function ConfettiCelebrationModal({
       <ConfirmModal
         visible={visible}
         title={title}
-        message={message}
+        message={
+          <View>
+            <ThemedText style={[styles.messageText, { color: colors.text }]}>{message}</ThemedText>
+            {aiInsight ? (
+              <View
+                style={[
+                  styles.insightCard,
+                  {
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <ThemedText style={[styles.insightTitle, { color: colors.textSecondary }]}>
+                  {t('home.done_for_today.ai_insight_title', { defaultValue: 'Avo Insight' })}
+                </ThemedText>
+                <ThemedText style={[styles.insightBody, { color: colors.text }]}>{aiInsight}</ThemedText>
+              </View>
+            ) : null}
+          </View>
+        }
         confirmText={confirmText}
         cancelText={null}
         onConfirm={onConfirm}
@@ -99,6 +131,21 @@ export function ConfettiCelebrationModal({
 }
 
 const styles = StyleSheet.create({
+  messageText: {
+    textAlign: 'center',
+  },
+  insightCard: {
+    marginTop: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  insightTitle: {
+    fontWeight: '700',
+    marginBottom: Spacing.xs,
+  },
+  insightBody: {},
   confettiContainer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10000,

@@ -311,7 +311,11 @@
       "toast_unknown": "Reopened today.",
       "toast_error": "Could not update today. Try again.",
       "confirm_title_for_date": "Done for {{date}}?",
-      "weekly_loss_projection": "Days like today ≈ {{amount}} {{unit}} per week."
+      "weekly_loss_projection": "Days like today ≈ {{amount}} {{unit}} per week.",
+      "success_title_completed": "✅ Day Complete",
+      "success_title_fasted": "✅ Fasted Day",
+      "ai_insight_title": "Avo Insight",
+      "ai_insight_fallback": "Nice work today. Keep building consistency tomorrow."
     },
     "accessibility": {
       "log_food_hint": "Double tap to add or edit food entries for {{mealType}}",
@@ -420,6 +424,32 @@
         "missing_activity_calories": "Fitbit data is missing total calories burned for that day.",
         "reconnect_required": "Reconnect Fitbit to sync."
       }
+    },
+    "sync_provider": {
+      "label": "Sync provider",
+      "fitbit": "Fitbit",
+      "health_connect": "Android Health Connect",
+      "apple_health": "Apple Health",
+      "toggles_apply_note": "Toggles apply to the active provider.",
+      "health_connect_web_note": "Your active provider is Health Connect (Android-only). Open the Android app to sync, or switch to Fitbit here.",
+      "switch_to_fitbit": "Switch to Fitbit",
+      "health_connect_android_only": "Health Connect is available in the Android app."
+    },
+    "health_connect": {
+      "card_title": "Health Connect",
+      "status_connected": "Connected",
+      "status_not_connected": "Not connected",
+      "status_install": "Install or enable Health Connect",
+      "status_manage": "Open Health Connect to manage permissions",
+      "status_tap_connect": "Tap Connect to grant permissions. You'll see a Health Connect permission screen.",
+      "status_update_required": "Health Connect update required",
+      "connect": "Connect",
+      "manage_permissions": "Manage permissions",
+      "sync_now": "Sync now",
+      "install_required": "Install/enable Health Connect",
+      "opening_store": "Opening Play Store…",
+      "opening_permissions": "Opening Health Connect…",
+      "sync_helper": "Sync uses Health Connect data when enabled."
     },
     "burn_correction": {
       "title": "Burn correction",
