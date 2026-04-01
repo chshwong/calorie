@@ -96,8 +96,17 @@ async function fetchAiInsight(payload: AiInsightPayload, fallbackText: string): 
 
     const data = await response.json().catch(() => null);
     const insight = typeof data?.insight === 'string' ? data.insight.trim() : '';
+    if (!insight && __DEV__) {
+      console.log('[AvoInsight] fetchAiInsight: empty insight in response, using fallback', {
+        ok: response.ok,
+        status: response.status,
+      });
+    }
     return insight || fallbackText;
-  } catch {
+  } catch (e) {
+    if (__DEV__) {
+      console.log('[AvoInsight] fetchAiInsight: catch, using fallback', e);
+    }
     return fallbackText;
   }
 }
@@ -147,7 +156,6 @@ export function DoneForTodayButton({
   const [isDismissing, setIsDismissing] = useState(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiInsightSessionRef = useRef(0);
-  const confettiVisibleRef = useRef(false);
 
   const isUnknown = logStatus === 'unknown';
   const isCompleted = logStatus === 'completed';
@@ -261,33 +269,62 @@ export function DoneForTodayButton({
             next === 'completed'
               ? t('home.done_for_today.success_title_completed', { defaultValue: '✅ Day Complete' })
               : t('home.done_for_today.success_title_fasted', { defaultValue: '✅ Fasted Day' });
+          const fallbackInsight = t('home.done_for_today.ai_insight_fallback', {
+            defaultValue: 'Nice work today. Keep building consistency tomorrow.',
+          });
           const sessionId = aiInsightSessionRef.current + 1;
           aiInsightSessionRef.current = sessionId;
+
+          if (__DEV__) {
+            console.log('[AvoInsight] Call it a Day success → show celebration', { sessionId, prevStatus, next });
+          }
+
+          // Seed fallback immediately so the Avo Insight block is visible before/without waiting on fetch.
+          // (Do not rely on confettiVisibleRef: in production a fast fetch can finish before useEffect runs.)
           show({
             title,
             message,
             confirmText: t('common.got_it', { defaultValue: 'Got it' }),
             withConfetti: true,
-            aiInsight: null,
+            aiInsight: fallbackInsight,
           });
 
-          // Non-blocking insight fetch; stale responses are ignored.
+          // Non-blocking insight fetch; stale responses are ignored via sessionId only.
           void (async () => {
-            const fallbackInsight = t('home.done_for_today.ai_insight_fallback', {
-              defaultValue: 'Nice work today. Keep building consistency tomorrow.',
-            });
-            const insight = await fetchAiInsight({
-              calories: eaten,
-              targetCalories,
-              protein: Number(todayRow?.protein_g ?? 0),
-              targetProtein: Number(userConfig?.protein_g_min ?? 0),
-              fiber: Number(todayRow?.fibre_g ?? 0),
-              targetFiber: Number(userConfig?.fiber_g_min ?? 0),
-            }, fallbackInsight);
+            if (__DEV__) {
+              console.log('[AvoInsight] fetchAiInsight start', { sessionId });
+            }
+            const insight = await fetchAiInsight(
+              {
+                calories: eaten,
+                targetCalories,
+                protein: Number(todayRow?.protein_g ?? 0),
+                targetProtein: Number(userConfig?.protein_g_min ?? 0),
+                fiber: Number(todayRow?.fibre_g ?? 0),
+                targetFiber: Number(userConfig?.fiber_g_min ?? 0),
+              },
+              fallbackInsight
+            );
 
-            if (aiInsightSessionRef.current !== sessionId) return;
-            if (!confettiVisibleRef.current) return;
+            if (__DEV__) {
+              console.log('[AvoInsight] fetchAiInsight returned', {
+                sessionId,
+                currentSession: aiInsightSessionRef.current,
+                insightLen: insight?.length,
+                sameAsFallback: insight === fallbackInsight,
+              });
+            }
+
+            if (aiInsightSessionRef.current !== sessionId) {
+              if (__DEV__) {
+                console.log('[AvoInsight] skip setAiInsightText (stale session)');
+              }
+              return;
+            }
             setAiInsightText(insight);
+            if (__DEV__) {
+              console.log('[AvoInsight] setAiInsightText applied');
+            }
           })();
         }
 
@@ -508,8 +545,8 @@ export function DoneForTodayButton({
     };
   }, []);
 
+  // Invalidate in-flight insight fetches when the celebration modal closes (session bump).
   useEffect(() => {
-    confettiVisibleRef.current = confettiProps.visible;
     if (!confettiProps.visible) {
       aiInsightSessionRef.current += 1;
     }

@@ -42,6 +42,19 @@ export function ConfettiCelebrationModal({
   const colors = Colors[colorScheme ?? 'light'];
   const confettiRef = useRef<any>(null);
 
+  useEffect(() => {
+    if (__DEV__ && visible) {
+      console.log('[AvoInsight] ConfettiCelebrationModal props', {
+        hasAiInsight: !!aiInsight,
+        aiInsightPreview: aiInsight
+          ? aiInsight.length > 48
+            ? `${aiInsight.slice(0, 48)}…`
+            : aiInsight
+          : null,
+      });
+    }
+  }, [visible, aiInsight]);
+
   // Trigger confetti when modal opens
   useEffect(() => {
     if (visible && withConfetti) {
